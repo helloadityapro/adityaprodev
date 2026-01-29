@@ -147,8 +147,7 @@ service cloud.firestore {
      * @principle Enforces authorization based on denormalized membership data (assignedProjectIds).
      */
     match /projects/{projectId} {
-      allow get: if isAssignedToProject(projectId) || isAdmin();
-      allow list: if isAdmin();
+      allow read: if isAssignedToProject(projectId) || isAdmin();
       allow create: if isAdmin();
       allow update: if isAdmin() && resource != null;
       allow delete: if isAdmin() && resource != null;
