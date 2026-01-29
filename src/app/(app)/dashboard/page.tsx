@@ -23,8 +23,8 @@ const parseCSV = (csvText: string): SiteData[] => {
   const lines = csvText.trim().split('\n');
   if (lines.length < 2) return [];
 
-  // Exclude the header row
-  const dataRows = lines.slice(1);
+  // Exclude the header row and the first 5 data rows
+  const dataRows = lines.slice(6);
   const data: SiteData[] = [];
 
   for (const line of dataRows) {
