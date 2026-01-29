@@ -76,7 +76,7 @@ function UserDisplay({ userId }: { userId: string }) {
 }
 
 
-function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; }) {
+const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; }) {
     return (
       <Table>
         <TableHeader>
@@ -149,7 +149,7 @@ function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect
         </TableBody>
       </Table>
     );
-}
+});
 
 const actionSchema = z.object({
   adminRemarks: z.string().min(1, "Remarks are required to proceed."),
@@ -227,7 +227,7 @@ function PermitDetailsDialog({ permit, open, onOpenChange }: { permit: Permit | 
             <div><Label>Site Name</Label><p>{permit.siteName}</p></div>
             <div><Label>Permit Type</Label><p>{permit.ptwType}</p></div>
             <div className="col-span-2"><Label>Description of Work</Label><p className="whitespace-pre-wrap">{permit.descriptionOfWork}</p></div>
-            <div><Label>Status</Label><StatusBadge status={permit.status} /></div>
+            <div><Label>Status</Label><div><StatusBadge status={permit.status} /></div></div>
             <div><Label>Requested On</Label><p>{permit.requestDate ? new Date(permit.requestDate.toDate()).toLocaleString() : 'N/A'}</p></div>
             <div className="flex items-center gap-2"><Label>Requested By</Label><UserDisplay userId={permit.siteEngineerId} /></div>
              {permit.supervisorId && <div className="flex items-center gap-2"><Label>Reviewed By (Supervisor)</Label><UserDisplay userId={permit.supervisorId} /></div>}
@@ -296,18 +296,22 @@ export default function PtwListPage() {
       router.push('/ptw/raise');
   }, [router]);
 
-  const summary = {
-    total: permits?.length || 0,
-    pending: permits?.filter(p => p.status === 'Pending').length || 0,
-    approved: permits?.filter(p => p.status === 'Approved').length || 0,
-    rejected: permits?.filter(p => p.status === 'Rejected').length || 0,
-  };
-
   if (isLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
     return <p>Loading permits...</p>
   }
   
   const allPermits = permits || [];
+  const pendingPermits = React.useMemo(() => allPermits.filter(p => p.status === 'Pending'), [allPermits]);
+  const approvedPermits = React.useMemo(() => allPermits.filter(p => p.status === 'Approved'), [allPermits]);
+  const rejectedPermits = React.useMemo(() => allPermits.filter(p => p.status === 'Rejected'), [allPermits]);
+  
+  const summary = {
+    total: allPermits.length,
+    pending: pendingPermits.length,
+    approved: approvedPermits.length,
+    rejected: rejectedPermits.length,
+  };
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -368,13 +372,13 @@ export default function PtwListPage() {
                 <PermitListTable permits={allPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
             <TabsContent value="pending" className="m-0">
-                <PermitListTable permits={allPermits.filter(p => p.status === 'Pending')} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
+                <PermitListTable permits={pendingPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
             <TabsContent value="approved" className="m-0">
-                <PermitListTable permits={allPermits.filter(p => p.status === 'Approved')} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
+                <PermitListTable permits={approvedPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
             <TabsContent value="rejected" className="m-0">
-                <PermitListTable permits={allPermits.filter(p => p.status === 'Rejected')} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
+                <PermitListTable permits={rejectedPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
         </Card>
       </Tabs>
