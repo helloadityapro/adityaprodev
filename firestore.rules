@@ -56,21 +56,28 @@ service cloud.firestore {
      * or by checking for a specific admin email.
      */
     function isAdmin() {
-      return isSignedIn() && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin' || request.auth.token.email == 'abhijeet.agepl@gmail.com');
+      // Guard against non-existent user doc to prevent evaluation error on .data access
+      let userDocExists = exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      let userIsAdminRole = userDocExists && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+      return isSignedIn() && (userIsAdminRole || request.auth.token.email == 'abhijeet.agepl@gmail.com');
     }
 
     /**
      * Checks if the requesting user has the Supervisor role by reading their user document.
      */
     function isSupervisor() {
-        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Supervisor';
+        // Guard against non-existent user doc
+        let userDocExists = exists(/databases/$(database)/documents/users/$(request.auth.uid));
+        return isSignedIn() && userDocExists && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Supervisor';
     }
 
     /**
      * Checks if the requesting user has the SiteEngineer role by reading their user document.
      */
     function isSiteEngineer() {
-        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SiteEngineer';
+        // Guard against non-existent user doc
+        let userDocExists = exists(/databases/$(database)/documents/users/$(request.auth.uid));
+        return isSignedIn() && userDocExists && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SiteEngineer';
     }
 
 
