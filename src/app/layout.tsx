@@ -4,7 +4,7 @@ import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'PermitFlow',
+  title: 'Projects and Permits',
   description: 'A platform for managing Permits to Work.',
 };
 
