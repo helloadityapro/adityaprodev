@@ -1,3 +1,6 @@
+'use client';
+
+import * as React from "react";
 import {
   Table,
   TableBody,
@@ -10,12 +13,24 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
-import { mockUsers, type User } from "@/lib/data"
 import { MoreHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase } from "@/firebase"
+import { collection, doc } from "firebase/firestore"
 
-function StatusBadge({ status }: { status: User["status"] }) {
+type User = {
+  id: string;
+  username: string;
+  email: string;
+  mobile: string;
+  role: 'Admin' | 'Supervisor' | 'Site Engineer';
+  registrationRequest: boolean;
+  avatarUrl?: string;
+};
+
+function StatusBadge({ isPending }: { isPending: boolean }) {
+  const status = isPending ? "Pending" : "Active";
   return (
     <Badge
       className={cn("text-xs font-medium", {
@@ -29,7 +44,19 @@ function StatusBadge({ status }: { status: User["status"] }) {
 }
 
 export default function UsersPage() {
-    const users = mockUsers;
+    const firestore = useFirestore();
+    const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+    const { data: users, isLoading } = useCollection<User>(usersQuery);
+
+    const handleApproveRegistration = (userId: string) => {
+        const userRef = doc(firestore, 'users', userId);
+        updateDocumentNonBlocking(userRef, { registrationRequest: false });
+    }
+
+    if(isLoading) {
+        return <p>Loading users...</p>
+    }
+
     return (
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
@@ -55,12 +82,12 @@ export default function UsersPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {users.map((user) => (
+                            {users?.map((user) => (
                                 <TableRow key={user.id}>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-9 w-9">
-                                                <AvatarImage src={user.avatarUrl} alt={user.username} data-ai-hint="person face" />
+                                                {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.username} data-ai-hint="person face" />}
                                                 <AvatarFallback>{user.username.charAt(0)}</AvatarFallback>
                                             </Avatar>
                                             <div className="grid gap-0.5">
@@ -71,7 +98,7 @@ export default function UsersPage() {
                                     </TableCell>
                                     <TableCell>{user.role}</TableCell>
                                     <TableCell>
-                                        <StatusBadge status={user.status} />
+                                        <StatusBadge isPending={user.registrationRequest} />
                                     </TableCell>
                                     <TableCell className="hidden md:table-cell">{user.mobile}</TableCell>
                                     <TableCell>
@@ -84,7 +111,7 @@ export default function UsersPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                {user.status === 'Pending' && <DropdownMenuItem>Approve Registration</DropdownMenuItem>}
+                                                {user.registrationRequest && <DropdownMenuItem onClick={() => handleApproveRegistration(user.id)}>Approve Registration</DropdownMenuItem>}
                                                 <DropdownMenuItem>Edit User</DropdownMenuItem>
                                                 <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">Delete User</DropdownMenuItem>
                                             </DropdownMenuContent>

@@ -1,3 +1,4 @@
+'use client';
 import {
   Table,
   TableBody,
@@ -8,25 +9,21 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { mockProjects, type Project } from "@/lib/data"
 import { cn } from "@/lib/utils"
+import { useCollection, useFirestore } from "@/firebase"
+import { collection } from "firebase/firestore"
 
-function StatusBadge({ status }: { status: Project["status"] }) {
-  return (
-    <Badge
-      className={cn("text-xs font-medium", {
-        "bg-yellow-100 text-yellow-800 hover:bg-yellow-100/80 dark:bg-yellow-900/50 dark:text-yellow-300 border-transparent": status === "On Hold",
-        "bg-green-100 text-green-800 hover:bg-green-100/80 dark:bg-green-900/50 dark:text-green-300 border-transparent": status === "Completed",
-        "bg-blue-100 text-blue-800 hover:bg-blue-100/80 dark:bg-blue-900/50 dark:text-blue-300 border-transparent": status === "In Progress",
-      })}
-    >
-      {status}
-    </Badge>
-  )
-}
+type Project = {
+  id: string;
+  name: string;
+  description: string;
+};
 
 export default function DashboardPage() {
-  const projects = mockProjects;
+  const firestore = useFirestore();
+  const { data: projects, isLoading } = useCollection<Project>(collection(firestore, 'projects'));
+
+  if(isLoading) return <p>Loading projects...</p>
 
   return (
     <>
@@ -43,22 +40,14 @@ export default function DashboardPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Project Name</TableHead>
-                <TableHead className="hidden md:table-cell">Site</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="hidden md:table-cell">Manager</TableHead>
-                <TableHead className="hidden sm:table-cell">Start Date</TableHead>
+                <TableHead>Description</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {projects.map((project) => (
+              {projects?.map((project) => (
                 <TableRow key={project.id}>
                   <TableCell className="font-medium">{project.name}</TableCell>
-                  <TableCell className="hidden md:table-cell">{project.site}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={project.status} />
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">{project.manager}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{project.startDate}</TableCell>
+                  <TableCell>{project.description}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

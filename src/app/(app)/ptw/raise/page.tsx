@@ -1,15 +1,67 @@
 "use client"
 
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { mockSites, mockPtwTypes } from "@/lib/data"
 import { FileVideo, Video } from "lucide-react"
+import { useCollection, useFirestore, useUser, addDocumentNonBlocking, useMemoFirebase } from "@/firebase"
+import { collection, serverTimestamp } from "firebase/firestore"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { useToast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
+
+const raisePtwSchema = z.object({
+  siteId: z.string().min(1, "Site is required"),
+  ptwTypeId: z.string().min(1, "Permit type is required"),
+  descriptionOfWork: z.string().min(10, "Description must be at least 10 characters"),
+  comments: z.string().optional(),
+})
 
 export default function RaisePtwPage() {
+  const firestore = useFirestore()
+  const { user } = useUser()
+  const router = useRouter()
+  const { toast } = useToast()
+
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const ptwTypesQuery = useMemoFirebase(() => collection(firestore, 'permit_to_work_types'), [firestore]);
+
+  const { data: sites } = useCollection(sitesQuery);
+  const { data: ptwTypes } = useCollection(ptwTypesQuery);
+
+  const form = useForm<z.infer<typeof raisePtwSchema>>({
+    resolver: zodResolver(raisePtwSchema),
+    defaultValues: {
+      siteId: "",
+      ptwTypeId: "",
+      descriptionOfWork: "",
+      comments: "",
+    },
+  })
+
+  const onSubmit = (values: z.infer<typeof raisePtwSchema>) => {
+    if (!user) {
+        toast({ variant: "destructive", title: "You must be logged in to submit a permit." });
+        return;
+    }
+    const permitData = {
+      ...values,
+      siteEngineerId: user.uid,
+      status: "Pending",
+      requestDate: serverTimestamp(),
+      commentsAndRemarks: values.comments,
+    }
+    addDocumentNonBlocking(collection(firestore, "permits_to_work"), permitData);
+    toast({ title: "Success", description: "Your permit request has been submitted." });
+    router.push('/ptw/list');
+  }
+
   return (
     <>
       <h1 className="text-lg font-headline font-semibold md:text-2xl">Raise a Permit to Work</h1>
@@ -19,41 +71,67 @@ export default function RaisePtwPage() {
           <CardDescription>Fill out the form below to submit a new permit request.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="site">Select Site</Label>
-                <Select>
-                  <SelectTrigger id="site">
-                    <SelectValue placeholder="Select a site" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockSites.map((site) => (
-                      <SelectItem key={site} value={site}>{site}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                    control={form.control}
+                    name="siteId"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Select Site</FormLabel>
+                             <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a site" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {sites?.map((site) => (
+                                    <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="ptwTypeId"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Select PtW Type</FormLabel>
+                             <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a permit type" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {ptwTypes?.map((type) => (
+                                    <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="ptw-type">Select PtW Type</Label>
-                <Select>
-                  <SelectTrigger id="ptw-type">
-                    <SelectValue placeholder="Select a permit type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mockPtwTypes.map((type) => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="description">Description of Work</Label>
-              <Textarea id="description" placeholder="Provide a detailed description of the work to be performed." rows={4}/>
-            </div>
-
+                <FormField
+                    control={form.control}
+                    name="descriptionOfWork"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Description of Work</FormLabel>
+                            <FormControl>
+                                <Textarea placeholder="Provide a detailed description of the work to be performed." rows={4} {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div className="grid gap-2">
                     <Label htmlFor="work-video">Attach video of work</Label>
@@ -71,15 +149,25 @@ export default function RaisePtwPage() {
                 </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="comments">Comments and Remarks</Label>
-              <Textarea id="comments" placeholder="Any additional comments or remarks." />
-            </div>
+            <FormField
+                control={form.control}
+                name="comments"
+                render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Comments and Remarks</FormLabel>
+                        <FormControl>
+                            <Textarea placeholder="Any additional comments or remarks." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )}
+            />
 
             <div className="flex justify-end">
               <Button type="submit">Submit Request</Button>
             </div>
-          </form>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </>
