@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, FileCheck, Clock, FileX, ArrowUpRight, List as ListIcon, ExternalLink } from "lucide-react"
+import { MoreHorizontal, FileCheck, Clock, FileX, ArrowUpRight, List as ListIcon, ExternalLink, FileVideo, Video } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
@@ -86,6 +86,7 @@ function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect
             <TableHead className="hidden md:table-cell">Requested By</TableHead>
             <TableHead className="hidden sm:table-cell">Date</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Attachments</TableHead>
             <TableHead>
               <span className="sr-only">Actions</span>
             </TableHead>
@@ -101,6 +102,23 @@ function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect
               <TableCell className="hidden sm:table-cell">{permit.requestDate ? new Date(permit.requestDate?.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
               <TableCell>
                 <StatusBadge status={permit.status} />
+              </TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  {permit.videoUrl && (
+                    <a href={permit.videoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                      <FileVideo className="h-4 w-4"/>
+                    </a>
+                  )}
+                  {permit.vlogUrl && (
+                    <a href={permit.vlogUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                      <Video className="h-4 w-4" />
+                    </a>
+                  )}
+                  {!permit.videoUrl && !permit.vlogUrl && (
+                    <span className="text-xs text-muted-foreground">N/A</span>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 <DropdownMenu>
