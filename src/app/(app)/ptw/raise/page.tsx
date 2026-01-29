@@ -41,15 +41,15 @@ type SiteData = {
 
 const parseCSV = (csvText: string): SiteData[] => {
   const lines = csvText.trim().split('\n');
-  if (lines.length < 2) return [];
-
-  // Exclude the header row and first 5 data rows
-  const dataRows = lines.slice(6);
   const data: SiteData[] = [];
 
-  for (const line of dataRows) {
+  // Iterate over lines, skipping the header (i=0)
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
     const values = line.split(',').map(v => v.trim().replace(/\r/g, ''));
-    if (values.length >= 5) {
+    
+    // A valid project row has a number in the first column ("Sr No") and a non-empty project name.
+    if (values.length >= 5 && !isNaN(parseInt(values[0], 10)) && values[2] && values[2].trim() !== '') {
       const entry: SiteData = {
         'Project Company': values[1],
         'Project name': values[2],
