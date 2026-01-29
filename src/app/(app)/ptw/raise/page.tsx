@@ -12,8 +12,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { FileVideo, Video } from "lucide-react"
-import { useFirebaseApp, useFirestore, useUser } from "@/firebase"
-import { addDoc, collection, serverTimestamp } from "firebase/firestore"
+import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase"
+import { addDoc, collection, serverTimestamp, doc } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
@@ -72,6 +72,12 @@ export default function RaisePtwPage() {
   const { user } = useUser()
   const router = useRouter()
   const { toast } = useToast()
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+  const { data: userProfile } = useDoc(userProfileRef);
 
   const [allSites, setAllSites] = React.useState<SiteData[]>([]);
   const [selectedSite, setSelectedSite] = React.useState<SiteData | null>(null);
@@ -214,7 +220,7 @@ export default function RaisePtwPage() {
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6">
               <div className="grid gap-2">
                 <Label>Requesting Engineer</Label>
-                <Input readOnly value={user?.displayName || user?.email || ''} className="bg-muted"/>
+                <Input readOnly value={userProfile?.username || user?.email || ''} className="bg-muted"/>
               </div>
 
               <FormField
