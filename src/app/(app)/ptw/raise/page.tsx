@@ -16,7 +16,6 @@ import { collection, serverTimestamp } from "firebase/firestore"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -69,7 +68,6 @@ export default function RaisePtwPage() {
   const { toast } = useToast()
 
   const [allSites, setAllSites] = React.useState<SiteData[]>([]);
-  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [selectedSite, setSelectedSite] = React.useState<SiteData | null>(null);
 
   const form = useForm<z.infer<typeof raisePtwSchema>>({
@@ -81,8 +79,6 @@ export default function RaisePtwPage() {
       comments: "",
     },
   })
-
-  const siteNameValue = form.watch('siteName');
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -101,35 +97,13 @@ export default function RaisePtwPage() {
     fetchData();
   }, [toast]);
 
-  const filteredSites = React.useMemo(() => {
-    if (!siteNameValue || siteNameValue.length < 3) return [];
-    return allSites?.filter(site => site['Project name'].toLowerCase().includes(siteNameValue.toLowerCase())) || [];
-  }, [siteNameValue, allSites]);
-  
-  React.useEffect(() => {
-    if (selectedSite && siteNameValue !== selectedSite['Project name']) {
-      setSelectedSite(null);
-    }
-  }, [siteNameValue, selectedSite]);
-
-  React.useEffect(() => {
-    const shouldBeOpen = !!(siteNameValue && siteNameValue.length >= 3 && filteredSites.length > 0 && (!selectedSite || selectedSite['Project name'] !== siteNameValue));
-    setIsSitePopoverOpen(shouldBeOpen);
-  }, [siteNameValue, filteredSites, selectedSite]);
-
-
-  const handleSiteSelect = (site: SiteData) => {
-    form.setValue('siteName', site['Project name'], { shouldValidate: true });
-    setSelectedSite(site);
-    setIsSitePopoverOpen(false);
-  }
 
   const onSubmit = (values: z.infer<typeof raisePtwSchema>) => {
     if (!user) {
         toast({ variant: "destructive", title: "You must be logged in to submit a permit." });
         return;
     }
-    if(!selectedSite || values.siteName !== selectedSite['Project name']) {
+    if(!selectedSite) {
         form.setError('siteName', { type: 'manual', message: 'Please select a valid site from the list.' });
         return;
     }
@@ -166,40 +140,24 @@ export default function RaisePtwPage() {
                   control={form.control}
                   name="siteName"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem>
                       <FormLabel>Site Name</FormLabel>
-                      <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
-                        <PopoverTrigger asChild>
+                       <Select onValueChange={(value) => {
+                          field.onChange(value);
+                          const site = allSites.find(s => s['Project name'] === value);
+                          setSelectedSite(site || null);
+                      }} defaultValue={field.value}>
                           <FormControl>
-                            <Input
-                              placeholder="Type to search for a site..."
-                              {...field}
-                            />
+                          <SelectTrigger>
+                              <SelectValue placeholder="Select a site" />
+                          </SelectTrigger>
                           </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                          {filteredSites.length > 0 ? (
-                            <ul className="py-1">
-                              {filteredSites.map((site, index) => (
-                                <li key={index}>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    className="w-full justify-start font-normal"
-                                    onClick={() => handleSiteSelect(site)}
-                                  >
-                                    {site['Project name']}
-                                  </Button>
-                                </li>
+                          <SelectContent>
+                              {allSites.map((site, index) => (
+                              <SelectItem key={index} value={site['Project name']}>{site['Project name']}</SelectItem>
                               ))}
-                            </ul>
-                          ) : (
-                            <div className="p-4 text-sm text-center text-muted-foreground">
-                              {siteNameValue && siteNameValue.length < 3 ? "Type at least 3 characters" : "No sites found."}
-                            </div>
-                          )}
-                        </PopoverContent>
-                      </Popover>
+                          </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
