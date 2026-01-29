@@ -42,9 +42,12 @@ type SiteData = {
 const parseCSV = (csvText: string): SiteData[] => {
   const lines = csvText.trim().split('\n');
   if (lines.length < 2) return [];
+
+  const dataRows = lines.slice(1);
   const data: SiteData[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(',').map(v => v.trim().replace(/\r/g, ''));
+
+  for (const line of dataRows) {
+    const values = line.split(',').map(v => v.trim().replace(/\r/g, ''));
     if (values.length >= 5) {
       const entry: SiteData = {
         'Project Company': values[1],
@@ -65,7 +68,6 @@ export default function RaisePtwPage() {
   const { toast } = useToast()
 
   const [allSites, setAllSites] = React.useState<SiteData[]>([]);
-  const [siteSearch, setSiteSearch] = React.useState("");
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [selectedSite, setSelectedSite] = React.useState<SiteData | null>(null);
 
@@ -78,6 +80,8 @@ export default function RaisePtwPage() {
       comments: "",
     },
   })
+
+  const siteNameValue = form.watch('siteName');
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -97,21 +101,24 @@ export default function RaisePtwPage() {
   }, [toast]);
 
   const filteredSites = React.useMemo(() => {
-    if (siteSearch.length < 3) return [];
-    return allSites?.filter(site => site['Project name'].toLowerCase().includes(siteSearch.toLowerCase())) || [];
-  }, [siteSearch, allSites]);
+    if (!siteNameValue || siteNameValue.length < 3) return [];
+    return allSites?.filter(site => site['Project name'].toLowerCase().includes(siteNameValue.toLowerCase())) || [];
+  }, [siteNameValue, allSites]);
+  
+  React.useEffect(() => {
+    if (selectedSite && siteNameValue !== selectedSite['Project name']) {
+      setSelectedSite(null);
+    }
+  }, [siteNameValue, selectedSite]);
 
   React.useEffect(() => {
-    if (siteSearch.length >= 3 && filteredSites.length > 0) {
-      setIsSitePopoverOpen(true);
-    } else {
-      setIsSitePopoverOpen(false);
-    }
-  }, [siteSearch, filteredSites]);
+    const shouldBeOpen = !!(siteNameValue && siteNameValue.length >= 3 && filteredSites.length > 0 && (!selectedSite || selectedSite['Project name'] !== siteNameValue));
+    setIsSitePopoverOpen(shouldBeOpen);
+  }, [siteNameValue, filteredSites, selectedSite]);
+
 
   const handleSiteSelect = (site: SiteData) => {
-    form.setValue('siteName', site['Project name']);
-    setSiteSearch(site['Project name']);
+    form.setValue('siteName', site['Project name'], { shouldValidate: true });
     setSelectedSite(site);
     setIsSitePopoverOpen(false);
   }
@@ -121,6 +128,11 @@ export default function RaisePtwPage() {
         toast({ variant: "destructive", title: "You must be logged in to submit a permit." });
         return;
     }
+    if(!selectedSite || values.siteName !== selectedSite['Project name']) {
+        form.setError('siteName', { type: 'manual', message: 'Please select a valid site from the list.' });
+        return;
+    }
+
     const permitData = {
       ...values,
       siteEngineerId: user.uid,
@@ -160,15 +172,7 @@ export default function RaisePtwPage() {
                           <FormControl>
                             <Input
                               placeholder="Type to search for a site..."
-                              value={siteSearch}
-                              onChange={(e) => {
-                                setSiteSearch(e.target.value)
-                                if (e.target.value !== field.value) {
-                                  field.onChange('');
-                                  setSelectedSite(null);
-                                }
-                              }}
-                              className="w-full"
+                              {...field}
                             />
                           </FormControl>
                         </PopoverTrigger>
@@ -190,7 +194,7 @@ export default function RaisePtwPage() {
                             </ul>
                           ) : (
                             <div className="p-4 text-sm text-center text-muted-foreground">
-                              {siteSearch.length < 3 ? "Type at least 3 characters" : "No sites found."}
+                              {siteNameValue && siteNameValue.length < 3 ? "Type at least 3 characters" : "No sites found."}
                             </div>
                           )}
                         </PopoverContent>

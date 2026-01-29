@@ -23,12 +23,13 @@ const parseCSV = (csvText: string): SiteData[] => {
   const lines = csvText.trim().split('\n');
   if (lines.length < 2) return [];
 
+  // Exclude the header row
+  const dataRows = lines.slice(1);
   const data: SiteData[] = [];
 
-  // Skip header line (i=1)
-  for (let i = 1; i < lines.length; i++) {
+  for (const line of dataRows) {
     // Handle potential carriage returns in data rows
-    const values = lines[i].split(',').map(v => v.trim().replace(/\r/g, ''));
+    const values = line.split(',').map(v => v.trim().replace(/\r/g, ''));
     if (values.length >= 5) { // Ensure there are enough columns
       const entry: SiteData = {
         'Project Company': values[1],
