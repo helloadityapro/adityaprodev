@@ -16,9 +16,12 @@ import { Button } from "@/components/ui/button"
 import { MoreHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase } from "@/firebase"
+import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
 import { collection, doc } from "firebase/firestore"
 import { AddUserDialog } from "@/components/add-user-dialog";
+import { EditUserDialog } from "@/components/edit-user-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 type User = {
   id: string;
@@ -48,11 +51,24 @@ export default function UsersPage() {
     const firestore = useFirestore();
     const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
     const { data: users, isLoading } = useCollection<User>(usersQuery);
+    const { toast } = useToast();
+
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
+    const [userToEdit, setUserToEdit] = React.useState<User | null>(null);
+    const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
 
     const handleApproveRegistration = (userId: string) => {
         const userRef = doc(firestore, 'users', userId);
         updateDocumentNonBlocking(userRef, { registrationRequest: false });
+        toast({ title: 'User Approved', description: 'The user registration has been approved.' });
+    }
+
+    const handleDeleteUser = () => {
+        if (!userToDelete) return;
+        const userRef = doc(firestore, 'users', userToDelete.id);
+        deleteDocumentNonBlocking(userRef);
+        toast({ title: 'User Deleted', description: `User ${userToDelete.username} has been deleted.` });
+        setUserToDelete(null);
     }
 
     if(isLoading) {
@@ -115,8 +131,8 @@ export default function UsersPage() {
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                     {user.registrationRequest && <DropdownMenuItem onClick={() => handleApproveRegistration(user.id)}>Approve Registration</DropdownMenuItem>}
-                                                    <DropdownMenuItem>Edit User</DropdownMenuItem>
-                                                    <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">Delete User</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => setUserToEdit(user)}>Edit User</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => setUserToDelete(user)} className="text-destructive focus:text-destructive focus:bg-destructive/10">Delete User</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
@@ -128,6 +144,22 @@ export default function UsersPage() {
                 </Card>
             </div>
             <AddUserDialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen} />
+            <EditUserDialog user={userToEdit} open={!!userToEdit} onOpenChange={() => setUserToEdit(null)} />
+            <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the user account
+                            for {userToDelete?.username} and remove their data from our servers.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     )
 }
