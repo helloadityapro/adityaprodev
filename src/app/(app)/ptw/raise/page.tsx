@@ -384,7 +384,7 @@ export default function RaisePtwPage() {
                     )}
                 </div>
                 <div className="grid gap-2">
-                    <Label htmlFor="vlog">Self video of engineer</Label>
+                    <Label htmlFor="vlog">Self attestation Video of engineer</Label>
                     <div className="flex items-center gap-2">
                         <Video className="h-5 w-5 text-muted-foreground"/>
                         <Input id="vlog" type="file" accept="video/*" className="border-dashed" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isSubmitting} />
@@ -449,3 +449,5 @@ export default function RaisePtwPage() {
     </>
   )
 }
+
+    
