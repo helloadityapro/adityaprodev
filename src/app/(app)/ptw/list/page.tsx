@@ -70,8 +70,8 @@ function UserDisplay({ userId }: { userId: string }) {
   const userRef = useMemoFirebase(() => userId ? doc(firestore, 'users', userId) : null, [firestore, userId]);
   const { data: user, isLoading } = useDoc(userRef);
 
-  if (isLoading) return <span>...</span>;
-  return <span>{user?.username || 'Unknown'}</span>;
+  if (isLoading) return <>...</>;
+  return <>{user?.username || 'Unknown'}</>;
 }
 
 
