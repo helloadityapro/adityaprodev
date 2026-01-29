@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { FileVideo, Video } from "lucide-react"
+import { FileVideo } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase"
 import { addDoc, collection, serverTimestamp, doc } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -86,8 +86,7 @@ export default function RaisePtwPage() {
   const [allSites, setAllSites] = React.useState<SiteData[]>([]);
   const [selectedSite, setSelectedSite] = React.useState<SiteData | null>(null);
   
-  const [videoFile, setVideoFile] = React.useState<File | null>(null);
-  const [vlogFile, setVlogFile] = React.useState<File | null>(null);
+  const [files, setFiles] = React.useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [uploadProgress, setUploadProgress] = React.useState<{ [key: string]: number }>({});
 
@@ -139,7 +138,7 @@ export default function RaisePtwPage() {
     setIsSubmitting(true);
     setUploadProgress({});
 
-    const uploadFile = (file: File, path: string, key: string): Promise<{ url: string; contentType: string }> => {
+    const uploadFile = (file: File, path: string): Promise<{ url: string; contentType: string; name: string; }> => {
         return new Promise((resolve, reject) => {
             const storage = getStorage(firebaseApp);
             const storageRef = ref(storage, path);
@@ -148,7 +147,7 @@ export default function RaisePtwPage() {
             uploadTask.on('state_changed',
                 (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    setUploadProgress(prev => ({ ...prev, [key]: progress }));
+                    setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
                 },
                 (error) => {
                     console.error("Upload failed:", error);
@@ -156,7 +155,7 @@ export default function RaisePtwPage() {
                 },
                 () => {
                     getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-                        resolve({ url: downloadURL, contentType: file.type });
+                        resolve({ url: downloadURL, contentType: file.type, name: file.name });
                     });
                 }
             );
@@ -164,24 +163,13 @@ export default function RaisePtwPage() {
     };
 
     try {
-        let videoUrl = "";
-        let vlogUrl = "";
-        let videoContentType = "";
-        let vlogContentType = "";
         const timestamp = Date.now();
+        const attachmentPromises = files.map(file => {
+            const filePath = `uploads/${user.uid}/${timestamp}-${file.name}`;
+            return uploadFile(file, filePath);
+        });
 
-        if (videoFile) {
-            const videoPath = `uploads/${user.uid}/${timestamp}-${videoFile.name}`;
-            const result = await uploadFile(videoFile, videoPath, 'video');
-            videoUrl = result.url;
-            videoContentType = result.contentType;
-        }
-        if (vlogFile) {
-            const vlogPath = `uploads/${user.uid}/${timestamp}-${vlogFile.name}`;
-            const result = await uploadFile(vlogFile, vlogPath, 'vlog');
-            vlogUrl = result.url;
-            vlogContentType = result.contentType;
-        }
+        const attachments = await Promise.all(attachmentPromises);
 
         const { undertaking, ...permitValues } = values;
 
@@ -190,10 +178,7 @@ export default function RaisePtwPage() {
           siteEngineerId: user.uid,
           status: "Pending",
           requestDate: serverTimestamp(),
-          videoUrl: videoUrl,
-          vlogUrl: vlogUrl,
-          videoContentType: videoContentType,
-          vlogContentType: vlogContentType,
+          attachments,
         };
 
         const permitsCollection = collection(firestore, "permits_to_work");
@@ -316,23 +301,23 @@ export default function RaisePtwPage() {
                   )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                      <Label htmlFor="work-video">Attach video and photos</Label>
-                      <div className="flex items-center gap-2">
-                          <FileVideo className="h-5 w-5 text-muted-foreground"/>
-                          <Input id="work-video" type="file" className="border-dashed" onChange={(e) => setVideoFile(e.target.files?.[0] || null)} disabled={isSubmitting} />
-                      </div>
-                      {uploadProgress.video != null && <Progress value={uploadProgress.video} className="w-full mt-2" />}
+              <div className="grid gap-2">
+                  <Label htmlFor="work-files">Attach files (videos, photos)</Label>
+                  <div className="flex items-center gap-2">
+                      <FileVideo className="h-5 w-5 text-muted-foreground"/>
+                      <Input id="work-files" type="file" className="border-dashed" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} disabled={isSubmitting} />
                   </div>
-                   <div className="grid gap-2">
-                      <Label htmlFor="vlog">Attach vlog of engineer</Label>
-                       <div className="flex items-center gap-2">
-                          <Video className="h-5 w-5 text-muted-foreground"/>
-                          <Input id="vlog" type="file" className="border-dashed" onChange={(e) => setVlogFile(e.target.files?.[0] || null)} disabled={isSubmitting}/>
-                      </div>
-                      {uploadProgress.vlog != null && <Progress value={uploadProgress.vlog} className="w-full mt-2" />}
-                  </div>
+                  {files.length > 0 && (
+                    <div className="mt-2 space-y-2">
+                      <Label>Selected Files:</Label>
+                      {files.map((file, index) => (
+                        <div key={index} className="text-sm">
+                          <p className="truncate">{file.name}</p>
+                          {uploadProgress[file.name] != null && <Progress value={uploadProgress[file.name]} className="w-full mt-1" />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
               </div>
 
               <FormField

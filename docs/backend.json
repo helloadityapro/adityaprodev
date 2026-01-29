@@ -123,31 +123,40 @@
           "type": "string",
           "description": "A description of the work to be performed."
         },
-        "videoUrl": {
-          "type": "string",
-          "description": "URL of the video of the work.",
-          "format": "uri"
-        },
-        "videoContentType": {
-          "type": "string",
-          "description": "Content type of the work video."
-        },
-        "vlogUrl": {
-          "type": "string",
-          "description": "URL of the engineer's vlog for this work.",
-          "format": "uri"
-        },
-        "vlogContentType": {
-            "type": "string",
-            "description": "Content type of the engineer's vlog."
+        "attachments": {
+          "type": "array",
+          "description": "An array of media files attached to the permit.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "description": "URL of the media file.",
+                "format": "uri"
+              },
+              "contentType": {
+                "type": "string",
+                "description": "Content type of the media file."
+              },
+              "name": {
+                "type": "string",
+                "description": "The name of the media file."
+              }
+            },
+            "required": [
+              "url",
+              "contentType",
+              "name"
+            ]
+          }
         },
         "commentsAndRemarks": {
           "type": "string",
           "description": "Comments and remarks related to the permit."
         },
         "adminRemarks": {
-            "type": "string",
-            "description": "Remarks added by the admin during the approval/rejection process."
+          "type": "string",
+          "description": "Remarks added by the admin during the approval/rejection process."
         },
         "status": {
           "type": "string",

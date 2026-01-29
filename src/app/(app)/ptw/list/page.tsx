@@ -25,7 +25,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { FileCheck, Clock, FileX, List as ListIcon, ExternalLink, Eye, FilePen, Trash2, Check, X, FileText, FileVideo, Video, Film } from "lucide-react"
+import { FileCheck, Clock, FileX, List as ListIcon, ExternalLink, Eye, FilePen, Trash2, Check, X, FileText, FileVideo, Video, Film, Paperclip } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
@@ -34,6 +34,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+
+type Attachment = {
+  url: string;
+  contentType: string;
+  name: string;
+};
 
 type Permit = {
   id: string;
@@ -45,10 +57,7 @@ type Permit = {
   supervisorId?: string;
   adminId?: string;
   requestDate: any; // Should be a timestamp
-  videoUrl?: string;
-  vlogUrl?: string;
-  videoContentType?: string;
-  vlogContentType?: string;
+  attachments?: Attachment[];
   commentsAndRemarks?: string;
   adminRemarks?: string;
 };
@@ -88,76 +97,79 @@ function UserDisplay({ userId }: { userId: string }) {
 
 const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onDelete, onAttachmentView }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onDelete: (permit: Permit) => void; onAttachmentView: (media: { url: string; type: string }) => void; }) {
     return (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[40px]">#</TableHead>
-            <TableHead>PTW Type</TableHead>
-            <TableHead>Site</TableHead>
-            <TableHead>Engineer</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Attachments</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {permits.map((permit, index) => (
-            <TableRow key={permit.id}>
-              <TableCell className="font-medium">{index + 1}</TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2 font-medium">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span>{permit.ptwType}</span>
-                </div>
-              </TableCell>
-              <TableCell>{permit.siteName}</TableCell>
-              <TableCell><UserDisplay userId={permit.siteEngineerId} /></TableCell>
-              <TableCell>{permit.requestDate ? new Date(permit.requestDate?.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
-              <TableCell>
-                <StatusBadge status={permit.status} />
-              </TableCell>
-               <TableCell>
-                <div className="flex items-center justify-start gap-1">
-                  {permit.videoUrl && permit.videoContentType && (
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onAttachmentView({url: permit.videoUrl!, type: permit.videoContentType!})}>
-                      <FileVideo className="h-4 w-4" />
-                      <span className="sr-only">View Work Video/Photo</span>
-                    </Button>
-                  )}
-                  {permit.vlogUrl && permit.vlogContentType && (
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onAttachmentView({url: permit.vlogUrl!, type: permit.vlogContentType!})}>
-                      <Video className="h-4 w-4" />
-                      <span className="sr-only">View Engineer Vlog</span>
-                    </Button>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => onViewDetails(permit)}><span className="sr-only">View</span><Eye className="h-4 w-4" /></Button>
-                    
-                    {userRole === 'SiteEngineer' && permit.status === 'Rejected' && (
-                        <Button variant="ghost" size="icon" onClick={() => onCorrect(permit)}><span className="sr-only">Correct</span><FilePen className="h-4 w-4" /></Button>
-                    )}
-                    
-                    {(userRole === 'Admin' || userRole === 'Supervisor') && (
-                        <>
-                            {permit.status !== 'Approved' && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(permit)}><span className="sr-only">Delete</span><Trash2 className="h-4 w-4" /></Button>}
-                            {permit.status === 'Pending' && (
-                                <>
-                                <Button variant="default" size="icon" className="bg-green-500 hover:bg-green-600 text-white h-8 w-8" onClick={() => onAction(permit, 'Approved')}><span className="sr-only">Approve</span><Check className="h-4 w-4" /></Button>
-                                <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => onAction(permit, 'Rejected')}><span className="sr-only">Reject</span><X className="h-4 w-4" /></Button>
-                                </>
-                            )}
-                        </>
-                    )}
-                </div>
-              </TableCell>
+      <TooltipProvider>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[40px]">#</TableHead>
+              <TableHead>PTW Type</TableHead>
+              <TableHead>Site</TableHead>
+              <TableHead>Engineer</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Attachments</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {permits.map((permit, index) => (
+              <TableRow key={permit.id}>
+                <TableCell className="font-medium">{index + 1}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2 font-medium">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span>{permit.ptwType}</span>
+                  </div>
+                </TableCell>
+                <TableCell>{permit.siteName}</TableCell>
+                <TableCell><UserDisplay userId={permit.siteEngineerId} /></TableCell>
+                <TableCell>{permit.requestDate ? new Date(permit.requestDate?.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
+                <TableCell>
+                  <StatusBadge status={permit.status} />
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center justify-start gap-1 flex-wrap">
+                    {permit.attachments?.map((attachment, index) => (
+                      <Tooltip key={index}>
+                        <TooltipTrigger asChild>
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onAttachmentView({url: attachment.url, type: attachment.contentType})}>
+                            {attachment.contentType.startsWith('video/') ? <Video className="h-4 w-4" /> : attachment.contentType.startsWith('image/') ? <FileVideo className="h-4 w-4" /> : <Paperclip className="h-4 w-4" />}
+                            <span className="sr-only">{attachment.name}</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{attachment.name}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => onViewDetails(permit)}><span className="sr-only">View</span><Eye className="h-4 w-4" /></Button>
+                      
+                      {userRole === 'SiteEngineer' && permit.status === 'Rejected' && (
+                          <Button variant="ghost" size="icon" onClick={() => onCorrect(permit)}><span className="sr-only">Correct</span><FilePen className="h-4 w-4" /></Button>
+                      )}
+                      
+                      {(userRole === 'Admin' || userRole === 'Supervisor') && (
+                          <>
+                              {permit.status !== 'Approved' && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(permit)}><span className="sr-only">Delete</span><Trash2 className="h-4 w-4" /></Button>}
+                              {permit.status === 'Pending' && (
+                                  <>
+                                  <Button variant="default" size="icon" className="bg-green-500 hover:bg-green-600 text-white h-8 w-8" onClick={() => onAction(permit, 'Approved')}><span className="sr-only">Approve</span><Check className="h-4 w-4" /></Button>
+                                  <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => onAction(permit, 'Rejected')}><span className="sr-only">Reject</span><X className="h-4 w-4" /></Button>
+                                  </>
+                              )}
+                          </>
+                      )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TooltipProvider>
     );
 });
 
@@ -244,20 +256,23 @@ function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: {
             {permit.adminId && <div className="flex items-center gap-2"><Label>Reviewed By (Admin)</Label><UserDisplay userId={permit.adminId} /></div>}
             {permit.commentsAndRemarks && <div className="col-span-2"><Label>Engineer's Remarks</Label><p className="whitespace-pre-wrap">{permit.commentsAndRemarks}</p></div>}
             {permit.adminRemarks && <div className="col-span-2"><Label>Admin's Remarks</Label><p className="whitespace-pre-wrap">{permit.adminRemarks}</p></div>}
-            {permit.videoUrl && permit.videoContentType && (
-              <div>
-                <Label>Work Video/Photos</Label>
-                <Button variant="link" className="p-0 h-auto flex items-center gap-1 text-primary" onClick={() => onAttachmentView({ url: permit.videoUrl!, type: permit.videoContentType! })}>
-                  <ExternalLink size={14}/>View Attachment
-                </Button>
-              </div>
-            )}
-            {permit.vlogUrl && permit.vlogContentType && (
-              <div>
-                <Label>Engineer's Vlog</Label>
-                <Button variant="link" className="p-0 h-auto flex items-center gap-1 text-primary" onClick={() => onAttachmentView({ url: permit.vlogUrl!, type: permit.vlogContentType! })}>
-                  <ExternalLink size={14}/>View Attachment
-                </Button>
+            
+            {permit.attachments && permit.attachments.length > 0 && (
+              <div className="col-span-2">
+                <Label>Attachments</Label>
+                <div className="flex flex-col gap-2 mt-2">
+                  {permit.attachments.map((attachment, index) => (
+                    <Button
+                      key={index}
+                      variant="link"
+                      className="p-0 h-auto flex items-center gap-2 justify-start text-primary"
+                      onClick={() => onAttachmentView({ url: attachment.url, type: attachment.contentType })}
+                    >
+                      <ExternalLink size={14}/>
+                      <span>{attachment.name}</span>
+                    </Button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
