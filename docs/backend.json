@@ -1,0 +1,314 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user in the PermitFlow application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user."
+        },
+        "username": {
+          "type": "string",
+          "description": "The username of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the user.",
+          "format": "email"
+        },
+        "mobile": {
+          "type": "string",
+          "description": "The mobile phone number of the user."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user (Admin, Supervisor, SiteEngineer)."
+        },
+        "registrationRequest": {
+          "type": "boolean",
+          "description": "Indicates whether the user's registration request is pending approval."
+        },
+        "assignedProjectIds": {
+          "type": "array",
+          "description": "References to Projects assigned to the user. (Relationship: User N:N Project)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "email",
+        "mobile",
+        "role"
+      ]
+    },
+    "Project": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Project",
+      "type": "object",
+      "description": "Represents a project in the PermitFlow application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the project."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the project."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the project."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "Site": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Site",
+      "type": "object",
+      "description": "Represents a site where work permits are required.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the site."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Reference to Project. (Relationship: Project 1:N Site)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the site."
+        },
+        "location": {
+          "type": "string",
+          "description": "The location of the site."
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "name",
+        "location"
+      ]
+    },
+    "PermitToWork": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PermitToWork",
+      "type": "object",
+      "description": "Represents a Permit to Work request.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the permit to work request."
+        },
+        "siteId": {
+          "type": "string",
+          "description": "Reference to Site. (Relationship: Site 1:N PermitToWork)"
+        },
+        "ptwTypeId": {
+          "type": "string",
+          "description": "Reference to PermitToWorkType. (Relationship: PermitToWorkType 1:N PermitToWork)"
+        },
+        "descriptionOfWork": {
+          "type": "string",
+          "description": "A description of the work to be performed."
+        },
+        "videoUrl": {
+          "type": "string",
+          "description": "URL of the video of the work.",
+          "format": "uri"
+        },
+        "vlogUrl": {
+          "type": "string",
+          "description": "URL of the engineer's vlog for this work.",
+          "format": "uri"
+        },
+        "commentsAndRemarks": {
+          "type": "string",
+          "description": "Comments and remarks related to the permit."
+        },
+        "status": {
+          "type": "string",
+          "description": "The status of the permit (e.g., Submitted, Approved, Rejected, Corrected)."
+        },
+        "siteEngineerId": {
+          "type": "string",
+          "description": "Reference to User (Site Engineer) who raised the request. (Relationship: User 1:N PermitToWork)"
+        },
+        "supervisorId": {
+          "type": "string",
+          "description": "Reference to User (Supervisor) who reviewed the request. (Relationship: User 1:N PermitToWork)"
+        },
+        "adminId": {
+          "type": "string",
+          "description": "Reference to User (Admin) who approved/rejected the request. (Relationship: User 1:N PermitToWork)"
+        }
+      },
+      "required": [
+        "id",
+        "siteId",
+        "ptwTypeId",
+        "descriptionOfWork",
+        "status",
+        "siteEngineerId"
+      ]
+    },
+    "PermitToWorkType": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PermitToWorkType",
+      "type": "object",
+      "description": "Represents the type of Permit to Work (e.g., Hot Work, Cold Work).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the permit to work type."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the permit to work type."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the permit to work type."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Includes denormalized 'assignedProjectIds' for authorization independence, enabling secure listing of projects a user has access to.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/projects/{projectId}",
+        "definition": {
+          "entityName": "Project",
+          "schema": {
+            "$ref": "#/backend/entities/Project"
+          },
+          "description": "Stores project information.",
+          "params": [
+            {
+              "name": "projectId",
+              "description": "The unique identifier for the project."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/sites/{siteId}",
+        "definition": {
+          "entityName": "Site",
+          "schema": {
+            "$ref": "#/backend/entities/Site"
+          },
+          "description": "Stores site information.",
+          "params": [
+            {
+              "name": "siteId",
+              "description": "The unique identifier for the site."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/permits_to_work/{permitId}",
+        "definition": {
+          "entityName": "PermitToWork",
+          "schema": {
+            "$ref": "#/backend/entities/PermitToWork"
+          },
+          "description": "Stores Permit to Work requests.",
+          "params": [
+            {
+              "name": "permitId",
+              "description": "The unique identifier for the permit to work request."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/permit_to_work_types/{ptwTypeId}",
+        "definition": {
+          "entityName": "PermitToWorkType",
+          "schema": {
+            "$ref": "#/backend/entities/PermitToWorkType"
+          },
+          "description": "Stores Permit to Work types.",
+          "params": [
+            {
+              "name": "ptwTypeId",
+              "description": "The unique identifier for the permit to work type."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "user",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection indicate admin role. Existence determines role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_supervisor/{userId}",
+        "definition": {
+          "entityName": "user",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Documents in this collection indicate supervisor role. Existence determines role.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support the PermitFlow application's core features, including user management, project/site management, and Permit to Work (PtW) request workflows. It adheres to the principles of Authorization Independence, Clarity of Intent, DBAC, and QAPs. Authorization Independence is achieved by denormalizing project membership into the user documents (assignedProjectIds). This enables secure list operations and avoids complex rule logic involving `get()` calls. Structural Segregation is implemented by separating user-related data into `/users/{userId}` and PtW data into `/permits_to_work/{permitId}`, ensuring homogeneous security postures. Access Modeling employs path-based ownership for user data and a membership map for project authorization. Explicit state modeling is used for PtW status, and predictable schemas are enforced for data clarity. The structure supports QAPs by allowing listing of permits limited to those the user has access to via denormalized roles."
+  }
+}
