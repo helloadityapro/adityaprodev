@@ -21,8 +21,6 @@ const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
   ptwType: z.string().min(1, "Permit type is required"),
   descriptionOfWork: z.string().min(10, "Description must be at least 10 characters"),
-  videoUrl: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
-  vlogUrl: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
   commentsAndRemarks: z.string().optional(),
 })
 
@@ -80,8 +78,6 @@ export default function RaisePtwPage() {
       siteName: "",
       ptwType: "",
       descriptionOfWork: "",
-      videoUrl: "",
-      vlogUrl: "",
       commentsAndRemarks: "",
     },
   })
@@ -234,38 +230,20 @@ export default function RaisePtwPage() {
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                    control={form.control}
-                    name="videoUrl"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Work Video URL</FormLabel>
-                            <FormControl>
-                                <div className="flex items-center gap-2">
-                                    <FileVideo className="h-5 w-5 text-muted-foreground"/>
-                                    <Input type="url" placeholder="https://example.com/video.mp4" {...field} />
-                                </div>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="vlogUrl"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Engineer Vlog URL</FormLabel>
-                            <FormControl>
-                                <div className="flex items-center gap-2">
-                                    <Video className="h-5 w-5 text-muted-foreground"/>
-                                    <Input type="url" placeholder="https://example.com/vlog.mp4" {...field} />
-                                </div>
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                   <div className="grid gap-2">
+                      <Label htmlFor="work-video">Attach video and photos</Label>
+                      <div className="flex items-center gap-2">
+                          <FileVideo className="h-5 w-5 text-muted-foreground"/>
+                          <Input id="work-video" type="file" className="border-dashed" multiple />
+                      </div>
+                  </div>
+                   <div className="grid gap-2">
+                      <Label htmlFor="vlog">Attach vlog of engineer</Label>
+                       <div className="flex items-center gap-2">
+                          <Video className="h-5 w-5 text-muted-foreground"/>
+                          <Input id="vlog" type="file" className="border-dashed" />
+                      </div>
+                  </div>
               </div>
 
               <FormField
