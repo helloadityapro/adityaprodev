@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { FileVideo, Video } from "lucide-react"
+import { Link as LinkIcon, Video } from "lucide-react"
 import { useFirestore, useUser, addDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp } from "firebase/firestore"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -22,6 +22,8 @@ const raisePtwSchema = z.object({
   ptwType: z.string().min(1, "Permit type is required"),
   descriptionOfWork: z.string().min(10, "Description must be at least 10 characters"),
   commentsAndRemarks: z.string().optional(),
+  videoUrl: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
+  vlogUrl: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
 })
 
 const ptwTypes = [
@@ -79,6 +81,8 @@ export default function RaisePtwPage() {
       ptwType: "",
       descriptionOfWork: "",
       commentsAndRemarks: "",
+      videoUrl: "",
+      vlogUrl: "",
     },
   })
 
@@ -230,20 +234,38 @@ export default function RaisePtwPage() {
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div className="grid gap-2">
-                      <Label htmlFor="work-video">Attach video and photos</Label>
-                      <div className="flex items-center gap-2">
-                          <FileVideo className="h-5 w-5 text-muted-foreground"/>
-                          <Input id="work-video" type="file" className="border-dashed" multiple />
-                      </div>
-                  </div>
-                   <div className="grid gap-2">
-                      <Label htmlFor="vlog">Attach vlog of engineer</Label>
-                       <div className="flex items-center gap-2">
-                          <Video className="h-5 w-5 text-muted-foreground"/>
-                          <Input id="vlog" type="file" className="border-dashed" />
-                      </div>
-                  </div>
+                  <FormField
+                      control={form.control}
+                      name="videoUrl"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Work Video/Photos URL</FormLabel>
+                               <div className="flex items-center gap-2">
+                                  <LinkIcon className="h-5 w-5 text-muted-foreground"/>
+                                  <FormControl>
+                                      <Input placeholder="https://example.com/video" {...field} />
+                                  </FormControl>
+                              </div>
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="vlogUrl"
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel>Engineer's Vlog URL</FormLabel>
+                               <div className="flex items-center gap-2">
+                                  <Video className="h-5 w-5 text-muted-foreground"/>
+                                  <FormControl>
+                                      <Input placeholder="https://example.com/vlog" {...field} />
+                                  </FormControl>
+                              </div>
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                  />
               </div>
 
               <FormField

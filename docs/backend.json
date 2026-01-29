@@ -137,6 +137,10 @@
           "type": "string",
           "description": "Comments and remarks related to the permit."
         },
+        "adminRemarks": {
+            "type": "string",
+            "description": "Remarks added by the admin during the approval/rejection process."
+        },
         "status": {
           "type": "string",
           "description": "The status of the permit (e.g., Submitted, Approved, Rejected, Corrected)."

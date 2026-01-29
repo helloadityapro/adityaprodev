@@ -1,5 +1,8 @@
 "use client";
 import * as React from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import {
   Table,
   TableBody,
@@ -12,11 +15,16 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, FileCheck, Clock, FileX, ArrowUpRight, List as ListIcon } from "lucide-react"
+import { MoreHorizontal, FileCheck, Clock, FileX, ArrowUpRight, List as ListIcon, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
 
 type Permit = {
   id: string;
@@ -28,6 +36,10 @@ type Permit = {
   supervisorId?: string;
   adminId?: string;
   requestDate: any; // Should be a timestamp
+  videoUrl?: string;
+  vlogUrl?: string;
+  commentsAndRemarks?: string;
+  adminRemarks?: string;
 };
 
 function StatusBadge({ status }: { status: Permit["status"] }) {
@@ -62,7 +74,7 @@ function UserDisplay({ userId }: { userId: string }) {
 }
 
 
-function PermitListTable({ permits, onAction, userRole }: { permits: Permit[]; onAction: (permitId: string, status: Permit['status']) => void; userRole: string }) {
+function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; }) {
     return (
       <Table>
         <TableHeader>
@@ -99,15 +111,15 @@ function PermitListTable({ permits, onAction, userRole }: { permits: Permit[]; o
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuItem>View Details</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onViewDetails(permit)}>View Details</DropdownMenuItem>
                     {(userRole === 'Admin' || userRole === 'Supervisor') && permit.status === 'Pending' && (
                         <>
-                            <DropdownMenuItem onClick={() => onAction(permit.id, 'Approved')}>Approve</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onAction(permit.id, 'Rejected')} className="text-destructive focus:text-destructive focus:bg-destructive/10">Reject</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onAction(permit, 'Approved')}>Approve</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onAction(permit, 'Rejected')} className="text-destructive focus:text-destructive focus:bg-destructive/10">Reject</DropdownMenuItem>
                         </>
                     )}
                     {userRole === 'SiteEngineer' && permit.status === 'Rejected' && (
-                        <DropdownMenuItem>Correct & Resubmit</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onCorrect(permit)}>Correct & Resubmit</DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -119,9 +131,103 @@ function PermitListTable({ permits, onAction, userRole }: { permits: Permit[]; o
     );
 }
 
+const actionSchema = z.object({
+  adminRemarks: z.string().min(1, "Remarks are required to proceed."),
+});
+
+function PermitActionDialog({ permit, status, open, onOpenChange, onConfirm }: { permit: Permit | null, status: 'Approved' | 'Rejected' | null, open: boolean, onOpenChange: (open: boolean) => void, onConfirm: (permitId: string, status: 'Approved' | 'Rejected', remarks: string) => void }) {
+  const { toast } = useToast();
+  const form = useForm<z.infer<typeof actionSchema>>({
+    resolver: zodResolver(actionSchema),
+    defaultValues: { adminRemarks: "" },
+  });
+
+  React.useEffect(() => {
+    if (open) {
+      form.reset({ adminRemarks: "" });
+    }
+  }, [open, form]);
+
+  const onSubmit = (values: z.infer<typeof actionSchema>) => {
+    if (!permit || !status) return;
+    onConfirm(permit.id, status, values.adminRemarks);
+    toast({ title: `Permit ${status}`, description: `The permit has been ${status.toLowerCase()}.` });
+    onOpenChange(false);
+  };
+  
+  if (!permit || !status) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{status} Permit Request?</DialogTitle>
+          <DialogDescription>
+            You are about to {status.toLowerCase()} this permit. Please provide remarks for this action.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="adminRemarks"
+              render={({ field }) => (
+                <FormItem>
+                  <Label htmlFor="adminRemarks">Remarks</Label>
+                  <FormControl>
+                    <Textarea id="adminRemarks" placeholder={`Enter remarks for ${status.toLowerCase()} this permit...`} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <DialogFooter>
+              <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+              <Button type="submit">{status}</Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PermitDetailsDialog({ permit, open, onOpenChange }: { permit: Permit | null, open: boolean, onOpenChange: (open: boolean) => void }) {
+  if (!permit) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Permit Details</DialogTitle>
+          <DialogDescription>ID: {permit.id}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4 text-sm">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+            <div><Label>Site Name</Label><p>{permit.siteName}</p></div>
+            <div><Label>Permit Type</Label><p>{permit.ptwType}</p></div>
+            <div className="col-span-2"><Label>Description of Work</Label><p className="whitespace-pre-wrap">{permit.descriptionOfWork}</p></div>
+            <div><Label>Status</Label><p><StatusBadge status={permit.status} /></p></div>
+            <div><Label>Requested On</Label><p>{permit.requestDate ? new Date(permit.requestDate.toDate()).toLocaleString() : 'N/A'}</p></div>
+            <div><Label>Requested By</Label><p><UserDisplay userId={permit.siteEngineerId} /></p></div>
+             {permit.supervisorId && <div><Label>Reviewed By (Supervisor)</Label><p><UserDisplay userId={permit.supervisorId} /></p></div>}
+            {permit.adminId && <div><Label>Reviewed By (Admin)</Label><p><UserDisplay userId={permit.adminId} /></p></div>}
+            {permit.commentsAndRemarks && <div className="col-span-2"><Label>Engineer's Remarks</Label><p className="whitespace-pre-wrap">{permit.commentsAndRemarks}</p></div>}
+            {permit.adminRemarks && <div className="col-span-2"><Label>Admin's Remarks</Label><p className="whitespace-pre-wrap">{permit.adminRemarks}</p></div>}
+            {permit.videoUrl && <div><Label>Work Video/Photos</Label><a href={permit.videoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary underline"><ExternalLink size={14}/>View Attachment</a></div>}
+            {permit.vlogUrl && <div><Label>Engineer's Vlog</Label><a href={permit.vlogUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary underline"><ExternalLink size={14}/>View Attachment</a></div>}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
 export default function PtwListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -132,6 +238,9 @@ export default function PtwListPage() {
   const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com';
   const userRole = isAdmin ? "Admin" : userProfile?.role;
   
+  const [actionState, setActionState] = React.useState<{permit: Permit, status: 'Approved' | 'Rejected'} | null>(null);
+  const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
+
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole) return null;
     const baseQuery = collection(firestore, 'permits_to_work');
@@ -143,9 +252,9 @@ export default function PtwListPage() {
 
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
 
-  const handlePermitAction = (permitId: string, status: Permit['status']) => {
+  const handlePermitAction = (permitId: string, status: Permit['status'], adminRemarks: string) => {
     const permitRef = doc(firestore, "permits_to_work", permitId);
-    let updateData: any = { status };
+    let updateData: any = { status, adminRemarks };
     if (userRole === 'Supervisor') {
         updateData.supervisorId = user?.uid;
     }
@@ -154,6 +263,12 @@ export default function PtwListPage() {
     }
     updateDocumentNonBlocking(permitRef, updateData);
   };
+  
+  const handleCorrectAndResubmit = (permit: Permit) => {
+      // For now, just logging. Could navigate to a pre-filled raise form.
+      console.log("Correct and Resubmit:", permit);
+      router.push('/ptw/raise'); // Simplified: just go to a new form
+  }
 
   const summary = {
     total: permits?.length || 0,
@@ -224,19 +339,34 @@ export default function PtwListPage() {
         </TabsList>
         <Card className="mt-4">
             <TabsContent value="all" className="m-0">
-                <PermitListTable permits={allPermits} onAction={handlePermitAction} userRole={userRole || ''} />
+                <PermitListTable permits={allPermits} onAction={(permit, status) => setActionState({permit, status})} userRole={userRole || ''} onViewDetails={setDetailsPermit} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
             <TabsContent value="pending" className="m-0">
-                <PermitListTable permits={allPermits.filter(p => p.status === 'Pending')} onAction={handlePermitAction} userRole={userRole || ''} />
+                <PermitListTable permits={allPermits.filter(p => p.status === 'Pending')} onAction={(permit, status) => setActionState({permit, status})} userRole={userRole || ''} onViewDetails={setDetailsPermit} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
             <TabsContent value="approved" className="m-0">
-                <PermitListTable permits={allPermits.filter(p => p.status === 'Approved')} onAction={handlePermitAction} userRole={userRole || ''} />
+                <PermitListTable permits={allPermits.filter(p => p.status === 'Approved')} onAction={(permit, status) => setActionState({permit, status})} userRole={userRole || ''} onViewDetails={setDetailsPermit} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
             <TabsContent value="rejected" className="m-0">
-                <PermitListTable permits={allPermits.filter(p => p.status === 'Rejected')} onAction={handlePermitAction} userRole={userRole || ''} />
+                <PermitListTable permits={allPermits.filter(p => p.status === 'Rejected')} onAction={(permit, status) => setActionState({permit, status})} userRole={userRole || ''} onViewDetails={setDetailsPermit} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
         </Card>
       </Tabs>
+
+      <PermitActionDialog
+        permit={actionState?.permit || null}
+        status={actionState?.status || null}
+        open={!!actionState}
+        onOpenChange={() => setActionState(null)}
+        onConfirm={handlePermitAction}
+      />
+      
+      <PermitDetailsDialog
+        permit={detailsPermit}
+        open={!!detailsPermit}
+        onOpenChange={() => setDetailsPermit(null)}
+      />
+
     </div>
   )
 }
