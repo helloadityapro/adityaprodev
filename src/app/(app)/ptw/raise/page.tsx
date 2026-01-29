@@ -89,7 +89,13 @@ export default function RaisePtwPage() {
         }
         const csvText = await response.text();
         const parsedData = parseCSV(csvText);
-        setAllSites(parsedData);
+        
+        // De-duplicate sites based on the project name to avoid key errors in the Select component
+        const uniqueSites = parsedData.filter((site, index, self) =>
+            index === self.findIndex((s) => s['Project name'] === site['Project name'])
+        );
+
+        setAllSites(uniqueSites);
       } catch (err: any) {
         toast({ variant: "destructive", title: "Error fetching sites", description: err.message });
       }
@@ -153,8 +159,8 @@ export default function RaisePtwPage() {
                           </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                              {allSites.map((site, index) => (
-                              <SelectItem key={index} value={site['Project name']}>{site['Project name']}</SelectItem>
+                              {allSites.map((site) => (
+                              <SelectItem key={site['Project name']} value={site['Project name']}>{site['Project name']}</SelectItem>
                               ))}
                           </SelectContent>
                       </Select>
