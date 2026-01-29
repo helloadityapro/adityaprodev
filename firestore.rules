@@ -189,18 +189,5 @@ service cloud.firestore {
       allow update: if isSignedIn() && resource != null && (request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId] || isAdmin() || isSupervisor());
       allow delete: if isAdmin() && resource != null;
     }
-
-    /**
-     * @description Stores the different types of permits available (e.g., Hot Work). This is
-     * considered public reference data, readable by any signed-in user, but only modifiable by Admins.
-     * @path /permit_to_work_types/{ptwTypeId}
-     * @allow (get, list) Any signed-in user can read the list of available permit types.
-     * @deny (create) A non-admin user attempts to add a new permit type.
-     * @principle Provides public read access for reference data while securing writes to administrators.
-     */
-    match /permit_to_work_types/{ptwTypeId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isAdmin();
-    }
   }
 }

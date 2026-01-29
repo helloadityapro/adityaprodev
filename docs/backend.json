@@ -111,13 +111,13 @@
           "type": "string",
           "description": "Unique identifier for the permit to work request."
         },
-        "siteId": {
+        "siteName": {
           "type": "string",
-          "description": "Reference to Site. (Relationship: Site 1:N PermitToWork)"
+          "description": "The name of the site."
         },
-        "ptwTypeId": {
+        "ptwType": {
           "type": "string",
-          "description": "Reference to PermitToWorkType. (Relationship: PermitToWorkType 1:N PermitToWork)"
+          "description": "The type of permit."
         },
         "descriptionOfWork": {
           "type": "string",
@@ -156,35 +156,11 @@
       },
       "required": [
         "id",
-        "siteId",
-        "ptwTypeId",
+        "siteName",
+        "ptwType",
         "descriptionOfWork",
         "status",
         "siteEngineerId"
-      ]
-    },
-    "PermitToWorkType": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "PermitToWorkType",
-      "type": "object",
-      "description": "Represents the type of Permit to Work (e.g., Hot Work, Cold Work).",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the permit to work type."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the permit to work type."
-        },
-        "description": {
-          "type": "string",
-          "description": "A description of the permit to work type."
-        }
-      },
-      "required": [
-        "id",
-        "name"
       ]
     }
   },
@@ -256,22 +232,6 @@
             {
               "name": "permitId",
               "description": "The unique identifier for the permit to work request."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/permit_to_work_types/{ptwTypeId}",
-        "definition": {
-          "entityName": "PermitToWorkType",
-          "schema": {
-            "$ref": "#/backend/entities/PermitToWorkType"
-          },
-          "description": "Stores Permit to Work types.",
-          "params": [
-            {
-              "name": "ptwTypeId",
-              "description": "The unique identifier for the permit to work type."
             }
           ]
         }
