@@ -56,11 +56,8 @@ service cloud.firestore {
      * or by checking for a specific admin email.
      */
     function isAdmin() {
-      // Guard against non-existent user doc and missing 'role' field
-      let userDocExists = exists(/databases/$(database)/documents/users/$(request.auth.uid));
-      let userIsAdminRole = userDocExists 
-                            && 'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data
-                            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      let userIsAdminRole = userDoc != null && 'role' in userDoc.data && userDoc.data.role == 'Admin';
       return isSignedIn() && (userIsAdminRole || request.auth.token.email == 'abhijeet.agepl@gmail.com');
     }
 
@@ -68,24 +65,22 @@ service cloud.firestore {
      * Checks if the requesting user has the Supervisor role by reading their user document.
      */
     function isSupervisor() {
-        // Guard against non-existent user doc and missing 'role' field
-        let userDocExists = exists(/databases/$(database)/documents/users/$(request.auth.uid));
-        return isSignedIn() 
-               && userDocExists 
-               && 'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data
-               && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Supervisor';
+        let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        return isSignedIn()
+               && userDoc != null
+               && 'role' in userDoc.data
+               && userDoc.data.role == 'Supervisor';
     }
 
     /**
      * Checks if the requesting user has the SiteEngineer role by reading their user document.
      */
     function isSiteEngineer() {
-        // Guard against non-existent user doc and missing 'role' field
-        let userDocExists = exists(/databases/$(database)/documents/users/$(request.auth.uid));
-        return isSignedIn() 
-               && userDocExists 
-               && 'role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data
-               && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SiteEngineer';
+        let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        return isSignedIn()
+               && userDoc != null
+               && 'role' in userDoc.data
+               && userDoc.data.role == 'SiteEngineer';
     }
 
 
@@ -111,7 +106,7 @@ service cloud.firestore {
      * Reads the 'assignedProjectIds' array from the user's own document.
      */
     function isAssignedToProject(projectId) {
-      return isSignedIn() && projectId in userRecord().data.assignedProjectIds;
+      return isSignedIn() && userRecord() != null && 'assignedProjectIds' in userRecord().data && projectId in userRecord().data.assignedProjectIds;
     }
 
     /**
@@ -120,7 +115,7 @@ service cloud.firestore {
      */
     function canAccessSite(siteId) {
         let site = get(/databases/$(database)/documents/sites/$(siteId));
-        return isAssignedToProject(site.data.projectId);
+        return site != null && isAssignedToProject(site.data.projectId);
     }
     
     /**
@@ -205,10 +200,10 @@ service cloud.firestore {
      * @principle Enforces document-level access based on roles defined within the document's fields and user roles.
      */
     match /permits_to_work/{permitId} {
-      allow get: if isSignedIn() && (request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId] || isAdmin());
+      allow get: if isSignedIn() && (isAdmin() || (resource != null && request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId]));
       allow list: if isAdmin() || isSupervisor() || isSiteEngineer();
       allow create: if isSignedIn() && request.resource.data.siteEngineerId == request.auth.uid;
-      allow update: if isSignedIn() && resource != null && (request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId] || isAdmin() || isSupervisor());
+      allow update: if isSignedIn() && resource != null && (isAdmin() || isSupervisor() || request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId]);
       allow delete: if isAdmin() && resource != null;
     }
   }
