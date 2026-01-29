@@ -13,13 +13,21 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, FileCheck, Clock, FileX, ArrowUpRight, List as ListIcon, ExternalLink, FileVideo, Video } from "lucide-react"
+import { FileCheck, Clock, FileX, List as ListIcon, ExternalLink, Eye, FilePen, Trash2, Check, X, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -45,10 +53,10 @@ type Permit = {
 
 function StatusBadge({ status }: { status: Permit["status"] }) {
     const statusConfig = {
-        Pending: { icon: Clock, className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100/80 dark:bg-yellow-900/50 dark:text-yellow-300 border-transparent' },
-        Approved: { icon: FileCheck, className: 'bg-green-100 text-green-800 hover:bg-green-100/80 dark:bg-green-900/50 dark:text-green-300 border-transparent' },
-        Rejected: { icon: FileX, className: 'bg-red-100 text-red-800 hover:bg-red-100/80 dark:bg-red-900/50 dark:text-red-300 border-transparent' },
-        Corrected: { icon: ArrowUpRight, className: 'bg-blue-100 text-blue-800 hover:bg-blue-100/80 dark:bg-blue-900/50 dark:text-blue-300 border-transparent' },
+        Pending: { icon: Clock, className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100/80 dark:bg-yellow-900/50 dark:text-yellow-300 border-yellow-300' },
+        Approved: { icon: FileCheck, className: 'bg-green-100 text-green-800 hover:bg-green-100/80 dark:bg-green-900/50 dark:text-green-300 border-green-300' },
+        Rejected: { icon: FileX, className: 'bg-red-100 text-red-800 hover:bg-red-100/80 dark:bg-red-900/50 dark:text-red-300 border-red-300' },
+        Corrected: { icon: FileCheck, className: 'bg-blue-100 text-blue-800 hover:bg-blue-100/80 dark:bg-blue-900/50 dark:text-blue-300 border-blue-300' },
     };
 
     const config = statusConfig[status];
@@ -57,7 +65,7 @@ function StatusBadge({ status }: { status: Permit["status"] }) {
 
     return (
         <Badge
-          className={cn("flex items-center gap-1.5 text-xs font-medium", config.className)}
+          className={cn("flex items-center gap-1.5 text-xs font-medium w-fit border", config.className)}
         >
             <Icon className="h-3 w-3" />
             {status}
@@ -76,73 +84,56 @@ function UserDisplay({ userId }: { userId: string }) {
 }
 
 
-const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; }) {
+const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onDelete }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onDelete: (permit: Permit) => void; }) {
     return (
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Permit ID</TableHead>
-            <TableHead>Site Name</TableHead>
-            <TableHead>Permit For</TableHead>
-            <TableHead className="hidden md:table-cell">Requested By</TableHead>
-            <TableHead className="hidden sm:table-cell">Date</TableHead>
+            <TableHead className="w-[40px]">#</TableHead>
+            <TableHead>PTW Type</TableHead>
+            <TableHead>Site</TableHead>
+            <TableHead>Engineer</TableHead>
+            <TableHead>Created</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Attachments</TableHead>
-            <TableHead>
-              <span className="sr-only">Actions</span>
-            </TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {permits.map((permit) => (
+          {permits.map((permit, index) => (
             <TableRow key={permit.id}>
-              <TableCell className="font-medium">{permit.id.substring(0,7)}...</TableCell>
+              <TableCell className="font-medium">{index + 1}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-2 font-medium">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span>{permit.ptwType}</span>
+                </div>
+              </TableCell>
               <TableCell>{permit.siteName}</TableCell>
-              <TableCell>{permit.ptwType}</TableCell>
-              <TableCell className="hidden md:table-cell"><UserDisplay userId={permit.siteEngineerId} /></TableCell>
-              <TableCell className="hidden sm:table-cell">{permit.requestDate ? new Date(permit.requestDate?.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
+              <TableCell><UserDisplay userId={permit.siteEngineerId} /></TableCell>
+              <TableCell>{permit.requestDate ? new Date(permit.requestDate?.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
               <TableCell>
                 <StatusBadge status={permit.status} />
               </TableCell>
               <TableCell>
-                <div className="flex items-center gap-2">
-                  {permit.videoUrl && (
-                    <a href={permit.videoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
-                      <FileVideo className="h-4 w-4"/>
-                    </a>
-                  )}
-                  {permit.vlogUrl && (
-                    <a href={permit.vlogUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
-                      <Video className="h-4 w-4" />
-                    </a>
-                  )}
-                  {!permit.videoUrl && !permit.vlogUrl && (
-                    <span className="text-xs text-muted-foreground">N/A</span>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button aria-haspopup="true" size="icon" variant="ghost">
-                      <MoreHorizontal className="h-4 w-4" />
-                      <span className="sr-only">Toggle menu</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuItem onClick={() => onViewDetails(permit)}>View Details</DropdownMenuItem>
-                    {(userRole === 'Admin' || userRole === 'Supervisor') && permit.status === 'Pending' && (
+                <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => onViewDetails(permit)}><span className="sr-only">View</span><Eye className="h-4 w-4" /></Button>
+                    
+                    {userRole === 'SiteEngineer' && permit.status === 'Rejected' && (
+                        <Button variant="ghost" size="icon" onClick={() => onCorrect(permit)}><span className="sr-only">Correct</span><FilePen className="h-4 w-4" /></Button>
+                    )}
+                    
+                    {(userRole === 'Admin' || userRole === 'Supervisor') && (
                         <>
-                            <DropdownMenuItem onClick={() => onAction(permit, 'Approved')}>Approve</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onAction(permit, 'Rejected')} className="text-destructive focus:text-destructive focus:bg-destructive/10">Reject</DropdownMenuItem>
+                            {permit.status !== 'Approved' && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(permit)}><span className="sr-only">Delete</span><Trash2 className="h-4 w-4" /></Button>}
+                            {permit.status === 'Pending' && (
+                                <>
+                                <Button variant="default" size="icon" className="bg-green-500 hover:bg-green-600 text-white h-8 w-8" onClick={() => onAction(permit, 'Approved')}><span className="sr-only">Approve</span><Check className="h-4 w-4" /></Button>
+                                <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => onAction(permit, 'Rejected')}><span className="sr-only">Reject</span><X className="h-4 w-4" /></Button>
+                                </>
+                            )}
                         </>
                     )}
-                    {userRole === 'SiteEngineer' && permit.status === 'Rejected' && (
-                        <DropdownMenuItem onClick={() => onCorrect(permit)}>Correct & Resubmit</DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                </div>
               </TableCell>
             </TableRow>
           ))}
@@ -260,6 +251,7 @@ export default function PtwListPage() {
   
   const [actionState, setActionState] = React.useState<{permit: Permit, status: 'Approved' | 'Rejected'} | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
+  const [permitToDelete, setPermitToDelete] = React.useState<Permit | null>(null);
 
   const handleActionTrigger = React.useCallback((permit: Permit, status: 'Approved' | 'Rejected') => {
     setActionState({ permit, status });
@@ -268,6 +260,17 @@ export default function PtwListPage() {
   const handleViewDetails = React.useCallback((permit: Permit) => {
       setDetailsPermit(permit);
   }, []);
+
+  const handleDeleteTrigger = React.useCallback((permit: Permit) => {
+    setPermitToDelete(permit);
+  }, []);
+  
+  const handleConfirmDelete = () => {
+    if (!permitToDelete) return;
+    const permitRef = doc(firestore, 'permits_to_work', permitToDelete.id);
+    deleteDocumentNonBlocking(permitRef);
+    setPermitToDelete(null);
+  }
 
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole) return null;
@@ -298,14 +301,13 @@ export default function PtwListPage() {
 
   const allPermits = permits || [];
   const pendingPermits = React.useMemo(() => allPermits.filter(p => p.status === 'Pending'), [allPermits]);
-  const approvedPermits = React.useMemo(() => allPermits.filter(p => p.status === 'Approved'), [allPermits]);
-  const rejectedPermits = React.useMemo(() => allPermits.filter(p => p.status === 'Rejected'), [allPermits]);
+  const otherPermits = React.useMemo(() => allPermits.filter(p => p.status !== 'Pending'), [allPermits]);
   
   const summary = {
     total: allPermits.length,
     pending: pendingPermits.length,
-    approved: approvedPermits.length,
-    rejected: rejectedPermits.length,
+    approved: React.useMemo(() => allPermits.filter(p => p.status === 'Approved').length, [allPermits]),
+    rejected: React.useMemo(() => allPermits.filter(p => p.status === 'Rejected').length, [allPermits]),
   };
 
   if (isLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
@@ -314,21 +316,31 @@ export default function PtwListPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center">
-        <h1 className="text-lg font-headline font-semibold md:text-2xl">Permits to Work</h1>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-3xl font-bold tracking-tight">PTW Request Management</h1>
+        <p className="text-muted-foreground">Review and manage permit to work requests</p>
       </div>
 
       {(userRole === 'Admin' || userRole === 'Supervisor') && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Permits</CardTitle>
+                    <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
                     <ListIcon className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">{summary.total}</div>
                 </CardContent>
             </Card>
+             <Card className="border-yellow-500 border-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Pending</CardTitle>
+                  <Clock className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{summary.pending}</div>
+              </CardContent>
+          </Card>
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Approved</CardTitle>
@@ -336,15 +348,6 @@ export default function PtwListPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold">{summary.approved}</div>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Pending</CardTitle>
-                    <Clock className="h-4 w-4 text-yellow-500" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">{summary.pending}</div>
                 </CardContent>
             </Card>
             <Card>
@@ -359,28 +362,36 @@ export default function PtwListPage() {
         </div>
       )}
 
-      <Tabs defaultValue="all">
-        <TabsList className="grid w-full grid-cols-4 sm:w-auto sm:inline-flex">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
-            <TabsTrigger value="approved">Approved</TabsTrigger>
-            <TabsTrigger value="rejected">Rejected</TabsTrigger>
-        </TabsList>
-        <Card className="mt-4">
-            <TabsContent value="all" className="m-0">
-                <PermitListTable permits={allPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
-            </TabsContent>
-            <TabsContent value="pending" className="m-0">
-                <PermitListTable permits={pendingPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
-            </TabsContent>
-            <TabsContent value="approved" className="m-0">
-                <PermitListTable permits={approvedPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
-            </TabsContent>
-            <TabsContent value="rejected" className="m-0">
-                <PermitListTable permits={rejectedPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
-            </TabsContent>
-        </Card>
-      </Tabs>
+      <Card>
+        <CardHeader>
+          <CardTitle>Pending PTW Requests</CardTitle>
+        </CardHeader>
+        <CardContent>
+            {pendingPermits.length > 0 ? (
+                <PermitListTable permits={pendingPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} />
+            ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                    <p>No pending requests.</p>
+                </div>
+            )}
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle>All Other Requests</CardTitle>
+        </CardHeader>
+        <CardContent>
+            {otherPermits.length > 0 ? (
+             <PermitListTable permits={otherPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} />
+            ) : (
+                 <div className="text-center py-12 text-muted-foreground">
+                    <p>No other requests found.</p>
+                </div>
+            )}
+        </CardContent>
+      </Card>
+
 
       <PermitActionDialog
         permit={actionState?.permit || null}
@@ -395,6 +406,21 @@ export default function PtwListPage() {
         open={!!detailsPermit}
         onOpenChange={() => setDetailsPermit(null)}
       />
+      
+      <AlertDialog open={!!permitToDelete} onOpenChange={() => setPermitToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the permit request.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   )
