@@ -1,12 +1,12 @@
 'use client';
 
-import type React from "react"
-import { useRouter } from "next/navigation"
-import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth } from "@/firebase"
-import { doc } from "firebase/firestore"
-import UserNav from "@/components/user-nav"
-import AppLogo from "@/components/app-logo"
-import { MainNav } from "@/components/main-nav"
+import React from "react";
+import { useRouter } from "next/navigation";
+import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth } from "@/firebase";
+import { doc } from "firebase/firestore";
+import UserNav from "@/components/user-nav";
+import AppLogo from "@/components/app-logo";
+import { MainNav } from "@/components/main-nav";
 import {
   SidebarProvider,
   Sidebar,
@@ -14,14 +14,14 @@ import {
   SidebarContent,
   SidebarInset,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
-  const auth = useAuth()
-  const { user, isUserLoading } = useUser()
-  const firestore = useFirestore()
+  const router = useRouter();
+  const auth = useAuth();
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
 
   const userProfileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -34,16 +34,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (!isUserLoading && !user) {
-      router.replace('/login')
+      router.replace('/login');
     }
-  }, [user, isUserLoading, router])
+  }, [user, isUserLoading, router]);
 
   if (isUserLoading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p>Loading...</p>
       </div>
-    )
+    );
   }
 
   // Check for registration approval
@@ -56,7 +56,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         <Button onClick={() => auth.signOut()}>Sign Out</Button>
       </div>
-    )
+    );
   }
 
 
@@ -83,5 +83,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }
