@@ -78,7 +78,6 @@ export default function RaisePtwPage() {
     },
   })
 
-  // Watch the siteName field to use for searching
   const siteNameValue = form.watch('siteName');
 
   React.useEffect(() => {
@@ -102,22 +101,21 @@ export default function RaisePtwPage() {
     if (!siteNameValue || siteNameValue.length < 3) return [];
     return allSites?.filter(site => site['Project name'].toLowerCase().includes(siteNameValue.toLowerCase())) || [];
   }, [siteNameValue, allSites]);
+  
+  React.useEffect(() => {
+    if (selectedSite && siteNameValue !== selectedSite['Project name']) {
+      setSelectedSite(null);
+    }
+  }, [siteNameValue, selectedSite]);
 
   React.useEffect(() => {
-    if (siteNameValue && siteNameValue.length >= 3 && filteredSites.length > 0) {
-       // Don't show popover if the current value is an exact match for the selected site
-      if (selectedSite && selectedSite['Project name'] === siteNameValue) {
-        setIsSitePopoverOpen(false);
-      } else {
-        setIsSitePopoverOpen(true);
-      }
-    } else {
-      setIsSitePopoverOpen(false);
-    }
+    const shouldBeOpen = !!(siteNameValue && siteNameValue.length >= 3 && filteredSites.length > 0 && (!selectedSite || selectedSite['Project name'] !== siteNameValue));
+    setIsSitePopoverOpen(shouldBeOpen);
   }, [siteNameValue, filteredSites, selectedSite]);
 
+
   const handleSiteSelect = (site: SiteData) => {
-    form.setValue('siteName', site['Project name']);
+    form.setValue('siteName', site['Project name'], { shouldValidate: true });
     setSelectedSite(site);
     setIsSitePopoverOpen(false);
   }
@@ -127,7 +125,6 @@ export default function RaisePtwPage() {
         toast({ variant: "destructive", title: "You must be logged in to submit a permit." });
         return;
     }
-    // Ensure a site was selected
     if(!selectedSite || values.siteName !== selectedSite['Project name']) {
         form.setError('siteName', { type: 'manual', message: 'Please select a valid site from the list.' });
         return;
@@ -173,12 +170,6 @@ export default function RaisePtwPage() {
                             <Input
                               placeholder="Type to search for a site..."
                               {...field}
-                               onChange={(e) => {
-                                field.onChange(e.target.value);
-                                if (selectedSite && e.target.value !== selectedSite['Project name']) {
-                                  setSelectedSite(null);
-                                }
-                              }}
                             />
                           </FormControl>
                         </PopoverTrigger>
