@@ -15,16 +15,16 @@
  * Key Security Decisions:
  * - Admin Supremacy: Users with an 'Admin' role have universal read/write access to facilitate
  *   system management.
- * - Role-Based Access: User roles ('Admin', 'Supervisor') are stored on the /users/{userId}
+ * - Role-Based Access: User roles ('Admin', 'Supervisor', 'SiteEngineer') are stored on the /users/{userId}
  *   document. Security rules read this document to grant permissions, ensuring a single source
  *   of truth for a user's role.
  * - Project Access via Denormalization: A user's access to /projects and their sub-collections
  *   is determined by checking the 'assignedProjectIds' array stored directly on their own
  *   /users/{userId} document. This avoids complex, slow, and costly cross-collection lookups
  *   in rules.
- * - Secure Listing: Listing entire collections is restricted. Admins can list users. Admins and
- *   Supervisors can list permits. Non-admin users must rely on targeted queries secured by
- *   more granular 'get' rules.
+ * - Secure Listing: Listing entire collections is restricted. Admins and Supervisors can list
+ *   permits. Site Engineers can list permits they have created. Non-admin users must rely on
+ *   targeted queries secured by more granular 'get' rules.
  * - Immutable Ownership: Critical relational IDs (e.g., the creator of a permit) are enforced
  *   as immutable after creation to maintain data integrity and a clear audit trail.
  */
@@ -64,6 +64,13 @@ service cloud.firestore {
      */
     function isSupervisor() {
         return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Supervisor';
+    }
+
+    /**
+     * Checks if the requesting user has the SiteEngineer role by reading their user document.
+     */
+    function isSiteEngineer() {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SiteEngineer';
     }
 
 
@@ -174,17 +181,17 @@ service cloud.firestore {
     }
 
     /**
-     * @description Stores Permit to Work requests. A Site Engineer can create a permit. Admins and Supervisors
-     * can list all permits. Users involved in a permit's workflow can read and update it.
+     * @description Stores Permit to Work requests. A Site Engineer can create and list their own permits.
+     * Admins and Supervisors can list all permits. Users involved in a permit's workflow can read and update it.
      * @path /permits_to_work/{permitId}
      * @allow (create) A Site Engineer creates a permit and sets `siteEngineerId` to their own UID.
-     * @allow (list) An Admin or Supervisor lists all permits.
+     * @allow (list) An Admin or Supervisor lists all permits. A Site Engineer can list their own permits.
      * @deny (update) A user not involved in the permit workflow tries to change its status.
      * @principle Enforces document-level access based on roles defined within the document's fields and user roles.
      */
     match /permits_to_work/{permitId} {
       allow get: if isSignedIn() && (request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId] || isAdmin());
-      allow list: if isAdmin() || isSupervisor();
+      allow list: if isAdmin() || isSupervisor() || isSiteEngineer();
       allow create: if isSignedIn() && request.resource.data.siteEngineerId == request.auth.uid;
       allow update: if isSignedIn() && resource != null && (request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId] || isAdmin() || isSupervisor());
       allow delete: if isAdmin() && resource != null;
