@@ -2,6 +2,7 @@
 "use client"
 
 import * as React from "react"
+import { useSearchParams } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -11,15 +12,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { FileVideo } from "lucide-react"
+import { FileVideo, Video } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase"
-import { addDoc, collection, serverTimestamp, doc } from "firebase/firestore"
+import { addDoc, collection, serverTimestamp, doc, updateDoc } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { Progress } from "@/components/ui/progress"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -76,6 +78,16 @@ export default function RaisePtwPage() {
   const { user } = useUser()
   const router = useRouter()
   const { toast } = useToast()
+  const searchParams = useSearchParams()
+  const permitIdToCorrect = searchParams.get('correct')
+  const isCorrectionMode = !!permitIdToCorrect;
+
+  const permitToCorrectRef = useMemoFirebase(() => {
+    if (!permitIdToCorrect || !firestore) return null;
+    return doc(firestore, 'permits_to_work', permitIdToCorrect);
+  }, [firestore, permitIdToCorrect]);
+
+  const { data: permitToCorrect, isLoading: isLoadingPermit } = useDoc(permitToCorrectRef);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -87,6 +99,7 @@ export default function RaisePtwPage() {
   const [selectedSite, setSelectedSite] = React.useState<SiteData | null>(null);
   
   const [files, setFiles] = React.useState<File[]>([]);
+  const [vlogFile, setVlogFile] = React.useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [uploadProgress, setUploadProgress] = React.useState<{ [key: string]: number }>({});
 
@@ -123,6 +136,20 @@ export default function RaisePtwPage() {
     };
     fetchData();
   }, [toast]);
+  
+  React.useEffect(() => {
+    if (isCorrectionMode && permitToCorrect && allSites.length > 0) {
+      form.reset({
+        siteName: permitToCorrect.siteName,
+        ptwType: permitToCorrect.ptwType,
+        descriptionOfWork: permitToCorrect.descriptionOfWork,
+        commentsAndRemarks: permitToCorrect.commentsAndRemarks || "",
+        undertaking: false, // Force re-agreement
+      });
+      const site = allSites.find(s => s['Project name'] === permitToCorrect.siteName);
+      setSelectedSite(site || null);
+    }
+  }, [isCorrectionMode, permitToCorrect, form, allSites]);
 
 
   const onSubmit = async (values: z.infer<typeof raisePtwSchema>) => {
@@ -164,7 +191,12 @@ export default function RaisePtwPage() {
 
     try {
         const timestamp = Date.now();
-        const attachmentPromises = files.map(file => {
+        const allFilesToUpload = [...files];
+        if (vlogFile) {
+          allFilesToUpload.push(vlogFile);
+        }
+
+        const attachmentPromises = allFilesToUpload.map(file => {
             const filePath = `uploads/${user.uid}/${timestamp}-${file.name}`;
             return uploadFile(file, filePath);
         });
@@ -173,18 +205,30 @@ export default function RaisePtwPage() {
 
         const { undertaking, ...permitValues } = values;
 
-        const permitData = {
-          ...permitValues,
-          siteEngineerId: user.uid,
-          status: "Pending",
-          requestDate: serverTimestamp(),
-          attachments,
-        };
+        if (isCorrectionMode && permitIdToCorrect) {
+            const permitRef = doc(firestore, "permits_to_work", permitIdToCorrect);
+            const updatedData = {
+                ...permitValues,
+                status: "Corrected" as const,
+                attachments,
+            };
+            await updateDoc(permitRef, updatedData);
+            toast({ title: "Success", description: "Your permit has been corrected and resubmitted." });
+        } else {
+            const permitData = {
+              ...permitValues,
+              siteEngineerId: user.uid,
+              status: "Pending" as const,
+              requestDate: serverTimestamp(),
+              attachments,
+            };
 
-        const permitsCollection = collection(firestore, "permits_to_work");
-        await addDoc(permitsCollection, permitData);
+            const permitsCollection = collection(firestore, "permits_to_work");
+            await addDoc(permitsCollection, permitData);
 
-        toast({ title: "Success", description: "Your permit request has been submitted." });
+            toast({ title: "Success", description: "Your permit request has been submitted." });
+        }
+
         router.push('/ptw/list');
 
     } catch (error: any) {
@@ -199,13 +243,32 @@ export default function RaisePtwPage() {
     }
   }
 
+  const pageTitle = isCorrectionMode ? "Correct and Resubmit PtW" : "Raise a Permit to Work";
+  const cardTitle = isCorrectionMode ? "Correct PtW Request" : "New PtW Request";
+  const cardDescription = isCorrectionMode ? "Update the form below to resubmit your permit." : "Fill out the form below to submit a new permit request.";
+  const submitButtonText = isCorrectionMode ? 'Resubmit Request' : 'Submit Request';
+  const submittingButtonText = isCorrectionMode ? 'Resubmitting...' : 'Submitting...';
+
+  if (isLoadingPermit) {
+    return <p>Loading permit data...</p>;
+  }
+
   return (
     <>
-      <h1 className="text-lg font-headline font-semibold md:text-2xl">Raise a Permit to Work</h1>
+      {isCorrectionMode && permitToCorrect?.adminRemarks && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertTitle>Rejection Remarks</AlertTitle>
+          <AlertDescription className="whitespace-pre-wrap">
+            {permitToCorrect.adminRemarks}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <h1 className="text-lg font-headline font-semibold md:text-2xl">{pageTitle}</h1>
       <Card className="w-full max-w-3xl mx-auto">
         <CardHeader>
-          <CardTitle>New PtW Request</CardTitle>
-          <CardDescription>Fill out the form below to submit a new permit request.</CardDescription>
+          <CardTitle>{cardTitle}</CardTitle>
+          <CardDescription>{cardDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -225,7 +288,7 @@ export default function RaisePtwPage() {
                           field.onChange(value);
                           const site = allSites.find(s => s['Project name'] === value);
                           setSelectedSite(site || null);
-                      }} defaultValue={field.value} disabled={isSubmitting}>
+                      }} value={field.value} disabled={isSubmitting}>
                           <FormControl>
                           <SelectTrigger>
                               <SelectValue placeholder="Select a site" />
@@ -270,7 +333,7 @@ export default function RaisePtwPage() {
                   render={({ field }) => (
                       <FormItem>
                           <FormLabel>PTW for</FormLabel>
-                           <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                           <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                               <FormControl>
                               <SelectTrigger>
                                   <SelectValue placeholder="Select a permit type" />
@@ -301,24 +364,43 @@ export default function RaisePtwPage() {
                   )}
               />
 
-              <div className="grid gap-2">
-                  <Label htmlFor="work-files">Attach files (videos, photos)</Label>
-                  <div className="flex items-center gap-2">
-                      <FileVideo className="h-5 w-5 text-muted-foreground"/>
-                      <Input id="work-files" type="file" className="border-dashed" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} disabled={isSubmitting} />
-                  </div>
-                  {files.length > 0 && (
-                    <div className="mt-2 space-y-2">
-                      <Label>Selected Files:</Label>
-                      {files.map((file, index) => (
-                        <div key={index} className="text-sm">
-                          <p className="truncate">{file.name}</p>
-                          {uploadProgress[file.name] != null && <Progress value={uploadProgress[file.name]} className="w-full mt-1" />}
-                        </div>
-                      ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="work-files">Attach files (videos, photos)</Label>
+                    <div className="flex items-center gap-2">
+                        <FileVideo className="h-5 w-5 text-muted-foreground"/>
+                        <Input id="work-files" type="file" className="border-dashed" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} disabled={isSubmitting} />
                     </div>
-                  )}
+                    {files.length > 0 && (
+                        <div className="mt-2 space-y-2">
+                        <Label>Selected Files:</Label>
+                        {files.map((file, index) => (
+                            <div key={index} className="text-sm">
+                            <p className="truncate">{file.name}</p>
+                            {uploadProgress[file.name] != null && <Progress value={uploadProgress[file.name]} className="w-full mt-1" />}
+                            </div>
+                        ))}
+                        </div>
+                    )}
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="vlog">Self video of engineer</Label>
+                    <div className="flex items-center gap-2">
+                        <Video className="h-5 w-5 text-muted-foreground"/>
+                        <Input id="vlog" type="file" accept="video/*" className="border-dashed" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isSubmitting} />
+                    </div>
+                    {vlogFile && (
+                        <div className="mt-2 space-y-2">
+                            <Label>Selected Vlog:</Label>
+                            <div className="text-sm">
+                                <p className="truncate">{vlogFile.name}</p>
+                                {uploadProgress[vlogFile.name] != null && <Progress value={uploadProgress[vlogFile.name]} className="w-full mt-1" />}
+                            </div>
+                        </div>
+                    )}
+                </div>
               </div>
+
 
               <FormField
                   control={form.control}
@@ -358,7 +440,7 @@ export default function RaisePtwPage() {
               />
 
               <div className="flex justify-end">
-                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit Request'}</Button>
+                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? submittingButtonText : submitButtonText}</Button>
               </div>
             </form>
           </Form>

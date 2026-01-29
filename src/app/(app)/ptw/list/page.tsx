@@ -377,7 +377,7 @@ export default function PtwListPage() {
   };
   
   const handleCorrectAndResubmit = React.useCallback((permit: Permit) => {
-      router.push('/ptw/raise');
+      router.push(`/ptw/raise?correct=${permit.id}`);
   }, [router]);
 
   const allPermits = permits || [];
