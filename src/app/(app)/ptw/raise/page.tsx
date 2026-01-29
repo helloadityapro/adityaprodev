@@ -19,12 +19,16 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { Progress } from "@/components/ui/progress"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
   ptwType: z.string().min(1, "Permit type is required"),
   descriptionOfWork: z.string().min(10, "Description must be at least 10 characters"),
   commentsAndRemarks: z.string().optional(),
+  undertaking: z.boolean().refine(value => value === true, {
+    message: "You must agree to the undertaking to proceed."
+  }),
 })
 
 const ptwTypes = [
@@ -94,6 +98,7 @@ export default function RaisePtwPage() {
       ptwType: "",
       descriptionOfWork: "",
       commentsAndRemarks: "",
+      undertaking: false,
     },
   })
 
@@ -178,8 +183,10 @@ export default function RaisePtwPage() {
             vlogContentType = result.contentType;
         }
 
+        const { undertaking, ...permitValues } = values;
+
         const permitData = {
-          ...values,
+          ...permitValues,
           siteEngineerId: user.uid,
           status: "Pending",
           requestDate: serverTimestamp(),
@@ -341,6 +348,29 @@ export default function RaisePtwPage() {
                       </FormItem>
                   )}
               />
+              
+              <FormField
+                  control={form.control}
+                  name="undertaking"
+                  render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
+                          <FormControl>
+                              <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  id="undertaking"
+                                  disabled={isSubmitting}
+                              />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                              <FormLabel htmlFor="undertaking" className="text-sm font-normal">
+                                  I, <span className="font-semibold">{userProfile?.username || user?.email}</span>, hereby undertake that the work for which I am requesting a Permit to Work (PTW) will be carried out in accordance with the approved Standard Operating Procedures. Kindly grant approval to proceed with the work.
+                              </FormLabel>
+                              <FormMessage />
+                          </div>
+                      </FormItem>
+                  )}
+              />
 
               <div className="flex justify-end">
                 <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit Request'}</Button>
@@ -352,5 +382,3 @@ export default function RaisePtwPage() {
     </>
   )
 }
-
-    
