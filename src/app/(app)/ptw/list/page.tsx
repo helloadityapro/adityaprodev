@@ -129,7 +129,8 @@ export default function PtwListPage() {
   }, [firestore, user]);
 
   const { data: userProfile } = useDoc(userProfileRef);
-  const userRole = userProfile?.role;
+  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com';
+  const userRole = isAdmin ? "Admin" : userProfile?.role;
   
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole) return null;
@@ -161,7 +162,7 @@ export default function PtwListPage() {
     rejected: permits?.filter(p => p.status === 'Rejected').length || 0,
   };
 
-  if (isLoading || !userProfile) {
+  if (isLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
     return <p>Loading permits...</p>
   }
   
