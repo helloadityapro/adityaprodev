@@ -11,7 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import AppLogo from "@/components/app-logo"
-import { useAuth, useUser, initiateEmailSignIn } from "@/firebase"
+import { useAuth, useUser } from "@/firebase"
+import { signInWithEmailAndPassword } from "firebase/auth"
+import { useToast } from "@/hooks/use-toast"
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -22,6 +24,7 @@ export default function LoginPage() {
   const router = useRouter()
   const auth = useAuth()
   const { user, isUserLoading } = useUser()
+  const { toast } = useToast()
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -37,8 +40,22 @@ export default function LoginPage() {
     }
   }, [user, isUserLoading, router])
 
-  const onSubmit = (values: z.infer<typeof loginSchema>) => {
-    initiateEmailSignIn(auth, values.email, values.password)
+  const onSubmit = async (values: z.infer<typeof loginSchema>) => {
+    try {
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+    } catch (error: any) {
+      let description = "An unexpected error occurred during login.";
+      if (error.code === 'auth/invalid-credential') {
+          description = "Invalid email or password. Please try again.";
+      } else if (error.code === 'auth/network-request-failed') {
+          description = "Network error. Please check your internet connection.";
+      }
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: description,
+      });
+    }
   }
 
   if (isUserLoading || user) {
