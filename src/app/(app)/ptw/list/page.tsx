@@ -208,7 +208,7 @@ function PermitDetailsDialog({ permit, open, onOpenChange }: { permit: Permit | 
             <div><Label>Site Name</Label><p>{permit.siteName}</p></div>
             <div><Label>Permit Type</Label><p>{permit.ptwType}</p></div>
             <div className="col-span-2"><Label>Description of Work</Label><p className="whitespace-pre-wrap">{permit.descriptionOfWork}</p></div>
-            <div><Label>Status</Label><p><StatusBadge status={permit.status} /></p></div>
+            <div><Label>Status</Label><StatusBadge status={permit.status} /></div>
             <div><Label>Requested On</Label><p>{permit.requestDate ? new Date(permit.requestDate.toDate()).toLocaleString() : 'N/A'}</p></div>
             <div><Label>Requested By</Label><p><UserDisplay userId={permit.siteEngineerId} /></p></div>
              {permit.supervisorId && <div><Label>Reviewed By (Supervisor)</Label><p><UserDisplay userId={permit.supervisorId} /></p></div>}
