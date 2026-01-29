@@ -296,10 +296,6 @@ export default function PtwListPage() {
       router.push('/ptw/raise');
   }, [router]);
 
-  if (isLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
-    return <p>Loading permits...</p>
-  }
-  
   const allPermits = permits || [];
   const pendingPermits = React.useMemo(() => allPermits.filter(p => p.status === 'Pending'), [allPermits]);
   const approvedPermits = React.useMemo(() => allPermits.filter(p => p.status === 'Approved'), [allPermits]);
@@ -312,6 +308,9 @@ export default function PtwListPage() {
     rejected: rejectedPermits.length,
   };
 
+  if (isLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
+    return <p>Loading permits...</p>
+  }
 
   return (
     <div className="flex flex-col gap-6">
