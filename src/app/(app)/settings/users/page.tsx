@@ -11,16 +11,26 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal } from "lucide-react"
+import { Eye, Edit, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase } from "@/firebase"
+import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
 import { collection, doc } from "firebase/firestore"
 import { AddUserDialog } from "@/components/add-user-dialog";
 import { EditUserDialog } from "@/components/edit-user-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { ViewUserDialog } from "@/components/view-user-dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 type User = {
   id: string;
@@ -54,12 +64,22 @@ export default function UsersPage() {
 
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
     const [userToEdit, setUserToEdit] = React.useState<User | null>(null);
+    const [userToView, setUserToView] = React.useState<User | null>(null);
+    const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
 
     const handleApproveRegistration = (userId: string) => {
         const userRef = doc(firestore, 'users', userId);
         updateDocumentNonBlocking(userRef, { registrationRequest: false });
         toast({ title: 'User Approved', description: 'The user registration has been approved.' });
     }
+    
+    const handleConfirmDelete = (userId: string) => {
+        if (!userId) return;
+        const userRef = doc(firestore, 'users', userId);
+        deleteDocumentNonBlocking(userRef);
+        toast({ title: 'User Deleted', description: 'The user has been successfully deleted.' });
+        setUserToDelete(null);
+    };
 
     if(isLoading) {
         return <p>Loading users...</p>
@@ -85,9 +105,7 @@ export default function UsersPage() {
                                     <TableHead>Role</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="hidden md:table-cell">Mobile</TableHead>
-                                    <TableHead>
-                                        <span className="sr-only">Actions</span>
-                                    </TableHead>
+                                    <TableHead>Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -111,19 +129,23 @@ export default function UsersPage() {
                                         </TableCell>
                                         <TableCell className="hidden md:table-cell">{user.mobile}</TableCell>
                                         <TableCell>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                        <span className="sr-only">Toggle menu</span>
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                    {user.registrationRequest && <DropdownMenuItem onClick={() => handleApproveRegistration(user.id)}>Approve Registration</DropdownMenuItem>}
-                                                    <DropdownMenuItem onClick={() => setUserToEdit(user)}>Edit User</DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            <div className="flex items-center gap-2">
+                                                {user.registrationRequest && (
+                                                    <Button variant="outline" size="sm" onClick={() => handleApproveRegistration(user.id)}>Approve</Button>
+                                                )}
+                                                <Button variant="ghost" size="icon" onClick={() => setUserToView(user)}>
+                                                    <Eye className="h-4 w-4" />
+                                                    <span className="sr-only">View</span>
+                                                </Button>
+                                                <Button variant="ghost" size="icon" onClick={() => setUserToEdit(user)}>
+                                                    <Edit className="h-4 w-4" />
+                                                    <span className="sr-only">Edit</span>
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setUserToDelete(user)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                    <span className="sr-only">Delete</span>
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -134,6 +156,22 @@ export default function UsersPage() {
             </div>
             <AddUserDialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen} />
             <EditUserDialog user={userToEdit} open={!!userToEdit} onOpenChange={() => setUserToEdit(null)} />
+            <ViewUserDialog user={userToView} open={!!userToView} onOpenChange={() => setUserToView(null)} />
+            <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete the user document from Firestore.
+                        It will not remove the user from the authentication system.
+                    </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => userToDelete && handleConfirmDelete(userToDelete.id)}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     )
 }
