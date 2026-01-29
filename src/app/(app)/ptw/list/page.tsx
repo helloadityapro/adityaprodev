@@ -70,8 +70,8 @@ function UserDisplay({ userId }: { userId: string }) {
   const userRef = useMemoFirebase(() => userId ? doc(firestore, 'users', userId) : null, [firestore, userId]);
   const { data: user, isLoading } = useDoc(userRef);
 
-  if (isLoading) return <>...</>;
-  return <>{user?.username || 'Unknown'}</>;
+  if (isLoading) return <p className="animate-pulse font-medium">...</p>;
+  return <p className="font-medium">{user?.username || 'Unknown'}</p>;
 }
 
 
@@ -228,9 +228,9 @@ function PermitDetailsDialog({ permit, open, onOpenChange }: { permit: Permit | 
             <div className="col-span-2"><Label>Description of Work</Label><p className="whitespace-pre-wrap">{permit.descriptionOfWork}</p></div>
             <div><Label>Status</Label><StatusBadge status={permit.status} /></div>
             <div><Label>Requested On</Label><p>{permit.requestDate ? new Date(permit.requestDate.toDate()).toLocaleString() : 'N/A'}</p></div>
-            <div><Label>Requested By</Label><p><UserDisplay userId={permit.siteEngineerId} /></p></div>
-             {permit.supervisorId && <div><Label>Reviewed By (Supervisor)</Label><p><UserDisplay userId={permit.supervisorId} /></p></div>}
-            {permit.adminId && <div><Label>Reviewed By (Admin)</Label><p><UserDisplay userId={permit.adminId} /></p></div>}
+            <div><Label>Requested By</Label><UserDisplay userId={permit.siteEngineerId} /></div>
+             {permit.supervisorId && <div><Label>Reviewed By (Supervisor)</Label><UserDisplay userId={permit.supervisorId} /></div>}
+            {permit.adminId && <div><Label>Reviewed By (Admin)</Label><UserDisplay userId={permit.adminId} /></div>}
             {permit.commentsAndRemarks && <div className="col-span-2"><Label>Engineer's Remarks</Label><p className="whitespace-pre-wrap">{permit.commentsAndRemarks}</p></div>}
             {permit.adminRemarks && <div className="col-span-2"><Label>Admin's Remarks</Label><p className="whitespace-pre-wrap">{permit.adminRemarks}</p></div>}
             {permit.videoUrl && <div><Label>Work Video/Photos</Label><a href={permit.videoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary underline"><ExternalLink size={14}/>View Attachment</a></div>}
