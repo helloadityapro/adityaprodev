@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth } from "@/firebase";
+import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking } from "@/firebase";
 import { doc } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import AppLogo from "@/components/app-logo";
@@ -28,7 +28,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const { data: userProfile } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+
+  // Bootstrap/self-heal the primary admin user
+  React.useEffect(() => {
+    if (user && user.email === 'abhijeet.agepl@gmail.com' && !isProfileLoading) {
+      if (!userProfile || userProfile.role !== 'Admin') {
+        const adminUserDoc = {
+          id: user.uid,
+          username: 'Admin User', // Default username
+          email: user.email,
+          mobile: user.phoneNumber || '0000000000',
+          role: 'Admin',
+          registrationRequest: false, // Pre-approved
+          assignedProjectIds: [],
+        };
+        setDocumentNonBlocking(doc(firestore, "users", user.uid), adminUserDoc, { merge: true });
+      }
+    }
+  }, [user, userProfile, isProfileLoading, firestore]);
 
   const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com';
   const userRole = isAdmin ? "Admin" : userProfile?.role || "SiteEngineer";
