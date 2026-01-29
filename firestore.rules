@@ -6,9 +6,7 @@
  *
  * Data Structure:
  * - /users/{userId}: Stores private user profiles, including a critical 'assignedProjectIds'
- *   list that drives project-related permissions.
- * - /roles_admin/{userId}, /roles_supervisor/{userId}: Role-lookup collections where the
- *   existence of a document signifies a user's role. This is a performant RBAC pattern.
+ *   list that drives project-related permissions and a 'role' field for RBAC.
  * - /projects/{projectId}: Top-level collection for project data.
  * - /sites/{siteId}: Site data, linked to a parent project.
  * - /permits_to_work/{permitId}: The core transactional data, containing references to the
@@ -17,15 +15,16 @@
  * Key Security Decisions:
  * - Admin Supremacy: Users with an 'Admin' role have universal read/write access to facilitate
  *   system management.
- * - Deny User Listing: Listing the entire /users collection is disallowed to protect user privacy
- *   and prevent data scraping.
+ * - Role-Based Access: User roles ('Admin', 'Supervisor') are stored on the /users/{userId}
+ *   document. Security rules read this document to grant permissions, ensuring a single source
+ *   of truth for a user's role.
  * - Project Access via Denormalization: A user's access to /projects and their sub-collections
  *   is determined by checking the 'assignedProjectIds' array stored directly on their own
  *   /users/{userId} document. This avoids complex, slow, and costly cross-collection lookups
  *   in rules.
- * - Secure Listing: Direct listing of sensitive top-level collections like /projects, /sites,
- *   and /permits_to_work is restricted to Admins. Regular users are expected to use targeted
- *   queries that will be secured by the more granular 'get' rules.
+ * - Secure Listing: Listing entire collections is restricted. Admins can list users. Admins and
+ *   Supervisors can list permits. Non-admin users must rely on targeted queries secured by
+ *   more granular 'get' rules.
  * - Immutable Ownership: Critical relational IDs (e.g., the creator of a permit) are enforced
  *   as immutable after creation to maintain data integrity and a clear audit trail.
  */
@@ -53,12 +52,19 @@ service cloud.firestore {
     }
 
     /**
-     * Checks if the requesting user has the Admin role by verifying
-     * the existence of a document in the roles_admin collection.
+     * Checks if the requesting user has the Admin role by reading their user document.
      */
     function isAdmin() {
-      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
     }
+
+    /**
+     * Checks if the requesting user has the Supervisor role by reading their user document.
+     */
+    function isSupervisor() {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Supervisor';
+    }
+
 
     /**
      * Checks if the user is an owner of an existing document.
@@ -122,16 +128,16 @@ service cloud.firestore {
 
     /**
      * @description Manages user profile data. A user can read and update their own profile,
-     * but cannot change their own role or project assignments. Admins have full access.
+     * but cannot change their own role or project assignments. Admins have full access and can list all users.
      * @path /users/{userId}
      * @allow (get) An authenticated user reads their own document: auth.uid == 'user_abc', path == '/users/user_abc'.
-     * @deny (list) Any user attempts to list all user documents.
+     * @allow (list) An Admin user lists all user documents.
      * @deny (update) A user tries to change their own role from 'SiteEngineer' to 'Admin'.
-     * @principle Restricts access to a user's own data tree and prevents privilege escalation.
+     * @principle Restricts access to a user's own data tree and prevents privilege escalation, while allowing admins to manage users.
      */
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
-      allow list: if false;
+      allow list: if isAdmin();
       allow create: if canCreateOwnUser(userId);
       allow update: if (isExistingOwner(userId) && canUpdateOwnUser()) || isAdmin();
       allow delete: if isAdmin() && resource != null;
@@ -171,19 +177,19 @@ service cloud.firestore {
     }
 
     /**
-     * @description Stores Permit to Work requests. A Site Engineer can create a permit, and any
-     * user involved in the permit's workflow (engineer, supervisor, admin) can read and update it.
+     * @description Stores Permit to Work requests. A Site Engineer can create a permit. Admins and Supervisors
+     * can list all permits. Users involved in a permit's workflow can read and update it.
      * @path /permits_to_work/{permitId}
      * @allow (create) A Site Engineer creates a permit and sets `siteEngineerId` to their own UID.
-     * @deny (update) A user not listed in the permit's `siteEngineerId` or `supervisorId` fields tries to change its status.
-     * @deny (delete) A non-admin user tries to delete a permit.
-     * @principle Enforces document-level access based on roles defined within the document's fields.
+     * @allow (list) An Admin or Supervisor lists all permits.
+     * @deny (update) A user not involved in the permit workflow tries to change its status.
+     * @principle Enforces document-level access based on roles defined within the document's fields and user roles.
      */
     match /permits_to_work/{permitId} {
       allow get: if isSignedIn() && (request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId] || isAdmin());
-      allow list: if isAdmin();
+      allow list: if isAdmin() || isSupervisor();
       allow create: if isSignedIn() && request.resource.data.siteEngineerId == request.auth.uid;
-      allow update: if isSignedIn() && resource != null && (request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId] || isAdmin());
+      allow update: if isSignedIn() && resource != null && (request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId] || isAdmin() || isSupervisor());
       allow delete: if isAdmin() && resource != null;
     }
 
@@ -197,38 +203,6 @@ service cloud.firestore {
      */
     match /permit_to_work_types/{ptwTypeId} {
       allow get, list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-    
-    /**
-     * @description Defines which users have the 'Admin' role. The existence of a document grants the role.
-     * Only other Admins can read or modify this collection.
-     * @path /roles_admin/{userId}
-     * @allow (create) An existing Admin grants another user Admin privileges.
-     * @deny (get, list) A non-admin user tries to read the list of administrators.
-     * @principle Secures role-granting collections to prevent unauthorized privilege escalation.
-     */
-    match /roles_admin/{userId} {
-      allow get: if isAdmin();
-      allow list: if false;
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Defines which users have the 'Supervisor' role. The existence of a document grants the role.
-     * Only Admins can assign or revoke this role.
-     * @path /roles_supervisor/{userId}
-     * @allow (create) An Admin grants a user Supervisor privileges.
-     * @deny (list) A non-admin user tries to see who all the supervisors are.
-     * @principle Secures role-granting collections to prevent unauthorized privilege escalation.
-     */
-    match /roles_supervisor/{userId} {
-      allow get: if isAdmin();
-      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin() && resource != null;
       allow delete: if isAdmin() && resource != null;

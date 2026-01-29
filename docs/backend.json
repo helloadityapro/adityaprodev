@@ -203,7 +203,7 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user profiles. Includes denormalized 'assignedProjectIds' for authorization independence, enabling secure listing of projects a user has access to.",
+          "description": "Stores user profiles. Includes denormalized 'assignedProjectIds' for authorization independence and a 'role' for role-based access control.",
           "params": [
             {
               "name": "userId",
@@ -275,40 +275,8 @@
             }
           ]
         }
-      },
-      {
-        "path": "/roles_admin/{userId}",
-        "definition": {
-          "entityName": "user",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Documents in this collection indicate admin role. Existence determines role.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/roles_supervisor/{userId}",
-        "definition": {
-          "entityName": "user",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Documents in this collection indicate supervisor role. Existence determines role.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user."
-            }
-          ]
-        }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support the PermitFlow application's core features, including user management, project/site management, and Permit to Work (PtW) request workflows. It adheres to the principles of Authorization Independence, Clarity of Intent, DBAC, and QAPs. Authorization Independence is achieved by denormalizing project membership into the user documents (assignedProjectIds). This enables secure list operations and avoids complex rule logic involving `get()` calls. Structural Segregation is implemented by separating user-related data into `/users/{userId}` and PtW data into `/permits_to_work/{permitId}`, ensuring homogeneous security postures. Access Modeling employs path-based ownership for user data and a membership map for project authorization. Explicit state modeling is used for PtW status, and predictable schemas are enforced for data clarity. The structure supports QAPs by allowing listing of permits limited to those the user has access to via denormalized roles."
+    "reasoning": "The Firestore structure is designed to support the PermitFlow application's core features, including user management, project/site management, and Permit to Work (PtW) request workflows. Authorization Independence is achieved by denormalizing project membership into the user documents ('assignedProjectIds') and storing user roles directly on the user document. This allows for clear and secure rule logic. Structural Segregation is implemented by separating user-related data into `/users/{userId}` and PtW data into `/permits_to_work/{permitId}`, ensuring homogeneous security postures. Access Modeling employs path-based ownership for user data and role-based access control, validated by reading the user's document within security rules. Explicit state modeling is used for PtW status, and predictable schemas are enforced for data clarity. The structure supports QAPs by allowing listing of permits and users based on assigned roles."
   }
 }
