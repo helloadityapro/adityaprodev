@@ -70,8 +70,9 @@ function UserDisplay({ userId }: { userId: string }) {
   const userRef = useMemoFirebase(() => userId ? doc(firestore, 'users', userId) : null, [firestore, userId]);
   const { data: user, isLoading } = useDoc(userRef);
 
-  if (isLoading) return <p className="animate-pulse font-medium">...</p>;
-  return <p className="font-medium">{user?.username || 'Unknown'}</p>;
+  if (isLoading) return <span className="animate-pulse">...</span>;
+  if (!user) return <span className="text-muted-foreground">Unknown</span>;
+  return <span>{user.username}</span>;
 }
 
 
@@ -228,9 +229,9 @@ function PermitDetailsDialog({ permit, open, onOpenChange }: { permit: Permit | 
             <div className="col-span-2"><Label>Description of Work</Label><p className="whitespace-pre-wrap">{permit.descriptionOfWork}</p></div>
             <div><Label>Status</Label><StatusBadge status={permit.status} /></div>
             <div><Label>Requested On</Label><p>{permit.requestDate ? new Date(permit.requestDate.toDate()).toLocaleString() : 'N/A'}</p></div>
-            <div><Label>Requested By</Label><UserDisplay userId={permit.siteEngineerId} /></div>
-             {permit.supervisorId && <div><Label>Reviewed By (Supervisor)</Label><UserDisplay userId={permit.supervisorId} /></div>}
-            {permit.adminId && <div><Label>Reviewed By (Admin)</Label><UserDisplay userId={permit.adminId} /></div>}
+            <div className="flex items-center gap-2"><Label>Requested By</Label><UserDisplay userId={permit.siteEngineerId} /></div>
+             {permit.supervisorId && <div className="flex items-center gap-2"><Label>Reviewed By (Supervisor)</Label><UserDisplay userId={permit.supervisorId} /></div>}
+            {permit.adminId && <div className="flex items-center gap-2"><Label>Reviewed By (Admin)</Label><UserDisplay userId={permit.adminId} /></div>}
             {permit.commentsAndRemarks && <div className="col-span-2"><Label>Engineer's Remarks</Label><p className="whitespace-pre-wrap">{permit.commentsAndRemarks}</p></div>}
             {permit.adminRemarks && <div className="col-span-2"><Label>Admin's Remarks</Label><p className="whitespace-pre-wrap">{permit.adminRemarks}</p></div>}
             {permit.videoUrl && <div><Label>Work Video/Photos</Label><a href={permit.videoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary underline"><ExternalLink size={14}/>View Attachment</a></div>}
@@ -260,6 +261,14 @@ export default function PtwListPage() {
   const [actionState, setActionState] = React.useState<{permit: Permit, status: 'Approved' | 'Rejected'} | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
 
+  const handleActionTrigger = React.useCallback((permit: Permit, status: 'Approved' | 'Rejected') => {
+    setActionState({ permit, status });
+  }, []);
+
+  const handleViewDetails = React.useCallback((permit: Permit) => {
+      setDetailsPermit(permit);
+  }, []);
+
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole) return null;
     const baseQuery = collection(firestore, 'permits_to_work');
@@ -283,11 +292,9 @@ export default function PtwListPage() {
     updateDocumentNonBlocking(permitRef, updateData);
   };
   
-  const handleCorrectAndResubmit = (permit: Permit) => {
-      // For now, just logging. Could navigate to a pre-filled raise form.
-      console.log("Correct and Resubmit:", permit);
-      router.push('/ptw/raise'); // Simplified: just go to a new form
-  }
+  const handleCorrectAndResubmit = React.useCallback((permit: Permit) => {
+      router.push('/ptw/raise');
+  }, [router]);
 
   const summary = {
     total: permits?.length || 0,
@@ -358,16 +365,16 @@ export default function PtwListPage() {
         </TabsList>
         <Card className="mt-4">
             <TabsContent value="all" className="m-0">
-                <PermitListTable permits={allPermits} onAction={(permit, status) => setActionState({permit, status})} userRole={userRole || ''} onViewDetails={setDetailsPermit} onCorrect={handleCorrectAndResubmit} />
+                <PermitListTable permits={allPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
             <TabsContent value="pending" className="m-0">
-                <PermitListTable permits={allPermits.filter(p => p.status === 'Pending')} onAction={(permit, status) => setActionState({permit, status})} userRole={userRole || ''} onViewDetails={setDetailsPermit} onCorrect={handleCorrectAndResubmit} />
+                <PermitListTable permits={allPermits.filter(p => p.status === 'Pending')} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
             <TabsContent value="approved" className="m-0">
-                <PermitListTable permits={allPermits.filter(p => p.status === 'Approved')} onAction={(permit, status) => setActionState({permit, status})} userRole={userRole || ''} onViewDetails={setDetailsPermit} onCorrect={handleCorrectAndResubmit} />
+                <PermitListTable permits={allPermits.filter(p => p.status === 'Approved')} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
             <TabsContent value="rejected" className="m-0">
-                <PermitListTable permits={allPermits.filter(p => p.status === 'Rejected')} onAction={(permit, status) => setActionState({permit, status})} userRole={userRole || ''} onViewDetails={setDetailsPermit} onCorrect={handleCorrectAndResubmit} />
+                <PermitListTable permits={allPermits.filter(p => p.status === 'Rejected')} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} />
             </TabsContent>
         </Card>
       </Tabs>
