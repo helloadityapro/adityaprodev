@@ -20,7 +20,7 @@ export default function AppLogo({ className }: { className?: string }) {
             <path d="m13.5 17.5-3-3" />
             <path d="M8 14h.01" />
         </svg>
-      <span className="font-headline text-xl font-semibold">Projects and Permits</span>
+      <span className="font-headline text-xl font-semibold">Project Permits</span>
     </div>
   );
 }
