@@ -22,20 +22,21 @@ type SiteData = {
 const parseCSV = (csvText: string): SiteData[] => {
   const lines = csvText.trim().split('\n');
   if (lines.length < 2) return [];
-  
-  // Handle potential carriage returns in headers
-  const headers = lines[0].split(',').map(h => h.trim().replace(/\r/g, ''));
-  const data = [];
 
+  const data: SiteData[] = [];
+
+  // Skip header line (i=1)
   for (let i = 1; i < lines.length; i++) {
     // Handle potential carriage returns in data rows
     const values = lines[i].split(',').map(v => v.trim().replace(/\r/g, ''));
-    if (values.length === headers.length) {
-      const entry: any = {};
-      for (let j = 0; j < headers.length; j++) {
-        entry[headers[j]] = values[j];
-      }
-      data.push(entry as SiteData);
+    if (values.length >= 5) { // Ensure there are enough columns
+      const entry: SiteData = {
+        'Project Company': values[1],
+        'Project name': values[2],
+        'DC Capacity': values[3],
+        'AC Capacity': values[4],
+      };
+      data.push(entry);
     }
   }
   return data;

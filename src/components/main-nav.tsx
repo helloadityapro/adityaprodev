@@ -6,7 +6,8 @@ import {
   FolderKanban,
   FilePlus,
   List,
-  Users
+  Users,
+  LayoutDashboard,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -54,8 +55,16 @@ export function MainNav({ userRole }: { userRole: string }) {
       </SidebarGroup>
       {userRole === "Admin" && (
         <SidebarGroup className="mt-auto">
-          <SidebarGroupLabel>Settings</SidebarGroupLabel>
+          <SidebarGroupLabel>Admin</SidebarGroupLabel>
           <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/admin/dashboard'}>
+                <Link href="/admin/dashboard">
+                  <LayoutDashboard />
+                  Dashboard
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="User Management" isActive={pathname.startsWith('/settings/users')}>
                 <Link href="/settings/users">

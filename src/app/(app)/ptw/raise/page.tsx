@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -15,6 +16,7 @@ import { collection, serverTimestamp } from "firebase/firestore"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 const raisePtwSchema = z.object({
   siteId: z.string().min(1, "Site is required"),
@@ -23,16 +25,21 @@ const raisePtwSchema = z.object({
   comments: z.string().optional(),
 })
 
+type Site = { id: string; name: string };
+
 export default function RaisePtwPage() {
   const firestore = useFirestore()
   const { user } = useUser()
   const router = useRouter()
   const { toast } = useToast()
 
+  const [siteSearch, setSiteSearch] = React.useState("");
+  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
+
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const ptwTypesQuery = useMemoFirebase(() => collection(firestore, 'permit_to_work_types'), [firestore]);
 
-  const { data: sites } = useCollection(sitesQuery);
+  const { data: sites } = useCollection<Site>(sitesQuery);
   const { data: ptwTypes } = useCollection(ptwTypesQuery);
 
   const form = useForm<z.infer<typeof raisePtwSchema>>({
@@ -44,6 +51,20 @@ export default function RaisePtwPage() {
       comments: "",
     },
   })
+
+  const filteredSites = React.useMemo(() => {
+    if (siteSearch.length < 3) return [];
+    return sites?.filter(site => site.name.toLowerCase().includes(siteSearch.toLowerCase())) || [];
+  }, [siteSearch, sites]);
+
+  React.useEffect(() => {
+    if(siteSearch.length >= 3) {
+      setIsSitePopoverOpen(true);
+    } else {
+      setIsSitePopoverOpen(false);
+    }
+  }, [siteSearch]);
+
 
   const onSubmit = (values: z.infer<typeof raisePtwSchema>) => {
     if (!user) {
@@ -78,22 +99,48 @@ export default function RaisePtwPage() {
                     control={form.control}
                     name="siteId"
                     render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Select Site</FormLabel>
-                             <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a site" />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {sites?.map((site) => (
-                                    <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Select Site</FormLabel>
+                        <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Input
+                                placeholder="Type to search for a site..."
+                                value={siteSearch}
+                                onChange={(e) => setSiteSearch(e.target.value)}
+                                className="w-full"
+                              />
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            {filteredSites.length > 0 ? (
+                              <ul className="py-1">
+                                {filteredSites.map((site) => (
+                                  <li key={site.id}>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      className="w-full justify-start font-normal"
+                                      onClick={() => {
+                                        field.onChange(site.id);
+                                        setSiteSearch(site.name);
+                                        setIsSitePopoverOpen(false);
+                                      }}
+                                    >
+                                      {site.name}
+                                    </Button>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <div className="p-4 text-sm text-center text-muted-foreground">
+                                {siteSearch.length < 3 ? "Type at least 3 characters" : "No sites found."}
+                              </div>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
                     )}
                 />
                 <FormField
