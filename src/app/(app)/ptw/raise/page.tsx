@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -10,20 +11,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Link as LinkIcon, Video } from "lucide-react"
-import { useFirestore, useUser, addDocumentNonBlocking } from "@/firebase"
-import { collection, serverTimestamp } from "firebase/firestore"
+import { FileVideo, Video } from "lucide-react"
+import { useFirebaseApp, useFirestore, useUser } from "@/firebase"
+import { addDoc, collection, serverTimestamp } from "firebase/firestore"
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
+import { Progress } from "@/components/ui/progress"
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
   ptwType: z.string().min(1, "Permit type is required"),
   descriptionOfWork: z.string().min(10, "Description must be at least 10 characters"),
   commentsAndRemarks: z.string().optional(),
-  videoUrl: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
-  vlogUrl: z.string().url("Please enter a valid URL.").optional().or(z.literal('')),
 })
 
 const ptwTypes = [
@@ -67,12 +68,18 @@ const parseCSV = (csvText: string): SiteData[] => {
 
 export default function RaisePtwPage() {
   const firestore = useFirestore()
+  const firebaseApp = useFirebaseApp()
   const { user } = useUser()
   const router = useRouter()
   const { toast } = useToast()
 
   const [allSites, setAllSites] = React.useState<SiteData[]>([]);
   const [selectedSite, setSelectedSite] = React.useState<SiteData | null>(null);
+  
+  const [videoFile, setVideoFile] = React.useState<File | null>(null);
+  const [vlogFile, setVlogFile] = React.useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState<{ [key: string]: number }>({});
 
   const form = useForm<z.infer<typeof raisePtwSchema>>({
     resolver: zodResolver(raisePtwSchema),
@@ -81,8 +88,6 @@ export default function RaisePtwPage() {
       ptwType: "",
       descriptionOfWork: "",
       commentsAndRemarks: "",
-      videoUrl: "",
-      vlogUrl: "",
     },
   })
 
@@ -110,7 +115,7 @@ export default function RaisePtwPage() {
   }, [toast]);
 
 
-  const onSubmit = (values: z.infer<typeof raisePtwSchema>) => {
+  const onSubmit = async (values: z.infer<typeof raisePtwSchema>) => {
     if (!user) {
         toast({ variant: "destructive", title: "You must be logged in to submit a permit." });
         return;
@@ -120,15 +125,72 @@ export default function RaisePtwPage() {
         return;
     }
 
-    const permitData = {
-      ...values,
-      siteEngineerId: user.uid,
-      status: "Pending",
-      requestDate: serverTimestamp(),
+    setIsSubmitting(true);
+    setUploadProgress({});
+
+    const uploadFile = (file: File, path: string, key: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const storage = getStorage(firebaseApp);
+            const storageRef = ref(storage, path);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setUploadProgress(prev => ({ ...prev, [key]: progress }));
+                },
+                (error) => {
+                    console.error("Upload failed:", error);
+                    reject(error);
+                },
+                () => {
+                    getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+                        resolve(downloadURL);
+                    });
+                }
+            );
+        });
+    };
+
+    try {
+        let videoUrl = "";
+        let vlogUrl = "";
+        const timestamp = Date.now();
+
+        if (videoFile) {
+            const videoPath = `uploads/${user.uid}/${timestamp}-${videoFile.name}`;
+            videoUrl = await uploadFile(videoFile, videoPath, 'video');
+        }
+        if (vlogFile) {
+            const vlogPath = `uploads/${user.uid}/${timestamp}-${vlogFile.name}`;
+            vlogUrl = await uploadFile(vlogFile, vlogPath, 'vlog');
+        }
+
+        const permitData = {
+          ...values,
+          siteEngineerId: user.uid,
+          status: "Pending",
+          requestDate: serverTimestamp(),
+          videoUrl: videoUrl,
+          vlogUrl: vlogUrl,
+        };
+
+        const permitsCollection = collection(firestore, "permits_to_work");
+        await addDoc(permitsCollection, permitData);
+
+        toast({ title: "Success", description: "Your permit request has been submitted." });
+        router.push('/ptw/list');
+
+    } catch (error: any) {
+        toast({
+            variant: "destructive",
+            title: "Submission Failed",
+            description: error.message || "Could not submit permit request."
+        });
+    } finally {
+        setIsSubmitting(false);
+        setUploadProgress({});
     }
-    addDocumentNonBlocking(collection(firestore, "permits_to_work"), permitData);
-    toast({ title: "Success", description: "Your permit request has been submitted." });
-    router.push('/ptw/list');
   }
 
   return (
@@ -157,7 +219,7 @@ export default function RaisePtwPage() {
                           field.onChange(value);
                           const site = allSites.find(s => s['Project name'] === value);
                           setSelectedSite(site || null);
-                      }} defaultValue={field.value}>
+                      }} defaultValue={field.value} disabled={isSubmitting}>
                           <FormControl>
                           <SelectTrigger>
                               <SelectValue placeholder="Select a site" />
@@ -202,7 +264,7 @@ export default function RaisePtwPage() {
                   render={({ field }) => (
                       <FormItem>
                           <FormLabel>PTW for</FormLabel>
-                           <Select onValueChange={field.onChange} defaultValue={field.value}>
+                           <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                               <FormControl>
                               <SelectTrigger>
                                   <SelectValue placeholder="Select a permit type" />
@@ -226,7 +288,7 @@ export default function RaisePtwPage() {
                       <FormItem>
                           <FormLabel>Description of Work</FormLabel>
                           <FormControl>
-                              <Textarea placeholder="Provide a detailed description of the work to be performed." rows={4} {...field} />
+                              <Textarea placeholder="Provide a detailed description of the work to be performed." rows={4} {...field} disabled={isSubmitting} />
                           </FormControl>
                           <FormMessage />
                       </FormItem>
@@ -234,38 +296,22 @@ export default function RaisePtwPage() {
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                      control={form.control}
-                      name="videoUrl"
-                      render={({ field }) => (
-                          <FormItem>
-                              <FormLabel>Work Video/Photos URL</FormLabel>
-                               <div className="flex items-center gap-2">
-                                  <LinkIcon className="h-5 w-5 text-muted-foreground"/>
-                                  <FormControl>
-                                      <Input placeholder="https://example.com/video" {...field} />
-                                  </FormControl>
-                              </div>
-                              <FormMessage />
-                          </FormItem>
-                      )}
-                  />
-                  <FormField
-                      control={form.control}
-                      name="vlogUrl"
-                      render={({ field }) => (
-                          <FormItem>
-                              <FormLabel>Engineer's Vlog URL</FormLabel>
-                               <div className="flex items-center gap-2">
-                                  <Video className="h-5 w-5 text-muted-foreground"/>
-                                  <FormControl>
-                                      <Input placeholder="https://example.com/vlog" {...field} />
-                                  </FormControl>
-                              </div>
-                              <FormMessage />
-                          </FormItem>
-                      )}
-                  />
+                  <div className="grid gap-2">
+                      <Label htmlFor="work-video">Attach video and photos</Label>
+                      <div className="flex items-center gap-2">
+                          <FileVideo className="h-5 w-5 text-muted-foreground"/>
+                          <Input id="work-video" type="file" className="border-dashed" onChange={(e) => setVideoFile(e.target.files?.[0] || null)} disabled={isSubmitting} />
+                      </div>
+                      {uploadProgress.video != null && <Progress value={uploadProgress.video} className="w-full mt-2" />}
+                  </div>
+                   <div className="grid gap-2">
+                      <Label htmlFor="vlog">Attach vlog of engineer</Label>
+                       <div className="flex items-center gap-2">
+                          <Video className="h-5 w-5 text-muted-foreground"/>
+                          <Input id="vlog" type="file" className="border-dashed" onChange={(e) => setVlogFile(e.target.files?.[0] || null)} disabled={isSubmitting}/>
+                      </div>
+                      {uploadProgress.vlog != null && <Progress value={uploadProgress.vlog} className="w-full mt-2" />}
+                  </div>
               </div>
 
               <FormField
@@ -275,7 +321,7 @@ export default function RaisePtwPage() {
                       <FormItem>
                           <FormLabel>Additional Comments and Remarks</FormLabel>
                           <FormControl>
-                              <Textarea placeholder="Any additional comments or remarks." {...field} />
+                              <Textarea placeholder="Any additional comments or remarks." {...field} disabled={isSubmitting}/>
                           </FormControl>
                           <FormMessage />
                       </FormItem>
@@ -283,7 +329,7 @@ export default function RaisePtwPage() {
               />
 
               <div className="flex justify-end">
-                <Button type="submit">Submit Request</Button>
+                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit Request'}</Button>
               </div>
             </form>
           </Form>
@@ -292,3 +338,5 @@ export default function RaisePtwPage() {
     </>
   )
 }
+
+    
