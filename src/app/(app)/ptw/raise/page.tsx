@@ -128,7 +128,7 @@ export default function RaisePtwPage() {
     setIsSubmitting(true);
     setUploadProgress({});
 
-    const uploadFile = (file: File, path: string, key: string): Promise<string> => {
+    const uploadFile = (file: File, path: string, key: string): Promise<{ url: string; contentType: string }> => {
         return new Promise((resolve, reject) => {
             const storage = getStorage(firebaseApp);
             const storageRef = ref(storage, path);
@@ -145,7 +145,7 @@ export default function RaisePtwPage() {
                 },
                 () => {
                     getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-                        resolve(downloadURL);
+                        resolve({ url: downloadURL, contentType: file.type });
                     });
                 }
             );
@@ -155,15 +155,21 @@ export default function RaisePtwPage() {
     try {
         let videoUrl = "";
         let vlogUrl = "";
+        let videoContentType = "";
+        let vlogContentType = "";
         const timestamp = Date.now();
 
         if (videoFile) {
             const videoPath = `uploads/${user.uid}/${timestamp}-${videoFile.name}`;
-            videoUrl = await uploadFile(videoFile, videoPath, 'video');
+            const result = await uploadFile(videoFile, videoPath, 'video');
+            videoUrl = result.url;
+            videoContentType = result.contentType;
         }
         if (vlogFile) {
             const vlogPath = `uploads/${user.uid}/${timestamp}-${vlogFile.name}`;
-            vlogUrl = await uploadFile(vlogFile, vlogPath, 'vlog');
+            const result = await uploadFile(vlogFile, vlogPath, 'vlog');
+            vlogUrl = result.url;
+            vlogContentType = result.contentType;
         }
 
         const permitData = {
@@ -173,6 +179,8 @@ export default function RaisePtwPage() {
           requestDate: serverTimestamp(),
           videoUrl: videoUrl,
           vlogUrl: vlogUrl,
+          videoContentType: videoContentType,
+          vlogContentType: vlogContentType,
         };
 
         const permitsCollection = collection(firestore, "permits_to_work");

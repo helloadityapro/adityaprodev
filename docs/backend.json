@@ -128,10 +128,18 @@
           "description": "URL of the video of the work.",
           "format": "uri"
         },
+        "videoContentType": {
+          "type": "string",
+          "description": "Content type of the work video."
+        },
         "vlogUrl": {
           "type": "string",
           "description": "URL of the engineer's vlog for this work.",
           "format": "uri"
+        },
+        "vlogContentType": {
+            "type": "string",
+            "description": "Content type of the engineer's vlog."
         },
         "commentsAndRemarks": {
           "type": "string",

@@ -25,7 +25,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { FileCheck, Clock, FileX, List as ListIcon, ExternalLink, Eye, FilePen, Trash2, Check, X, FileText } from "lucide-react"
+import { FileCheck, Clock, FileX, List as ListIcon, ExternalLink, Eye, FilePen, Trash2, Check, X, FileText, FileVideo, Video, Film } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
@@ -47,6 +47,8 @@ type Permit = {
   requestDate: any; // Should be a timestamp
   videoUrl?: string;
   vlogUrl?: string;
+  videoContentType?: string;
+  vlogContentType?: string;
   commentsAndRemarks?: string;
   adminRemarks?: string;
 };
@@ -84,7 +86,7 @@ function UserDisplay({ userId }: { userId: string }) {
 }
 
 
-const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onDelete }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onDelete: (permit: Permit) => void; }) {
+const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onDelete, onAttachmentView }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onDelete: (permit: Permit) => void; onAttachmentView: (media: { url: string; type: string }) => void; }) {
     return (
       <Table>
         <TableHeader>
@@ -95,6 +97,7 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
             <TableHead>Engineer</TableHead>
             <TableHead>Created</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Attachments</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -113,6 +116,22 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
               <TableCell>{permit.requestDate ? new Date(permit.requestDate?.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
               <TableCell>
                 <StatusBadge status={permit.status} />
+              </TableCell>
+               <TableCell>
+                <div className="flex items-center justify-start gap-1">
+                  {permit.videoUrl && permit.videoContentType && (
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onAttachmentView({url: permit.videoUrl!, type: permit.videoContentType!})}>
+                      <FileVideo className="h-4 w-4" />
+                      <span className="sr-only">View Work Video/Photo</span>
+                    </Button>
+                  )}
+                  {permit.vlogUrl && permit.vlogContentType && (
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onAttachmentView({url: permit.vlogUrl!, type: permit.vlogContentType!})}>
+                      <Video className="h-4 w-4" />
+                      <span className="sr-only">View Engineer Vlog</span>
+                    </Button>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 <div className="flex items-center justify-end gap-1">
@@ -203,7 +222,7 @@ function PermitActionDialog({ permit, status, open, onOpenChange, onConfirm }: {
   );
 }
 
-function PermitDetailsDialog({ permit, open, onOpenChange }: { permit: Permit | null, open: boolean, onOpenChange: (open: boolean) => void }) {
+function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: { permit: Permit | null, open: boolean, onOpenChange: (open: boolean) => void, onAttachmentView: (media: { url: string; type: string }) => void }) {
   if (!permit) return null;
 
   return (
@@ -225,9 +244,55 @@ function PermitDetailsDialog({ permit, open, onOpenChange }: { permit: Permit | 
             {permit.adminId && <div className="flex items-center gap-2"><Label>Reviewed By (Admin)</Label><UserDisplay userId={permit.adminId} /></div>}
             {permit.commentsAndRemarks && <div className="col-span-2"><Label>Engineer's Remarks</Label><p className="whitespace-pre-wrap">{permit.commentsAndRemarks}</p></div>}
             {permit.adminRemarks && <div className="col-span-2"><Label>Admin's Remarks</Label><p className="whitespace-pre-wrap">{permit.adminRemarks}</p></div>}
-            {permit.videoUrl && <div><Label>Work Video/Photos</Label><a href={permit.videoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary underline"><ExternalLink size={14}/>View Attachment</a></div>}
-            {permit.vlogUrl && <div><Label>Engineer's Vlog</Label><a href={permit.vlogUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary underline"><ExternalLink size={14}/>View Attachment</a></div>}
+            {permit.videoUrl && permit.videoContentType && (
+              <div>
+                <Label>Work Video/Photos</Label>
+                <Button variant="link" className="p-0 h-auto flex items-center gap-1 text-primary" onClick={() => onAttachmentView({ url: permit.videoUrl!, type: permit.videoContentType! })}>
+                  <ExternalLink size={14}/>View Attachment
+                </Button>
+              </div>
+            )}
+            {permit.vlogUrl && permit.vlogContentType && (
+              <div>
+                <Label>Engineer's Vlog</Label>
+                <Button variant="link" className="p-0 h-auto flex items-center gap-1 text-primary" onClick={() => onAttachmentView({ url: permit.vlogUrl!, type: permit.vlogContentType! })}>
+                  <ExternalLink size={14}/>View Attachment
+                </Button>
+              </div>
+            )}
           </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MediaViewerDialog({ media, open, onOpenChange }: { media: { url: string; type: string } | null, open: boolean, onOpenChange: (open: boolean) => void }) {
+  if (!media) return null;
+
+  const isVideo = media.type.startsWith('video/');
+  const isImage = media.type.startsWith('image/');
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Attachment Viewer</DialogTitle>
+        </DialogHeader>
+        <div className="py-4 flex items-center justify-center bg-black rounded-md">
+          {isVideo ? (
+            <video controls autoPlay src={media.url} className="max-h-[80vh] w-full rounded-md" />
+          ) : isImage ? (
+            <img src={media.url} alt="Attachment" className="max-h-[80vh] w-auto rounded-md" />
+          ) : (
+            <div className="flex flex-col items-center gap-4 p-8 text-muted-foreground">
+                <Film size={48} />
+                <p>Unsupported file type: {media.type}.</p>
+                <Button asChild>
+                    <a href={media.url} target="_blank" rel="noopener noreferrer">Download file</a>
+                </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -252,6 +317,7 @@ export default function PtwListPage() {
   const [actionState, setActionState] = React.useState<{permit: Permit, status: 'Approved' | 'Rejected'} | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [permitToDelete, setPermitToDelete] = React.useState<Permit | null>(null);
+  const [mediaToView, setMediaToView] = React.useState<{ url: string, type: string } | null>(null);
 
   const handleActionTrigger = React.useCallback((permit: Permit, status: 'Approved' | 'Rejected') => {
     setActionState({ permit, status });
@@ -368,7 +434,7 @@ export default function PtwListPage() {
         </CardHeader>
         <CardContent>
             {pendingPermits.length > 0 ? (
-                <PermitListTable permits={pendingPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} />
+                <PermitListTable permits={pendingPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} onAttachmentView={setMediaToView} />
             ) : (
                 <div className="text-center py-12 text-muted-foreground">
                     <p>No pending requests.</p>
@@ -383,7 +449,7 @@ export default function PtwListPage() {
         </CardHeader>
         <CardContent>
             {otherPermits.length > 0 ? (
-             <PermitListTable permits={otherPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} />
+             <PermitListTable permits={otherPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} onAttachmentView={setMediaToView} />
             ) : (
                  <div className="text-center py-12 text-muted-foreground">
                     <p>No other requests found.</p>
@@ -405,6 +471,7 @@ export default function PtwListPage() {
         permit={detailsPermit}
         open={!!detailsPermit}
         onOpenChange={() => setDetailsPermit(null)}
+        onAttachmentView={setMediaToView}
       />
       
       <AlertDialog open={!!permitToDelete} onOpenChange={() => setPermitToDelete(null)}>
@@ -421,6 +488,8 @@ export default function PtwListPage() {
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <MediaViewerDialog media={mediaToView} open={!!mediaToView} onOpenChange={() => setMediaToView(null)} />
 
     </div>
   )
