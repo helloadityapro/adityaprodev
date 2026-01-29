@@ -7,10 +7,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { cn } from "@/lib/utils"
-import { useCollection, useFirestore } from "@/firebase"
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { collection } from "firebase/firestore"
 
 type Project = {
@@ -21,7 +19,8 @@ type Project = {
 
 export default function DashboardPage() {
   const firestore = useFirestore();
-  const { data: projects, isLoading } = useCollection<Project>(collection(firestore, 'projects'));
+  const projectsQuery = useMemoFirebase(() => collection(firestore, 'projects'), [firestore]);
+  const { data: projects, isLoading } = useCollection<Project>(projectsQuery);
 
   if(isLoading) return <p>Loading projects...</p>
 
