@@ -14,10 +14,9 @@ export default function AppLogo({ className }: { className?: string }) {
             strokeLinejoin="round"
             className="text-primary"
         >
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-            <path d="M14 2v6h6" />
-            <path d="M10 16s.5-1 2-1 2 1 2 1" />
-            <path d="M12 11.5a2.5 2.5 0 0 1 0 5" />
+            <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <path d="m9 14 2 2 4-4"/>
         </svg>
       <span className="font-headline text-xl font-semibold">Project Permits</span>
     </div>

@@ -23,7 +23,7 @@ export default function AdminDashboardPage() {
 
     useEffect(() => {
         if (!isProfileLoading && !isAdmin) {
-            router.replace('/dashboard');
+            router.replace('/ptw/raise');
         }
     }, [isProfileLoading, isAdmin, router]);
 
