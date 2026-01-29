@@ -30,7 +30,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const { data: userProfile } = useDoc(userProfileRef);
 
-  const userRole = userProfile?.role || "SiteEngineer";
+  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com';
+  const userRole = isAdmin ? "Admin" : userProfile?.role || "SiteEngineer";
+
 
   React.useEffect(() => {
     if (!isUserLoading && !user) {
@@ -46,8 +48,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Check for registration approval
-  if (userProfile && userProfile.registrationRequest) {
+  // Check for registration approval but allow admin email through
+  if (userProfile && userProfile.registrationRequest && user?.email !== 'abhijeet.agepl@gmail.com') {
      return (
       <div className="flex flex-col min-h-screen items-center justify-center text-center gap-4">
         <div>
