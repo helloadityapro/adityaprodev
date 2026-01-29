@@ -1,4 +1,5 @@
 "use client";
+import * as React from "react";
 import {
   Table,
   TableBody,
@@ -37,7 +38,7 @@ function StatusBadge({ status }: { status: Permit["status"] }) {
     );
 }
 
-function PermitListTable({ permits }: { permits: Permit[] }) {
+function PermitListTable({ permits, onAction }: { permits: Permit[]; onAction: (permitId: string, status: Permit['status']) => void; }) {
     const userRole = 'admin'; // mock role
     return (
       <Table>
@@ -78,8 +79,8 @@ function PermitListTable({ permits }: { permits: Permit[] }) {
                     <DropdownMenuItem>View Details</DropdownMenuItem>
                     {(userRole === 'admin' || userRole === 'supervisor') && permit.status === 'Pending' && (
                         <>
-                            <DropdownMenuItem>Approve</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">Reject</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onAction(permit.id, 'Approved')}>Approve</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onAction(permit.id, 'Rejected')} className="text-destructive focus:text-destructive focus:bg-destructive/10">Reject</DropdownMenuItem>
                         </>
                     )}
                     {userRole === 'site-engineer' && permit.status === 'Rejected' && (
@@ -96,8 +97,16 @@ function PermitListTable({ permits }: { permits: Permit[] }) {
 }
 
 export default function PtwListPage() {
-  const permits = mockPermits;
+  const [permits, setPermits] = React.useState<Permit[]>(mockPermits);
   const userRole = 'admin'; // or 'supervisor', 'site-engineer'
+
+  const handlePermitAction = (permitId: string, status: Permit['status']) => {
+    setPermits(currentPermits =>
+      currentPermits.map(p =>
+        p.id === permitId ? { ...p, status } : p
+      )
+    );
+  };
 
   const summary = {
     total: permits.length,
@@ -162,16 +171,16 @@ export default function PtwListPage() {
         </TabsList>
         <Card className="mt-4">
             <TabsContent value="all" className="m-0">
-                <PermitListTable permits={permits} />
+                <PermitListTable permits={permits} onAction={handlePermitAction} />
             </TabsContent>
             <TabsContent value="pending" className="m-0">
-                <PermitListTable permits={permits.filter(p => p.status === 'Pending')} />
+                <PermitListTable permits={permits.filter(p => p.status === 'Pending')} onAction={handlePermitAction} />
             </TabsContent>
             <TabsContent value="approved" className="m-0">
-                <PermitListTable permits={permits.filter(p => p.status === 'Approved')} />
+                <PermitListTable permits={permits.filter(p => p.status === 'Approved')} onAction={handlePermitAction} />
             </TabsContent>
             <TabsContent value="rejected" className="m-0">
-                <PermitListTable permits={permits.filter(p => p.status === 'Rejected')} />
+                <PermitListTable permits={permits.filter(p => p.status === 'Rejected')} onAction={handlePermitAction} />
             </TabsContent>
         </Card>
       </Tabs>
