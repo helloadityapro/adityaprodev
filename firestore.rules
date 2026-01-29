@@ -52,10 +52,11 @@ service cloud.firestore {
     }
 
     /**
-     * Checks if the requesting user has the Admin role by reading their user document.
+     * Checks if the requesting user has the Admin role by reading their user document
+     * or by checking for a specific admin email.
      */
     function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+      return isSignedIn() && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin' || request.auth.token.email == 'abhijeet.agepl@gmail.com');
     }
 
     /**
@@ -153,10 +154,9 @@ service cloud.firestore {
      * @principle Enforces authorization based on denormalized membership data (assignedProjectIds).
      */
     match /projects/{projectId} {
-      allow read: if isAssignedToProject(projectId) || isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow get: if isAssignedToProject(projectId) || isAdmin();
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     /**
@@ -170,10 +170,7 @@ service cloud.firestore {
      */
     match /sites/{siteId} {
       allow get: if canAccessSite(siteId) || isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow list, create, update, delete: if isAdmin();
     }
 
     /**
@@ -202,10 +199,8 @@ service cloud.firestore {
      * @principle Provides public read access for reference data while securing writes to administrators.
      */
     match /permit_to_work_types/{ptwTypeId} {
-      allow get, list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
   }
 }
