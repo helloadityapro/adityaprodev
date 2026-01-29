@@ -23,46 +23,46 @@ export function MainNav({ userRole }: { userRole: string }) {
     <>
       <SidebarMenu>
         <SidebarMenuItem>
-          <Link href="/dashboard" legacyBehavior passHref>
-            <SidebarMenuButton tooltip="Projects" isActive={pathname === '/dashboard'}>
+          <SidebarMenuButton asChild tooltip="Projects" isActive={pathname === '/dashboard'}>
+            <Link href="/dashboard">
               <FolderKanban />
               Projects
-            </SidebarMenuButton>
-          </Link>
+            </Link>
+          </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
       <SidebarGroup>
         <SidebarGroupLabel>PtW</SidebarGroupLabel>
         <SidebarMenu>
           <SidebarMenuItem>
-            <Link href="/ptw/raise" legacyBehavior passHref>
-              <SidebarMenuButton tooltip="Raise PtW" isActive={pathname === '/ptw/raise'}>
+            <SidebarMenuButton asChild tooltip="Raise PtW" isActive={pathname === '/ptw/raise'}>
+              <Link href="/ptw/raise">
                 <FilePlus />
                 Raise PtW
-              </SidebarMenuButton>
-            </Link>
+              </Link>
+            </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <Link href="/ptw/list" legacyBehavior passHref>
-              <SidebarMenuButton tooltip="List of PtW" isActive={pathname === '/ptw/list'}>
+            <SidebarMenuButton asChild tooltip="List of PtW" isActive={pathname === '/ptw/list'}>
+              <Link href="/ptw/list">
                 <List />
                 List of PtW
-              </SidebarMenuButton>
-            </Link>
+              </Link>
+            </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroup>
-      {userRole === "admin" && (
+      {userRole === "Admin" && (
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel>Settings</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
-              <Link href="/settings/users" legacyBehavior passHref>
-                <SidebarMenuButton tooltip="User Management" isActive={pathname.startsWith('/settings/users')}>
+              <SidebarMenuButton asChild tooltip="User Management" isActive={pathname.startsWith('/settings/users')}>
+                <Link href="/settings/users">
                   <Users />
                   Users management
-                </SidebarMenuButton>
-              </Link>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
