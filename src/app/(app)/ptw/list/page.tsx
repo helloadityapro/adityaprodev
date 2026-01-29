@@ -20,8 +20,8 @@ import { collection, doc, query, where } from "firebase/firestore";
 
 type Permit = {
   id: string;
-  siteId: string;
-  ptwTypeId: string;
+  siteName: string;
+  ptwType: string;
   descriptionOfWork: string;
   status: 'Pending' | 'Approved' | 'Rejected' | 'Corrected';
   siteEngineerId: string;
@@ -61,24 +61,6 @@ function UserDisplay({ userId }: { userId: string }) {
   return <span>{user?.username || 'Unknown'}</span>;
 }
 
-function SiteDisplay({ siteId }: { siteId: string }) {
-  const firestore = useFirestore();
-  const siteRef = useMemoFirebase(() => siteId ? doc(firestore, 'sites', siteId) : null, [firestore, siteId]);
-  const { data: site, isLoading } = useDoc(siteRef);
-
-  if (isLoading) return <span>...</span>;
-  return <span>{site?.name || 'Unknown Site'}</span>;
-}
-
-function PtwTypeDisplay({ ptwTypeId }: { ptwTypeId: string }) {
-  const firestore = useFirestore();
-  const ptwTypeRef = useMemoFirebase(() => ptwTypeId ? doc(firestore, 'permit_to_work_types', ptwTypeId) : null, [firestore, ptwTypeId]);
-  const { data: ptwType, isLoading } = useDoc(ptwTypeRef);
-
-  if (isLoading) return <span>...</span>;
-  return <span>{ptwType?.name || 'Unknown Type'}</span>;
-}
-
 
 function PermitListTable({ permits, onAction, userRole }: { permits: Permit[]; onAction: (permitId: string, status: Permit['status']) => void; userRole: string }) {
     return (
@@ -86,8 +68,8 @@ function PermitListTable({ permits, onAction, userRole }: { permits: Permit[]; o
         <TableHeader>
           <TableRow>
             <TableHead>Permit ID</TableHead>
-            <TableHead>Site</TableHead>
-            <TableHead>Type</TableHead>
+            <TableHead>Site Name</TableHead>
+            <TableHead>Permit For</TableHead>
             <TableHead className="hidden md:table-cell">Requested By</TableHead>
             <TableHead className="hidden sm:table-cell">Date</TableHead>
             <TableHead>Status</TableHead>
@@ -100,8 +82,8 @@ function PermitListTable({ permits, onAction, userRole }: { permits: Permit[]; o
           {permits.map((permit) => (
             <TableRow key={permit.id}>
               <TableCell className="font-medium">{permit.id.substring(0,7)}...</TableCell>
-              <TableCell><SiteDisplay siteId={permit.siteId} /></TableCell>
-              <TableCell><PtwTypeDisplay ptwTypeId={permit.ptwTypeId} /></TableCell>
+              <TableCell>{permit.siteName}</TableCell>
+              <TableCell>{permit.ptwType}</TableCell>
               <TableCell className="hidden md:table-cell"><UserDisplay userId={permit.siteEngineerId} /></TableCell>
               <TableCell className="hidden sm:table-cell">{permit.requestDate ? new Date(permit.requestDate?.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
               <TableCell>

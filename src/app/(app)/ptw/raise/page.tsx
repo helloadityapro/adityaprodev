@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { FileVideo, Video } from "lucide-react"
-import { useCollection, useFirestore, useUser, addDocumentNonBlocking, useMemoFirebase } from "@/firebase"
+import { useFirestore, useUser, addDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp } from "firebase/firestore"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
@@ -19,13 +19,44 @@ import { useRouter } from "next/navigation"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 const raisePtwSchema = z.object({
-  siteId: z.string().min(1, "Site is required"),
-  ptwTypeId: z.string().min(1, "Permit type is required"),
+  siteName: z.string().min(1, "Site is required"),
+  ptwType: z.string().min(1, "Permit type is required"),
   descriptionOfWork: z.string().min(10, "Description must be at least 10 characters"),
   comments: z.string().optional(),
 })
 
-type Site = { id: string; name: string };
+const ptwTypes = [
+  "MMS columns concreting/erection work",
+  "AC Cables cutting",
+  "AC Cable Trench laying",
+  "Civil works",
+];
+
+type SiteData = {
+  'Project Company': string;
+  'Project name': string;
+  'AC Capacity': string;
+  'DC Capacity': string;
+};
+
+const parseCSV = (csvText: string): SiteData[] => {
+  const lines = csvText.trim().split('\n');
+  if (lines.length < 2) return [];
+  const data: SiteData[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = lines[i].split(',').map(v => v.trim().replace(/\r/g, ''));
+    if (values.length >= 5) {
+      const entry: SiteData = {
+        'Project Company': values[1],
+        'Project name': values[2],
+        'DC Capacity': values[3],
+        'AC Capacity': values[4],
+      };
+      data.push(entry);
+    }
+  }
+  return data;
+};
 
 export default function RaisePtwPage() {
   const firestore = useFirestore()
@@ -33,38 +64,57 @@ export default function RaisePtwPage() {
   const router = useRouter()
   const { toast } = useToast()
 
+  const [allSites, setAllSites] = React.useState<SiteData[]>([]);
   const [siteSearch, setSiteSearch] = React.useState("");
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
-
-  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
-  const ptwTypesQuery = useMemoFirebase(() => collection(firestore, 'permit_to_work_types'), [firestore]);
-
-  const { data: sites } = useCollection<Site>(sitesQuery);
-  const { data: ptwTypes } = useCollection(ptwTypesQuery);
+  const [selectedSite, setSelectedSite] = React.useState<SiteData | null>(null);
 
   const form = useForm<z.infer<typeof raisePtwSchema>>({
     resolver: zodResolver(raisePtwSchema),
     defaultValues: {
-      siteId: "",
-      ptwTypeId: "",
+      siteName: "",
+      ptwType: "",
       descriptionOfWork: "",
       comments: "",
     },
   })
 
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vT8JE2-QFEjU_CVprrrBPivhxoygAtkC8S6JFPTK8-R28EL9XuTTv7aJ3Onejmsp55_RQEvF8g7Ku1p/pub?gid=1131066411&single=true&output=csv');
+        if (!response.ok) {
+          throw new Error('Failed to fetch site data.');
+        }
+        const csvText = await response.text();
+        const parsedData = parseCSV(csvText);
+        setAllSites(parsedData);
+      } catch (err: any) {
+        toast({ variant: "destructive", title: "Error fetching sites", description: err.message });
+      }
+    };
+    fetchData();
+  }, [toast]);
+
   const filteredSites = React.useMemo(() => {
     if (siteSearch.length < 3) return [];
-    return sites?.filter(site => site.name.toLowerCase().includes(siteSearch.toLowerCase())) || [];
-  }, [siteSearch, sites]);
+    return allSites?.filter(site => site['Project name'].toLowerCase().includes(siteSearch.toLowerCase())) || [];
+  }, [siteSearch, allSites]);
 
   React.useEffect(() => {
-    if(siteSearch.length >= 3) {
+    if (siteSearch.length >= 3 && filteredSites.length > 0) {
       setIsSitePopoverOpen(true);
     } else {
       setIsSitePopoverOpen(false);
     }
-  }, [siteSearch]);
+  }, [siteSearch, filteredSites]);
 
+  const handleSiteSelect = (site: SiteData) => {
+    form.setValue('siteName', site['Project name']);
+    setSiteSearch(site['Project name']);
+    setSelectedSite(site);
+    setIsSitePopoverOpen(false);
+  }
 
   const onSubmit = (values: z.infer<typeof raisePtwSchema>) => {
     if (!user) {
@@ -94,125 +144,155 @@ export default function RaisePtwPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                    control={form.control}
-                    name="siteId"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Select Site</FormLabel>
-                        <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Input
-                                placeholder="Type to search for a site..."
-                                value={siteSearch}
-                                onChange={(e) => setSiteSearch(e.target.value)}
-                                className="w-full"
-                              />
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                            {filteredSites.length > 0 ? (
-                              <ul className="py-1">
-                                {filteredSites.map((site) => (
-                                  <li key={site.id}>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      className="w-full justify-start font-normal"
-                                      onClick={() => {
-                                        field.onChange(site.id);
-                                        setSiteSearch(site.name);
-                                        setIsSitePopoverOpen(false);
-                                      }}
-                                    >
-                                      {site.name}
-                                    </Button>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <div className="p-4 text-sm text-center text-muted-foreground">
-                                {siteSearch.length < 3 ? "Type at least 3 characters" : "No sites found."}
-                              </div>
-                            )}
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="ptwTypeId"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Select PtW Type</FormLabel>
-                             <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a permit type" />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {ptwTypes?.map((type) => (
-                                    <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+              <div className="grid gap-2">
+                <Label>Requesting Engineer</Label>
+                <Input readOnly value={user?.displayName || user?.email || ''} className="bg-muted"/>
               </div>
-                <FormField
-                    control={form.control}
-                    name="descriptionOfWork"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Description of Work</FormLabel>
-                            <FormControl>
-                                <Textarea placeholder="Provide a detailed description of the work to be performed." rows={4} {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div className="grid gap-2">
-                    <Label htmlFor="work-video">Attach video of work</Label>
-                    <div className="flex items-center gap-2">
-                        <FileVideo className="h-5 w-5 text-muted-foreground"/>
-                        <Input id="work-video" type="file" className="border-dashed" />
-                    </div>
-                </div>
-                 <div className="grid gap-2">
-                    <Label htmlFor="vlog">Attach vlog of engineer</Label>
-                     <div className="flex items-center gap-2">
-                        <Video className="h-5 w-5 text-muted-foreground"/>
-                        <Input id="vlog" type="file" className="border-dashed" />
-                    </div>
-                </div>
-            </div>
 
-            <FormField
-                control={form.control}
-                name="comments"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Comments and Remarks</FormLabel>
-                        <FormControl>
-                            <Textarea placeholder="Any additional comments or remarks." {...field} />
-                        </FormControl>
-                        <FormMessage />
+              <FormField
+                  control={form.control}
+                  name="siteName"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Site Name</FormLabel>
+                      <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Input
+                              placeholder="Type to search for a site..."
+                              value={siteSearch}
+                              onChange={(e) => {
+                                setSiteSearch(e.target.value)
+                                if (e.target.value !== field.value) {
+                                  field.onChange('');
+                                  setSelectedSite(null);
+                                }
+                              }}
+                              className="w-full"
+                            />
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                          {filteredSites.length > 0 ? (
+                            <ul className="py-1">
+                              {filteredSites.map((site, index) => (
+                                <li key={index}>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="w-full justify-start font-normal"
+                                    onClick={() => handleSiteSelect(site)}
+                                  >
+                                    {site['Project name']}
+                                  </Button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="p-4 text-sm text-center text-muted-foreground">
+                              {siteSearch.length < 3 ? "Type at least 3 characters" : "No sites found."}
+                            </div>
+                          )}
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
                     </FormItem>
-                )}
-            />
+                  )}
+              />
+              
+              {selectedSite && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Site Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p className="text-muted-foreground">Project Company</p>
+                        <p className="font-medium">{selectedSite['Project Company']}</p>
+                    </div>
+                     <div>
+                        <p className="text-muted-foreground">AC Capacity</p>
+                        <p className="font-medium">{selectedSite['AC Capacity']}</p>
+                    </div>
+                    <div>
+                        <p className="text-muted-foreground">DC Capacity</p>
+                        <p className="font-medium">{selectedSite['DC Capacity']}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              <FormField
+                  control={form.control}
+                  name="ptwType"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>PTW for</FormLabel>
+                           <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Select a permit type" />
+                              </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                  {ptwTypes.map((type) => (
+                                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                                  ))}
+                              </SelectContent>
+                          </Select>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
 
-            <div className="flex justify-end">
-              <Button type="submit">Submit Request</Button>
-            </div>
+              <FormField
+                  control={form.control}
+                  name="descriptionOfWork"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Description of Work</FormLabel>
+                          <FormControl>
+                              <Textarea placeholder="Provide a detailed description of the work to be performed." rows={4} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div className="grid gap-2">
+                      <Label htmlFor="work-video">Attach video and photos</Label>
+                      <div className="flex items-center gap-2">
+                          <FileVideo className="h-5 w-5 text-muted-foreground"/>
+                          <Input id="work-video" type="file" className="border-dashed" multiple />
+                      </div>
+                  </div>
+                   <div className="grid gap-2">
+                      <Label htmlFor="vlog">Attach vlog of engineer</Label>
+                       <div className="flex items-center gap-2">
+                          <Video className="h-5 w-5 text-muted-foreground"/>
+                          <Input id="vlog" type="file" className="border-dashed" />
+                      </div>
+                  </div>
+              </div>
+
+              <FormField
+                  control={form.control}
+                  name="comments"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Additional Comments and Remarks</FormLabel>
+                          <FormControl>
+                              <Textarea placeholder="Any additional comments or remarks." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
+
+              <div className="flex justify-end">
+                <Button type="submit">Submit Request</Button>
+              </div>
             </form>
           </Form>
         </CardContent>
