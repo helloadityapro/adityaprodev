@@ -1,3 +1,4 @@
+
 "use client";
 import * as React from "react";
 import { useForm } from "react-hook-form";
@@ -25,7 +26,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { FileCheck, Clock, FileX, List as ListIcon, ExternalLink, Eye, FilePen, Trash2, Check, X, FileText, FileVideo, Video, Film, Paperclip } from "lucide-react"
+import { FileCheck, Clock, FileX, List as ListIcon, ExternalLink, Eye, FilePen, Trash2, Check, X, FileText, FileVideo, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
@@ -39,7 +40,12 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format, isSameDay } from "date-fns";
+
 
 type Attachment = {
   url: string;
@@ -61,6 +67,43 @@ type Permit = {
   commentsAndRemarks?: string;
   adminRemarks?: string;
 };
+
+type SiteData = {
+  'Project Company': string;
+  'Project name': string;
+  'AC Capacity': string;
+  'DC Capacity': string;
+};
+
+// Simple CSV to JSON parser
+const parseCSV = (csvText: string): SiteData[] => {
+  const lines = csvText.trim().split('\n');
+  const data: SiteData[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    const values = line.split(',').map(v => v.trim().replace(/\r/g, ''));
+    
+    if (values.length >= 5 && !isNaN(parseInt(values[0], 10)) && values[2] && values[2].trim() !== '') {
+      const entry: SiteData = {
+        'Project Company': values[1],
+        'Project name': values[2],
+        'DC Capacity': values[3],
+        'AC Capacity': values[4],
+      };
+      data.push(entry);
+    }
+  }
+  return data;
+};
+
+const ptwTypes = [
+  "MMS columns concreting/erection work",
+  "AC Cables cutting",
+  "AC Cable Trench laying",
+  "Civil works",
+];
+
 
 function StatusBadge({ status }: { status: Permit["status"] }) {
     const statusConfig = {
@@ -322,8 +365,16 @@ export default function PtwListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
 
-  const [filter, setFilter] = React.useState<'all' | 'Pending' | 'Approved' | 'Rejected'>('all');
+  const [statusFilter, setStatusFilter] = React.useState<'all' | 'Pending' | 'Approved' | 'Rejected'>('all');
+  const [filters, setFilters] = React.useState({
+    ptwType: "",
+    siteName: "",
+    siteEngineerId: "",
+    date: undefined as Date | undefined,
+  });
+
   const userProfileRef = useMemoFirebase(() => {
     if (!user) return null;
     return doc(firestore, 'users', user.uid);
@@ -368,6 +419,29 @@ export default function PtwListPage() {
 
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
 
+  const engineersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), where('role', '==', 'SiteEngineer')), [firestore]);
+  const { data: engineers, isLoading: engineersLoading } = useCollection(engineersQuery);
+
+  const [siteNames, setSiteNames] = React.useState<string[]>([]);
+  React.useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vT8JE2-QFEjU_CVprrrBPivhxoygAtkC8S6JFPTK8-R28EL9XuTTv7aJ3Onejmsp55_RQEvF8g7Ku1p/pub?gid=1131066411&single=true&output=csv');
+        if (!response.ok) {
+          throw new Error('Failed to fetch site data.');
+        }
+        const csvText = await response.text();
+        const parsedData = parseCSV(csvText);
+        const uniqueSiteNames = [...new Set(parsedData.map(s => s['Project name']))];
+        setSiteNames(uniqueSiteNames);
+      } catch (err: any) {
+        toast({ variant: "destructive", title: "Error fetching sites", description: err.message });
+      }
+    };
+    fetchData();
+  }, [toast]);
+
+
   const handlePermitAction = (permitId: string, status: Permit['status'], adminRemarks: string) => {
     const permitRef = doc(firestore, "permits_to_work", permitId);
     let updateData: any = { status, adminRemarks };
@@ -394,20 +468,24 @@ export default function PtwListPage() {
   }), [allPermits]);
 
   const filteredPermits = React.useMemo(() => {
-    switch (filter) {
-      case 'Pending':
-        return allPermits.filter(p => p.status === 'Pending' || p.status === 'Corrected');
-      case 'Approved':
-        return allPermits.filter(p => p.status === 'Approved');
-      case 'Rejected':
-        return allPermits.filter(p => p.status === 'Rejected');
-      default:
-        return allPermits;
-    }
-  }, [allPermits, filter]);
+    return allPermits.filter(permit => {
+      const statusMatch = statusFilter === 'all'
+        ? true
+        : statusFilter === 'Pending'
+        ? permit.status === 'Pending' || permit.status === 'Corrected'
+        : permit.status === statusFilter;
+
+      const ptwTypeMatch = !filters.ptwType || permit.ptwType === filters.ptwType;
+      const siteNameMatch = !filters.siteName || permit.siteName === filters.siteName;
+      const engineerMatch = !filters.siteEngineerId || permit.siteEngineerId === filters.siteEngineerId;
+      const dateMatch = !filters.date || (permit.requestDate && isSameDay(permit.requestDate.toDate(), filters.date));
+
+      return statusMatch && ptwTypeMatch && siteNameMatch && engineerMatch && dateMatch;
+    });
+  }, [allPermits, statusFilter, filters]);
   
   const cardTitle = React.useMemo(() => {
-     switch (filter) {
+     switch (statusFilter) {
       case 'Pending':
         return "Pending & Corrected PTW Requests";
       case 'Approved':
@@ -417,9 +495,9 @@ export default function PtwListPage() {
       default:
         return "All PTW Requests";
     }
-  }, [filter]);
+  }, [statusFilter]);
 
-  if (isLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
+  if (isLoading || engineersLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
     return <p>Loading permits...</p>
   }
 
@@ -430,9 +508,68 @@ export default function PtwListPage() {
         <p className="text-muted-foreground">Review and manage permit to work requests</p>
       </div>
 
+      <Card>
+        <CardHeader>
+            <CardTitle>Filter Requests</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
+                <div className="grid gap-1.5">
+                    <Label>PTW Type</Label>
+                    <Select value={filters.ptwType} onValueChange={(value) => setFilters(prev => ({...prev, ptwType: value === 'all' ? '' : value}))}>
+                        <SelectTrigger><SelectValue placeholder="All Types" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Types</SelectItem>
+                            {ptwTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid gap-1.5">
+                    <Label>Site</Label>
+                     <Select value={filters.siteName} onValueChange={(value) => setFilters(prev => ({...prev, siteName: value === 'all' ? '' : value}))}>
+                        <SelectTrigger><SelectValue placeholder="All Sites" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Sites</SelectItem>
+                            {siteNames.map(site => <SelectItem key={site} value={site}>{site}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                 <div className="grid gap-1.5">
+                    <Label>Engineer</Label>
+                     <Select value={filters.siteEngineerId} onValueChange={(value) => setFilters(prev => ({...prev, siteEngineerId: value === 'all' ? '' : value}))}>
+                        <SelectTrigger><SelectValue placeholder="All Engineers" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Engineers</SelectItem>
+                            {engineers?.map(eng => <SelectItem key={eng.id} value={eng.id}>{eng.username}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="grid gap-1.5">
+                    <Label>Date</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !filters.date && "text-muted-foreground")}>
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {filters.date ? format(filters.date, "PPP") : <span>Pick a date</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={filters.date} onSelect={(date) => setFilters(prev => ({...prev, date: date || undefined}))} initialFocus />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <Button onClick={() => setFilters({ ptwType: '', siteName: '', siteEngineerId: '', date: undefined })} variant="outline" className="w-full">
+                  <FilterX className="mr-2 h-4 w-4"/>
+                  Clear Filters
+                </Button>
+            </div>
+        </CardContent>
+      </Card>
+
+
       {(userRole === 'Admin' || userRole === 'Supervisor') && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card onClick={() => setFilter('all')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'all' && "border-primary border-2")}>
+            <Card onClick={() => setStatusFilter('all')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", statusFilter === 'all' && "border-primary border-2")}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
                     <ListIcon className="h-4 w-4 text-muted-foreground" />
@@ -441,7 +578,7 @@ export default function PtwListPage() {
                     <div className="text-2xl font-bold">{summary.total}</div>
                 </CardContent>
             </Card>
-            <Card onClick={() => setFilter('Pending')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'Pending' && "border-yellow-500 border-2")}>
+            <Card onClick={() => setStatusFilter('Pending')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", statusFilter === 'Pending' && "border-yellow-500 border-2")}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Pending</CardTitle>
                   <Clock className="h-4 w-4 text-yellow-500" />
@@ -450,7 +587,7 @@ export default function PtwListPage() {
                   <div className="text-2xl font-bold">{summary.pending}</div>
               </CardContent>
             </Card>
-            <Card onClick={() => setFilter('Approved')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'Approved' && "border-green-500 border-2")}>
+            <Card onClick={() => setStatusFilter('Approved')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", statusFilter === 'Approved' && "border-green-500 border-2")}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Approved</CardTitle>
                     <FileCheck className="h-4 w-4 text-green-500" />
@@ -459,7 +596,7 @@ export default function PtwListPage() {
                     <div className="text-2xl font-bold">{summary.approved}</div>
                 </CardContent>
             </Card>
-            <Card onClick={() => setFilter('Rejected')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'Rejected' && "border-red-500 border-2")}>
+            <Card onClick={() => setStatusFilter('Rejected')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", statusFilter === 'Rejected' && "border-red-500 border-2")}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Rejected</CardTitle>
                     <FileX className="h-4 w-4 text-red-500" />
@@ -480,7 +617,7 @@ export default function PtwListPage() {
                 <PermitListTable permits={filteredPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} onAttachmentView={setMediaToView} />
             ) : (
                 <div className="text-center py-12 text-muted-foreground">
-                    <p>No {filter !== 'all' ? filter.toLowerCase() : ''} requests found.</p>
+                    <p>No {statusFilter !== 'all' ? statusFilter.toLowerCase() : ''} requests found matching your filters.</p>
                 </div>
             )}
         </CardContent>
@@ -521,3 +658,5 @@ export default function PtwListPage() {
     </div>
   )
 }
+
+    
