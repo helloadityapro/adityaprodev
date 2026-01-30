@@ -191,19 +191,33 @@ service cloud.firestore {
     }
 
     /**
-     * @description Stores Permit to Work requests. A Site Engineer can create and list their own permits.
-     * Admins and Supervisors can list all permits. Users involved in a permit's workflow can read and update it.
-     * @path /permits_to_work/{permitId}
-     * @allow (create) A Site Engineer creates a permit and sets `siteEngineerId` to their own UID.
-     * @allow (list) An Admin or Supervisor lists all permits. A Site Engineer can list their own permits.
-     * @deny (update) A user not involved in the permit workflow tries to change its status.
-     * @principle Enforces document-level access based on roles defined within the document's fields and user roles.
+     * @description Stores Permit to Work requests.
+     * - READ: Admins/Supervisors can read all. Site Engineers can read their own.
+     * - LIST: Any authenticated user can list, but GET rules still apply to each doc.
+     * - CREATE: Only Site Engineers can create, setting themselves as the owner.
+     * - UPDATE: Role-based state machine. Admins can always update. Supervisors can action 'Pending' permits.
+     *           Engineers can resubmit 'Rejected' permits.
+     * - DELETE: Only Admins can delete.
      */
     match /permits_to_work/{permitId} {
-      allow get: if isSignedIn() && (isAdmin() || isSupervisor() || (resource != null && request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId]));
-      allow list: if isAdmin() || isSupervisor() || isSiteEngineer();
-      allow create: if isSignedIn() && request.resource.data.siteEngineerId == request.auth.uid;
-      allow update: if isSignedIn() && resource != null && (isAdmin() || (isSupervisor() && resource.data.status == 'Pending') || request.auth.uid in [resource.data.siteEngineerId, resource.data.supervisorId, resource.data.adminId]);
+      allow get: if isSignedIn() && (
+        isAdmin() ||
+        isSupervisor() ||
+        (resource != null && request.auth.uid == resource.data.siteEngineerId)
+      );
+
+      allow list: if isSignedIn();
+
+      allow create: if isSiteEngineer() &&
+                       request.resource.data.siteEngineerId == request.auth.uid &&
+                       request.resource.data.status == 'Pending';
+
+      allow update: if isSignedIn() && resource != null && (
+        isAdmin() ||
+        (isSupervisor() && resource.data.status == 'Pending') ||
+        (request.auth.uid == resource.data.siteEngineerId && resource.data.status == 'Rejected')
+      );
+      
       allow delete: if isAdmin() && resource != null;
     }
   }
