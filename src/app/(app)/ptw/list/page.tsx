@@ -145,11 +145,14 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center justify-end gap-1">
+                  <div className="flex items-center justify-end gap-2">
                       <Button variant="ghost" size="icon" onClick={() => onViewDetails(permit)}><span className="sr-only">View</span><Eye className="h-4 w-4" /></Button>
                       
                       {userRole === 'SiteEngineer' && permit.status === 'Rejected' && (
-                          <Button variant="ghost" size="icon" onClick={() => onCorrect(permit)}><span className="sr-only">Correct</span><FilePen className="h-4 w-4" /></Button>
+                          <Button variant="outline" size="sm" onClick={() => onCorrect(permit)}>
+                              <FilePen className="h-4 w-4 mr-2" />
+                              Resubmit
+                          </Button>
                       )}
                       
                       {(userRole === 'Admin' || userRole === 'Supervisor') && (
@@ -509,3 +512,5 @@ export default function PtwListPage() {
     </div>
   )
 }
+
+    
