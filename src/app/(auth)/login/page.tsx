@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from 'next/navigation'
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -14,6 +14,7 @@ import AppLogo from "@/components/app-logo"
 import { useAuth, useUser } from "@/firebase"
 import { signInWithEmailAndPassword } from "firebase/auth"
 import { useToast } from "@/hooks/use-toast"
+import { Eye, EyeOff } from "lucide-react"
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -25,6 +26,7 @@ export default function LoginPage() {
   const auth = useAuth()
   const { user, isUserLoading } = useUser()
   const { toast } = useToast()
+  const [showPassword, setShowPassword] = useState(false)
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -109,7 +111,23 @@ export default function LoginPage() {
                         </Link>
                       </div>
                     <FormControl>
-                      <Input type="password" {...field} />
+                      <div className="relative">
+                        <Input 
+                          type={showPassword ? "text" : "password"} 
+                          {...field} 
+                          className="pr-10"
+                        />
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-0 top-0 h-full w-10 text-muted-foreground hover:bg-transparent"
+                            onClick={() => setShowPassword((prev) => !prev)}
+                        >
+                          {showPassword ? <EyeOff /> : <Eye />}
+                          <span className="sr-only">{showPassword ? 'Hide password' : 'Show password'}</span>
+                        </Button>
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
