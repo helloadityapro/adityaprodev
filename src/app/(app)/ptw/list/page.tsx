@@ -101,33 +101,33 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40px]">#</TableHead>
-              <TableHead>PTW Type</TableHead>
-              <TableHead>Site</TableHead>
-              <TableHead>Engineer</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Attachments</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="w-[40px] h-auto py-2 px-4">#</TableHead>
+              <TableHead className="h-auto py-2 px-4">PTW Type</TableHead>
+              <TableHead className="h-auto py-2 px-4">Site</TableHead>
+              <TableHead className="h-auto py-2 px-4">Engineer</TableHead>
+              <TableHead className="h-auto py-2 px-4">Created</TableHead>
+              <TableHead className="h-auto py-2 px-4">Status</TableHead>
+              <TableHead className="h-auto py-2 px-4">Attachments</TableHead>
+              <TableHead className="text-right h-auto py-2 px-4">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {permits.map((permit, index) => (
               <TableRow key={permit.id}>
-                <TableCell className="font-medium">{index + 1}</TableCell>
-                <TableCell>
+                <TableCell className="font-medium py-2 px-4">{index + 1}</TableCell>
+                <TableCell className="py-2 px-4">
                   <div className="flex items-center gap-2 font-medium">
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <span>{permit.ptwType}</span>
                   </div>
                 </TableCell>
-                <TableCell>{permit.siteName}</TableCell>
-                <TableCell><UserDisplay userId={permit.siteEngineerId} /></TableCell>
-                <TableCell>{permit.requestDate ? new Date(permit.requestDate?.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
-                <TableCell>
+                <TableCell className="py-2 px-4">{permit.siteName}</TableCell>
+                <TableCell className="py-2 px-4"><UserDisplay userId={permit.siteEngineerId} /></TableCell>
+                <TableCell className="py-2 px-4">{permit.requestDate ? new Date(permit.requestDate?.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
+                <TableCell className="py-2 px-4">
                   <StatusBadge status={permit.status} />
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-2 px-4">
                   <div className="flex items-center justify-start gap-1 flex-wrap">
                     {permit.attachments?.map((attachment, index) => (
                       <Tooltip key={index}>
@@ -144,7 +144,7 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                     ))}
                   </div>
                 </TableCell>
-                <TableCell>
+                <TableCell className="py-2 px-4">
                   <div className="flex items-center justify-end gap-2">
                       <Button variant="ghost" size="icon" onClick={() => onViewDetails(permit)}><span className="sr-only">View</span><Eye className="h-4 w-4" /></Button>
                       
