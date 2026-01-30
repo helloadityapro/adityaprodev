@@ -53,7 +53,7 @@ const parseCSV = (csvText: string): SiteData[] => {
   const lines = csvText.trim().split('\n');
   const data: SiteData[] = [];
 
-  // Iterate over lines, skipping the header (i=0)
+  // Iterate over lines, skipping the header (i=1)
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     const values = line.split(',').map(v => v.trim().replace(/\r/g, ''));
@@ -153,7 +153,7 @@ export default function RaisePtwPage() {
   }, [isCorrectionMode, permitToCorrect, form, allSites]);
 
 
-  const onSubmit = async (values: z.infer<typeof raisePtwSchema>>) => {
+  const onSubmit = async (values: z.infer<typeof raisePtwSchema>) => {
     if (!user) {
         toast({ variant: "destructive", title: "You must be logged in to submit a permit." });
         return;
