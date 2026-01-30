@@ -42,7 +42,7 @@ const siteSchema = z.object({
   dcCapacity: z.string().min(1, 'DC capacity is required.'),
 });
 
-function DropdownManagementSkeleton() {
+function AddOptionsSkeleton() {
     return (
         <div className="space-y-6 animate-pulse">
             <Skeleton className="h-9 w-80 mb-4" />
@@ -77,7 +77,7 @@ function DropdownManagementSkeleton() {
     )
 }
 
-export default function DropdownManagementPage() {
+export default function AddOptionsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -140,7 +140,7 @@ export default function DropdownManagementPage() {
   };
 
   if (isProfileLoading || ptwTypesLoading || sitesLoading) {
-    return <DropdownManagementSkeleton />;
+    return <AddOptionsSkeleton />;
   }
 
   if (!isAdmin) {
@@ -149,7 +149,7 @@ export default function DropdownManagementPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-headline font-semibold md:text-2xl">Dropdown Management</h1>
+      <h1 className="text-lg font-headline font-semibold md:text-2xl">Add Options</h1>
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>

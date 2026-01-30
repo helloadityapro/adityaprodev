@@ -75,10 +75,10 @@ export function MainNav({ userRole }: { userRole: string }) {
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Dropdowns" isActive={pathname.startsWith('/settings/dropdown-management')}>
+              <SidebarMenuButton asChild tooltip="Add Options" isActive={pathname.startsWith('/settings/dropdown-management')}>
                 <Link href="/settings/dropdown-management">
                   <SlidersHorizontal />
-                  Dropdowns
+                  Add Options
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
