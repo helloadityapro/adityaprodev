@@ -4,7 +4,7 @@ import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'Project Permits',
+  title: 'Aditya Pro',
   description: 'A platform for managing Permits to Work.',
 };
 
