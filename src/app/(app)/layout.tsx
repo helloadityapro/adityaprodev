@@ -2,8 +2,8 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection, addDocumentNonBlocking } from "@/firebase";
+import { collection, doc } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import AppLogo from "@/components/app-logo";
 import { MainNav } from "@/components/main-nav";
@@ -70,6 +70,44 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       }
     }
   }, [user, userProfile, isProfileLoading, firestore]);
+
+  // Seed PTW Types if the collection is empty
+  const ptwTypesCollectionRef = useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]);
+  const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection(ptwTypesCollectionRef);
+
+  React.useEffect(() => {
+    if (ptwTypesCollectionRef && !ptwTypesLoading && ptwTypes && ptwTypes.length === 0) {
+        const defaultPtwTypes = [
+            { name: 'Hot Work' },
+            { name: 'Confined Space Entry' },
+            { name: 'Electrical (HV & LV)' },
+            { name: 'Work at Height' },
+            { name: 'Excavation' },
+            { name: 'Lifting & Rigging' },
+            { name: 'General Work' },
+        ];
+        defaultPtwTypes.forEach(type => {
+            addDocumentNonBlocking(ptwTypesCollectionRef, type);
+        });
+    }
+  }, [ptwTypes, ptwTypesLoading, ptwTypesCollectionRef]);
+
+  // Seed Sites if the collection is empty
+  const sitesCollectionRef = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: sites, isLoading: sitesLoading } = useCollection(sitesCollectionRef);
+
+  React.useEffect(() => {
+    if (sitesCollectionRef && !sitesLoading && sites && sites.length === 0) {
+        const defaultSites = [
+            { name: 'Nagalwadi', projectCompany: 'Aditya Green Energy', acCapacity: '50 MW', dcCapacity: '60 MWp' },
+            { name: 'Mahoba Solar', projectCompany: 'Adani Green Energy', acCapacity: '250 MW', dcCapacity: '300 MWp' },
+            { name: 'Pavagada Solar Park', projectCompany: 'Azure Power', acCapacity: '150 MW', dcCapacity: '180 MWp' },
+        ];
+        defaultSites.forEach(site => {
+            addDocumentNonBlocking(sitesCollectionRef, site);
+        });
+    }
+  }, [sites, sitesLoading, sitesCollectionRef]);
 
   const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com';
   const userRole = isAdmin ? "Admin" : userProfile?.role || "SiteEngineer";
