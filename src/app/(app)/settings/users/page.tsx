@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Eye, Edit, Trash2 } from "lucide-react"
+import { Eye, Edit, Trash2, Users, UserPlus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
@@ -62,6 +62,7 @@ export default function UsersPage() {
     const { data: users, isLoading } = useCollection<User>(usersQuery);
     const { toast } = useToast();
 
+    const [filter, setFilter] = React.useState<'all' | 'pending'>('all');
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
     const [userToEdit, setUserToEdit] = React.useState<User | null>(null);
     const [userToView, setUserToView] = React.useState<User | null>(null);
@@ -97,6 +98,23 @@ export default function UsersPage() {
         setIsRejecting(false);
     }
 
+    const summary = React.useMemo(() => {
+        if (!users) return { totalUsers: 0, pendingRegistrations: 0 };
+        return {
+            totalUsers: users.length,
+            pendingRegistrations: users.filter(u => u.registrationRequest).length,
+        };
+    }, [users]);
+    
+    const filteredUsers = React.useMemo(() => {
+        if (!users) return [];
+        if (filter === 'pending') {
+            return users.filter(u => u.registrationRequest);
+        }
+        return users;
+    }, [users, filter]);
+
+
     if(isLoading) {
         return <p>Loading users...</p>
     }
@@ -108,71 +126,99 @@ export default function UsersPage() {
                     <h1 className="text-lg font-headline font-semibold md:text-2xl">User Management</h1>
                     <Button onClick={() => setIsAddUserDialogOpen(true)}>Add User</Button>
                 </div>
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <Card onClick={() => setFilter('all')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'all' && "border-primary border-2")}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{summary.totalUsers}</div>
+                        </CardContent>
+                    </Card>
+                    <Card onClick={() => setFilter('pending')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'pending' && "border-yellow-500 border-2")}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Pending Registrations</CardTitle>
+                            <UserPlus className="h-4 w-4 text-yellow-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{summary.pendingRegistrations}</div>
+                        </CardContent>
+                    </Card>
+                </div>
+
                 <Card>
                     <CardHeader>
-                        <CardTitle>Users</CardTitle>
-                        <CardDescription>Manage your users and their roles.</CardDescription>
+                        <CardTitle>{filter === 'all' ? 'All Users' : 'Pending Registrations'}</CardTitle>
+                        <CardDescription>A list of all users in the system.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>User</TableHead>
-                                    <TableHead>Role</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="hidden md:table-cell">Mobile</TableHead>
-                                    <TableHead>Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {users?.map((user) => (
-                                    <TableRow key={user.id}>
-                                        <TableCell>
-                                            <div className="flex items-center gap-3">
-                                                <Avatar className="h-9 w-9">
-                                                    {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.username} data-ai-hint="person face" />}
-                                                    <AvatarFallback>{user.username.charAt(0).toUpperCase()}</AvatarFallback>
-                                                </Avatar>
-                                                <div className="grid gap-0.5">
-                                                    <p className="font-medium">{user.username}</p>
-                                                    <p className="text-sm text-muted-foreground">{user.email}</p>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>{user.role}</TableCell>
-                                        <TableCell>
-                                            <StatusBadge isPending={user.registrationRequest} />
-                                        </TableCell>
-                                        <TableCell className="hidden md:table-cell">{user.mobile}</TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                {user.registrationRequest ? (
-                                                    <>
-                                                        <Button variant="outline" size="sm" onClick={() => handleApproveRegistration(user.id)}>Approve</Button>
-                                                        <Button variant="destructive" size="sm" onClick={() => handleRejectClick(user)}>Reject</Button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Button variant="ghost" size="icon" onClick={() => setUserToView(user)}>
-                                                            <Eye className="h-4 w-4" />
-                                                            <span className="sr-only">View</span>
-                                                        </Button>
-                                                        <Button variant="ghost" size="icon" onClick={() => setUserToEdit(user)}>
-                                                            <Edit className="h-4 w-4" />
-                                                            <span className="sr-only">Edit</span>
-                                                        </Button>
-                                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(user)}>
-                                                            <Trash2 className="h-4 w-4" />
-                                                            <span className="sr-only">Delete</span>
-                                                        </Button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </TableCell>
+                        {filteredUsers.length > 0 ? (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>User</TableHead>
+                                        <TableHead>Role</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="hidden md:table-cell">Mobile</TableHead>
+                                        <TableHead>Actions</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredUsers.map((user) => (
+                                        <TableRow key={user.id}>
+                                            <TableCell>
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar className="h-9 w-9">
+                                                        {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.username} data-ai-hint="person face" />}
+                                                        <AvatarFallback>{user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="grid gap-0.5">
+                                                        <p className="font-medium">{user.username}</p>
+                                                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{user.role}</TableCell>
+                                            <TableCell>
+                                                <StatusBadge isPending={user.registrationRequest} />
+                                            </TableCell>
+                                            <TableCell className="hidden md:table-cell">{user.mobile}</TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2">
+                                                    {user.registrationRequest ? (
+                                                        <>
+                                                            <Button variant="outline" size="sm" onClick={() => handleApproveRegistration(user.id)}>Approve</Button>
+                                                            <Button variant="destructive" size="sm" onClick={() => handleRejectClick(user)}>Reject</Button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Button variant="ghost" size="icon" onClick={() => setUserToView(user)}>
+                                                                <Eye className="h-4 w-4" />
+                                                                <span className="sr-only">View</span>
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" onClick={() => setUserToEdit(user)}>
+                                                                <Edit className="h-4 w-4" />
+                                                                <span className="sr-only">Edit</span>
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(user)}>
+                                                                <Trash2 className="h-4 w-4" />
+                                                                <span className="sr-only">Delete</span>
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <div className="text-center py-12 text-muted-foreground">
+                               <p>No {filter === 'pending' ? 'pending' : ''} users found.</p>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>

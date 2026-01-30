@@ -323,6 +323,7 @@ export default function PtwListPage() {
   const { user } = useUser();
   const router = useRouter();
 
+  const [filter, setFilter] = React.useState<'all' | 'Pending' | 'Approved' | 'Rejected'>('all');
   const userProfileRef = useMemoFirebase(() => {
     if (!user) return null;
     return doc(firestore, 'users', user.uid);
@@ -384,15 +385,39 @@ export default function PtwListPage() {
   }, [router]);
 
   const allPermits = permits || [];
-  const pendingPermits = React.useMemo(() => allPermits.filter(p => p.status === 'Pending' || p.status === 'Corrected'), [allPermits]);
-  const otherPermits = React.useMemo(() => allPermits.filter(p => p.status !== 'Pending' && p.status !== 'Corrected'), [allPermits]);
   
-  const summary = {
+  const summary = React.useMemo(() => ({
     total: allPermits.length,
-    pending: pendingPermits.length,
-    approved: React.useMemo(() => allPermits.filter(p => p.status === 'Approved').length, [allPermits]),
-    rejected: React.useMemo(() => allPermits.filter(p => p.status === 'Rejected').length, [allPermits]),
-  };
+    pending: allPermits.filter(p => p.status === 'Pending' || p.status === 'Corrected').length,
+    approved: allPermits.filter(p => p.status === 'Approved').length,
+    rejected: allPermits.filter(p => p.status === 'Rejected').length,
+  }), [allPermits]);
+
+  const filteredPermits = React.useMemo(() => {
+    switch (filter) {
+      case 'Pending':
+        return allPermits.filter(p => p.status === 'Pending' || p.status === 'Corrected');
+      case 'Approved':
+        return allPermits.filter(p => p.status === 'Approved');
+      case 'Rejected':
+        return allPermits.filter(p => p.status === 'Rejected');
+      default:
+        return allPermits;
+    }
+  }, [allPermits, filter]);
+  
+  const cardTitle = React.useMemo(() => {
+     switch (filter) {
+      case 'Pending':
+        return "Pending & Corrected PTW Requests";
+      case 'Approved':
+        return "Approved PTW Requests";
+      case 'Rejected':
+        return "Rejected PTW Requests";
+      default:
+        return "All PTW Requests";
+    }
+  }, [filter]);
 
   if (isLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
     return <p>Loading permits...</p>
@@ -407,7 +432,7 @@ export default function PtwListPage() {
 
       {(userRole === 'Admin' || userRole === 'Supervisor') && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
+            <Card onClick={() => setFilter('all')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'all' && "border-primary border-2")}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
                     <ListIcon className="h-4 w-4 text-muted-foreground" />
@@ -416,7 +441,7 @@ export default function PtwListPage() {
                     <div className="text-2xl font-bold">{summary.total}</div>
                 </CardContent>
             </Card>
-             <Card className="border-yellow-500 border-2">
+            <Card onClick={() => setFilter('Pending')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'Pending' && "border-yellow-500 border-2")}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Pending</CardTitle>
                   <Clock className="h-4 w-4 text-yellow-500" />
@@ -424,8 +449,8 @@ export default function PtwListPage() {
               <CardContent>
                   <div className="text-2xl font-bold">{summary.pending}</div>
               </CardContent>
-          </Card>
-            <Card>
+            </Card>
+            <Card onClick={() => setFilter('Approved')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'Approved' && "border-green-500 border-2")}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Approved</CardTitle>
                     <FileCheck className="h-4 w-4 text-green-500" />
@@ -434,7 +459,7 @@ export default function PtwListPage() {
                     <div className="text-2xl font-bold">{summary.approved}</div>
                 </CardContent>
             </Card>
-            <Card>
+            <Card onClick={() => setFilter('Rejected')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'Rejected' && "border-red-500 border-2")}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Rejected</CardTitle>
                     <FileX className="h-4 w-4 text-red-500" />
@@ -448,34 +473,18 @@ export default function PtwListPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Pending PTW Requests</CardTitle>
+          <CardTitle>{cardTitle}</CardTitle>
         </CardHeader>
         <CardContent>
-            {pendingPermits.length > 0 ? (
-                <PermitListTable permits={pendingPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} onAttachmentView={setMediaToView} />
+            {filteredPermits.length > 0 ? (
+                <PermitListTable permits={filteredPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} onAttachmentView={setMediaToView} />
             ) : (
                 <div className="text-center py-12 text-muted-foreground">
-                    <p>No pending requests.</p>
+                    <p>No {filter !== 'all' ? filter.toLowerCase() : ''} requests found.</p>
                 </div>
             )}
         </CardContent>
       </Card>
-      
-      <Card>
-        <CardHeader>
-            <CardTitle>All Other Requests</CardTitle>
-        </CardHeader>
-        <CardContent>
-            {otherPermits.length > 0 ? (
-             <PermitListTable permits={otherPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} onAttachmentView={setMediaToView} />
-            ) : (
-                 <div className="text-center py-12 text-muted-foreground">
-                    <p>No other requests found.</p>
-                </div>
-            )}
-        </CardContent>
-      </Card>
-
 
       <PermitActionDialog
         permit={actionState?.permit || null}
@@ -512,5 +521,3 @@ export default function PtwListPage() {
     </div>
   )
 }
-
-    
