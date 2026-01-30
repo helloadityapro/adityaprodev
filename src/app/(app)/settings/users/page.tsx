@@ -66,6 +66,7 @@ export default function UsersPage() {
     const [userToEdit, setUserToEdit] = React.useState<User | null>(null);
     const [userToView, setUserToView] = React.useState<User | null>(null);
     const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
+    const [isRejecting, setIsRejecting] = React.useState(false);
 
     const handleApproveRegistration = (userId: string) => {
         const userRef = doc(firestore, 'users', userId);
@@ -73,13 +74,28 @@ export default function UsersPage() {
         toast({ title: 'User Approved', description: 'The user registration has been approved.' });
     }
     
+    const handleRejectClick = (user: User) => {
+        setIsRejecting(true);
+        setUserToDelete(user);
+    }
+
+    const handleDeleteClick = (user: User) => {
+        setIsRejecting(false);
+        setUserToDelete(user);
+    }
+    
     const handleConfirmDelete = (userId: string) => {
         if (!userId) return;
         const userRef = doc(firestore, 'users', userId);
         deleteDocumentNonBlocking(userRef);
-        toast({ title: 'User Deleted', description: 'The user has been successfully deleted.' });
+        toast({ title: isRejecting ? 'User Rejected' : 'User Deleted', description: `The user has been successfully ${isRejecting ? 'rejected and removed' : 'deleted'}.` });
         setUserToDelete(null);
     };
+
+    const onDialogClose = () => {
+        setUserToDelete(null);
+        setIsRejecting(false);
+    }
 
     if(isLoading) {
         return <p>Loading users...</p>
@@ -130,21 +146,27 @@ export default function UsersPage() {
                                         <TableCell className="hidden md:table-cell">{user.mobile}</TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2">
-                                                {user.registrationRequest && (
-                                                    <Button variant="outline" size="sm" onClick={() => handleApproveRegistration(user.id)}>Approve</Button>
+                                                {user.registrationRequest ? (
+                                                    <>
+                                                        <Button variant="outline" size="sm" onClick={() => handleApproveRegistration(user.id)}>Approve</Button>
+                                                        <Button variant="destructive" size="sm" onClick={() => handleRejectClick(user)}>Reject</Button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Button variant="ghost" size="icon" onClick={() => setUserToView(user)}>
+                                                            <Eye className="h-4 w-4" />
+                                                            <span className="sr-only">View</span>
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" onClick={() => setUserToEdit(user)}>
+                                                            <Edit className="h-4 w-4" />
+                                                            <span className="sr-only">Edit</span>
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(user)}>
+                                                            <Trash2 className="h-4 w-4" />
+                                                            <span className="sr-only">Delete</span>
+                                                        </Button>
+                                                    </>
                                                 )}
-                                                <Button variant="ghost" size="icon" onClick={() => setUserToView(user)}>
-                                                    <Eye className="h-4 w-4" />
-                                                    <span className="sr-only">View</span>
-                                                </Button>
-                                                <Button variant="ghost" size="icon" onClick={() => setUserToEdit(user)}>
-                                                    <Edit className="h-4 w-4" />
-                                                    <span className="sr-only">Edit</span>
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setUserToDelete(user)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                    <span className="sr-only">Delete</span>
-                                                </Button>
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -157,18 +179,23 @@ export default function UsersPage() {
             <AddUserDialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen} />
             <EditUserDialog user={userToEdit} open={!!userToEdit} onOpenChange={() => setUserToEdit(null)} />
             <ViewUserDialog user={userToView} open={!!userToView} onOpenChange={() => setUserToView(null)} />
-            <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+            <AlertDialog open={!!userToDelete} onOpenChange={onDialogClose}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the user document from Firestore.
-                        It will not remove the user from the authentication system.
+                        {isRejecting 
+                            ? "This will reject the user registration and delete their account data. This action cannot be undone."
+                            : "This action cannot be undone. This will permanently delete the user document from Firestore."
+                        }
+                         It will not remove the user from the authentication system.
                     </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => userToDelete && handleConfirmDelete(userToDelete.id)}>Delete</AlertDialogAction>
+                    <AlertDialogAction onClick={() => userToDelete && handleConfirmDelete(userToDelete.id)}>
+                         {isRejecting ? 'Yes, Reject' : 'Delete'}
+                    </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

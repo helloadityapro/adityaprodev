@@ -14,11 +14,13 @@ import { useAuth, useFirestore, setDocumentNonBlocking } from "@/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { createUserWithEmailAndPassword } from "firebase/auth"
 import { doc } from "firebase/firestore"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const registerSchema = z.object({
   username: z.string().min(1, { message: "Username is required." }),
   email: z.string().email({ message: "Invalid email address." }),
   mobile: z.string().min(1, { message: "Mobile number is required." }),
+  role: z.enum(['SiteEngineer', 'Supervisor'], { required_error: "Please select a role." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string()
 }).refine(data => data.password === data.confirmPassword, {
@@ -40,6 +42,7 @@ export default function RegisterPage() {
       mobile: "",
       password: "",
       confirmPassword: "",
+      role: undefined,
     },
   })
 
@@ -53,7 +56,7 @@ export default function RegisterPage() {
         username: values.username,
         email: values.email,
         mobile: values.mobile,
-        role: "SiteEngineer",
+        role: values.role,
         registrationRequest: true,
         assignedProjectIds: [],
       }
@@ -124,6 +127,27 @@ export default function RegisterPage() {
                     <FormControl>
                       <Input placeholder="+1 234 567 890" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a role for your account" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            <SelectItem value="SiteEngineer">Site Engineer</SelectItem>
+                            <SelectItem value="Supervisor">Supervisor</SelectItem>
+                        </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
