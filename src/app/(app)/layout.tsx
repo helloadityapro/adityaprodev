@@ -17,6 +17,20 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
+function FullPageLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex items-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" role="status">
+          <span className="sr-only">Loading...</span>
+        </div>
+        <p className="text-lg font-medium text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const auth = useAuth();
@@ -68,11 +82,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [user, isUserLoading, router]);
 
   if (isUserLoading || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   // Check for registration approval but allow admin email through
@@ -107,7 +117,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <UserNav />
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40 animate-in fade-in-0 duration-500">
           {children}
         </main>
       </SidebarInset>

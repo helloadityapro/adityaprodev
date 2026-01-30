@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { FolderKanban } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Permit = {
   id: string;
@@ -17,6 +18,50 @@ type Permit = {
   status: 'Pending' | 'Approved' | 'Rejected' | 'Corrected';
   siteEngineerId: string;
 };
+
+function ProfilePageSkeleton() {
+    return (
+        <div className="space-y-6 animate-pulse">
+            <Skeleton className="h-9 w-40" />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <Card className="lg:col-span-1">
+                    <CardHeader className="items-center text-center">
+                        <Skeleton className="h-24 w-24 rounded-full mb-4" />
+                        <Skeleton className="h-8 w-48" />
+                        <Skeleton className="h-4 w-56 mt-1" />
+                        <Skeleton className="h-6 w-20 mt-2" />
+                    </CardHeader>
+                    <CardContent className="text-sm">
+                        <Separator className="my-4" />
+                        <div className="space-y-4">
+                            <div className="flex justify-between">
+                                <Skeleton className="h-5 w-16" />
+                                <Skeleton className="h-5 w-24" />
+                            </div>
+                            <div className="flex justify-between">
+                                <Skeleton className="h-5 w-16" />
+                                <Skeleton className="h-6 w-24" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <Skeleton className="h-8 w-32" />
+                        <Skeleton className="h-4 w-full max-w-sm mt-1" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            <Skeleton className="h-12 w-full rounded-md" />
+                            <Skeleton className="h-12 w-full rounded-md" />
+                            <Skeleton className="h-12 w-full rounded-md" />
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+    );
+}
 
 export default function ProfilePage() {
   const { user, isUserLoading: isAuthLoading } = useUser();
@@ -42,7 +87,7 @@ export default function ProfilePage() {
   }, [permits]);
 
   if (isAuthLoading || isProfileLoading || arePermitsLoading) {
-    return <p>Loading profile...</p>;
+    return <ProfilePageSkeleton />;
   }
 
   if (!userProfile) {

@@ -6,6 +6,53 @@ import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@
 import { collection, doc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, FileText, FolderKanban, UserPlus } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function AdminDashboardSkeleton() {
+    return (
+        <div className="animate-pulse">
+            <Skeleton className="h-9 w-64 mb-4" />
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="h-4 w-4" />
+                    </CardHeader>
+                    <CardContent>
+                        <Skeleton className="h-8 w-12" />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <Skeleton className="h-5 w-32" />
+                        <Skeleton className="h-4 w-4" />
+                    </CardHeader>
+                    <CardContent>
+                        <Skeleton className="h-8 w-12" />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="h-4 w-4" />
+                    </CardHeader>
+                    <CardContent>
+                        <Skeleton className="h-8 w-12" />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="h-4 w-4" />
+                    </CardHeader>
+                    <CardContent>
+                        <Skeleton className="h-8 w-12" />
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+    );
+}
 
 export default function AdminDashboardPage() {
     const firestore = useFirestore();
@@ -37,7 +84,7 @@ export default function AdminDashboardPage() {
     const { data: projects, isLoading: projectsLoading } = useCollection(projectsQuery);
 
     if (isProfileLoading || usersLoading || permitsLoading || projectsLoading) {
-        return <p>Loading admin dashboard...</p>
+        return <AdminDashboardSkeleton />
     }
 
     if (!isAdmin) {

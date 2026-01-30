@@ -23,6 +23,7 @@ import { Progress } from "@/components/ui/progress"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import imageCompression from 'browser-image-compression';
+import { Skeleton } from "@/components/ui/skeleton";
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -71,6 +72,56 @@ const parseCSV = (csvText: string): SiteData[] => {
   }
   return data;
 };
+
+function RaisePtwSkeleton() {
+    return (
+        <div className="animate-pulse">
+            <Skeleton className="h-9 w-72 mb-6" />
+            <Card className="w-full max-w-3xl mx-auto">
+                <CardHeader>
+                    <Skeleton className="h-8 w-56" />
+                    <Skeleton className="h-4 w-full max-w-sm mt-1" />
+                </CardHeader>
+                <CardContent className="grid gap-6">
+                    <div className="grid gap-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-10 w-full" />
+                    </div>
+                    <div className="grid gap-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-10 w-full" />
+                    </div>
+                    <div className="grid gap-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-10 w-full" />
+                    </div>
+                    <div className="grid gap-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-20 w-full" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-10 w-full" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-10 w-full" />
+                        </div>
+                    </div>
+                    <div className="grid gap-2">
+                        <Skeleton className="h-4 w-48" />
+                        <Skeleton className="h-20 w-full" />
+                    </div>
+                    <Skeleton className="h-24 w-full rounded-md" />
+                    <div className="flex justify-end">
+                        <Skeleton className="h-10 w-32" />
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    )
+}
 
 
 export default function RaisePtwPage() {
@@ -276,7 +327,7 @@ export default function RaisePtwPage() {
   const submittingButtonText = isCorrectionMode ? 'Resubmitting...' : 'Submitting...';
 
   if (isLoadingPermit) {
-    return <p>Loading permit data...</p>;
+    return <RaisePtwSkeleton />;
   }
 
   return (

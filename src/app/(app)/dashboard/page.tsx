@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Define the type for our site data
 type SiteData = {
@@ -23,7 +24,7 @@ const parseCSV = (csvText: string): SiteData[] => {
   const lines = csvText.trim().split('\n');
   const data: SiteData[] = [];
 
-  // Iterate over lines, skipping the header (i=0)
+  // Iterate over lines, skipping the header (i=1)
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     const values = line.split(',').map(v => v.trim().replace(/\r/g, ''));
@@ -42,6 +43,44 @@ const parseCSV = (csvText: string): SiteData[] => {
   return data;
 };
 
+
+function DashboardSkeleton() {
+    return (
+      <div className="animate-pulse">
+        <div className="flex items-center mb-6">
+            <Skeleton className="h-9 w-48" />
+        </div>
+        <Card>
+            <CardHeader>
+                <Skeleton className="h-8 w-32" />
+                <Skeleton className="h-4 w-64 mt-1" />
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead><Skeleton className="h-5 w-32" /></TableHead>
+                            <TableHead><Skeleton className="h-5 w-32" /></TableHead>
+                            <TableHead><Skeleton className="h-5 w-24" /></TableHead>
+                            <TableHead><Skeleton className="h-5 w-24" /></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <TableRow key={i}>
+                                <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                                <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                                <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                                <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+      </div>
+    );
+}
 
 export default function DashboardPage() {
   const [sites, setSites] = useState<SiteData[]>([]);
@@ -68,7 +107,7 @@ export default function DashboardPage() {
     fetchData();
   }, []);
 
-  if (isLoading) return <p>Loading site data from Google Sheet...</p>;
+  if (isLoading) return <DashboardSkeleton />;
   if (error) return <p>Error: {error}</p>;
 
   return (

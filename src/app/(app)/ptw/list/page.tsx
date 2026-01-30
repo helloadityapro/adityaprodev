@@ -45,6 +45,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, isSameDay } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 type Attachment = {
@@ -360,6 +361,65 @@ function MediaViewerDialog({ media, open, onOpenChange }: { media: { url: string
   );
 }
 
+function PermitListSkeleton() {
+    return (
+        <div className="flex flex-col gap-6 animate-pulse">
+             <div className="flex flex-col gap-1">
+                <Skeleton className="h-9 w-80" />
+                <Skeleton className="h-5 w-96" />
+            </div>
+
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-40" />
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-end">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                    </div>
+                </CardContent>
+            </Card>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+            </div>
+
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-1/2" />
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                {Array.from({ length: 8 }).map((_, i) => (
+                                    <TableHead key={i} className="h-auto py-2 px-4"><Skeleton className="h-5 w-full" /></TableHead>
+                                ))}
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <TableRow key={i}>
+                                    {Array.from({ length: 8 }).map((_, j) => (
+                                        <TableCell key={j} className="py-2 px-4"><Skeleton className="h-5 w-full" /></TableCell>
+                                    ))}
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
 
 export default function PtwListPage() {
   const firestore = useFirestore();
@@ -498,7 +558,7 @@ export default function PtwListPage() {
   }, [statusFilter]);
 
   if (isLoading || engineersLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
-    return <p>Loading permits...</p>
+    return <PermitListSkeleton />
   }
 
   return (

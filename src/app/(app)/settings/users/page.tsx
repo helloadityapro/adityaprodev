@@ -31,6 +31,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Skeleton } from "@/components/ui/skeleton";
 
 type User = {
   id: string;
@@ -54,6 +55,66 @@ function StatusBadge({ isPending }: { isPending: boolean }) {
       {status}
     </Badge>
   )
+}
+
+function UsersPageSkeleton() {
+    return (
+        <div className="flex flex-col gap-6 animate-pulse">
+            <div className="flex items-center justify-between">
+                <Skeleton className="h-9 w-48" />
+                <Skeleton className="h-10 w-24" />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+            </div>
+
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-40" />
+                    <Skeleton className="h-4 w-64 mt-1" />
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead><Skeleton className="h-5 w-40" /></TableHead>
+                                <TableHead><Skeleton className="h-5 w-24" /></TableHead>
+                                <TableHead><Skeleton className="h-5 w-24" /></TableHead>
+                                <TableHead className="hidden md:table-cell"><Skeleton className="h-5 w-32" /></TableHead>
+                                <TableHead><Skeleton className="h-5 w-32" /></TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <TableRow key={i}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-3">
+                                            <Skeleton className="h-9 w-9 rounded-full" />
+                                            <div className="grid gap-1">
+                                                <Skeleton className="h-4 w-24" />
+                                                <Skeleton className="h-3 w-32" />
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                                    <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-32" /></TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <Skeleton className="h-8 w-20" />
+                                            <Skeleton className="h-8 w-20" />
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+        </div>
+    )
 }
 
 export default function UsersPage() {
@@ -116,7 +177,7 @@ export default function UsersPage() {
 
 
     if(isLoading) {
-        return <p>Loading users...</p>
+        return <UsersPageSkeleton />
     }
 
     return (
