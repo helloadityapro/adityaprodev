@@ -195,7 +195,7 @@ service cloud.firestore {
      * - READ: Admins/Supervisors can read all. Site Engineers can read their own.
      * - LIST: Any authenticated user can list, but GET rules still apply to each doc.
      * - CREATE: Only Site Engineers can create, setting themselves as the owner.
-     * - UPDATE: Role-based state machine. Admins can always update. Supervisors can action 'Pending' permits.
+     * - UPDATE: Role-based state machine. Admins can always update. Supervisors can action 'Pending' or 'Corrected' permits.
      *           Engineers can resubmit 'Rejected' permits.
      * - DELETE: Only Admins can delete.
      */
@@ -214,7 +214,7 @@ service cloud.firestore {
 
       allow update: if isSignedIn() && resource != null && (
         isAdmin() ||
-        (isSupervisor() && resource.data.status == 'Pending') ||
+        (isSupervisor() && (resource.data.status == 'Pending' || resource.data.status == 'Corrected')) ||
         (request.auth.uid == resource.data.siteEngineerId && resource.data.status == 'Rejected')
       );
       

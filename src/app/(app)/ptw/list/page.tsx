@@ -158,7 +158,7 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                       {(userRole === 'Admin' || userRole === 'Supervisor') && (
                           <>
                               {permit.status !== 'Approved' && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(permit)}><span className="sr-only">Delete</span><Trash2 className="h-4 w-4" /></Button>}
-                              {permit.status === 'Pending' && (
+                              {(permit.status === 'Pending' || permit.status === 'Corrected') && (
                                   <>
                                   <Button variant="default" size="icon" className="bg-green-500 hover:bg-green-600 text-white h-8 w-8" onClick={() => onAction(permit, 'Approved')}><span className="sr-only">Approve</span><Check className="h-4 w-4" /></Button>
                                   <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => onAction(permit, 'Rejected')}><span className="sr-only">Reject</span><X className="h-4 w-4" /></Button>
@@ -384,8 +384,8 @@ export default function PtwListPage() {
   }, [router]);
 
   const allPermits = permits || [];
-  const pendingPermits = React.useMemo(() => allPermits.filter(p => p.status === 'Pending'), [allPermits]);
-  const otherPermits = React.useMemo(() => allPermits.filter(p => p.status !== 'Pending'), [allPermits]);
+  const pendingPermits = React.useMemo(() => allPermits.filter(p => p.status === 'Pending' || p.status === 'Corrected'), [allPermits]);
+  const otherPermits = React.useMemo(() => allPermits.filter(p => p.status !== 'Pending' && p.status !== 'Corrected'), [allPermits]);
   
   const summary = {
     total: allPermits.length,
