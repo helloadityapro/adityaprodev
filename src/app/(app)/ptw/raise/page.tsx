@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation"
 import { Progress } from "@/components/ui/progress"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import imageCompression from 'browser-image-compression';
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -152,7 +153,7 @@ export default function RaisePtwPage() {
   }, [isCorrectionMode, permitToCorrect, form, allSites]);
 
 
-  const onSubmit = async (values: z.infer<typeof raisePtwSchema>) => {
+  const onSubmit = async (values: z.infer<typeof raisePtwSchema>>) => {
     if (!user) {
         toast({ variant: "destructive", title: "You must be logged in to submit a permit." });
         return;
@@ -191,12 +192,37 @@ export default function RaisePtwPage() {
 
     try {
         const timestamp = Date.now();
-        const allFilesToUpload = [...files];
+        let allFilesToUpload = [...files];
         if (vlogFile) {
           allFilesToUpload.push(vlogFile);
         }
 
-        const attachmentPromises = allFilesToUpload.map(file => {
+        const compressionPromises = allFilesToUpload.map(async (file) => {
+          if (file.type.startsWith('image/')) {
+            try {
+              const options = {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1920,
+                useWebWorker: true,
+              };
+              const compressedFile = await imageCompression(file, options);
+              return compressedFile;
+            } catch (compressionError) {
+              console.error('Image compression error:', compressionError);
+              toast({
+                variant: 'destructive',
+                title: 'Compression Failed',
+                description: `Could not compress ${file.name}. It will be uploaded in its original size.`,
+              });
+              return file;
+            }
+          }
+          return file;
+        });
+
+        const processedFiles = await Promise.all(compressionPromises);
+
+        const attachmentPromises = processedFiles.map(file => {
             const filePath = `uploads/${user.uid}/${timestamp}-${file.name}`;
             return uploadFile(file, filePath);
         });
@@ -210,7 +236,7 @@ export default function RaisePtwPage() {
             const updatedData = {
                 ...permitValues,
                 status: "Corrected" as const,
-                attachments,
+                attachments: [...(permitToCorrect.attachments || []), ...attachments],
             };
             await updateDoc(permitRef, updatedData);
             toast({ title: "Success", description: "Your permit has been corrected and resubmitted." });
@@ -449,5 +475,3 @@ export default function RaisePtwPage() {
     </>
   )
 }
-
-    
