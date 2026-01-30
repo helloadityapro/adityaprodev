@@ -128,6 +128,11 @@ export default function RaisePtwPage() {
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
+  
+  const uniqueSites = React.useMemo(() => {
+    if (!allSites) return [];
+    return Array.from(new Map(allSites.map(site => [site.name, site])).values());
+  }, [allSites]);
 
   const [selectedSite, setSelectedSite] = React.useState<Site | null>(null);
   
@@ -148,7 +153,7 @@ export default function RaisePtwPage() {
   })
 
   React.useEffect(() => {
-    if (isCorrectionMode && permitToCorrect && allSites && allSites.length > 0) {
+    if (isCorrectionMode && permitToCorrect && uniqueSites && uniqueSites.length > 0) {
       form.reset({
         siteName: permitToCorrect.siteName,
         ptwType: permitToCorrect.ptwType,
@@ -156,10 +161,10 @@ export default function RaisePtwPage() {
         commentsAndRemarks: permitToCorrect.commentsAndRemarks || "",
         undertaking: false, // Force re-agreement
       });
-      const site = allSites.find(s => s.name === permitToCorrect.siteName);
+      const site = uniqueSites.find(s => s.name === permitToCorrect.siteName);
       setSelectedSite(site || null);
     }
-  }, [isCorrectionMode, permitToCorrect, form, allSites]);
+  }, [isCorrectionMode, permitToCorrect, form, uniqueSites]);
 
 
   const onSubmit = async (values: z.infer<typeof raisePtwSchema>) => {
@@ -321,7 +326,7 @@ export default function RaisePtwPage() {
                       <FormLabel>Site Name</FormLabel>
                        <Select onValueChange={(value) => {
                           field.onChange(value);
-                          const site = allSites?.find(s => s.name === value);
+                          const site = uniqueSites?.find(s => s.name === value);
                           setSelectedSite(site || null);
                       }} value={field.value} disabled={isSubmitting}>
                           <FormControl>
@@ -330,7 +335,7 @@ export default function RaisePtwPage() {
                           </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                              {allSites?.map((site) => (
+                              {uniqueSites?.map((site) => (
                               <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>
                               ))}
                           </SelectContent>
@@ -484,3 +489,5 @@ export default function RaisePtwPage() {
     </>
   )
 }
+
+    

@@ -462,6 +462,11 @@ export default function PtwListPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
+  const uniqueSites = React.useMemo(() => {
+    if (!sites) return [];
+    return Array.from(new Map(sites.map(site => [site.name, site])).values());
+  }, [sites]);
+
 
   const handlePermitAction = (permitId: string, status: Permit['status'], adminRemarks: string) => {
     const permitRef = doc(firestore, "permits_to_work", permitId);
@@ -551,7 +556,7 @@ export default function PtwListPage() {
                         <SelectTrigger><SelectValue placeholder="All Sites" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Sites</SelectItem>
-                            {sites?.map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
+                            {uniqueSites?.map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 </div>
@@ -679,5 +684,7 @@ export default function PtwListPage() {
     </div>
   )
 }
+
+    
 
     
