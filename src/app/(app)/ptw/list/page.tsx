@@ -69,41 +69,15 @@ type Permit = {
   adminRemarks?: string;
 };
 
-type SiteData = {
-  'Project Company': string;
-  'Project name': string;
-  'AC Capacity': string;
-  'DC Capacity': string;
+type PtwType = {
+  id: string;
+  name: string;
 };
 
-// Simple CSV to JSON parser
-const parseCSV = (csvText: string): SiteData[] => {
-  const lines = csvText.trim().split('\n');
-  const data: SiteData[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    const values = line.split(',').map(v => v.trim().replace(/\r/g, ''));
-    
-    if (values.length >= 5 && !isNaN(parseInt(values[0], 10)) && values[2] && values[2].trim() !== '') {
-      const entry: SiteData = {
-        'Project Company': values[1],
-        'Project name': values[2],
-        'DC Capacity': values[3],
-        'AC Capacity': values[4],
-      };
-      data.push(entry);
-    }
-  }
-  return data;
+type Site = {
+  id: string;
+  name: string;
 };
-
-const ptwTypes = [
-  "MMS columns concreting/erection work",
-  "AC Cables cutting",
-  "AC Cable Trench laying",
-  "Civil works",
-];
 
 
 function StatusBadge({ status }: { status: Permit["status"] }) {
@@ -481,25 +455,12 @@ export default function PtwListPage() {
 
   const engineersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), where('role', '==', 'SiteEngineer')), [firestore]);
   const { data: engineers, isLoading: engineersLoading } = useCollection(engineersQuery);
+  
+  const ptwTypesQuery = useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]);
+  const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection<PtwType>(ptwTypesQuery);
 
-  const [siteNames, setSiteNames] = React.useState<string[]>([]);
-  React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vT8JE2-QFEjU_CVprrrBPivhxoygAtkC8S6JFPTK8-R28EL9XuTTv7aJ3Onejmsp55_RQEvF8g7Ku1p/pub?gid=1131066411&single=true&output=csv');
-        if (!response.ok) {
-          throw new Error('Failed to fetch site data.');
-        }
-        const csvText = await response.text();
-        const parsedData = parseCSV(csvText);
-        const uniqueSiteNames = [...new Set(parsedData.map(s => s['Project name']))];
-        setSiteNames(uniqueSiteNames);
-      } catch (err: any) {
-        toast({ variant: "destructive", title: "Error fetching sites", description: err.message });
-      }
-    };
-    fetchData();
-  }, [toast]);
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: sites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
 
   const handlePermitAction = (permitId: string, status: Permit['status'], adminRemarks: string) => {
@@ -557,7 +518,7 @@ export default function PtwListPage() {
     }
   }, [statusFilter]);
 
-  if (isLoading || engineersLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
+  if (isLoading || engineersLoading || ptwTypesLoading || sitesLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
     return <PermitListSkeleton />
   }
 
@@ -580,7 +541,7 @@ export default function PtwListPage() {
                         <SelectTrigger><SelectValue placeholder="All Types" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Types</SelectItem>
-                            {ptwTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                            {ptwTypes?.map(type => <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 </div>
@@ -590,7 +551,7 @@ export default function PtwListPage() {
                         <SelectTrigger><SelectValue placeholder="All Sites" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Sites</SelectItem>
-                            {siteNames.map(site => <SelectItem key={site} value={site}>{site}</SelectItem>)}
+                            {sites?.map(site => <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 </div>

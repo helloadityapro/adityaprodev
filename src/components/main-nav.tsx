@@ -8,6 +8,7 @@ import {
   List,
   Users,
   LayoutDashboard,
+  SlidersHorizontal,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -70,6 +71,14 @@ export function MainNav({ userRole }: { userRole: string }) {
                 <Link href="/settings/users">
                   <Users />
                   Users management
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Dropdowns" isActive={pathname.startsWith('/settings/dropdown-management')}>
+                <Link href="/settings/dropdown-management">
+                  <SlidersHorizontal />
+                  Dropdowns
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

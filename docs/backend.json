@@ -75,30 +75,41 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Site",
       "type": "object",
-      "description": "Represents a site where work permits are required.",
+      "description": "Represents a site managed by admins, used in dropdowns.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the site."
-        },
-        "projectId": {
-          "type": "string",
-          "description": "Reference to Project. (Relationship: Project 1:N Site)"
-        },
         "name": {
           "type": "string",
-          "description": "The name of the site."
+          "description": "The name of the site (Project name)."
         },
-        "location": {
+        "projectCompany": {
           "type": "string",
-          "description": "The location of the site."
+          "description": "The company associated with the project."
+        },
+        "acCapacity": {
+          "type": "string",
+          "description": "The AC capacity of the site."
+        },
+        "dcCapacity": {
+          "type": "string",
+          "description": "The DC capacity of the site."
         }
       },
       "required": [
-        "id",
-        "projectId",
-        "name",
-        "location"
+        "name"
+      ]
+    },
+    "PtwType": {
+      "title": "PTW Type",
+      "type": "object",
+      "description": "Represents a type of Permit to Work, used in dropdowns.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the PTW type."
+        }
+      },
+      "required": [
+        "name"
       ]
     },
     "PermitToWork": {
@@ -232,11 +243,27 @@
           "schema": {
             "$ref": "#/backend/entities/Site"
           },
-          "description": "Stores site information.",
+          "description": "Stores site information managed by the admin.",
           "params": [
             {
               "name": "siteId",
               "description": "The unique identifier for the site."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/ptw_types/{ptwTypeId}",
+        "definition": {
+          "entityName": "PtwType",
+          "schema": {
+            "$ref": "#/backend/entities/PtwType"
+          },
+          "description": "Stores the available types for Permits to Work, managed by the admin.",
+          "params": [
+            {
+              "name": "ptwTypeId",
+              "description": "The unique identifier for the PTW type."
             }
           ]
         }

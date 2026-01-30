@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { FileVideo, Video } from "lucide-react"
-import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase"
+import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase"
 import { addDoc, collection, serverTimestamp, doc, updateDoc } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -35,43 +35,19 @@ const raisePtwSchema = z.object({
   }),
 })
 
-const ptwTypes = [
-  "MMS columns concreting/erection work",
-  "AC Cables cutting",
-  "AC Cable Trench laying",
-  "Civil works",
-];
-
-type SiteData = {
-  'Project Company': string;
-  'Project name': string;
-  'AC Capacity': string;
-  'DC Capacity': string;
+type PtwType = {
+  id: string;
+  name: string;
 };
 
-// Simple CSV to JSON parser
-const parseCSV = (csvText: string): SiteData[] => {
-  const lines = csvText.trim().split('\n');
-  const data: SiteData[] = [];
-
-  // Iterate over lines, skipping the header (i=1)
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    const values = line.split(',').map(v => v.trim().replace(/\r/g, ''));
-    
-    // A valid project row has a number in the first column ("Sr No") and a non-empty project name.
-    if (values.length >= 5 && !isNaN(parseInt(values[0], 10)) && values[2] && values[2].trim() !== '') {
-      const entry: SiteData = {
-        'Project Company': values[1],
-        'Project name': values[2],
-        'DC Capacity': values[3],
-        'AC Capacity': values[4],
-      };
-      data.push(entry);
-    }
-  }
-  return data;
+type Site = {
+  id: string;
+  name: string;
+  projectCompany: string;
+  acCapacity: string;
+  dcCapacity: string;
 };
+
 
 function RaisePtwSkeleton() {
     return (
@@ -147,8 +123,13 @@ export default function RaisePtwPage() {
   }, [firestore, user]);
   const { data: userProfile } = useDoc(userProfileRef);
 
-  const [allSites, setAllSites] = React.useState<SiteData[]>([]);
-  const [selectedSite, setSelectedSite] = React.useState<SiteData | null>(null);
+  const ptwTypesQuery = useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]);
+  const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection<PtwType>(ptwTypesQuery);
+
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
+
+  const [selectedSite, setSelectedSite] = React.useState<Site | null>(null);
   
   const [files, setFiles] = React.useState<File[]>([]);
   const [vlogFile, setVlogFile] = React.useState<File | null>(null);
@@ -167,30 +148,7 @@ export default function RaisePtwPage() {
   })
 
   React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vT8JE2-QFEjU_CVprrrBPivhxoygAtkC8S6JFPTK8-R28EL9XuTTv7aJ3Onejmsp55_RQEvF8g7Ku1p/pub?gid=1131066411&single=true&output=csv');
-        if (!response.ok) {
-          throw new Error('Failed to fetch site data.');
-        }
-        const csvText = await response.text();
-        const parsedData = parseCSV(csvText);
-        
-        // De-duplicate sites based on the project name to avoid key errors in the Select component
-        const uniqueSites = parsedData.filter((site, index, self) =>
-            index === self.findIndex((s) => s['Project name'] === site['Project name'])
-        );
-
-        setAllSites(uniqueSites);
-      } catch (err: any) {
-        toast({ variant: "destructive", title: "Error fetching sites", description: err.message });
-      }
-    };
-    fetchData();
-  }, [toast]);
-  
-  React.useEffect(() => {
-    if (isCorrectionMode && permitToCorrect && allSites.length > 0) {
+    if (isCorrectionMode && permitToCorrect && allSites && allSites.length > 0) {
       form.reset({
         siteName: permitToCorrect.siteName,
         ptwType: permitToCorrect.ptwType,
@@ -198,7 +156,7 @@ export default function RaisePtwPage() {
         commentsAndRemarks: permitToCorrect.commentsAndRemarks || "",
         undertaking: false, // Force re-agreement
       });
-      const site = allSites.find(s => s['Project name'] === permitToCorrect.siteName);
+      const site = allSites.find(s => s.name === permitToCorrect.siteName);
       setSelectedSite(site || null);
     }
   }, [isCorrectionMode, permitToCorrect, form, allSites]);
@@ -326,7 +284,7 @@ export default function RaisePtwPage() {
   const submitButtonText = isCorrectionMode ? 'Resubmit Request' : 'Submit Request';
   const submittingButtonText = isCorrectionMode ? 'Resubmitting...' : 'Submitting...';
 
-  if (isLoadingPermit) {
+  if (isLoadingPermit || ptwTypesLoading || sitesLoading) {
     return <RaisePtwSkeleton />;
   }
 
@@ -363,7 +321,7 @@ export default function RaisePtwPage() {
                       <FormLabel>Site Name</FormLabel>
                        <Select onValueChange={(value) => {
                           field.onChange(value);
-                          const site = allSites.find(s => s['Project name'] === value);
+                          const site = allSites?.find(s => s.name === value);
                           setSelectedSite(site || null);
                       }} value={field.value} disabled={isSubmitting}>
                           <FormControl>
@@ -372,8 +330,8 @@ export default function RaisePtwPage() {
                           </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                              {allSites.map((site) => (
-                              <SelectItem key={site['Project name']} value={site['Project name']}>{site['Project name']}</SelectItem>
+                              {allSites?.map((site) => (
+                              <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>
                               ))}
                           </SelectContent>
                       </Select>
@@ -390,15 +348,15 @@ export default function RaisePtwPage() {
                   <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                         <p className="text-muted-foreground">Project Company</p>
-                        <p className="font-medium">{selectedSite['Project Company']}</p>
+                        <p className="font-medium">{selectedSite.projectCompany}</p>
                     </div>
                      <div>
                         <p className="text-muted-foreground">AC Capacity</p>
-                        <p className="font-medium">{selectedSite['AC Capacity']}</p>
+                        <p className="font-medium">{selectedSite.acCapacity}</p>
                     </div>
                     <div>
                         <p className="text-muted-foreground">DC Capacity</p>
-                        <p className="font-medium">{selectedSite['DC Capacity']}</p>
+                        <p className="font-medium">{selectedSite.dcCapacity}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -417,8 +375,8 @@ export default function RaisePtwPage() {
                               </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                  {ptwTypes.map((type) => (
-                                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                                  {ptwTypes?.map((type) => (
+                                  <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
                                   ))}
                               </SelectContent>
                           </Select>

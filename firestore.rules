@@ -8,7 +8,8 @@
  * - /users/{userId}: Stores private user profiles, including a critical 'assignedProjectIds'
  *   list that drives project-related permissions and a 'role' field for RBAC.
  * - /projects/{projectId}: Top-level collection for project data.
- * - /sites/{siteId}: Site data, linked to a parent project.
+ * - /sites/{siteId}: Site data, managed by admins.
+ * - /ptw_types/{ptwTypeId}: PTW type data, managed by admins.
  * - /permits_to_work/{permitId}: The core transactional data, containing references to the
  *   various users (engineer, supervisor) involved in the workflow.
  *
@@ -108,15 +109,6 @@ service cloud.firestore {
     function isAssignedToProject(projectId) {
       return isSignedIn() && userRecord() != null && 'assignedProjectIds' in userRecord().data && projectId in userRecord().data.assignedProjectIds;
     }
-
-    /**
-     * Validates that the user can access a site by checking their assignment
-     * to the site's parent project. Requires a get() on the site document itself.
-     */
-    function canAccessSite(siteId) {
-        let site = get(/databases/$(database)/documents/sites/$(siteId));
-        return site != null && isAssignedToProject(site.data.projectId);
-    }
     
     /**
      * Validates a user can create their own user document, ensuring the
@@ -177,17 +169,21 @@ service cloud.firestore {
     }
 
     /**
-     * @description Stores site information. Access is determined by a user's assignment to the
-     * site's parent project. Only Admins can create or modify sites.
+     * @description Stores site information. Any signed-in user can read, but only admins can modify.
      * @path /sites/{siteId}
-     * @allow (get) A user assigned to the parent project of 'site_xyz' reads the site document.
-     * @deny (get) A user tries to read a site belonging to a project they are not assigned to.
-     * @deny (create) A non-admin user attempts to create a new site.
-     * @principle Enforces authorization by checking parent resource relationships.
      */
     match /sites/{siteId} {
-      allow get: if canAccessSite(siteId) || isAdmin();
-      allow list, create, update, delete: if isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    
+    /**
+     * @description Stores PTW types. Any signed-in user can read, but only admins can modify.
+     * @path /ptw_types/{ptwTypeId}
+     */
+    match /ptw_types/{ptwTypeId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     /**
