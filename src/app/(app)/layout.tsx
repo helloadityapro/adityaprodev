@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React from "react";
@@ -97,7 +98,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [user, userProfile, isProfileLoading, firestore]);
 
   // Seed PTW Types if the collection is empty
-  const ptwTypesCollectionRef = useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]);
+  const ptwTypesCollectionRef = useMemoFirebase(() => (user ? collection(firestore, 'ptw_types') : null), [firestore, user]);
   const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection(ptwTypesCollectionRef);
 
   React.useEffect(() => {
@@ -115,7 +116,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [ptwTypes, ptwTypesLoading, ptwTypesCollectionRef]);
 
   // Seed Sites if the collection is empty
-  const sitesCollectionRef = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const sitesCollectionRef = useMemoFirebase(() => (user ? collection(firestore, 'sites') : null), [firestore, user]);
   const { data: sites, isLoading: sitesLoading } = useCollection(sitesCollectionRef);
 
   React.useEffect(() => {
