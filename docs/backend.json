@@ -213,6 +213,51 @@
         "siteEngineerId",
         "requestDate"
       ]
+    },
+    "Notification": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Notification",
+      "type": "object",
+      "description": "Represents a user notification.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the notification."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user this notification is for."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the notification."
+        },
+        "description": {
+          "type": "string",
+          "description": "The body of the notification."
+        },
+        "link": {
+          "type": "string",
+          "description": "A URL to navigate to when the notification is clicked."
+        },
+        "read": {
+          "type": "boolean",
+          "description": "Whether the user has read the notification."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the notification was created."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "title",
+        "description",
+        "read",
+        "createdAt"
+      ]
     }
   },
   "auth": {
@@ -299,6 +344,22 @@
             {
               "name": "permitId",
               "description": "The unique identifier for the permit to work request."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/notifications/{notificationId}",
+        "definition": {
+          "entityName": "Notification",
+          "schema": {
+            "$ref": "#/backend/entities/Notification"
+          },
+          "description": "Stores user-specific notifications.",
+          "params": [
+            {
+              "name": "notificationId",
+              "description": "The unique identifier for the notification."
             }
           ]
         }

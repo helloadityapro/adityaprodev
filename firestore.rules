@@ -216,5 +216,19 @@ service cloud.firestore {
       
       allow delete: if isAdmin() && resource != null;
     }
+
+    /**
+     * @description Manages user notifications. A user can read and update their own notifications
+     * (e.g., to mark them as read). Only authenticated users (like an admin or the system) can create notifications.
+     * @path /notifications/{notificationId}
+     * @allow (read) A user reads a list of their own notifications.
+     * @allow (update) A user marks their own notification as read.
+     * @allow (create) An admin/supervisor creates a notification for a site engineer after a permit status change.
+     * @deny (delete) Notifications are not user-deletable to maintain an audit trail.
+     */
+    match /notifications/{notificationId} {
+      allow read, update: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow create: if isSignedIn();
+    }
   }
 }

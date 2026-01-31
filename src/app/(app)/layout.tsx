@@ -3,7 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where } from "firebase/firestore";
+import { collection, doc, query, where, orderBy } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import AppLogo from "@/components/app-logo";
 import { MainNav } from "@/components/main-nav";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { UserNotifications } from "@/components/user-notifications";
 
 function FullPageLoader() {
   return (
@@ -151,32 +152,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [permitsForBadge]);
 
   // --- Pop-up notifications for Site Engineers ---
-  const ptwQueryForNotifications = useMemoFirebase(() => {
-    if (userRole === 'SiteEngineer' && user) {
-        return query(collection(firestore, 'permits_to_work'), where('siteEngineerId', '==', user.uid));
-    }
-    return null;
-  }, [firestore, userRole, user]);
-  const { data: engineerPermits } = useCollection(ptwQueryForNotifications);
+  const notificationsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(
+        collection(firestore, 'notifications'), 
+        where('userId', '==', user.uid),
+        orderBy('createdAt', 'desc')
+    );
+  }, [user, firestore]);
+  const { data: notifications } = useCollection(notificationsQuery);
 
-  const prevPermitsRef = React.useRef<any[]>();
+  const displayedNotifsRef = React.useRef<Set<string>>(new Set());
+
   React.useEffect(() => {
-    if (userRole === 'SiteEngineer' && engineerPermits && prevPermitsRef.current) {
-        engineerPermits.forEach(currentPermit => {
-            const prevPermit = prevPermitsRef.current!.find(p => p.id === currentPermit.id);
-            if (prevPermit && prevPermit.status !== currentPermit.status) {
-                if (currentPermit.status === 'Approved' || currentPermit.status === 'Rejected') {
-                    toast({
-                        title: `Permit Status Updated`,
-                        description: `Your permit for "${currentPermit.siteName}" has been ${currentPermit.status.toLowerCase()}.`,
-                        duration: 8000,
-                    });
-                }
-            }
-        });
-    }
-    prevPermitsRef.current = engineerPermits || undefined;
-  }, [engineerPermits, userRole, toast]);
+      if (notifications) {
+          notifications.forEach(notif => {
+              if (!notif.read && !displayedNotifsRef.current.has(notif.id)) {
+                  toast({
+                      title: notif.title,
+                      description: notif.description,
+                  });
+                  displayedNotifsRef.current.add(notif.id);
+              }
+          });
+      }
+  }, [notifications, toast]);
 
 
   React.useEffect(() => {
@@ -219,6 +219,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="w-full flex-1">
             {/* Can add a search form here if needed */}
           </div>
+          <UserNotifications />
           <UserNav />
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40 animate-in fade-in-0 duration-500">

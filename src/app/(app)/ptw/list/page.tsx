@@ -28,7 +28,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Trash2, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -215,7 +215,7 @@ const actionSchema = z.object({
   adminRemarks: z.string().min(1, "Remarks are required to proceed."),
 });
 
-function PermitActionDialog({ permit, status, open, onOpenChange, onConfirm }: { permit: Permit | null, status: 'Approved' | 'Rejected' | null, open: boolean, onOpenChange: (open: boolean) => void, onConfirm: (permitId: string, status: 'Approved' | 'Rejected', remarks: string) => void }) {
+function PermitActionDialog({ permit, status, open, onOpenChange, onConfirm }: { permit: Permit | null, status: 'Approved' | 'Rejected' | null, open: boolean, onOpenChange: (open: boolean) => void, onConfirm: (permit: Permit, status: 'Approved' | 'Rejected', remarks: string) => void }) {
   const { toast } = useToast();
   const form = useForm<z.infer<typeof actionSchema>>({
     resolver: zodResolver(actionSchema),
@@ -230,7 +230,7 @@ function PermitActionDialog({ permit, status, open, onOpenChange, onConfirm }: {
 
   const onSubmit = (values: z.infer<typeof actionSchema>) => {
     if (!permit || !status) return;
-    onConfirm(permit.id, status, values.adminRemarks);
+    onConfirm(permit, status, values.adminRemarks);
     toast({ title: `Permit ${status}`, description: `The permit has been ${status.toLowerCase()}.` });
     onOpenChange(false);
   };
@@ -587,8 +587,8 @@ export default function PtwListPage() {
   }, [sites]);
 
 
-  const handlePermitAction = (permitId: string, status: Permit['status'], adminRemarks: string) => {
-    const permitRef = doc(firestore, "permits_to_work", permitId);
+  const handlePermitAction = (permit: Permit, status: Permit['status'], adminRemarks: string) => {
+    const permitRef = doc(firestore, "permits_to_work", permit.id);
     let updateData: any = { status, adminRemarks, statusChangeDate: serverTimestamp() };
     if (userRole === 'Supervisor') {
         updateData.supervisorId = user?.uid;
@@ -597,6 +597,16 @@ export default function PtwListPage() {
         updateData.adminId = user?.uid;
     }
     updateDocumentNonBlocking(permitRef, updateData);
+
+    const notificationsCollection = collection(firestore, 'notifications');
+    addDocumentNonBlocking(notificationsCollection, {
+        userId: permit.siteEngineerId,
+        title: `Permit ${status}`,
+        description: `Your permit for "${permit.siteName}" has been ${status.toLowerCase()}.`,
+        link: `/ptw/list`,
+        read: false,
+        createdAt: serverTimestamp(),
+    });
   };
   
   const handleCorrectAndResubmit = React.useCallback((permit: Permit) => {
@@ -825,3 +835,4 @@ export default function PtwListPage() {
     
 
     
+
