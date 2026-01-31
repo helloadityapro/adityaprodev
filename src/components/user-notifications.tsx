@@ -1,11 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { Bell, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, X } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  PopoverClose,
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,9 +59,9 @@ export function UserNotifications() {
   const notifications = React.useMemo(() => {
     if (!unsortedNotifications) return null;
     return [...unsortedNotifications].sort((a, b) => {
-        const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
-        const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
-        return dateB - dateA;
+      const dateA = a.createdAt?.toDate?.().getTime() || 0;
+      const dateB = b.createdAt?.toDate?.().getTime() || 0;
+      return dateB - dateA;
     });
   }, [unsortedNotifications]);
 
@@ -106,17 +107,25 @@ export function UserNotifications() {
       <PopoverContent align="end" className="w-80 p-0 md:w-96">
         <div className="flex items-center justify-between border-b p-3">
           <h3 className="font-medium">Notifications</h3>
-          {unreadCount > 0 && (
-            <Button
-              variant="link"
-              size="sm"
-              className="h-auto p-0 text-xs"
-              onClick={handleMarkAllAsRead}
-            >
-              <CheckCheck className="mr-1 h-4 w-4" />
-              Mark all as read
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-xs"
+                onClick={handleMarkAllAsRead}
+              >
+                <CheckCheck className="mr-1 h-4 w-4" />
+                Mark all as read
+              </Button>
+            )}
+            <PopoverClose asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground opacity-70 hover:opacity-100">
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </PopoverClose>
+          </div>
         </div>
         <ScrollArea className="h-96">
           <div className="p-2">
