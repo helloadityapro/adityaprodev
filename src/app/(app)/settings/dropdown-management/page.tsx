@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -13,10 +14,25 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import { Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
+type Permit = {
+  id: string;
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Corrected';
+};
 
 type PtwType = {
   id: string;
@@ -42,7 +58,7 @@ const siteSchema = z.object({
   dcCapacity: z.string().min(1, 'DC capacity is required.'),
 });
 
-function AddOptionsSkeleton() {
+function AdminSettingsSkeleton() {
     return (
         <div className="space-y-6 animate-pulse">
             <Skeleton className="h-9 w-80 mb-4" />
@@ -73,15 +89,28 @@ function AddOptionsSkeleton() {
                     </CardContent>
                 </Card>
             </div>
+             <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-4 w-full max-w-md mt-1" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                </CardContent>
+            </Card>
         </div>
     )
 }
 
-export default function AddOptionsPage() {
+export default function AdminSettingsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
   const { user } = useUser();
+
+  const [statusToDelete, setStatusToDelete] = React.useState<'Approved' | 'Rejected' | 'Pending' | null>(null);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -104,6 +133,9 @@ export default function AddOptionsPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
   const sitesCollectionRef = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+
+  const permitsQuery = useMemoFirebase(() => collection(firestore, 'permits_to_work'), [firestore]);
+  const { data: allPermits, isLoading: permitsLoading } = useCollection<Permit>(permitsQuery);
 
   const ptwTypeForm = useForm<z.infer<typeof ptwTypeSchema>>({
     resolver: zodResolver(ptwTypeSchema),
@@ -139,8 +171,42 @@ export default function AddOptionsPage() {
     toast({ title: 'Success', description: 'Site deleted.' });
   };
 
-  if (isProfileLoading || ptwTypesLoading || sitesLoading) {
-    return <AddOptionsSkeleton />;
+  const handleBulkDelete = async () => {
+    if (!statusToDelete || !allPermits) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not determine which permits to delete.' });
+        return;
+    }
+
+    const permitsToDelete = allPermits.filter(p => {
+        if (statusToDelete === 'Pending') {
+            return p.status === 'Pending' || p.status === 'Corrected';
+        }
+        return p.status === statusToDelete;
+    });
+
+    if (permitsToDelete.length === 0) {
+        toast({ title: 'No permits to delete', description: `There are no ${statusToDelete.toLowerCase()} permits to delete.` });
+        setStatusToDelete(null);
+        return;
+    }
+
+    try {
+        const batch = writeBatch(firestore);
+        permitsToDelete.forEach(permit => {
+            const permitRef = doc(firestore, 'permits_to_work', permit.id);
+            batch.delete(permitRef);
+        });
+        await batch.commit();
+        toast({ title: 'Success', description: `${permitsToDelete.length} permit(s) deleted successfully.` });
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: `Failed to delete permits: ${error.message}` });
+    } finally {
+        setStatusToDelete(null);
+    }
+  };
+
+  if (isProfileLoading || ptwTypesLoading || sitesLoading || permitsLoading) {
+    return <AdminSettingsSkeleton />;
   }
 
   if (!isAdmin) {
@@ -149,7 +215,40 @@ export default function AddOptionsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-headline font-semibold md:text-2xl">Add Options</h1>
+      <h1 className="text-lg font-headline font-semibold md:text-2xl">Admin Settings</h1>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle>Bulk Permit Deletion</CardTitle>
+            <CardDescription>
+                Permanently delete multiple permit requests at once. This action cannot be undone.
+            </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                    <p className="font-medium">Delete Approved Permits</p>
+                    <p className="text-sm text-muted-foreground">Delete all permits with 'Approved' status.</p>
+                </div>
+                <Button variant="destructive" onClick={() => setStatusToDelete('Approved')}>Delete</Button>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                    <p className="font-medium">Delete Rejected Permits</p>
+                    <p className="text-sm text-muted-foreground">Delete all permits with 'Rejected' status.</p>
+                </div>
+                <Button variant="destructive" onClick={() => setStatusToDelete('Rejected')}>Delete</Button>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                    <p className="font-medium">Delete Pending & Corrected Permits</p>
+                    <p className="text-sm text-muted-foreground">Delete all permits with 'Pending' or 'Corrected' status.</p>
+                </div>
+                <Button variant="destructive" onClick={() => setStatusToDelete('Pending')}>Delete</Button>
+            </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -250,6 +349,20 @@ export default function AddOptionsPage() {
           </CardContent>
         </Card>
       </div>
+      <AlertDialog open={!!statusToDelete} onOpenChange={() => setStatusToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This will permanently delete all {statusToDelete === 'Pending' ? 'Pending and Corrected' : statusToDelete} permits. This action cannot be undone.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive hover:bg-destructive/90">Confirm Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -81,10 +82,10 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Add Options" isActive={pathname.startsWith('/settings/dropdown-management')}>
+              <SidebarMenuButton asChild tooltip="Admin Settings" isActive={pathname.startsWith('/settings/dropdown-management')}>
                 <Link href="/settings/dropdown-management">
                   <SlidersHorizontal />
-                  Add Options
+                  Admin Settings
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

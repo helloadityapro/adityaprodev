@@ -135,7 +135,7 @@ const formatTimestamp = (timestamp: any) => {
     return `${day}/${month}/${year} ${hours}:${minutes}`;
 };
 
-const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onDelete, onAttachmentView }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onDelete: (permit: Permit) => void; onAttachmentView: (attachments: Attachment[], startIndex: number) => void; }) {
+const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onAttachmentView }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onAttachmentView: (attachments: Attachment[], startIndex: number) => void; }) {
     return (
       <TooltipProvider>
         <Table>
@@ -193,7 +193,6 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                       
                       {(userRole === 'Admin' || userRole === 'Supervisor') && (
                           <>
-                              {permit.status !== 'Approved' && <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(permit)}><span className="sr-only">Delete</span><Trash2 className="h-4 w-4" /></Button>}
                               {(permit.status === 'Pending' || permit.status === 'Corrected') && (
                                   <>
                                   <Button variant="default" size="icon" className="bg-green-500 hover:bg-green-600 text-white h-8 w-8" onClick={() => onAction(permit, 'Approved')}><span className="sr-only">Approve</span><Check className="h-4 w-4" /></Button>
@@ -535,7 +534,6 @@ export default function PtwListPage() {
   
   const [actionState, setActionState] = React.useState<{permit: Permit, status: 'Approved' | 'Rejected'} | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
-  const [permitToDelete, setPermitToDelete] = React.useState<Permit | null>(null);
   const [viewerState, setViewerState] = React.useState<{ attachments: Attachment[]; startIndex: number } | null>(null);
 
 
@@ -547,20 +545,9 @@ export default function PtwListPage() {
       setDetailsPermit(permit);
   }, []);
 
-  const handleDeleteTrigger = React.useCallback((permit: Permit) => {
-    setPermitToDelete(permit);
-  }, []);
-  
-  const handleConfirmDelete = () => {
-    if (!permitToDelete) return;
-    const permitRef = doc(firestore, 'permits_to_work', permitToDelete.id);
-    deleteDocumentNonBlocking(permitRef);
-    setPermitToDelete(null);
-  }
-
-    const handleAttachmentView = React.useCallback((attachments: Attachment[], startIndex: number) => {
+  const handleAttachmentView = React.useCallback((attachments: Attachment[], startIndex: number) => {
       setViewerState({ attachments, startIndex });
-    }, []);
+  }, []);
 
 
   const permitsQuery = useMemoFirebase(() => {
@@ -803,7 +790,7 @@ export default function PtwListPage() {
         </CardHeader>
         <CardContent>
             {filteredPermits.length > 0 ? (
-                <PermitListTable permits={filteredPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} onAttachmentView={handleAttachmentView} />
+                <PermitListTable permits={filteredPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onAttachmentView={handleAttachmentView} />
             ) : (
                 <div className="text-center py-12 text-muted-foreground">
                     <p>No {statusFilter !== 'all' ? statusFilter.toLowerCase() : ''} requests found matching your filters.</p>
@@ -827,21 +814,6 @@ export default function PtwListPage() {
         onAttachmentView={handleAttachmentView}
       />
       
-      <AlertDialog open={!!permitToDelete} onOpenChange={() => setPermitToDelete(null)}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the permit request.
-            </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete}>Delete</AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
       <MediaViewerDialog
         attachments={viewerState?.attachments || null}
         startIndex={viewerState?.startIndex || 0}
@@ -856,6 +828,7 @@ export default function PtwListPage() {
     
 
     
+
 
 
 
