@@ -146,7 +146,7 @@ service cloud.firestore {
      * @principle Restricts access to a user's own data tree and prevents privilege escalation, while allowing admins to manage users.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin() || isSupervisor();
+      allow get: if isSignedIn();
       allow list: if isAdmin();
       allow create: if canCreateOwnUser(userId) || isAdmin();
       allow update: if (isExistingOwner(userId) && canUpdateOwnUser()) || isAdmin();
