@@ -27,9 +27,9 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Trash2, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX, MapPin } from "lucide-react"
+import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, writeBatch } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -136,7 +136,7 @@ const formatTimestamp = (timestamp: any) => {
     return `${day}/${month}/${year} ${hours}:${minutes}`;
 };
 
-const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onAttachmentView, onDelete }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onAttachmentView: (attachments: Attachment[], startIndex: number) => void; onDelete: (permit: Permit) => void; }) {
+const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onAttachmentView }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onAttachmentView: (attachments: Attachment[], startIndex: number) => void; }) {
     return (
       <TooltipProvider>
         <Table>
@@ -216,17 +216,6 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                                   </>
                               )}
                           </>
-                      )}
-                      {userRole === 'Admin' && (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(permit)}>
-                                    <Trash2 className="h-4 w-4" />
-                                    <span className="sr-only">Delete</span>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Delete Permit</p></TooltipContent>
-                        </Tooltip>
                       )}
                   </div>
                 </TableCell>
@@ -562,8 +551,6 @@ export default function PtwListPage() {
   const [actionState, setActionState] = React.useState<{permit: Permit, status: 'Approved' | 'Rejected'} | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [viewerState, setViewerState] = React.useState<{ attachments: Attachment[]; startIndex: number } | null>(null);
-  const [permitToDelete, setPermitToDelete] = React.useState<Permit | null>(null);
-
 
   const handleActionTrigger = React.useCallback((permit: Permit, status: 'Approved' | 'Rejected') => {
     setActionState({ permit, status });
@@ -575,10 +562,6 @@ export default function PtwListPage() {
 
   const handleAttachmentView = React.useCallback((attachments: Attachment[], startIndex: number) => {
       setViewerState({ attachments, startIndex });
-  }, []);
-
-  const handleDeleteTrigger = React.useCallback((permit: Permit) => {
-    setPermitToDelete(permit);
   }, []);
 
   const permitsQuery = useMemoFirebase(() => {
@@ -646,17 +629,6 @@ export default function PtwListPage() {
         read: false,
         createdAt: serverTimestamp(),
     });
-  };
-
-  const handleConfirmDelete = () => {
-    if (!permitToDelete) return;
-    deleteDocumentNonBlocking(doc(firestore, "permits_to_work", permitToDelete.id));
-    toast({
-        title: "Permit Deleted",
-        description: "The permit request has been successfully deleted.",
-        variant: "success",
-    });
-    setPermitToDelete(null);
   };
   
   const handleCorrectAndResubmit = React.useCallback((permit: Permit) => {
@@ -832,7 +804,7 @@ export default function PtwListPage() {
         </CardHeader>
         <CardContent>
             {filteredPermits.length > 0 ? (
-                <PermitListTable permits={filteredPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onAttachmentView={handleAttachmentView} onDelete={handleDeleteTrigger} />
+                <PermitListTable permits={filteredPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onAttachmentView={handleAttachmentView} />
             ) : (
                 <div className="text-center py-12 text-muted-foreground">
                     <p>No {statusFilter !== 'all' ? statusFilter.toLowerCase() : ''} requests found matching your filters.</p>
@@ -862,23 +834,6 @@ export default function PtwListPage() {
         open={!!viewerState}
         onOpenChange={() => setViewerState(null)}
       />
-
-      <AlertDialog open={!!permitToDelete} onOpenChange={() => setPermitToDelete(null)}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete this permit request.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90">
-                    Delete
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
