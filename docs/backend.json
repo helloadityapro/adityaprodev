@@ -173,6 +173,10 @@
           "type": "string",
           "description": "The status of the permit (e.g., Submitted, Approved, Rejected, Corrected)."
         },
+        "isNew": {
+          "type": "boolean",
+          "description": "Indicates if the permit is new and has not been seen by an admin/supervisor yet. Used for notification badges."
+        },
         "requestDate": {
           "type": "string",
           "format": "date-time",

@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button"
 import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Trash2, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, writeBatch } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
@@ -78,6 +78,7 @@ type Permit = {
   adminRemarks?: string;
   latitude?: number;
   longitude?: number;
+  isNew?: boolean;
 };
 
 type PtwType = {
@@ -573,6 +574,22 @@ export default function PtwListPage() {
 
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
 
+  React.useEffect(() => {
+    if (permits && (userRole === 'Admin' || userRole === 'Supervisor')) {
+      const newPermits = permits.filter(p => p.isNew);
+      if (newPermits.length > 0) {
+        const batch = writeBatch(firestore);
+        newPermits.forEach(p => {
+          const permitRef = doc(firestore, 'permits_to_work', p.id);
+          batch.update(permitRef, { isNew: false });
+        });
+        batch.commit().catch(err => {
+            console.error("Failed to mark permits as read", err);
+        });
+      }
+    }
+  }, [permits, userRole, firestore]);
+
   const engineersQuery = useMemoFirebase(() => {
     if (!isAdmin) return null;
     return query(collection(firestore, 'users'), where('role', '==', 'SiteEngineer'));
@@ -839,5 +856,6 @@ export default function PtwListPage() {
     
 
     
+
 
 

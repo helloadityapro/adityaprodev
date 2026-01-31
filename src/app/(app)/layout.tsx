@@ -148,7 +148,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const pendingPtwCount = React.useMemo(() => {
     if (!permitsForBadge) return 0;
-    return permitsForBadge.filter(p => p.status === 'Pending' || p.status === 'Corrected').length;
+    return permitsForBadge.filter(p => p.isNew).length;
   }, [permitsForBadge]);
 
   // --- Pop-up notifications for Site Engineers ---

@@ -300,6 +300,7 @@ export default function RaisePtwPage() {
                 status: "Corrected" as const,
                 attachments: [...(permitToCorrect.attachments || []), ...attachments],
                 statusChangeDate: serverTimestamp(),
+                isNew: true,
             };
             await updateDoc(permitRef, updatedData);
             toast({ title: "Success", description: "Your permit has been corrected and resubmitted." });
@@ -312,6 +313,7 @@ export default function RaisePtwPage() {
               attachments,
               latitude: location.latitude,
               longitude: location.longitude,
+              isNew: true,
             };
 
             const permitsCollection = collection(firestore, "permits_to_work");
