@@ -204,7 +204,7 @@ service cloud.firestore {
 
       allow list: if isSignedIn();
 
-      allow create: if isSiteEngineer() &&
+      allow create: if (isSiteEngineer() || isAdmin()) &&
                        request.resource.data.siteEngineerId == request.auth.uid &&
                        request.resource.data.status == 'Pending';
 
