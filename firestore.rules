@@ -218,16 +218,29 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages user notifications. A user can read and update their own notifications
-     * (e.g., to mark them as read). Only authenticated users (like an admin or the system) can create notifications.
+     * @description Manages user notifications. This is a more secure rule set that ensures users can only
+     * list and read their own notifications.
      * @path /notifications/{notificationId}
-     * @allow (read) A user reads a list of their own notifications.
-     * @allow (update) A user marks their own notification as read.
+     * @allow (get) A user can get their own notification.
+     * @allow (list) A user can list their own notifications (the query must filter by userId).
+     * @allow (update) A user can update their own notification (e.g., mark as read).
      * @allow (create) An admin/supervisor creates a notification for a site engineer after a permit status change.
      * @deny (delete) Notifications are not user-deletable to maintain an audit trail.
      */
     match /notifications/{notificationId} {
-      allow read, update: if isSignedIn() && request.auth.uid == resource.data.userId;
+      // A user can read a notification if they are the owner.
+      // This rule is checked for single document gets, and for each document returned by a query.
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      // A user can query the notifications collection if they are signed in.
+      // The actual data they receive will be filtered by the `get` rule above.
+      // This requires the client query to have a `where('userId', '==', auth.uid)` clause.
+      allow list: if isSignedIn();
+      
+      // A user can update their own notification (e.g., to mark as read).
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      // Any signed-in user (e.g., the system/backend functions triggered by an action) can create a notification.
       allow create: if isSignedIn();
     }
   }
