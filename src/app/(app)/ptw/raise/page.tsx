@@ -13,8 +13,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Paperclip } from "lucide-react"
-import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase"
-import { addDoc, collection, serverTimestamp, doc, updateDoc } from "firebase/firestore"
+import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
+import { collection, serverTimestamp, doc } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
@@ -302,7 +302,7 @@ export default function RaisePtwPage() {
                 statusChangeDate: serverTimestamp(),
                 isNew: true,
             };
-            await updateDoc(permitRef, updatedData);
+            updateDocumentNonBlocking(permitRef, updatedData);
             toast({ title: "Success", description: "Your permit has been corrected and resubmitted." });
         } else {
             const permitData = {
@@ -317,7 +317,7 @@ export default function RaisePtwPage() {
             };
 
             const permitsCollection = collection(firestore, "permits_to_work");
-            await addDoc(permitsCollection, permitData);
+            addDocumentNonBlocking(permitsCollection, permitData);
 
             toast({ title: "Success", description: "Your permit request has been submitted." });
         }
@@ -548,5 +548,7 @@ export default function RaisePtwPage() {
     </>
   )
 }
+
+    
 
     
