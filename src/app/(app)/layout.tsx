@@ -52,6 +52,8 @@ const parseCSVToSites = (csvText: string) => {
     return data;
 };
 
+const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
+
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -168,19 +170,36 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const notifications = React.useMemo(() => {
     if (!unsortedNotifications) return null;
     return [...unsortedNotifications].sort((a, b) => {
-        const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
-        const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+        const dateA = a.createdAt?.toDate?.().getTime() || 0;
+        const dateB = b.createdAt?.toDate?.().getTime() || 0;
         return dateB - dateA;
     });
   }, [unsortedNotifications]);
 
 
-  const displayedNotifsRef = React.useRef<Set<string>>(new Set());
+  // Use state to manage displayed notifications, initialized from sessionStorage
+  const [displayedNotifIds, setDisplayedNotifIds] = React.useState<Set<string>>(new Set());
+
+  // Load displayed IDs from sessionStorage on component mount (client-side only)
+  React.useEffect(() => {
+    try {
+      const storedIds = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
+      if (storedIds) {
+        setDisplayedNotifIds(new Set(JSON.parse(storedIds)));
+      }
+    } catch (e) {
+      console.error("Could not parse sessionStorage for notifications:", e);
+    }
+  }, []);
+
 
   React.useEffect(() => {
       if (notifications) {
+          const newDisplayedIds = new Set(displayedNotifIds);
+          let wasUpdated = false;
+
           notifications.forEach(notif => {
-              if (!notif.read && !displayedNotifsRef.current.has(notif.id)) {
+              if (!notif.read && !displayedNotifIds.has(notif.id)) {
                   let variant: 'default' | 'destructive' | 'success' = 'default';
                   if (notif.title.includes('Approved')) {
                     variant = 'success';
@@ -193,11 +212,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       description: notif.description,
                       variant,
                   });
-                  displayedNotifsRef.current.add(notif.id);
+                  newDisplayedIds.add(notif.id);
+                  wasUpdated = true;
               }
           });
+
+          if (wasUpdated) {
+              setDisplayedNotifIds(newDisplayedIds);
+              try {
+                sessionStorage.setItem(DISPLAYED_NOTIFS_KEY, JSON.stringify(Array.from(newDisplayedIds)));
+              } catch(e) {
+                console.error("Could not update sessionStorage for notifications:", e);
+              }
+          }
       }
-  }, [notifications, toast]);
+  }, [notifications, toast, displayedNotifIds]);
 
 
   React.useEffect(() => {
