@@ -31,7 +31,10 @@ import {
 
 type Permit = {
   id: string;
+  siteName: string;
+  ptwType: string;
   status: 'Pending' | 'Approved' | 'Rejected' | 'Corrected';
+  requestDate: any;
 };
 
 type PtwType = {
@@ -111,6 +114,7 @@ export default function AdminSettingsPage() {
   const { user } = useUser();
 
   const [statusToDelete, setStatusToDelete] = React.useState<'Approved' | 'Rejected' | 'Pending' | null>(null);
+  const [individualPermitToDelete, setIndividualPermitToDelete] = React.useState<Permit | null>(null);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -136,6 +140,15 @@ export default function AdminSettingsPage() {
 
   const permitsQuery = useMemoFirebase(() => collection(firestore, 'permits_to_work'), [firestore]);
   const { data: allPermits, isLoading: permitsLoading } = useCollection<Permit>(permitsQuery);
+
+  const sortedPermits = React.useMemo(() => {
+    if (!allPermits) return [];
+    return [...allPermits].sort((a, b) => {
+      const dateA = a.requestDate?.toDate?.()?.getTime() || 0;
+      const dateB = b.requestDate?.toDate?.()?.getTime() || 0;
+      return dateB - dateA;
+    });
+  }, [allPermits]);
 
   const ptwTypeForm = useForm<z.infer<typeof ptwTypeSchema>>({
     resolver: zodResolver(ptwTypeSchema),
@@ -205,6 +218,17 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const handleConfirmIndividualDelete = () => {
+    if (!individualPermitToDelete) return;
+    deleteDocumentNonBlocking(doc(firestore, "permits_to_work", individualPermitToDelete.id));
+    toast({
+        title: "Permit Deleted",
+        description: "The permit request has been successfully deleted.",
+        variant: "success",
+    });
+    setIndividualPermitToDelete(null);
+  };
+
   if (isProfileLoading || ptwTypesLoading || sitesLoading || permitsLoading) {
     return <AdminSettingsSkeleton />;
   }
@@ -245,6 +269,48 @@ export default function AdminSettingsPage() {
                     <p className="text-sm text-muted-foreground">Delete all permits with 'Pending' or 'Corrected' status.</p>
                 </div>
                 <Button variant="destructive" onClick={() => setStatusToDelete('Pending')}>Delete</Button>
+            </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+            <CardTitle>Individual Permit Deletion</CardTitle>
+            <CardDescription>
+                Review and delete specific permit requests from the system.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div className="rounded-md border max-h-96 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>PTW Type</TableHead>
+                    <TableHead>Site</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-[50px] text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedPermits?.length > 0 ? sortedPermits.map((permit) => (
+                    <TableRow key={permit.id}>
+                      <TableCell>{permit.ptwType}</TableCell>
+                      <TableCell>{permit.siteName}</TableCell>
+                      <TableCell>{permit.status}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => setIndividualPermitToDelete(permit)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                        <TableCell colSpan={4} className="text-center h-24">No permits found.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
         </CardContent>
       </Card>
@@ -349,6 +415,7 @@ export default function AdminSettingsPage() {
           </CardContent>
         </Card>
       </div>
+
       <AlertDialog open={!!statusToDelete} onOpenChange={() => setStatusToDelete(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
@@ -363,6 +430,22 @@ export default function AdminSettingsPage() {
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!individualPermitToDelete} onOpenChange={() => setIndividualPermitToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This will permanently delete this permit request. This action cannot be undone.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmIndividualDelete} className="bg-destructive hover:bg-destructive/90">Confirm Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
