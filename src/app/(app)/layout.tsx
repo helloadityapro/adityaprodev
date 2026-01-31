@@ -3,7 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, orderBy } from "firebase/firestore";
+import { collection, doc, query, where } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import AppLogo from "@/components/app-logo";
 import { MainNav } from "@/components/main-nav";
@@ -156,11 +156,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!user) return null;
     return query(
         collection(firestore, 'notifications'), 
-        where('userId', '==', user.uid),
-        orderBy('createdAt', 'desc')
+        where('userId', '==', user.uid)
     );
   }, [user, firestore]);
-  const { data: notifications } = useCollection(notificationsQuery);
+  const { data: unsortedNotifications } = useCollection(notificationsQuery);
+
+  const notifications = React.useMemo(() => {
+    if (!unsortedNotifications) return null;
+    return [...unsortedNotifications].sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+        const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+        return dateB - dateA;
+    });
+  }, [unsortedNotifications]);
+
 
   const displayedNotifsRef = React.useRef<Set<string>>(new Set());
 

@@ -20,7 +20,6 @@ import {
   collection,
   query,
   where,
-  orderBy,
   doc,
   writeBatch,
 } from 'firebase/firestore';
@@ -48,14 +47,22 @@ export function UserNotifications() {
     if (!user) return null;
     return query(
       collection(firestore, 'notifications'),
-      where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      where('userId', '==', user.uid)
     );
   }, [user, firestore]);
 
-  const { data: notifications } = useCollection<Notification>(
+  const { data: unsortedNotifications } = useCollection<Notification>(
     notificationsQuery
   );
+
+  const notifications = React.useMemo(() => {
+    if (!unsortedNotifications) return null;
+    return [...unsortedNotifications].sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+        const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+        return dateB - dateA;
+    });
+  }, [unsortedNotifications]);
 
   const unreadCount = React.useMemo(() => {
     return notifications?.filter((n) => !n.read).length || 0;
