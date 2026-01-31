@@ -228,17 +228,18 @@ service cloud.firestore {
      * @deny (delete) Notifications are not user-deletable to maintain an audit trail.
      */
     match /notifications/{notificationId} {
-      // A user can read a notification if they are the owner.
-      // This rule is checked for single document gets, and for each document returned by a query.
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-
-      // A user can query the notifications collection if they are signed in.
+      // A user can read (get or list) a notification only if they are the owner.
+      // This rule is checked for single document gets, and for each document that a query would return.
+      // Crucially, we check for the existence of 'userId' to prevent errors on malformed data.
+      allow get: if isSignedIn() && 'userId' in resource.data && resource.data.userId == request.auth.uid;
+      
+      // A user can query the notifications collection.
       // The actual data they receive will be filtered by the `get` rule above.
       // This requires the client query to have a `where('userId', '==', auth.uid)` clause.
       allow list: if isSignedIn();
       
-      // A user can update their own notification (e.g., to mark as read).
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // A user can update their own notification (e.g., to mark as read), with the same data check.
+      allow update: if isSignedIn() && 'userId' in resource.data && resource.data.userId == request.auth.uid;
 
       // Any signed-in user (e.g., the system/backend functions triggered by an action) can create a notification.
       allow create: if isSignedIn();
