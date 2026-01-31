@@ -15,10 +15,11 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarGroup,
-  SidebarGroupLabel
+  SidebarGroupLabel,
+  SidebarMenuBadge,
 } from "@/components/ui/sidebar"
 
-export function MainNav({ userRole }: { userRole: string }) {
+export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendingPtwCount: number }) {
   const pathname = usePathname()
 
   return (
@@ -51,6 +52,11 @@ export function MainNav({ userRole }: { userRole: string }) {
                 List of PtW
               </Link>
             </SidebarMenuButton>
+            {(userRole === 'Admin' || userRole === 'Supervisor') && pendingPtwCount > 0 && (
+                <SidebarMenuBadge className="bg-red-500 text-white">
+                    {pendingPtwCount}
+                </SidebarMenuBadge>
+            )}
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroup>

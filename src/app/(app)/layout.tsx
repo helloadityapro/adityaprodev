@@ -134,6 +134,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com';
   const userRole = isAdmin ? "Admin" : userProfile?.role || "SiteEngineer";
+  
+  const permitsQuery = useMemoFirebase(() => {
+    if (userRole === 'Admin' || userRole === 'Supervisor') {
+      return collection(firestore, 'permits_to_work');
+    }
+    return null;
+  }, [firestore, userRole]);
+  const { data: permits } = useCollection(permitsQuery);
+
+  const pendingPtwCount = React.useMemo(() => {
+    if (!permits) return 0;
+    return permits.filter(p => p.status === 'Pending' || p.status === 'Corrected').length;
+  }, [permits]);
 
 
   React.useEffect(() => {
@@ -167,7 +180,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <AppLogo />
         </SidebarHeader>
         <SidebarContent>
-          <MainNav userRole={userRole} />
+          <MainNav userRole={userRole} pendingPtwCount={pendingPtwCount} />
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
