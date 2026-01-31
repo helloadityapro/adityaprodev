@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -140,7 +141,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const ptwQueryForBadge = useMemoFirebase(() => {
     if (userRole === 'Admin' || userRole === 'Supervisor') {
-      return collection(firestore, 'permits_to_work');
+      return query(
+        collection(firestore, 'permits_to_work'),
+        where('isNew', '==', true)
+      );
     }
     return null;
   }, [firestore, userRole]);
@@ -148,7 +152,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const pendingPtwCount = React.useMemo(() => {
     if (!permitsForBadge) return 0;
-    return permitsForBadge.filter(p => p.isNew).length;
+    return permitsForBadge.length;
   }, [permitsForBadge]);
 
   // --- Pop-up notifications for Site Engineers ---
