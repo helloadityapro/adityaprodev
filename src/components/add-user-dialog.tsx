@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, setDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, serverTimestamp } from 'firebase/firestore';
 import { initializeApp, deleteApp, getApps } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
@@ -77,6 +77,7 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
         role: values.role,
         registrationRequest: false, // Admin-created users are pre-approved
         assignedProjectIds: [],
+        createdAt: serverTimestamp(),
       };
 
       setDocumentNonBlocking(doc(firestore, 'users', user.uid), userDoc, { merge: true });

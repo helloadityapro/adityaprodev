@@ -484,7 +484,14 @@ export default function PtwListPage() {
       router.push(`/ptw/raise?correct=${permit.id}`);
   }, [router]);
 
-  const allPermits = permits || [];
+  const allPermits = React.useMemo(() => {
+    if (!permits) return [];
+    return [...permits].sort((a, b) => {
+      const dateA = a.requestDate?.toDate()?.getTime() || 0;
+      const dateB = b.requestDate?.toDate()?.getTime() || 0;
+      return dateB - dateA;
+    });
+  }, [permits]);
   
   const summary = React.useMemo(() => ({
     total: allPermits.length,

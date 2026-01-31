@@ -41,6 +41,7 @@ type User = {
   role: 'Admin' | 'Supervisor' | 'SiteEngineer';
   registrationRequest: boolean;
   avatarUrl?: string;
+  createdAt?: any;
 };
 
 function StatusBadge({ isPending }: { isPending: boolean }) {
@@ -159,21 +160,30 @@ export default function UsersPage() {
         setIsRejecting(false);
     }
 
-    const summary = React.useMemo(() => {
-        if (!users) return { totalUsers: 0, pendingRegistrations: 0 };
-        return {
-            totalUsers: users.length,
-            pendingRegistrations: users.filter(u => u.registrationRequest).length,
-        };
+    const sortedUsers = React.useMemo(() => {
+        if (!users) return [];
+        return [...users].sort((a, b) => {
+          const dateA = a.createdAt?.toDate()?.getTime() || 0;
+          const dateB = b.createdAt?.toDate()?.getTime() || 0;
+          return dateB - dateA;
+        });
     }, [users]);
+
+    const summary = React.useMemo(() => {
+        if (!sortedUsers) return { totalUsers: 0, pendingRegistrations: 0 };
+        return {
+            totalUsers: sortedUsers.length,
+            pendingRegistrations: sortedUsers.filter(u => u.registrationRequest).length,
+        };
+    }, [sortedUsers]);
     
     const filteredUsers = React.useMemo(() => {
-        if (!users) return [];
+        if (!sortedUsers) return [];
         if (filter === 'pending') {
-            return users.filter(u => u.registrationRequest);
+            return sortedUsers.filter(u => u.registrationRequest);
         }
-        return users;
-    }, [users, filter]);
+        return sortedUsers;
+    }, [sortedUsers, filter]);
 
 
     if(isLoading) {

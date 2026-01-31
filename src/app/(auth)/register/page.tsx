@@ -13,7 +13,7 @@ import AppLogo from "@/components/app-logo"
 import { useAuth, useFirestore, setDocumentNonBlocking } from "@/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { createUserWithEmailAndPassword } from "firebase/auth"
-import { doc } from "firebase/firestore"
+import { doc, serverTimestamp } from "firebase/firestore"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const registerSchema = z.object({
@@ -59,6 +59,7 @@ export default function RegisterPage() {
         role: values.role,
         registrationRequest: true,
         assignedProjectIds: [],
+        createdAt: serverTimestamp(),
       }
 
       setDocumentNonBlocking(doc(firestore, "users", user.uid), userDoc, { merge: true })
