@@ -206,9 +206,10 @@ export default function RaisePtwPage() {
 
     try {
         const timestamp = Date.now();
-        let allFilesToUpload = [...files];
+        let allFilesToUpload: File[] = [...files];
         if (vlogFile) {
-          allFilesToUpload.push(vlogFile);
+          const attestationVlogFile = new File([vlogFile], `attestation-${vlogFile.name}`, { type: vlogFile.type, lastModified: vlogFile.lastModified });
+          allFilesToUpload.push(attestationVlogFile);
         }
 
         const compressionPromises = allFilesToUpload.map(async (file) => {
@@ -427,7 +428,7 @@ export default function RaisePtwPage() {
                     )}
                 </div>
                 <div className="grid gap-2">
-                    <Label htmlFor="vlog">Self attestation file of engineer</Label>
+                    <Label htmlFor="vlog">Self attestation file</Label>
                     <div className="flex items-center gap-2">
                         <Paperclip className="h-5 w-5 text-muted-foreground"/>
                         <Input id="vlog" type="file" className="border-dashed" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isSubmitting} />
@@ -435,7 +436,7 @@ export default function RaisePtwPage() {
                     {vlogFile && (
                         <div className="mt-2 space-y-2">
                             <div className="flex justify-between items-center">
-                              <Label>Selected Vlog:</Label>
+                              <Label>Selected Attestation File:</Label>
                               <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setVlogFile(null)}>Clear</Button>
                             </div>
                             <div className="text-sm">
@@ -495,3 +496,5 @@ export default function RaisePtwPage() {
     </>
   )
 }
+
+    

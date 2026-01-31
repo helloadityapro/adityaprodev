@@ -26,7 +26,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { FileCheck, Clock, FileX, List as ListIcon, ExternalLink, Eye, FilePen, Trash2, Check, X, FileText, FileVideo, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX } from "lucide-react"
+import { FileCheck, Clock, FileX, List as ListIcon, ExternalLink, Eye, FilePen, Trash2, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
@@ -147,19 +147,37 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                 </TableCell>
                 <TableCell className="py-2 px-4">
                   <div className="flex items-center justify-start gap-1 flex-wrap">
-                    {permit.attachments?.map((attachment, index) => (
-                      <Tooltip key={index}>
-                        <TooltipTrigger asChild>
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onAttachmentView({url: attachment.url, type: attachment.contentType})}>
-                            {attachment.contentType.startsWith('video/') ? <Video className="h-4 w-4" /> : attachment.contentType.startsWith('image/') ? <FileVideo className="h-4 w-4" /> : <Paperclip className="h-4 w-4" />}
-                            <span className="sr-only">{attachment.name}</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{attachment.name}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ))}
+                    {permit.attachments?.map((attachment, index) => {
+                      const isAttestation = attachment.name.startsWith('attestation-');
+                      const isVideo = attachment.contentType.startsWith('video/');
+                      const isImage = attachment.contentType.startsWith('image/');
+                      const cleanName = attachment.name.replace(/^attestation-/, '');
+
+                      let Icon = Paperclip;
+                      let iconClassName = "";
+                      if (isAttestation) {
+                        Icon = Film;
+                        iconClassName = "text-purple-500";
+                      } else if (isVideo) {
+                        Icon = Video;
+                      } else if (isImage) {
+                        Icon = Image;
+                      }
+                      
+                      return (
+                        <Tooltip key={index}>
+                          <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onAttachmentView({url: attachment.url, type: attachment.contentType})}>
+                              <Icon className={cn("h-4 w-4", iconClassName)} />
+                              <span className="sr-only">{cleanName}</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{cleanName}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
                   </div>
                 </TableCell>
                 <TableCell className="py-2 px-4">
@@ -290,7 +308,7 @@ function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: {
                       onClick={() => onAttachmentView({ url: attachment.url, type: attachment.contentType })}
                     >
                       <ExternalLink size={14}/>
-                      <span>{attachment.name}</span>
+                      <span>{attachment.name.replace(/^attestation-/, '')}</span>
                     </Button>
                   ))}
                 </div>
@@ -706,3 +724,6 @@ export default function PtwListPage() {
     
 
 
+
+
+    
