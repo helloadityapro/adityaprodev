@@ -3,7 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, query, where } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import AppLogo from "@/components/app-logo";
 import { MainNav } from "@/components/main-nav";
@@ -16,6 +16,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 function FullPageLoader() {
   return (
@@ -55,6 +56,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   React.useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -135,18 +137,46 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com';
   const userRole = isAdmin ? "Admin" : userProfile?.role || "SiteEngineer";
   
-  const permitsQuery = useMemoFirebase(() => {
+  const ptwQueryForBadge = useMemoFirebase(() => {
     if (userRole === 'Admin' || userRole === 'Supervisor') {
       return collection(firestore, 'permits_to_work');
     }
     return null;
   }, [firestore, userRole]);
-  const { data: permits } = useCollection(permitsQuery);
+  const { data: permitsForBadge } = useCollection(ptwQueryForBadge);
 
   const pendingPtwCount = React.useMemo(() => {
-    if (!permits) return 0;
-    return permits.filter(p => p.status === 'Pending' || p.status === 'Corrected').length;
-  }, [permits]);
+    if (!permitsForBadge) return 0;
+    return permitsForBadge.filter(p => p.status === 'Pending' || p.status === 'Corrected').length;
+  }, [permitsForBadge]);
+
+  // --- Pop-up notifications for Site Engineers ---
+  const ptwQueryForNotifications = useMemoFirebase(() => {
+    if (userRole === 'SiteEngineer' && user) {
+        return query(collection(firestore, 'permits_to_work'), where('siteEngineerId', '==', user.uid));
+    }
+    return null;
+  }, [firestore, userRole, user]);
+  const { data: engineerPermits } = useCollection(ptwQueryForNotifications);
+
+  const prevPermitsRef = React.useRef<any[]>();
+  React.useEffect(() => {
+    if (userRole === 'SiteEngineer' && engineerPermits && prevPermitsRef.current) {
+        engineerPermits.forEach(currentPermit => {
+            const prevPermit = prevPermitsRef.current!.find(p => p.id === currentPermit.id);
+            if (prevPermit && prevPermit.status !== currentPermit.status) {
+                if (currentPermit.status === 'Approved' || currentPermit.status === 'Rejected') {
+                    toast({
+                        title: `Permit Status Updated`,
+                        description: `Your permit for "${currentPermit.siteName}" has been ${currentPermit.status.toLowerCase()}.`,
+                        duration: 8000,
+                    });
+                }
+            }
+        });
+    }
+    prevPermitsRef.current = engineerPermits || undefined;
+  }, [engineerPermits, userRole, toast]);
 
 
   React.useEffect(() => {
