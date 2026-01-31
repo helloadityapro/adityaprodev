@@ -299,18 +299,37 @@ function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: {
             {permit.attachments && permit.attachments.length > 0 && (
               <div className="col-span-2">
                 <Label>Attachments</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {permit.attachments.map((attachment, index) => (
-                    <Button
-                      key={index}
-                      variant="link"
-                      className="p-0 h-auto flex items-center gap-2 justify-start text-primary"
-                      onClick={() => onAttachmentView(permit.attachments!, index)}
-                    >
-                      <Paperclip size={14}/>
-                      <span>{attachment.name.replace(/^attestation-/, '')}</span>
-                    </Button>
-                  ))}
+                <div className="flex flex-wrap gap-4 mt-2 items-center">
+                  {permit.attachments.map((attachment, index) => {
+                      const isAttestation = attachment.name.startsWith('attestation-');
+                      const isVideo = attachment.contentType.startsWith('video/');
+                      const isImage = attachment.contentType.startsWith('image/');
+                      const cleanName = attachment.name.replace(/^attestation-/, '');
+                      
+                      let Icon = Paperclip;
+                      let iconColor = "";
+
+                      if (isAttestation) {
+                          Icon = Film;
+                          iconColor = "text-purple-500";
+                      } else if (isVideo) {
+                          Icon = Video;
+                      } else if (isImage) {
+                          Icon = Image;
+                      }
+
+                      return (
+                          <Button
+                              key={index}
+                              variant="link"
+                              className="p-0 h-auto flex items-center gap-2 justify-start text-primary"
+                              onClick={() => onAttachmentView(permit.attachments!, index)}
+                          >
+                              <Icon size={14} className={cn(iconColor)} />
+                              <span className="truncate max-w-[200px]">{cleanName}</span>
+                          </Button>
+                      );
+                  })}
                 </div>
               </div>
             )}
@@ -362,6 +381,7 @@ function MediaViewerDialog({ attachments, startIndex, open, onOpenChange }: { at
         <Carousel setApi={setApi} opts={{ startIndex, loop: false }} className="w-full">
             <CarouselContent>
                 {attachments.map((attachment, index) => {
+                    const isAttestation = attachment.name.startsWith('attestation-');
                     const isVideo = attachment.contentType.startsWith('video/');
                     const isImage = attachment.contentType.startsWith('image/');
                     const cleanName = attachment.name.replace(/^attestation-/, '');
@@ -376,7 +396,7 @@ function MediaViewerDialog({ attachments, startIndex, open, onOpenChange }: { at
                                         <img src={attachment.url} alt={cleanName} className="max-h-[70vh] w-auto rounded-md" data-ai-hint="attached image"/>
                                     ) : (
                                         <div className="flex flex-col items-center gap-4 p-8 text-muted-foreground">
-                                            <Film size={48} />
+                                            <FileText size={48} />
                                             <p>Unsupported file type: {attachment.contentType}.</p>
                                             <Button asChild>
                                                 <a href={attachment.url} target="_blank" rel="noopener noreferrer">Download file</a>
@@ -384,7 +404,10 @@ function MediaViewerDialog({ attachments, startIndex, open, onOpenChange }: { at
                                         </div>
                                     )}
                                 </div>
-                                <p className="text-center text-sm text-muted-foreground mt-2">{cleanName}</p>
+                                <div className="flex items-center justify-center gap-2 mt-2">
+                                    <p className="text-center text-sm text-muted-foreground">{cleanName}</p>
+                                    {isAttestation && <Badge variant="secondary">Self Attestation</Badge>}
+                                </div>
                             </div>
                         </CarouselItem>
                     );
@@ -779,5 +802,7 @@ export default function PtwListPage() {
     </div>
   )
 }
+
+    
 
     
