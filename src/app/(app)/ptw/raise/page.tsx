@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { FileVideo, Video } from "lucide-react"
+import { Paperclip } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase"
 import { addDoc, collection, serverTimestamp, doc, updateDoc } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -408,30 +408,36 @@ export default function RaisePtwPage() {
                 <div className="grid gap-2">
                     <Label htmlFor="work-files">Attach files (videos, photos)</Label>
                     <div className="flex items-center gap-2">
-                        <FileVideo className="h-5 w-5 text-muted-foreground"/>
-                        <Input id="work-files" type="file" className="border-dashed" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} disabled={isSubmitting} />
+                        <Paperclip className="h-5 w-5 text-muted-foreground"/>
+                        <Input id="work-files" type="file" className="border-dashed" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isSubmitting} />
                     </div>
                     {files.length > 0 && (
                         <div className="mt-2 space-y-2">
-                        <Label>Selected Files:</Label>
-                        {files.map((file, index) => (
-                            <div key={index} className="text-sm">
-                            <p className="truncate">{file.name}</p>
-                            {uploadProgress[file.name] != null && <Progress value={uploadProgress[file.name]} className="w-full mt-1" />}
-                            </div>
-                        ))}
+                          <div className="flex justify-between items-center">
+                            <Label>Selected Files:</Label>
+                            <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setFiles([])}>Clear all</Button>
+                          </div>
+                          {files.map((file, index) => (
+                              <div key={index} className="text-sm">
+                              <p className="truncate">{file.name}</p>
+                              {uploadProgress[file.name] != null && <Progress value={uploadProgress[file.name]} className="w-full mt-1" />}
+                              </div>
+                          ))}
                         </div>
                     )}
                 </div>
                 <div className="grid gap-2">
-                    <Label htmlFor="vlog">Self attestation Video of engineer</Label>
+                    <Label htmlFor="vlog">Self attestation file of engineer</Label>
                     <div className="flex items-center gap-2">
-                        <Video className="h-5 w-5 text-muted-foreground"/>
-                        <Input id="vlog" type="file" accept="video/*" className="border-dashed" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isSubmitting} />
+                        <Paperclip className="h-5 w-5 text-muted-foreground"/>
+                        <Input id="vlog" type="file" className="border-dashed" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isSubmitting} />
                     </div>
                     {vlogFile && (
                         <div className="mt-2 space-y-2">
-                            <Label>Selected Vlog:</Label>
+                            <div className="flex justify-between items-center">
+                              <Label>Selected Vlog:</Label>
+                              <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setVlogFile(null)}>Clear</Button>
+                            </div>
                             <div className="text-sm">
                                 <p className="truncate">{vlogFile.name}</p>
                                 {uploadProgress[vlogFile.name] != null && <Progress value={uploadProgress[vlogFile.name]} className="w-full mt-1" />}
@@ -489,5 +495,3 @@ export default function RaisePtwPage() {
     </>
   )
 }
-
-    
