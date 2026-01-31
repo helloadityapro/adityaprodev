@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Bell, CheckCheck, X } from 'lucide-react';
+import { Bell, CheckCheck, X, CheckCircle, XCircle } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -135,26 +135,35 @@ export function UserNotifications() {
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
                   className={cn(
-                    'flex cursor-pointer flex-col gap-1 rounded-md p-2 hover:bg-accent',
+                    'flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-accent',
                     !notification.read && 'bg-blue-500/10'
                   )}
                 >
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold">{notification.title}</p>
-                    {!notification.read && (
-                      <div className="h-2 w-2 rounded-full bg-primary" />
-                    )}
+                  {notification.title.includes('Approved') ? (
+                    <CheckCircle className="mt-1 h-5 w-5 shrink-0 text-green-500" />
+                  ) : notification.title.includes('Rejected') ? (
+                    <XCircle className="mt-1 h-5 w-5 shrink-0 text-destructive" />
+                  ) : (
+                    <Bell className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" />
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold">{notification.title}</p>
+                      {!notification.read && (
+                        <div className="h-2 w-2 shrink-0 rounded-full bg-primary" />
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {notification.description}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {notification.createdAt
+                        ? formatDistanceToNow(notification.createdAt.toDate(), {
+                            addSuffix: true,
+                          })
+                        : ''}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {notification.description}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {notification.createdAt
-                      ? formatDistanceToNow(notification.createdAt.toDate(), {
-                          addSuffix: true,
-                        })
-                      : ''}
-                  </p>
                 </div>
               ))
             ) : (
