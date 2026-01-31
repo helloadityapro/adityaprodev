@@ -166,6 +166,36 @@ export default function RaisePtwPage() {
     }
   }, [isCorrectionMode, permitToCorrect, form, uniqueSites]);
 
+  const getCurrentLocation = (): Promise<{ latitude: number; longitude: number } | null> => {
+    return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+            toast({
+                variant: 'destructive',
+                title: 'Geolocation Not Supported',
+                description: 'Your browser does not support this feature.',
+            });
+            resolve(null);
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                });
+            },
+            (error) => {
+                toast({
+                    variant: 'destructive',
+                    title: 'Location Error',
+                    description: `Could not get location: ${error.message}. Please enable location services.`,
+                });
+                resolve(null);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    });
+  };
 
   const onSubmit = async (values: z.infer<typeof raisePtwSchema>) => {
     if (!user) {
@@ -179,6 +209,21 @@ export default function RaisePtwPage() {
 
     setIsSubmitting(true);
     setUploadProgress({});
+
+    toast({ title: "Capturing location..." });
+    const location = await getCurrentLocation();
+
+    if (!location) {
+        toast({
+            variant: "destructive",
+            title: "Location Required",
+            description: "Could not capture your location. Please enable location services and try again."
+        });
+        setIsSubmitting(false);
+        return;
+    }
+
+    toast({ title: "Location captured!", description: "Proceeding with file uploads..." });
 
     const uploadFile = (file: File, path: string): Promise<{ url: string; contentType: string; name: string; }> => {
         return new Promise((resolve, reject) => {
@@ -250,6 +295,8 @@ export default function RaisePtwPage() {
             const permitRef = doc(firestore, "permits_to_work", permitIdToCorrect);
             const updatedData = {
                 ...permitValues,
+                latitude: location.latitude,
+                longitude: location.longitude,
                 status: "Corrected" as const,
                 attachments: [...(permitToCorrect.attachments || []), ...attachments],
                 statusChangeDate: serverTimestamp(),
@@ -263,6 +310,8 @@ export default function RaisePtwPage() {
               status: "Pending" as const,
               requestDate: serverTimestamp(),
               attachments,
+              latitude: location.latitude,
+              longitude: location.longitude,
             };
 
             const permitsCollection = collection(firestore, "permits_to_work");

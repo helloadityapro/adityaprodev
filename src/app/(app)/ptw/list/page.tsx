@@ -26,7 +26,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Trash2, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX } from "lucide-react"
+import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Trash2, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
@@ -76,6 +76,8 @@ type Permit = {
   attachments?: Attachment[];
   commentsAndRemarks?: string;
   adminRemarks?: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 type PtwType = {
@@ -296,6 +298,23 @@ function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: {
             {permit.commentsAndRemarks && <div className="col-span-2"><Label>Engineer's Remarks</Label><p className="whitespace-pre-wrap">{permit.commentsAndRemarks}</p></div>}
             {permit.adminRemarks && <div className="col-span-2"><Label>Admin's Remarks</Label><p className="whitespace-pre-wrap">{permit.adminRemarks}</p></div>}
             
+            {permit.latitude && permit.longitude && (
+                <div className="col-span-2">
+                    <Label>Location</Label>
+                    <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <a
+                            href={`https://www.google.com/maps?q=${permit.latitude},${permit.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary underline hover:text-primary/80"
+                        >
+                            {permit.latitude.toFixed(5)}, {permit.longitude.toFixed(5)}
+                        </a>
+                    </div>
+                </div>
+            )}
+
             {permit.attachments && permit.attachments.length > 0 && (
               <div className="col-span-2">
                 <Label>Attachments</Label>

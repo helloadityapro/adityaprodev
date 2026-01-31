@@ -194,6 +194,14 @@
         "adminId": {
           "type": "string",
           "description": "Reference to User (Admin) who approved/rejected the request. (Relationship: User 1:N PermitToWork)"
+        },
+        "latitude": {
+          "type": "number",
+          "description": "The latitude of the user when submitting the request."
+        },
+        "longitude": {
+          "type": "number",
+          "description": "The longitude of the user when submitting the request."
         }
       },
       "required": [
