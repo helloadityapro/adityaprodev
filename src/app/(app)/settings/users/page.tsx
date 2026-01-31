@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Eye, Edit, Trash2, Users, UserPlus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking } from "@/firebase"
+import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
 import { collection, doc } from "firebase/firestore"
 import { AddUserDialog } from "@/components/add-user-dialog";
 import { EditUserDialog } from "@/components/edit-user-dialog";
@@ -32,6 +32,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "next/navigation";
 
 type User = {
   id: string;
@@ -120,9 +121,29 @@ function UsersPageSkeleton() {
 
 export default function UsersPage() {
     const firestore = useFirestore();
-    const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-    const { data: users, isLoading } = useCollection<User>(usersQuery);
+    const router = useRouter();
+    const { user } = useUser();
     const { toast } = useToast();
+
+    const userProfileRef = useMemoFirebase(() => {
+        if (!user) return null;
+        return doc(firestore, 'users', user.uid);
+    }, [firestore, user]);
+    const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+
+    const isAdmin = userProfile?.role === 'Admin' || user?.email === 'abhijeet.agepl@gmail.com';
+
+    React.useEffect(() => {
+        if (!isProfileLoading && !isAdmin) {
+            router.replace('/ptw/raise');
+        }
+    }, [isProfileLoading, isAdmin, router]);
+
+    const usersQuery = useMemoFirebase(() => {
+        if (!isAdmin) return null;
+        return collection(firestore, 'users');
+    }, [firestore, isAdmin]);
+    const { data: users, isLoading } = useCollection<User>(usersQuery);
 
     const [filter, setFilter] = React.useState<'all' | 'pending'>('all');
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
@@ -186,8 +207,12 @@ export default function UsersPage() {
     }, [sortedUsers, filter]);
 
 
-    if(isLoading) {
+    if(isLoading || isProfileLoading) {
         return <UsersPageSkeleton />
+    }
+    
+    if (!isAdmin) {
+        return <UsersPageSkeleton />;
     }
 
     return (

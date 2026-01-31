@@ -141,7 +141,7 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                 </TableCell>
                 <TableCell className="py-2 px-4">{permit.siteName}</TableCell>
                 <TableCell className="py-2 px-4"><UserDisplay userId={permit.siteEngineerId} /></TableCell>
-                <TableCell className="py-2 px-4">{permit.requestDate && permit.requestDate.toDate ? new Date(permit.requestDate.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
+                <TableCell className="py-2 px-4">{permit.requestDate?.toDate ? new Date(permit.requestDate.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
                 <TableCell className="py-2 px-4">
                   <StatusBadge status={permit.status} />
                 </TableCell>
@@ -453,7 +453,10 @@ export default function PtwListPage() {
 
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
 
-  const engineersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), where('role', '==', 'SiteEngineer')), [firestore]);
+  const engineersQuery = useMemoFirebase(() => {
+    if (!isAdmin) return null;
+    return query(collection(firestore, 'users'), where('role', '==', 'SiteEngineer'));
+  }, [firestore, isAdmin]);
   const { data: engineers, isLoading: engineersLoading } = useCollection(engineersQuery);
   
   const ptwTypesQuery = useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]);
@@ -569,8 +572,14 @@ export default function PtwListPage() {
                 </div>
                  <div className="grid gap-1.5">
                     <Label>Engineer</Label>
-                     <Select value={filters.siteEngineerId} onValueChange={(value) => setFilters(prev => ({...prev, siteEngineerId: value === 'all' ? '' : value}))}>
-                        <SelectTrigger><SelectValue placeholder="All Engineers" /></SelectTrigger>
+                     <Select 
+                        value={filters.siteEngineerId} 
+                        onValueChange={(value) => setFilters(prev => ({...prev, siteEngineerId: value === 'all' ? '' : value}))}
+                        disabled={!isAdmin}
+                      >
+                        <SelectTrigger>
+                            <SelectValue placeholder={!isAdmin ? "N/A" : "All Engineers"} />
+                        </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Engineers</SelectItem>
                             {engineers?.map(eng => <SelectItem key={eng.id} value={eng.id}>{eng.username}</SelectItem>)}
@@ -695,4 +704,5 @@ export default function PtwListPage() {
     
 
     
+
 

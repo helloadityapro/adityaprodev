@@ -74,7 +74,10 @@ export default function AdminDashboardPage() {
         }
     }, [isProfileLoading, isAdmin, router]);
 
-    const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+    const usersQuery = useMemoFirebase(() => {
+        if (!isAdmin) return null;
+        return collection(firestore, 'users');
+    }, [firestore, isAdmin]);
     const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
 
     const permitsQuery = useMemoFirebase(() => collection(firestore, 'permits_to_work'), [firestore]);
@@ -83,7 +86,7 @@ export default function AdminDashboardPage() {
     const projectsQuery = useMemoFirebase(() => collection(firestore, 'projects'), [firestore]);
     const { data: projects, isLoading: projectsLoading } = useCollection(projectsQuery);
 
-    if (isProfileLoading || usersLoading || permitsLoading || projectsLoading) {
+    if (isProfileLoading || (isAdmin && usersLoading) || permitsLoading || projectsLoading) {
         return <AdminDashboardSkeleton />
     }
 
