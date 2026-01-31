@@ -735,12 +735,3 @@ export default function PtwListPage() {
     </div>
   )
 }
-
-    
-
-    
-
-
-
-
-    
