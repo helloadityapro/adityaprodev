@@ -168,43 +168,14 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                   )}
                 </TableCell>
                 <TableCell className="py-2 px-4">
-                  <div className="flex items-center justify-start gap-1 flex-wrap">
-                    {permit.attachments && permit.attachments.length > 0 ? (
-                      permit.attachments.map((attachment, attachIndex) => {
-                        const isAttestation = attachment.name.startsWith('attestation-');
-                        const isVideo = attachment.contentType.startsWith('video/');
-                        const isImage = attachment.contentType.startsWith('image/');
-                        const cleanName = attachment.name.replace(/^attestation-/, '');
-
-                        let Icon = Paperclip;
-                        let iconClassName = "";
-                        if (isAttestation) {
-                          Icon = Film;
-                          iconClassName = "text-purple-500";
-                        } else if (isVideo) {
-                          Icon = Video;
-                        } else if (isImage) {
-                          Icon = Image;
-                        }
-                        
-                        return (
-                          <Tooltip key={attachIndex}>
-                            <TooltipTrigger asChild>
-                              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onAttachmentView(permit.attachments!, attachIndex)}>
-                                <Icon className={cn("h-4 w-4", iconClassName)} />
-                                <span className="sr-only">{cleanName}</span>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{cleanName}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      })
-                    ) : (
-                      <span className="text-muted-foreground text-xs">No Files</span>
-                    )}
-                  </div>
+                  {permit.attachments && permit.attachments.length > 0 ? (
+                    <Button variant="outline" size="sm" onClick={() => onAttachmentView(permit.attachments!, 0)}>
+                      <Paperclip />
+                      View Files ({permit.attachments.length})
+                    </Button>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">No Files</span>
+                  )}
                 </TableCell>
                 <TableCell className="py-2 px-4">
                   <div className="flex items-center justify-end gap-2">
@@ -593,8 +564,8 @@ export default function PtwListPage() {
   const allPermits = React.useMemo(() => {
     if (!permits) return [];
     return [...permits].sort((a, b) => {
-      const dateA = a.requestDate?.toDate()?.getTime() || 0;
-      const dateB = b.requestDate?.toDate()?.getTime() || 0;
+      const dateA = a.requestDate?.toDate?.()?.getTime() || 0;
+      const dateB = b.requestDate?.toDate?.()?.getTime() || 0;
       return dateB - dateA;
     });
   }, [permits]);
@@ -808,3 +779,5 @@ export default function PtwListPage() {
     </div>
   )
 }
+
+    
