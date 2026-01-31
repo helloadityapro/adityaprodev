@@ -252,6 +252,7 @@ export default function RaisePtwPage() {
                 ...permitValues,
                 status: "Corrected" as const,
                 attachments: [...(permitToCorrect.attachments || []), ...attachments],
+                statusChangeDate: serverTimestamp(),
             };
             await updateDoc(permitRef, updatedData);
             toast({ title: "Success", description: "Your permit has been corrected and resubmitted." });
@@ -441,7 +442,7 @@ export default function RaisePtwPage() {
                             </div>
                             <div className="text-sm">
                                 <p className="truncate">{vlogFile.name}</p>
-                                {uploadProgress[vlogFile.name] != null && <Progress value={uploadProgress[vlogFile.name]} className="w-full mt-1" />}
+                                {uploadProgress[`attestation-${vlogFile.name}`] != null && <Progress value={uploadProgress[`attestation-${vlogFile.name}`]} className="w-full mt-1" />}
                             </div>
                         </div>
                     )}

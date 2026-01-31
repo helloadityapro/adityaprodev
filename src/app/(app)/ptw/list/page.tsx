@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button"
 import { FileCheck, Clock, FileX, List as ListIcon, ExternalLink, Eye, FilePen, Trash2, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
@@ -64,6 +64,7 @@ type Permit = {
   supervisorId?: string;
   adminId?: string;
   requestDate: any; // Should be a timestamp
+  statusChangeDate?: any;
   attachments?: Attachment[];
   commentsAndRemarks?: string;
   adminRemarks?: string;
@@ -112,6 +113,16 @@ function UserDisplay({ userId }: { userId: string }) {
   return <span>{user.username}</span>;
 }
 
+const formatTimestamp = (timestamp: any) => {
+    if (!timestamp || !timestamp.toDate) return 'N/A';
+    const date = timestamp.toDate();
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+};
 
 const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onDelete, onAttachmentView }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onDelete: (permit: Permit) => void; onAttachmentView: (media: { url: string; type: string }) => void; }) {
     return (
@@ -123,7 +134,7 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
               <TableHead className="h-auto py-2 px-4">PTW Type</TableHead>
               <TableHead className="h-auto py-2 px-4">Site</TableHead>
               <TableHead className="h-auto py-2 px-4">Engineer</TableHead>
-              <TableHead className="h-auto py-2 px-4">Created</TableHead>
+              <TableHead className="h-auto py-2 px-4">Submitted At</TableHead>
               <TableHead className="h-auto py-2 px-4">Status</TableHead>
               <TableHead className="h-auto py-2 px-4">Attachments</TableHead>
               <TableHead className="text-right h-auto py-2 px-4">Actions</TableHead>
@@ -141,9 +152,12 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                 </TableCell>
                 <TableCell className="py-2 px-4">{permit.siteName}</TableCell>
                 <TableCell className="py-2 px-4"><UserDisplay userId={permit.siteEngineerId} /></TableCell>
-                <TableCell className="py-2 px-4">{permit.requestDate?.toDate ? new Date(permit.requestDate.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
+                <TableCell className="py-2 px-4">{formatTimestamp(permit.requestDate)}</TableCell>
                 <TableCell className="py-2 px-4">
                   <StatusBadge status={permit.status} />
+                   {(permit.status === 'Approved' || permit.status === 'Rejected' || permit.status === 'Corrected') && permit.statusChangeDate && (
+                    <p className="text-xs text-muted-foreground mt-1">{formatTimestamp(permit.statusChangeDate)}</p>
+                  )}
                 </TableCell>
                 <TableCell className="py-2 px-4">
                   <div className="flex items-center justify-start gap-1 flex-wrap">
@@ -289,7 +303,10 @@ function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: {
             <div><Label>Permit Type</Label><p>{permit.ptwType}</p></div>
             <div className="col-span-2"><Label>Description of Work</Label><p className="whitespace-pre-wrap">{permit.descriptionOfWork}</p></div>
             <div><Label>Status</Label><div><StatusBadge status={permit.status} /></div></div>
-            <div><Label>Requested On</Label><p>{permit.requestDate && permit.requestDate.toDate ? new Date(permit.requestDate.toDate()).toLocaleString() : 'N/A'}</p></div>
+            <div><Label>Requested On</Label><p>{formatTimestamp(permit.requestDate)}</p></div>
+            {(permit.status === 'Approved' || permit.status === 'Rejected' || permit.status === 'Corrected') && permit.statusChangeDate && (
+                <div><Label>{permit.status} On</Label><p>{formatTimestamp(permit.statusChangeDate)}</p></div>
+            )}
             <div className="flex items-center gap-2"><Label>Requested By</Label><UserDisplay userId={permit.siteEngineerId} /></div>
              {permit.supervisorId && <div className="flex items-center gap-2"><Label>Reviewed By (Supervisor)</Label><UserDisplay userId={permit.supervisorId} /></div>}
             {permit.adminId && <div className="flex items-center gap-2"><Label>Reviewed By (Admin)</Label><UserDisplay userId={permit.adminId} /></div>}
@@ -491,7 +508,7 @@ export default function PtwListPage() {
 
   const handlePermitAction = (permitId: string, status: Permit['status'], adminRemarks: string) => {
     const permitRef = doc(firestore, "permits_to_work", permitId);
-    let updateData: any = { status, adminRemarks };
+    let updateData: any = { status, adminRemarks, statusChangeDate: serverTimestamp() };
     if (userRole === 'Supervisor') {
         updateData.supervisorId = user?.uid;
     }

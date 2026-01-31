@@ -173,6 +173,16 @@
           "type": "string",
           "description": "The status of the permit (e.g., Submitted, Approved, Rejected, Corrected)."
         },
+        "requestDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the permit was requested."
+        },
+        "statusChangeDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last status change (e.g., approval, rejection, correction)."
+        },
         "siteEngineerId": {
           "type": "string",
           "description": "Reference to User (Site Engineer) who raised the request. (Relationship: User 1:N PermitToWork)"
@@ -192,7 +202,8 @@
         "ptwType",
         "descriptionOfWork",
         "status",
-        "siteEngineerId"
+        "siteEngineerId",
+        "requestDate"
       ]
     }
   },
