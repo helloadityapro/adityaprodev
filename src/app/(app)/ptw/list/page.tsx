@@ -1,4 +1,5 @@
 
+
 "use client";
 import * as React from "react";
 import { useForm } from "react-hook-form";
@@ -135,7 +136,7 @@ const formatTimestamp = (timestamp: any) => {
     return `${day}/${month}/${year} ${hours}:${minutes}`;
 };
 
-const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onAttachmentView }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onAttachmentView: (attachments: Attachment[], startIndex: number) => void; }) {
+const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onAttachmentView, onDelete }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onAttachmentView: (attachments: Attachment[], startIndex: number) => void; onDelete: (permit: Permit) => void; }) {
     return (
       <TooltipProvider>
         <Table>
@@ -182,7 +183,12 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                 </TableCell>
                 <TableCell className="py-2 px-4">
                   <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="icon" onClick={() => onViewDetails(permit)}><span className="sr-only">View</span><Eye className="h-4 w-4" /></Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={() => onViewDetails(permit)}><span className="sr-only">View</span><Eye className="h-4 w-4" /></Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>View Details</p></TooltipContent>
+                      </Tooltip>
                       
                       {userRole === 'SiteEngineer' && permit.status === 'Rejected' && (
                           <Button variant="outline" size="sm" onClick={() => onCorrect(permit)}>
@@ -195,11 +201,32 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                           <>
                               {(permit.status === 'Pending' || permit.status === 'Corrected') && (
                                   <>
-                                  <Button variant="default" size="icon" className="bg-green-500 hover:bg-green-600 text-white h-8 w-8" onClick={() => onAction(permit, 'Approved')}><span className="sr-only">Approve</span><Check className="h-4 w-4" /></Button>
-                                  <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => onAction(permit, 'Rejected')}><span className="sr-only">Reject</span><X className="h-4 w-4" /></Button>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="default" size="icon" className="bg-green-500 hover:bg-green-600 text-white h-8 w-8" onClick={() => onAction(permit, 'Approved')}><span className="sr-only">Approve</span><Check className="h-4 w-4" /></Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Approve</p></TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => onAction(permit, 'Rejected')}><span className="sr-only">Reject</span><X className="h-4 w-4" /></Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>Reject</p></TooltipContent>
+                                    </Tooltip>
                                   </>
                               )}
                           </>
+                      )}
+                      {userRole === 'Admin' && (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => onDelete(permit)}>
+                                    <Trash2 className="h-4 w-4" />
+                                    <span className="sr-only">Delete</span>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Delete Permit</p></TooltipContent>
+                        </Tooltip>
                       )}
                   </div>
                 </TableCell>
@@ -535,6 +562,7 @@ export default function PtwListPage() {
   const [actionState, setActionState] = React.useState<{permit: Permit, status: 'Approved' | 'Rejected'} | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [viewerState, setViewerState] = React.useState<{ attachments: Attachment[]; startIndex: number } | null>(null);
+  const [permitToDelete, setPermitToDelete] = React.useState<Permit | null>(null);
 
 
   const handleActionTrigger = React.useCallback((permit: Permit, status: 'Approved' | 'Rejected') => {
@@ -549,6 +577,9 @@ export default function PtwListPage() {
       setViewerState({ attachments, startIndex });
   }, []);
 
+  const handleDeleteTrigger = React.useCallback((permit: Permit) => {
+    setPermitToDelete(permit);
+  }, []);
 
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole) return null;
@@ -615,6 +646,17 @@ export default function PtwListPage() {
         read: false,
         createdAt: serverTimestamp(),
     });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!permitToDelete) return;
+    deleteDocumentNonBlocking(doc(firestore, "permits_to_work", permitToDelete.id));
+    toast({
+        title: "Permit Deleted",
+        description: "The permit request has been successfully deleted.",
+        variant: "success",
+    });
+    setPermitToDelete(null);
   };
   
   const handleCorrectAndResubmit = React.useCallback((permit: Permit) => {
@@ -790,7 +832,7 @@ export default function PtwListPage() {
         </CardHeader>
         <CardContent>
             {filteredPermits.length > 0 ? (
-                <PermitListTable permits={filteredPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onAttachmentView={handleAttachmentView} />
+                <PermitListTable permits={filteredPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onAttachmentView={handleAttachmentView} onDelete={handleDeleteTrigger} />
             ) : (
                 <div className="text-center py-12 text-muted-foreground">
                     <p>No {statusFilter !== 'all' ? statusFilter.toLowerCase() : ''} requests found matching your filters.</p>
@@ -821,14 +863,22 @@ export default function PtwListPage() {
         onOpenChange={() => setViewerState(null)}
       />
 
+      <AlertDialog open={!!permitToDelete} onOpenChange={() => setPermitToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete this permit request.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive hover:bg-destructive/90">
+                    Delete
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
-
-    
-
-    
-
-
-
-
