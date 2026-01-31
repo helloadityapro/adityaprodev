@@ -177,9 +177,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (notifications) {
           notifications.forEach(notif => {
               if (!notif.read && !displayedNotifsRef.current.has(notif.id)) {
+                  let variant: 'default' | 'destructive' | 'success' = 'default';
+                  if (notif.title.includes('Approved')) {
+                    variant = 'success';
+                  } else if (notif.title.includes('Rejected')) {
+                    variant = 'destructive';
+                  }
+
                   toast({
                       title: notif.title,
                       description: notif.description,
+                      variant,
                   });
                   displayedNotifsRef.current.add(notif.id);
               }

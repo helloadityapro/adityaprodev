@@ -231,7 +231,11 @@ function PermitActionDialog({ permit, status, open, onOpenChange, onConfirm }: {
   const onSubmit = (values: z.infer<typeof actionSchema>) => {
     if (!permit || !status) return;
     onConfirm(permit, status, values.adminRemarks);
-    toast({ title: `Permit ${status}`, description: `The permit has been ${status.toLowerCase()}.` });
+    toast({ 
+        title: `Permit ${status}`, 
+        description: `The permit has been ${status.toLowerCase()}.`,
+        variant: status === 'Approved' ? 'success' : 'destructive',
+    });
     onOpenChange(false);
   };
   
@@ -835,4 +839,5 @@ export default function PtwListPage() {
     
 
     
+
 
