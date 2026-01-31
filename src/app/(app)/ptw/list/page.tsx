@@ -26,7 +26,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { FileCheck, Clock, FileX, List as ListIcon, ExternalLink, Eye, FilePen, Trash2, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX } from "lucide-react"
+import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Trash2, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
@@ -46,6 +46,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, isSameDay } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+  type CarouselApi,
+} from "@/components/ui/carousel";
 
 
 type Attachment = {
@@ -124,7 +132,7 @@ const formatTimestamp = (timestamp: any) => {
     return `${day}/${month}/${year} ${hours}:${minutes}`;
 };
 
-const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onDelete, onAttachmentView }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onDelete: (permit: Permit) => void; onAttachmentView: (media: { url: string; type: string }) => void; }) {
+const PermitListTable = React.memo(function PermitListTable({ permits, onAction, userRole, onViewDetails, onCorrect, onDelete, onAttachmentView }: { permits: Permit[]; onAction: (permit: Permit, status: 'Approved' | 'Rejected') => void; userRole: string; onViewDetails: (permit: Permit) => void; onCorrect: (permit: Permit) => void; onDelete: (permit: Permit) => void; onAttachmentView: (attachments: Attachment[], startIndex: number) => void; }) {
     return (
       <TooltipProvider>
         <Table>
@@ -161,37 +169,41 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                 </TableCell>
                 <TableCell className="py-2 px-4">
                   <div className="flex items-center justify-start gap-1 flex-wrap">
-                    {permit.attachments?.map((attachment, index) => {
-                      const isAttestation = attachment.name.startsWith('attestation-');
-                      const isVideo = attachment.contentType.startsWith('video/');
-                      const isImage = attachment.contentType.startsWith('image/');
-                      const cleanName = attachment.name.replace(/^attestation-/, '');
+                    {permit.attachments && permit.attachments.length > 0 ? (
+                      permit.attachments.map((attachment, attachIndex) => {
+                        const isAttestation = attachment.name.startsWith('attestation-');
+                        const isVideo = attachment.contentType.startsWith('video/');
+                        const isImage = attachment.contentType.startsWith('image/');
+                        const cleanName = attachment.name.replace(/^attestation-/, '');
 
-                      let Icon = Paperclip;
-                      let iconClassName = "";
-                      if (isAttestation) {
-                        Icon = Film;
-                        iconClassName = "text-purple-500";
-                      } else if (isVideo) {
-                        Icon = Video;
-                      } else if (isImage) {
-                        Icon = Image;
-                      }
-                      
-                      return (
-                        <Tooltip key={index}>
-                          <TooltipTrigger asChild>
-                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onAttachmentView({url: attachment.url, type: attachment.contentType})}>
-                              <Icon className={cn("h-4 w-4", iconClassName)} />
-                              <span className="sr-only">{cleanName}</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{cleanName}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })}
+                        let Icon = Paperclip;
+                        let iconClassName = "";
+                        if (isAttestation) {
+                          Icon = Film;
+                          iconClassName = "text-purple-500";
+                        } else if (isVideo) {
+                          Icon = Video;
+                        } else if (isImage) {
+                          Icon = Image;
+                        }
+                        
+                        return (
+                          <Tooltip key={attachIndex}>
+                            <TooltipTrigger asChild>
+                              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => onAttachmentView(permit.attachments!, attachIndex)}>
+                                <Icon className={cn("h-4 w-4", iconClassName)} />
+                                <span className="sr-only">{cleanName}</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{cleanName}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })
+                    ) : (
+                      <span className="text-muted-foreground text-xs">No Files</span>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="py-2 px-4">
@@ -287,7 +299,7 @@ function PermitActionDialog({ permit, status, open, onOpenChange, onConfirm }: {
   );
 }
 
-function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: { permit: Permit | null, open: boolean, onOpenChange: (open: boolean) => void, onAttachmentView: (media: { url: string; type: string }) => void }) {
+function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: { permit: Permit | null, open: boolean, onOpenChange: (open: boolean) => void, onAttachmentView: (attachments: Attachment[], startIndex: number) => void }) {
   if (!permit) return null;
 
   return (
@@ -316,15 +328,15 @@ function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: {
             {permit.attachments && permit.attachments.length > 0 && (
               <div className="col-span-2">
                 <Label>Attachments</Label>
-                <div className="flex flex-col gap-2 mt-2">
+                <div className="flex flex-wrap gap-2 mt-2">
                   {permit.attachments.map((attachment, index) => (
                     <Button
                       key={index}
                       variant="link"
                       className="p-0 h-auto flex items-center gap-2 justify-start text-primary"
-                      onClick={() => onAttachmentView({ url: attachment.url, type: attachment.contentType })}
+                      onClick={() => onAttachmentView(permit.attachments!, index)}
                     >
-                      <ExternalLink size={14}/>
+                      <Paperclip size={14}/>
                       <span>{attachment.name.replace(/^attestation-/, '')}</span>
                     </Button>
                   ))}
@@ -338,37 +350,87 @@ function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: {
   );
 }
 
-function MediaViewerDialog({ media, open, onOpenChange }: { media: { url: string; type: string } | null, open: boolean, onOpenChange: (open: boolean) => void }) {
-  if (!media) return null;
+function MediaViewerDialog({ attachments, startIndex, open, onOpenChange }: { attachments: Attachment[] | null, startIndex: number, open: boolean, onOpenChange: (open: boolean) => void }) {
+  const [api, setApi] = React.useState<CarouselApi>()
+  const [current, setCurrent] = React.useState(0)
+  const [count, setCount] = React.useState(0)
 
-  const isVideo = media.type.startsWith('video/');
-  const isImage = media.type.startsWith('image/');
+  React.useEffect(() => {
+    if (open) {
+      setCurrent(startIndex + 1);
+    }
+  }, [open, startIndex]);
+ 
+  React.useEffect(() => {
+    if (!api) {
+      return
+    }
+ 
+    setCount(api.scrollSnapList().length)
+    setCurrent(api.selectedScrollSnap() + 1)
+ 
+    api.on("select", () => {
+      setCurrent(api.selectedScrollSnap() + 1)
+    })
+  }, [api])
+
+
+  if (!attachments || attachments.length === 0) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Attachment Viewer</DialogTitle>
-        </DialogHeader>
-        <div className="py-4 flex items-center justify-center bg-black rounded-md">
-          {isVideo ? (
-            <video controls autoPlay src={media.url} className="max-h-[80vh] w-full rounded-md" />
-          ) : isImage ? (
-            <img src={media.url} alt="Attachment" className="max-h-[80vh] w-auto rounded-md" />
-          ) : (
-            <div className="flex flex-col items-center gap-4 p-8 text-muted-foreground">
-                <Film size={48} />
-                <p>Unsupported file type: {media.type}.</p>
-                <Button asChild>
-                    <a href={media.url} target="_blank" rel="noopener noreferrer">Download file</a>
-                </Button>
-            </div>
+          <DialogTitle>Attachments</DialogTitle>
+          {count > 0 && (
+            <DialogDescription>
+              Viewing file {current} of {count}
+            </DialogDescription>
           )}
-        </div>
+        </DialogHeader>
+        <Carousel setApi={setApi} opts={{ startIndex, loop: false }} className="w-full">
+            <CarouselContent>
+                {attachments.map((attachment, index) => {
+                    const isVideo = attachment.contentType.startsWith('video/');
+                    const isImage = attachment.contentType.startsWith('image/');
+                    const cleanName = attachment.name.replace(/^attestation-/, '');
+
+                    return (
+                        <CarouselItem key={index}>
+                            <div className="flex flex-col items-center justify-center gap-2">
+                                <div className="flex items-center justify-center bg-black rounded-md min-h-[60vh] w-full p-1">
+                                    {isVideo ? (
+                                        <video controls autoPlay src={attachment.url} className="max-h-[70vh] w-full rounded-md" />
+                                    ) : isImage ? (
+                                        <img src={attachment.url} alt={cleanName} className="max-h-[70vh] w-auto rounded-md" data-ai-hint="attached image"/>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-4 p-8 text-muted-foreground">
+                                            <Film size={48} />
+                                            <p>Unsupported file type: {attachment.contentType}.</p>
+                                            <Button asChild>
+                                                <a href={attachment.url} target="_blank" rel="noopener noreferrer">Download file</a>
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                                <p className="text-center text-sm text-muted-foreground mt-2">{cleanName}</p>
+                            </div>
+                        </CarouselItem>
+                    );
+                })}
+            </CarouselContent>
+            {count > 1 && (
+                <>
+                    <CarouselPrevious className="left-[-50px] -translate-y-1/2" />
+                    <CarouselNext className="right-[-50px] -translate-y-1/2" />
+                </>
+            )}
+        </Carousel>
       </DialogContent>
     </Dialog>
   );
 }
+
 
 function PermitListSkeleton() {
     return (
@@ -456,7 +518,8 @@ export default function PtwListPage() {
   const [actionState, setActionState] = React.useState<{permit: Permit, status: 'Approved' | 'Rejected'} | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [permitToDelete, setPermitToDelete] = React.useState<Permit | null>(null);
-  const [mediaToView, setMediaToView] = React.useState<{ url: string, type: string } | null>(null);
+  const [viewerState, setViewerState] = React.useState<{ attachments: Attachment[]; startIndex: number } | null>(null);
+
 
   const handleActionTrigger = React.useCallback((permit: Permit, status: 'Approved' | 'Rejected') => {
     setActionState({ permit, status });
@@ -476,6 +539,11 @@ export default function PtwListPage() {
     deleteDocumentNonBlocking(permitRef);
     setPermitToDelete(null);
   }
+
+    const handleAttachmentView = React.useCallback((attachments: Attachment[], startIndex: number) => {
+      setViewerState({ attachments, startIndex });
+    }, []);
+
 
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole) return null;
@@ -691,7 +759,7 @@ export default function PtwListPage() {
         </CardHeader>
         <CardContent>
             {filteredPermits.length > 0 ? (
-                <PermitListTable permits={filteredPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} onAttachmentView={setMediaToView} />
+                <PermitListTable permits={filteredPermits} onAction={handleActionTrigger} userRole={userRole || ''} onViewDetails={handleViewDetails} onCorrect={handleCorrectAndResubmit} onDelete={handleDeleteTrigger} onAttachmentView={handleAttachmentView} />
             ) : (
                 <div className="text-center py-12 text-muted-foreground">
                     <p>No {statusFilter !== 'all' ? statusFilter.toLowerCase() : ''} requests found matching your filters.</p>
@@ -712,7 +780,7 @@ export default function PtwListPage() {
         permit={detailsPermit}
         open={!!detailsPermit}
         onOpenChange={() => setDetailsPermit(null)}
-        onAttachmentView={setMediaToView}
+        onAttachmentView={handleAttachmentView}
       />
       
       <AlertDialog open={!!permitToDelete} onOpenChange={() => setPermitToDelete(null)}>
@@ -730,7 +798,12 @@ export default function PtwListPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <MediaViewerDialog media={mediaToView} open={!!mediaToView} onOpenChange={() => setMediaToView(null)} />
+      <MediaViewerDialog
+        attachments={viewerState?.attachments || null}
+        startIndex={viewerState?.startIndex || 0}
+        open={!!viewerState}
+        onOpenChange={() => setViewerState(null)}
+      />
 
     </div>
   )
