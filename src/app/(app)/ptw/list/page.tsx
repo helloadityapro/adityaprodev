@@ -141,7 +141,7 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                 </TableCell>
                 <TableCell className="py-2 px-4">{permit.siteName}</TableCell>
                 <TableCell className="py-2 px-4"><UserDisplay userId={permit.siteEngineerId} /></TableCell>
-                <TableCell className="py-2 px-4">{permit.requestDate ? new Date(permit.requestDate?.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
+                <TableCell className="py-2 px-4">{permit.requestDate && permit.requestDate.toDate ? new Date(permit.requestDate.toDate()).toLocaleDateString() : 'N/A'}</TableCell>
                 <TableCell className="py-2 px-4">
                   <StatusBadge status={permit.status} />
                 </TableCell>
@@ -271,7 +271,7 @@ function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: {
             <div><Label>Permit Type</Label><p>{permit.ptwType}</p></div>
             <div className="col-span-2"><Label>Description of Work</Label><p className="whitespace-pre-wrap">{permit.descriptionOfWork}</p></div>
             <div><Label>Status</Label><div><StatusBadge status={permit.status} /></div></div>
-            <div><Label>Requested On</Label><p>{permit.requestDate ? new Date(permit.requestDate.toDate()).toLocaleString() : 'N/A'}</p></div>
+            <div><Label>Requested On</Label><p>{permit.requestDate && permit.requestDate.toDate ? new Date(permit.requestDate.toDate()).toLocaleString() : 'N/A'}</p></div>
             <div className="flex items-center gap-2"><Label>Requested By</Label><UserDisplay userId={permit.siteEngineerId} /></div>
              {permit.supervisorId && <div className="flex items-center gap-2"><Label>Reviewed By (Supervisor)</Label><UserDisplay userId={permit.supervisorId} /></div>}
             {permit.adminId && <div className="flex items-center gap-2"><Label>Reviewed By (Admin)</Label><UserDisplay userId={permit.adminId} /></div>}
@@ -511,7 +511,7 @@ export default function PtwListPage() {
       const ptwTypeMatch = !filters.ptwType || permit.ptwType === filters.ptwType;
       const siteNameMatch = !filters.siteName || permit.siteName === filters.siteName;
       const engineerMatch = !filters.siteEngineerId || permit.siteEngineerId === filters.siteEngineerId;
-      const dateMatch = !filters.date || (permit.requestDate && isSameDay(permit.requestDate.toDate(), filters.date));
+      const dateMatch = !filters.date || (permit.requestDate && permit.requestDate.toDate && isSameDay(permit.requestDate.toDate(), filters.date));
 
       return statusMatch && ptwTypeMatch && siteNameMatch && engineerMatch && dateMatch;
     });
@@ -695,3 +695,4 @@ export default function PtwListPage() {
     
 
     
+
