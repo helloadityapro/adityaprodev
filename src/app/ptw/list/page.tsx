@@ -16,10 +16,20 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX, MapPin } from "lucide-react"
+import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Check, X, FileText, Image, Video, Film, Paperclip, Calendar as CalendarIcon, FilterX, MapPin, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, writeBatch } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";

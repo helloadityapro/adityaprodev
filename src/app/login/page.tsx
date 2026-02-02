@@ -22,9 +22,6 @@ const loginSchema = z.object({
 })
 
 export default function LoginPage() {
-  const router = useRouter()
-  const auth = useAuth()
-  const { user, isUserLoading } = useUser()
   const { toast } = useToast()
   const [showPassword, setShowPassword] = useState(false)
 
@@ -35,13 +32,9 @@ export default function LoginPage() {
       password: "",
     },
   })
-
-  useEffect(() => {
-    if (!isUserLoading && user) {
-      router.push('/ptw/raise')
-    }
-  }, [user, isUserLoading, router])
-
+  
+  const auth = useAuth()
+  
   const onSubmit = async (values: z.infer<typeof loginSchema>) => {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
@@ -58,14 +51,6 @@ export default function LoginPage() {
         description: description,
       });
     }
-  }
-
-  if (isUserLoading || user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    )
   }
 
   return (
@@ -133,8 +118,8 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full">
-                Login
+              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Logging in...' : 'Login'}
               </Button>
             </form>
           </Form>
