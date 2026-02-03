@@ -1,3 +1,4 @@
+
 'use client'
 
 import Link from "next/link"
@@ -22,8 +23,18 @@ const loginSchema = z.object({
 })
 
 export default function LoginPage() {
+  const router = useRouter()
   const { toast } = useToast()
   const [showPassword, setShowPassword] = useState(false)
+  const auth = useAuth()
+  const { user } = useUser()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      router.replace('/dashboard')
+    }
+  }, [user, router])
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -33,11 +44,10 @@ export default function LoginPage() {
     },
   })
   
-  const auth = useAuth()
-  
   const onSubmit = async (values: z.infer<typeof loginSchema>) => {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
+      // The useEffect above will handle the redirect once the auth state updates
     } catch (error: any) {
       let description = "An unexpected error occurred during login.";
       if (error.code === 'auth/invalid-credential') {
@@ -53,9 +63,11 @@ export default function LoginPage() {
     }
   }
 
+  if (user) return null;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="mx-auto w-full max-w-sm">
+      <Card className="mx-auto w-full max-w-sm animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="text-center">
           <div className="mb-4 flex justify-center">
             <AppLogo />
@@ -109,7 +121,7 @@ export default function LoginPage() {
                             className="absolute right-0 top-0 h-full w-10 text-muted-foreground hover:bg-transparent"
                             onClick={() => setShowPassword((prev) => !prev)}
                         >
-                          {showPassword ? <EyeOff /> : <Eye />}
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           <span className="sr-only">{showPassword ? 'Hide password' : 'Show password'}</span>
                         </Button>
                       </div>
@@ -125,7 +137,7 @@ export default function LoginPage() {
           </Form>
           <div className="mt-4 text-center text-sm">
             Don&apos;t have an account?{" "}
-            <Link href="/register" className="underline">
+            <Link href="/register" className="underline font-medium">
               Sign up
             </Link>
           </div>

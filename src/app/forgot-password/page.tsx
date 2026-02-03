@@ -1,6 +1,9 @@
+
 'use client'
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -9,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import AppLogo from "@/components/app-logo"
-import { useAuth } from "@/firebase"
+import { useAuth, useUser } from "@/firebase"
 import { sendPasswordResetEmail } from "firebase/auth"
 import { useToast } from "@/hooks/use-toast"
 import { ArrowLeft } from "lucide-react"
@@ -19,8 +22,17 @@ const forgotPasswordSchema = z.object({
 })
 
 export default function ForgotPasswordPage() {
+  const router = useRouter()
   const { toast } = useToast()
   const auth = useAuth()
+  const { user } = useUser()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      router.replace('/dashboard')
+    }
+  }, [user, router])
 
   const form = useForm<z.infer<typeof forgotPasswordSchema>>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -48,9 +60,11 @@ export default function ForgotPasswordPage() {
     }
   }
 
+  if (user) return null;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="mx-auto w-full max-w-sm">
+      <Card className="mx-auto w-full max-w-sm animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="text-center">
           <div className="mb-4 flex justify-center">
             <AppLogo />
@@ -82,7 +96,7 @@ export default function ForgotPasswordPage() {
             </form>
           </Form>
           <div className="mt-4 text-center text-sm">
-            <Link href="/login" className="inline-flex items-center gap-1 underline">
+            <Link href="/login" className="inline-flex items-center gap-1 underline font-medium">
                 <ArrowLeft className="h-4 w-4" />
                 Back to login
             </Link>

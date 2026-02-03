@@ -1,7 +1,9 @@
+
 'use client'
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -10,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import AppLogo from "@/components/app-logo"
-import { useAuth, useFirestore, setDocumentNonBlocking } from "@/firebase"
+import { useAuth, useFirestore, setDocumentNonBlocking, useUser } from "@/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { createUserWithEmailAndPassword } from "firebase/auth"
 import { doc, serverTimestamp } from "firebase/firestore"
@@ -33,6 +35,14 @@ export default function RegisterPage() {
   const auth = useAuth()
   const firestore = useFirestore()
   const { toast } = useToast()
+  const { user } = useUser()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      router.replace('/dashboard')
+    }
+  }, [user, router])
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -49,10 +59,10 @@ export default function RegisterPage() {
   const onSubmit = async (values: z.infer<typeof registerSchema>) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password)
-      const user = userCredential.user
+      const newUser = userCredential.user
 
       const userDoc = {
-        id: user.uid,
+        id: newUser.uid,
         username: values.username,
         email: values.email,
         mobile: values.mobile,
@@ -62,13 +72,13 @@ export default function RegisterPage() {
         createdAt: serverTimestamp(),
       }
 
-      setDocumentNonBlocking(doc(firestore, "users", user.uid), userDoc, { merge: true })
+      setDocumentNonBlocking(doc(firestore, "users", newUser.uid), userDoc, { merge: true })
 
       toast({
         title: "Registration successful!",
         description: "Your account has been created and is pending approval.",
       })
-      router.push("/login")
+      // The AppShell logic in layout.tsx will handle the pending approval state
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -78,9 +88,11 @@ export default function RegisterPage() {
     }
   }
 
+  if (user) return null;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="mx-auto w-full max-w-md">
+      <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="text-center">
             <div className="mb-4 flex justify-center">
                 <AppLogo />
@@ -186,7 +198,7 @@ export default function RegisterPage() {
           </Form>
           <div className="mt-4 text-center text-sm">
             Already have an account?{" "}
-            <Link href="/login" className="underline">
+            <Link href="/login" className="underline font-medium">
               Sign in
             </Link>
           </div>
