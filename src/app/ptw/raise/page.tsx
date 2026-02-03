@@ -24,6 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import imageCompression from 'browser-image-compression';
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -322,7 +323,10 @@ export default function RaisePtwPage() {
             toast({ title: "Success", description: "Your permit request has been submitted." });
         }
 
-        router.push('/ptw/list');
+        // Add a small delay to allow the animation to play before redirect
+        setTimeout(() => {
+          router.push('/ptw/list');
+        }, 2500);
 
     } catch (error: any) {
         toast({
@@ -330,17 +334,13 @@ export default function RaisePtwPage() {
             title: "Submission Failed",
             description: error.message || "Could not submit permit request."
         });
-    } finally {
         setIsSubmitting(false);
-        setUploadProgress({});
     }
   }
 
   const pageTitle = isCorrectionMode ? "Correct and Resubmit PtW" : "Raise a Permit to Work";
   const cardTitle = isCorrectionMode ? "Correct PtW Request" : "New PtW Request";
   const cardDescription = isCorrectionMode ? "Update the form below to resubmit your permit." : "Fill out the form below to submit a new permit request.";
-  const submitButtonText = isCorrectionMode ? 'Resubmit Request' : 'Submit Request';
-  const submittingButtonText = isCorrectionMode ? 'Resubmitting...' : 'Submitting...';
 
   if (isLoadingPermit || ptwTypesLoading || sitesLoading) {
     return <RaisePtwSkeleton />;
@@ -538,8 +538,39 @@ export default function RaisePtwPage() {
                   )}
               />
 
-              <div className="flex justify-end">
-                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? submittingButtonText : submitButtonText}</Button>
+              <div className="flex justify-center mt-4">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={cn(
+                    "relative w-[270px] h-[80px] border-none outline-none bg-[#2f2f2f] text-white text-[22px] rounded-[40px] text-center shadow-[0_6px_20px_-5px_rgba(0,0,0,0.4)] overflow-hidden cursor-pointer transition-all duration-1000 flex items-center justify-center font-body",
+                    isSubmitting && "bg-[#556EA2]"
+                  )}
+                >
+                  <p className={cn("transition-all duration-1000", isSubmitting && "mr-[65px]")}>
+                    {isSubmitting ? "Submitted" : "Submit"}
+                  </p>
+                  <div
+                    className={cn(
+                      "absolute top-0 right-[-40px] w-[80px] h-[80px] rounded-[40px] shadow-[0_0_12px_-2px_rgba(0,0,0,0.5)] opacity-0 transition-all duration-1000 flex items-center justify-center",
+                      isSubmitting && "right-0 opacity-100"
+                    )}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" className="w-[40px] h-[40px]">
+                      <path
+                        fill="transparent"
+                        d="M14.1 27.2l7.1 7.2 16.7-16.8"
+                        stroke="white"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        className={cn(
+                          "transition-all duration-1000 [stroke-dasharray:34] [stroke-dashoffset:34]",
+                          isSubmitting && "delay-1000 [stroke-dashoffset:0]"
+                        )}
+                      />
+                    </svg>
+                  </div>
+                </button>
               </div>
             </form>
           </Form>
