@@ -22,15 +22,14 @@ import { UserNotifications } from "@/components/user-notifications";
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { Loader2 } from "lucide-react";
 
 function FullPageLoader() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="flex items-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" role="status">
-          <span className="sr-only">Loading...</span>
-        </div>
-        <p className="text-lg font-medium text-muted-foreground">Loading...</p>
+    <div className="flex min-h-screen items-center justify-center bg-background animate-in fade-in duration-300">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="text-sm font-medium text-muted-foreground tracking-widest uppercase">Initializing</p>
       </div>
     </div>
   );
@@ -59,6 +58,7 @@ const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -80,17 +80,16 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  // Bootstrap/self-heal the primary admin user
   React.useEffect(() => {
     if (user && user.email === 'abhijeet.agepl@gmail.com' && !isProfileLoading) {
       if (!userProfile || userProfile.role !== 'Admin') {
         const adminUserDoc = {
           id: user.uid,
-          username: 'Admin User', // Default username
+          username: 'Admin User',
           email: user.email,
           mobile: user.phoneNumber || '0000000000',
           role: 'Admin',
-          registrationRequest: false, // Pre-approved
+          registrationRequest: false,
           assignedProjectIds: [],
         };
         setDocumentNonBlocking(doc(firestore, "users", user.uid), adminUserDoc, { merge: true });
@@ -98,7 +97,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [user, userProfile, isProfileLoading, firestore]);
 
-  // Seed PTW Types if the collection is empty
   const ptwTypesCollectionRef = useMemoFirebase(() => (user ? collection(firestore, 'ptw_types') : null), [firestore, user]);
   const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection(ptwTypesCollectionRef);
 
@@ -116,7 +114,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [ptwTypes, ptwTypesLoading, ptwTypesCollectionRef]);
 
-  // Seed Sites if the collection is empty
   const sitesCollectionRef = useMemoFirebase(() => (user ? collection(firestore, 'sites') : null), [firestore, user]);
   const { data: sites, isLoading: sitesLoading } = useCollection(sitesCollectionRef);
 
@@ -159,7 +156,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
     return permitsForBadge.length;
   }, [permitsForBadge]);
 
-  // --- Pop-up notifications for Site Engineers ---
   const notificationsQuery = useMemoFirebase(() => {
     if (!user) return null;
     return query(
@@ -178,11 +174,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
     });
   }, [unsortedNotifications]);
 
-
-  // Use state to manage displayed notifications, initialized from sessionStorage
   const [displayedNotifIds, setDisplayedNotifIds] = React.useState<Set<string>>(new Set());
 
-  // Load displayed IDs from sessionStorage on component mount (client-side only)
   React.useEffect(() => {
     try {
       const storedIds = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
@@ -193,7 +186,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
       console.error("Could not parse sessionStorage for notifications:", e);
     }
   }, []);
-
 
   React.useEffect(() => {
       if (notifications) {
@@ -241,15 +233,14 @@ function AppShell({ children }: { children: React.ReactNode }) {
     return <FullPageLoader />;
   }
 
-  // Check for registration approval but allow admin email through
   if (userProfile && userProfile.registrationRequest && user?.email !== 'abhijeet.agepl@gmail.com') {
      return (
-      <div className="flex flex-col min-h-screen items-center justify-center text-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Registration Pending</h1>
-          <p className="text-muted-foreground">Your account is awaiting admin approval.</p>
+      <div className="flex flex-col min-h-screen items-center justify-center text-center gap-6 p-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight">Registration Pending</h1>
+          <p className="text-muted-foreground">Your account is awaiting administrator approval. You will be notified once approved.</p>
         </div>
-        <Button onClick={() => auth.signOut()}>Sign Out</Button>
+        <Button variant="outline" onClick={() => auth.signOut()}>Sign Out</Button>
       </div>
     );
   }
@@ -266,15 +257,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+        <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 sticky top-0 z-10">
           <SidebarTrigger />
           <div className="w-full flex-1">
-            {/* Can add a search form here if needed */}
           </div>
           <UserNotifications />
           <UserNav />
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40 animate-in fade-in-0 duration-500">
+        <main 
+          key={pathname}
+          className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40 animate-in fade-in slide-in-from-bottom-2 duration-500"
+        >
           {children}
         </main>
       </SidebarInset>
@@ -299,7 +292,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className="font-body antialiased">
+      <body className="font-body antialiased selection:bg-primary/20">
         <FirebaseClientProvider>
           {isAuthPage ? children : <AppShell>{children}</AppShell>}
         </FirebaseClientProvider>
