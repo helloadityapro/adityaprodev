@@ -538,25 +538,25 @@ export default function RaisePtwPage() {
                   )}
               />
 
-              <div className="flex justify-center mt-4">
+              <div className="flex justify-end mt-4">
                 <button
                   type="submit"
                   disabled={isSubmitting}
                   className={cn(
-                    "relative w-[270px] h-[80px] border-none outline-none bg-[#2f2f2f] text-white text-[22px] rounded-[40px] text-center shadow-[0_6px_20px_-5px_rgba(0,0,0,0.4)] overflow-hidden cursor-pointer transition-all duration-1000 flex items-center justify-center font-body",
+                    "relative h-10 px-6 border-none outline-none bg-[#2f2f2f] text-white text-sm font-medium rounded-md text-center shadow-sm overflow-hidden cursor-pointer transition-all duration-500 flex items-center justify-center font-body",
                     isSubmitting && "bg-[#556EA2]"
                   )}
                 >
-                  <p className={cn("transition-all duration-1000", isSubmitting && "mr-[65px]")}>
+                  <p className={cn("transition-all duration-500", isSubmitting && "mr-6")}>
                     {isSubmitting ? "Submitted" : "Submit"}
                   </p>
                   <div
                     className={cn(
-                      "absolute top-0 right-[-40px] w-[80px] h-[80px] rounded-[40px] shadow-[0_0_12px_-2px_rgba(0,0,0,0.5)] opacity-0 transition-all duration-1000 flex items-center justify-center",
+                      "absolute top-0 right-[-20px] w-10 h-10 rounded-md opacity-0 transition-all duration-500 flex items-center justify-center",
                       isSubmitting && "right-0 opacity-100"
                     )}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" className="w-[40px] h-[40px]">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" className="w-5 h-5">
                       <path
                         fill="transparent"
                         d="M14.1 27.2l7.1 7.2 16.7-16.8"
@@ -564,8 +564,8 @@ export default function RaisePtwPage() {
                         strokeWidth="3"
                         strokeLinecap="round"
                         className={cn(
-                          "transition-all duration-1000 [stroke-dasharray:34] [stroke-dashoffset:34]",
-                          isSubmitting && "delay-1000 [stroke-dashoffset:0]"
+                          "transition-all duration-500 [stroke-dasharray:34] [stroke-dashoffset:34]",
+                          isSubmitting && "delay-500 [stroke-dashoffset:0]"
                         )}
                       />
                     </svg>
