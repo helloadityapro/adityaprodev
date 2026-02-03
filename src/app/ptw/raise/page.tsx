@@ -139,7 +139,8 @@ export default function RaisePtwPage() {
   
   const [files, setFiles] = React.useState<File[]>([]);
   const [vlogFile, setVlogFile] = React.useState<File | null>(null);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [uploadProgress, setUploadProgress] = React.useState<{ [key: string]: number }>({});
 
   const form = useForm<z.infer<typeof raisePtwSchema>>({
@@ -208,7 +209,8 @@ export default function RaisePtwPage() {
         return;
     }
 
-    setIsSubmitting(true);
+    setIsProcessing(true);
+    setIsSubmitted(false);
     setUploadProgress({});
 
     toast({ title: "Capturing location..." });
@@ -220,7 +222,7 @@ export default function RaisePtwPage() {
             title: "Location Required",
             description: "Could not capture your location. Please enable location services and try again."
         });
-        setIsSubmitting(false);
+        setIsProcessing(false);
         return;
     }
 
@@ -304,7 +306,6 @@ export default function RaisePtwPage() {
                 isNew: true,
             };
             updateDocumentNonBlocking(permitRef, updatedData);
-            toast({ title: "Success", description: "Your permit has been corrected and resubmitted." });
         } else {
             const permitData = {
               ...permitValues,
@@ -319,9 +320,12 @@ export default function RaisePtwPage() {
 
             const permitsCollection = collection(firestore, "permits_to_work");
             addDocumentNonBlocking(permitsCollection, permitData);
-
-            toast({ title: "Success", description: "Your permit request has been submitted." });
         }
+
+        // Successfully reached the end of logic
+        setIsSubmitted(true);
+        setIsProcessing(false);
+        toast({ title: "Success", description: "Your permit request has been submitted." });
 
         // Add a small delay to allow the animation to play before redirect
         setTimeout(() => {
@@ -334,7 +338,8 @@ export default function RaisePtwPage() {
             title: "Submission Failed",
             description: error.message || "Could not submit permit request."
         });
-        setIsSubmitting(false);
+        setIsProcessing(false);
+        setIsSubmitted(false);
     }
   }
 
@@ -381,7 +386,7 @@ export default function RaisePtwPage() {
                           field.onChange(value);
                           const site = uniqueSites?.find(s => s.name === value);
                           setSelectedSite(site || null);
-                      }} value={field.value} disabled={isSubmitting}>
+                      }} value={field.value} disabled={isProcessing || isSubmitted}>
                           <FormControl>
                           <SelectTrigger>
                               <SelectValue placeholder="Select a site" />
@@ -426,7 +431,7 @@ export default function RaisePtwPage() {
                   render={({ field }) => (
                       <FormItem>
                           <FormLabel>PTW for</FormLabel>
-                           <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                           <Select onValueChange={field.onChange} value={field.value} disabled={isProcessing || isSubmitted}>
                               <FormControl>
                               <SelectTrigger>
                                   <SelectValue placeholder="Select a permit type" />
@@ -450,7 +455,7 @@ export default function RaisePtwPage() {
                       <FormItem>
                           <FormLabel>Description of Work</FormLabel>
                           <FormControl>
-                              <Textarea placeholder="Provide a detailed description of the work to be performed." rows={4} {...field} disabled={isSubmitting} />
+                              <Textarea placeholder="Provide a detailed description of the work to be performed." rows={4} {...field} disabled={isProcessing || isSubmitted} />
                           </FormControl>
                           <FormMessage />
                       </FormItem>
@@ -462,13 +467,13 @@ export default function RaisePtwPage() {
                     <Label htmlFor="work-files">Attach files (videos, photos)</Label>
                     <div className="flex items-center gap-2">
                         <Paperclip className="h-5 w-5 text-muted-foreground"/>
-                        <Input id="work-files" type="file" className="border-dashed" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isSubmitting} />
+                        <Input id="work-files" type="file" className="border-dashed" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} />
                     </div>
                     {files.length > 0 && (
                         <div className="mt-2 space-y-2">
                           <div className="flex justify-between items-center">
                             <Label>Selected Files:</Label>
-                            <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setFiles([])}>Clear all</Button>
+                            <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setFiles([])} disabled={isProcessing || isSubmitted}>Clear all</Button>
                           </div>
                           {files.map((file, index) => (
                               <div key={index} className="text-sm">
@@ -483,13 +488,13 @@ export default function RaisePtwPage() {
                     <Label htmlFor="vlog">Self attestation file</Label>
                     <div className="flex items-center gap-2">
                         <Paperclip className="h-5 w-5 text-muted-foreground"/>
-                        <Input id="vlog" type="file" className="border-dashed" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isSubmitting} />
+                        <Input id="vlog" type="file" className="border-dashed" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isProcessing || isSubmitted} />
                     </div>
                     {vlogFile && (
                         <div className="mt-2 space-y-2">
                             <div className="flex justify-between items-center">
                               <Label>Selected Attestation File:</Label>
-                              <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setVlogFile(null)}>Clear</Button>
+                              <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setVlogFile(null)} disabled={isProcessing || isSubmitted}>Clear</Button>
                             </div>
                             <div className="text-sm">
                                 <p className="truncate">{vlogFile.name}</p>
@@ -508,7 +513,7 @@ export default function RaisePtwPage() {
                       <FormItem>
                           <FormLabel>Additional Comments and Remarks</FormLabel>
                           <FormControl>
-                              <Textarea placeholder="Any additional comments or remarks." {...field} disabled={isSubmitting}/>
+                              <Textarea placeholder="Any additional comments or remarks." {...field} disabled={isProcessing || isSubmitted}/>
                           </FormControl>
                           <FormMessage />
                       </FormItem>
@@ -525,7 +530,7 @@ export default function RaisePtwPage() {
                                   checked={field.value}
                                   onCheckedChange={field.onChange}
                                   id="undertaking"
-                                  disabled={isSubmitting}
+                                  disabled={isProcessing || isSubmitted}
                               />
                           </FormControl>
                           <div className="space-y-1 leading-none">
@@ -541,19 +546,19 @@ export default function RaisePtwPage() {
               <div className="flex justify-end mt-4">
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isProcessing || isSubmitted}
                   className={cn(
                     "relative h-10 px-6 border-none outline-none bg-[#2f2f2f] text-white text-sm font-medium rounded-md text-center shadow-sm overflow-hidden cursor-pointer transition-all duration-500 flex items-center justify-center font-body",
-                    isSubmitting && "bg-[#556EA2]"
+                    isSubmitted && "bg-[#556EA2]"
                   )}
                 >
-                  <p className={cn("transition-all duration-500", isSubmitting && "mr-6")}>
-                    {isSubmitting ? "Submitted" : "Submit"}
+                  <p className={cn("transition-all duration-500", isSubmitted && "mr-6")}>
+                    {isSubmitted ? "Submitted" : isProcessing ? "Submitting..." : "Submit"}
                   </p>
                   <div
                     className={cn(
                       "absolute top-0 right-[-20px] w-10 h-10 rounded-md opacity-0 transition-all duration-500 flex items-center justify-center",
-                      isSubmitting && "right-0 opacity-100"
+                      isSubmitted && "right-0 opacity-100"
                     )}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" className="w-5 h-5">
@@ -565,7 +570,7 @@ export default function RaisePtwPage() {
                         strokeLinecap="round"
                         className={cn(
                           "transition-all duration-500 [stroke-dasharray:34] [stroke-dashoffset:34]",
-                          isSubmitting && "delay-500 [stroke-dashoffset:0]"
+                          isSubmitted && "delay-500 [stroke-dashoffset:0]"
                         )}
                       />
                     </svg>
