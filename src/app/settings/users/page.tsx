@@ -122,7 +122,7 @@ function UsersPageSkeleton() {
 export default function UsersPage() {
     const firestore = useFirestore();
     const router = useRouter();
-    const { user } = useUser();
+    const { user, isUserLoading } = useUser();
     const { toast } = useToast();
 
     const userProfileRef = useMemoFirebase(() => {
@@ -134,16 +134,16 @@ export default function UsersPage() {
     const isAdmin = userProfile?.role === 'Admin' || user?.email === 'abhijeet.agepl@gmail.com';
 
     React.useEffect(() => {
-        if (!isProfileLoading && !isAdmin) {
+        if (!isUserLoading && !isProfileLoading && !isAdmin) {
             router.replace('/ptw/raise');
         }
-    }, [isProfileLoading, isAdmin, router]);
+    }, [isUserLoading, isProfileLoading, isAdmin, router]);
 
     const usersQuery = useMemoFirebase(() => {
         if (!isAdmin) return null;
         return collection(firestore, 'users');
     }, [firestore, isAdmin]);
-    const { data: users, isLoading } = useCollection<User>(usersQuery);
+    const { data: users, isLoading: isUsersLoading } = useCollection<User>(usersQuery);
 
     const [filter, setFilter] = React.useState<'all' | 'pending'>('all');
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
@@ -207,12 +207,12 @@ export default function UsersPage() {
     }, [sortedUsers, filter]);
 
 
-    if(isLoading || isProfileLoading) {
+    if(isUserLoading || isProfileLoading || (isAdmin && isUsersLoading)) {
         return <UsersPageSkeleton />
     }
     
     if (!isAdmin) {
-        return <UsersPageSkeleton />;
+        return null;
     }
 
     return (

@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -111,7 +110,7 @@ export default function AdminSettingsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
 
   const [statusToDelete, setStatusToDelete] = React.useState<'Approved' | 'Rejected' | 'Pending' | null>(null);
   const [individualPermitToDelete, setIndividualPermitToDelete] = React.useState<Permit | null>(null);
@@ -125,10 +124,10 @@ export default function AdminSettingsPage() {
   const isAdmin = userProfile?.role === 'Admin' || user?.email === 'abhijeet.agepl@gmail.com';
 
   React.useEffect(() => {
-    if (!isProfileLoading && !isAdmin) {
+    if (!isUserLoading && !isProfileLoading && !isAdmin) {
       router.replace('/ptw/raise');
     }
-  }, [isProfileLoading, isAdmin, router]);
+  }, [isUserLoading, isProfileLoading, isAdmin, router]);
 
   const ptwTypesQuery = useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]);
   const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection<PtwType>(ptwTypesQuery);
@@ -229,7 +228,7 @@ export default function AdminSettingsPage() {
     setIndividualPermitToDelete(null);
   };
 
-  if (isProfileLoading || ptwTypesLoading || sitesLoading || permitsLoading) {
+  if (isUserLoading || isProfileLoading || ptwTypesLoading || sitesLoading || permitsLoading) {
     return <AdminSettingsSkeleton />;
   }
 

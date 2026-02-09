@@ -57,7 +57,7 @@ function AdminDashboardSkeleton() {
 export default function AdminDashboardPage() {
     const firestore = useFirestore();
     const router = useRouter();
-    const { user } = useUser();
+    const { user, isUserLoading } = useUser();
 
     const userProfileRef = useMemoFirebase(() => {
         if (!user) return null;
@@ -69,10 +69,10 @@ export default function AdminDashboardPage() {
     const isAdmin = userProfile?.role === 'Admin' || user?.email === 'abhijeet.agepl@gmail.com';
 
     useEffect(() => {
-        if (!isProfileLoading && !isAdmin) {
+        if (!isUserLoading && !isProfileLoading && !isAdmin) {
             router.replace('/ptw/raise');
         }
-    }, [isProfileLoading, isAdmin, router]);
+    }, [isUserLoading, isProfileLoading, isAdmin, router]);
 
     const usersQuery = useMemoFirebase(() => {
         if (!isAdmin) return null;
@@ -86,7 +86,7 @@ export default function AdminDashboardPage() {
     const projectsQuery = useMemoFirebase(() => collection(firestore, 'projects'), [firestore]);
     const { data: projects, isLoading: projectsLoading } = useCollection(projectsQuery);
 
-    if (isProfileLoading || (isAdmin && usersLoading) || permitsLoading || projectsLoading) {
+    if (isUserLoading || isProfileLoading || (isAdmin && usersLoading) || permitsLoading || projectsLoading) {
         return <AdminDashboardSkeleton />
     }
 
