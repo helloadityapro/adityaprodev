@@ -2,7 +2,7 @@
 
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection, addDocumentNonBlocking } from "@/firebase";
+import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection } from "@/firebase";
 import { collection, doc, query, where } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import AppLogo from "@/components/app-logo";
@@ -33,25 +33,6 @@ function FullPageLoader() {
     </div>
   );
 }
-
-const parseCSVToSites = (csvText: string) => {
-    const lines = csvText.trim().split('\n');
-    const data = [];
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        const values = line.split(',').map(v => v.trim().replace(/\r/g, ''));
-        if (values.length >= 5 && !isNaN(parseInt(values[0], 10)) && values[2] && values[2].trim() !== '') {
-            const entry = {
-                projectCompany: values[1],
-                name: values[2],
-                dcCapacity: values[3],
-                acCapacity: values[4],
-            };
-            data.push(entry);
-        }
-    }
-    return data;
-};
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
 
@@ -97,48 +78,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
       }
     }
   }, [user, userProfile, isProfileLoading, firestore]);
-
-  const ptwTypesCollectionRef = useMemoFirebase(() => (user ? collection(firestore, 'ptw_types') : null), [firestore, user]);
-  const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection(ptwTypesCollectionRef);
-
-  React.useEffect(() => {
-    // Only admins are allowed to seed the database
-    if (isAdmin && ptwTypesCollectionRef && !ptwTypesLoading && ptwTypes && ptwTypes.length === 0) {
-        const defaultPtwTypes = [
-            { name: 'MMS columns concreting/erection work' },
-            { name: 'Cables cutting' },
-            { name: 'Trench laying' },
-            { name: 'Civil works' },
-        ];
-        defaultPtwTypes.forEach(type => {
-            addDocumentNonBlocking(ptwTypesCollectionRef, type);
-        });
-    }
-  }, [ptwTypes, ptwTypesLoading, ptwTypesCollectionRef, isAdmin]);
-
-  const sitesCollectionRef = useMemoFirebase(() => (user ? collection(firestore, 'sites') : null), [firestore, user]);
-  const { data: sites, isLoading: sitesLoading } = useCollection(sitesCollectionRef);
-
-  React.useEffect(() => {
-    const seedSites = async () => {
-      // Only admins are allowed to seed the database
-      if (isAdmin && sitesCollectionRef && !sitesLoading && sites && sites.length === 0) {
-          try {
-            const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vT8JE2-QFEjU_CVprrrBPivhxoygAtkC8S6JFPTK8-R28EL9XuTTv7aJ3Onejmsp55_RQEvF8g7Ku1p/pub?gid=1131066411&single=true&output=csv');
-            if (response.ok) {
-                const csvText = await response.text();
-                const parsedData = parseCSVToSites(csvText);
-                parsedData.forEach(site => {
-                    addDocumentNonBlocking(sitesCollectionRef, site);
-                });
-            }
-          } catch (error) {
-            console.error("Error seeding sites from Google Sheet:", error);
-          }
-      }
-    }
-    seedSites();
-  }, [sites, sitesLoading, sitesCollectionRef, isAdmin]);
 
   const userRole = isAdmin ? "Admin" : userProfile?.role || "SiteEngineer";
   
