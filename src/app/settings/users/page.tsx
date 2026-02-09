@@ -40,7 +40,7 @@ type User = {
   username: string;
   email: string;
   mobile: string;
-  role: 'Admin' | 'Site Manager' | 'SiteEngineer';
+  role: 'Admin' | 'Site Manager' | 'Site Engineer';
   registrationRequest: boolean;
   avatarUrl?: string;
   createdAt?: any;
@@ -132,7 +132,10 @@ export default function UsersPage() {
     }, [firestore, user]);
     const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-    const isAdmin = userProfile?.role === 'Admin' || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com';
+    const isAdmin = userProfile?.role === 'Admin' || 
+                    user?.email === 'abhijeet.agepl@gmail.com' || 
+                    user?.email === 'abhijeetsb22@gmail.com' ||
+                    user?.email === 'khalil@adityagreenenergy.com';
 
     React.useEffect(() => {
         if (!isUserLoading && !isProfileLoading && !isAdmin) {

@@ -18,7 +18,7 @@ type User = {
   id: string;
   username: string;
   email: string;
-  role: 'Admin' | 'Site Manager' | 'SiteEngineer';
+  role: 'Admin' | 'Site Manager' | 'Site Engineer';
   siteManagerId?: string;
 };
 
@@ -31,7 +31,10 @@ export default function TeamMappingPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  const isAdmin = userProfile?.role === 'Admin' || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com';
+  const isAdmin = userProfile?.role === 'Admin' || 
+                  user?.email === 'abhijeet.agepl@gmail.com' || 
+                  user?.email === 'abhijeetsb22@gmail.com' ||
+                  user?.email === 'khalil@adityagreenenergy.com';
 
   React.useEffect(() => {
     if (!isProfileLoading && !isAdmin) {
@@ -42,7 +45,7 @@ export default function TeamMappingPage() {
   const managersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), where('role', '==', 'Site Manager')), [firestore]);
   const { data: managers, isLoading: managersLoading } = useCollection<User>(managersQuery);
 
-  const engineersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), where('role', '==', 'SiteEngineer')), [firestore]);
+  const engineersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), where('role', '==', 'Site Engineer')), [firestore]);
   const { data: engineers, isLoading: engineersLoading } = useCollection<User>(engineersQuery);
 
   const [selectedManagerId, setSelectedManagerId] = React.useState<string | null>(null);

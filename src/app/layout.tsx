@@ -61,14 +61,21 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com';
+  const isAdmin = userProfile?.role === "Admin" || 
+                  user?.email === 'abhijeet.agepl@gmail.com' || 
+                  user?.email === 'abhijeetsb22@gmail.com' ||
+                  user?.email === 'khalil@adityagreenenergy.com';
 
   React.useEffect(() => {
-    if (user && (user.email === 'abhijeet.agepl@gmail.com' || user.email === 'abhijeetsb22@gmail.com') && !isProfileLoading) {
+    const isSuperAdminEmail = user?.email === 'abhijeet.agepl@gmail.com' || 
+                              user?.email === 'abhijeetsb22@gmail.com' ||
+                              user?.email === 'khalil@adityagreenenergy.com';
+
+    if (user && isSuperAdminEmail && !isProfileLoading) {
       if (!userProfile || userProfile.role !== 'Admin') {
         const adminUserDoc = {
           id: user.uid,
-          username: 'Admin User',
+          username: user.displayName || 'Admin User',
           email: user.email,
           mobile: user.phoneNumber || '0000000000',
           role: 'Admin',
@@ -80,7 +87,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [user, userProfile, isProfileLoading, firestore]);
 
-  const userRole = isAdmin ? "Admin" : userProfile?.role || "SiteEngineer";
+  const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
   
   const ptwQueryForBadge = useMemoFirebase(() => {
     if (userRole === 'Admin' || userRole === 'Site Manager') {

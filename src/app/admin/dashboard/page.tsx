@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect } from 'react';
@@ -66,7 +67,10 @@ export default function AdminDashboardPage() {
 
     const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-    const isAdmin = userProfile?.role === 'Admin' || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com';
+    const isAdmin = userProfile?.role === 'Admin' || 
+                    user?.email === 'abhijeet.agepl@gmail.com' || 
+                    user?.email === 'abhijeetsb22@gmail.com' ||
+                    user?.email === 'khalil@adityagreenenergy.com';
 
     useEffect(() => {
         if (!isUserLoading && !isProfileLoading && !isAdmin) {
