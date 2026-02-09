@@ -57,9 +57,11 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn(); // Allow listing for mapping
+      allow list: if isSignedIn(); 
       allow create: if canCreateOwnUser(userId) || isAdmin();
-      allow update: if (isOwner(userId) && canUpdateOwnUser()) || isAdmin();
+      allow update: if (isOwner(userId) && canUpdateOwnUser()) 
+                    || isAdmin()
+                    || (isSiteManager() && resource.data.siteManagerId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedProjectIds']));
       allow delete: if isAdmin();
     }
 

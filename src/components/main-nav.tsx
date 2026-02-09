@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   SlidersHorizontal,
   UsersRound,
+  MapPin,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -62,6 +63,23 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroup>
+      
+      {(userRole === "Admin" || userRole === "Site Manager") && (
+        <SidebarGroup>
+          <SidebarGroupLabel>Management</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Assign Sites" isActive={pathname === '/settings/site-assignment'}>
+                <Link href="/settings/site-assignment">
+                  <MapPin />
+                  Assign Sites
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+      )}
+
       {userRole === "Admin" && (
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel>Admin</SidebarGroupLabel>

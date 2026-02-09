@@ -75,10 +75,25 @@ export default function RaisePtwPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
   
-  const uniqueSites = React.useMemo(() => {
+  const accessibleSites = React.useMemo(() => {
     if (!allSites) return [];
-    return Array.from(new Map(allSites.map(site => [site.name, site])).values());
-  }, [allSites]);
+    if (!userProfile) return [];
+    
+    // Admins see everything
+    const isAdmin = userProfile.role === 'Admin' || 
+                    user?.email === 'abhijeet.agepl@gmail.com' || 
+                    user?.email === 'abhijeetsb22@gmail.com' ||
+                    user?.email === 'khalil@adityagreenenergy.com';
+    
+    if (isAdmin) {
+        return Array.from(new Map(allSites.map(site => [site.name, site])).values());
+    }
+
+    // Site Engineers and Managers see assigned sites
+    const assignedIds = userProfile.assignedProjectIds || [];
+    const filtered = allSites.filter(s => assignedIds.includes(s.id));
+    return Array.from(new Map(filtered.map(site => [site.name, site])).values());
+  }, [allSites, userProfile, user]);
 
   const [selectedSite, setSelectedSite] = React.useState<Site | null>(null);
   
@@ -100,7 +115,7 @@ export default function RaisePtwPage() {
   })
 
   React.useEffect(() => {
-    if (isCorrectionMode && permitToCorrect && uniqueSites && uniqueSites.length > 0) {
+    if (isCorrectionMode && permitToCorrect && accessibleSites && accessibleSites.length > 0) {
       form.reset({
         siteName: permitToCorrect.siteName,
         ptwType: permitToCorrect.ptwType,
@@ -108,10 +123,10 @@ export default function RaisePtwPage() {
         commentsAndRemarks: permitToCorrect.commentsAndRemarks || "",
         undertaking: false,
       });
-      const site = uniqueSites.find(s => s.name === permitToCorrect.siteName);
+      const site = accessibleSites.find(s => s.name === permitToCorrect.siteName);
       setSelectedSite(site || null);
     }
-  }, [isCorrectionMode, permitToCorrect, form, uniqueSites]);
+  }, [isCorrectionMode, permitToCorrect, form, accessibleSites]);
 
   const hasManagerMapping = !!userProfile?.siteManagerId || userProfile?.role === 'Admin';
 
@@ -230,6 +245,16 @@ export default function RaisePtwPage() {
         </Alert>
       )}
 
+      {accessibleSites.length === 0 && !isProfileLoading && (
+         <Alert variant="destructive" className="bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200">
+          <MapPin className="h-4 w-4 text-yellow-600" />
+          <AlertTitle>No Sites Assigned</AlertTitle>
+          <AlertDescription>
+            You do not have any sites assigned to your account. Please contact your Admin or Site Manager to assign sites to you.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <h1 className="text-2xl font-bold font-headline">Raise a Permit to Work</h1>
       <Card className="max-w-3xl mx-auto">
         <CardHeader>
@@ -245,9 +270,9 @@ export default function RaisePtwPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Site Name</FormLabel>
-                       <Select onValueChange={(value) => { field.onChange(value); setSelectedSite(uniqueSites?.find(s => s.name === value) || null); }} value={field.value} disabled={isProcessing || isSubmitted || !hasManagerMapping}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Select a site" /></SelectTrigger></FormControl>
-                          <SelectContent>{uniqueSites?.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
+                       <Select onValueChange={(value) => { field.onChange(value); setSelectedSite(accessibleSites?.find(s => s.name === value) || null); }} value={field.value} disabled={isProcessing || isSubmitted || !hasManagerMapping || accessibleSites.length === 0}>
+                          <FormControl><SelectTrigger><SelectValue placeholder={accessibleSites.length === 0 ? "No sites available" : "Select a site"} /></SelectTrigger></FormControl>
+                          <SelectContent>{accessibleSites?.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
@@ -318,7 +343,7 @@ export default function RaisePtwPage() {
               <div className="flex justify-end mt-4">
                 <button
                   type="submit"
-                  disabled={isProcessing || isSubmitted || !hasManagerMapping}
+                  disabled={isProcessing || isSubmitted || !hasManagerMapping || accessibleSites.length === 0}
                   className={cn(
                     "relative h-10 px-6 border-none outline-none bg-[#2f2f2f] text-white text-sm font-medium rounded-md text-center shadow-sm overflow-hidden cursor-pointer transition-all duration-500 flex items-center justify-center font-body disabled:opacity-50 disabled:cursor-not-allowed",
                     isSubmitted && "bg-[#556EA2]"
