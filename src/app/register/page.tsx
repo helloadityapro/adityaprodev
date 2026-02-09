@@ -92,7 +92,7 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="mx-auto w-full max-md animate-in fade-in zoom-in-95 duration-300">
+      <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="text-center">
             <div className="mb-4 flex justify-center">
                 <AppLogo />
