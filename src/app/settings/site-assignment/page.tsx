@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -8,11 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { MapPin, Users, Loader2 } from 'lucide-react';
+import { MapPin, Trash2, Loader2, PlusCircle } from 'lucide-react';
 
 type User = {
   id: string;
@@ -63,6 +62,7 @@ export default function SiteAssignmentPage() {
   const { data: users, isLoading: usersLoading } = useCollection<User>(usersQuery);
 
   const [selectedUserId, setSelectedUserId] = React.useState<string | null>(null);
+  const [selectedSiteToAdd, setSelectedSiteToAdd] = React.useState<string | null>(null);
   const selectedUser = React.useMemo(() => users?.find(u => u.id === selectedUserId), [users, selectedUserId]);
   const [localAssignedSites, setLocalAssignedSites] = React.useState<string[]>([]);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -75,10 +75,18 @@ export default function SiteAssignmentPage() {
     }
   }, [selectedUser]);
 
-  const toggleSite = (siteId: string) => {
-    setLocalAssignedSites(prev => 
-      prev.includes(siteId) ? prev.filter(id => id !== siteId) : [...prev, siteId]
-    );
+  const handleAddSite = () => {
+    if (!selectedSiteToAdd) return;
+    if (localAssignedSites.includes(selectedSiteToAdd)) {
+        toast({ title: 'Already Assigned', description: 'This site is already assigned to the user.', variant: 'destructive' });
+        return;
+    }
+    setLocalAssignedSites(prev => [...prev, selectedSiteToAdd]);
+    setSelectedSiteToAdd(null);
+  };
+
+  const handleRemoveSite = (siteId: string) => {
+    setLocalAssignedSites(prev => prev.filter(id => id !== siteId));
   };
 
   const handleSave = () => {
@@ -91,6 +99,7 @@ export default function SiteAssignmentPage() {
     toast({
       title: 'Sites Assigned',
       description: `Sites have been successfully updated for ${selectedUser?.username}.`,
+      variant: 'success',
     });
     setIsSaving(false);
   };
@@ -107,13 +116,13 @@ export default function SiteAssignmentPage() {
 
   if (!isAdmin && !isManager) return null;
 
-  // Filter users to show only those relevant for the current logged in user
-  // Admins see everyone (except themselves maybe, or just Managers/Engineers)
-  // Managers see only their Engineers
   const filteredUsers = users?.filter(u => {
-      if (isAdmin) return u.role !== 'Admin' || u.id === user?.uid; // Allow admins to manage themselves or others
-      return u.role === 'Site Engineer'; // Managers only manage engineers
+      if (isAdmin) return u.role !== 'Admin' || u.id === user?.uid;
+      return u.role === 'Site Engineer';
   }) || [];
+
+  // Filter out sites that are already assigned for the "Add" dropdown
+  const availableSitesToAssign = sites?.filter(site => !localAssignedSites.includes(site.id)) || [];
 
   return (
     <div className="space-y-6">
@@ -151,34 +160,70 @@ export default function SiteAssignmentPage() {
       {selectedUserId && (
         <Card className="animate-in fade-in slide-in-from-top-4 duration-300">
           <CardHeader>
-            <CardTitle>Sites for {selectedUser?.username}</CardTitle>
-            <CardDescription>Select the sites this user should be allowed to access.</CardDescription>
+            <CardTitle>Site Access for {selectedUser?.username}</CardTitle>
+            <CardDescription>Add new sites or remove existing ones from this user's access list.</CardDescription>
           </CardHeader>
-          <CardContent>
-            {sites && sites.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {sites.map(site => (
-                  <div key={site.id} className="flex items-center space-x-3 p-3 rounded-md border bg-card hover:bg-muted/50 transition-colors">
-                    <Checkbox 
-                      id={`site-${site.id}`} 
-                      checked={localAssignedSites.includes(site.id)}
-                      onCheckedChange={() => toggleSite(site.id)}
-                    />
-                    <Label htmlFor={`site-${site.id}`} className="flex-1 cursor-pointer font-medium">
-                      {site.name}
-                    </Label>
-                  </div>
-                ))}
+          <CardContent className="space-y-6">
+            <div className="flex flex-col sm:flex-row items-end gap-4 p-4 border rounded-lg bg-muted/20">
+              <div className="flex-1 space-y-2 w-full">
+                <Label>Add New Site</Label>
+                <Select value={selectedSiteToAdd || ''} onValueChange={setSelectedSiteToAdd}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={availableSitesToAssign.length > 0 ? "Select a site to add" : "No more sites available"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSitesToAssign.map(site => (
+                      <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border rounded-lg border-dashed">
-                <MapPin className="h-12 w-12 mb-4 opacity-20" />
-                <p>No sites found. Please add sites in Admin Settings.</p>
+              <Button onClick={handleAddSite} disabled={!selectedSiteToAdd} className="w-full sm:w-auto">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Site
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-lg font-semibold">Assigned Sites</Label>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Site Name</TableHead>
+                      <TableHead className="w-[100px] text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {localAssignedSites.length > 0 ? (
+                      localAssignedSites.map(siteId => {
+                        const site = sites?.find(s => s.id === siteId);
+                        return (
+                          <TableRow key={siteId}>
+                            <TableCell className="font-medium">{site?.name || 'Unknown Site'}</TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleRemoveSite(siteId)}>
+                                <Trash2 className="h-4 w-4" />
+                                <span className="sr-only">Remove</span>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={2} className="h-24 text-center text-muted-foreground italic">
+                          No sites assigned to this user yet.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
-            )}
+            </div>
             
-            <div className="mt-8 flex justify-end">
-                <Button onClick={handleSave} disabled={isSaving}>
+            <div className="flex justify-end pt-4">
+                <Button onClick={handleSave} disabled={isSaving} size="lg">
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Save Assignment
                 </Button>
