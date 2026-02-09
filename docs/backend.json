@@ -26,7 +26,7 @@
         },
         "role": {
           "type": "string",
-          "description": "The role of the user (Admin, Site Manager, SiteEngineer)."
+          "description": "The role of the user (Admin, Site Manager, Site Engineer)."
         },
         "registrationRequest": {
           "type": "boolean",
@@ -34,7 +34,7 @@
         },
         "siteManagerId": {
           "type": "string",
-          "description": "Reference to the Site Manager this Site Engineer is assigned to. (Only for SiteEngineer role)"
+          "description": "Reference to the Site Manager this Site Engineer is assigned to. (Only for Site Engineer role)"
         },
         "assignedProjectIds": {
           "type": "array",

@@ -20,7 +20,7 @@ type User = {
   username: string;
   email: string;
   mobile: string;
-  role: 'Admin' | 'Site Manager' | 'SiteEngineer';
+  role: 'Admin' | 'Site Manager' | 'Site Engineer';
 };
 
 interface ViewUserDialogProps {

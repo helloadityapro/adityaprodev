@@ -31,7 +31,7 @@ import { doc } from 'firebase/firestore';
 const editUserSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
   mobile: z.string().min(1, 'Mobile number is required.'),
-  role: z.enum(['Admin', 'Site Manager', 'SiteEngineer'], { required_error: 'Role is required' }),
+  role: z.enum(['Admin', 'Site Manager', 'Site Engineer'], { required_error: 'Role is required' }),
 });
 
 type User = {
@@ -39,7 +39,7 @@ type User = {
   username: string;
   email: string;
   mobile: string;
-  role: 'Admin' | 'Site Manager' | 'SiteEngineer';
+  role: 'Admin' | 'Site Manager' | 'Site Engineer';
 };
 
 interface EditUserDialogProps {
@@ -152,7 +152,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="SiteEngineer">Site Engineer</SelectItem>
+                        <SelectItem value="Site Engineer">Site Engineer</SelectItem>
                         <SelectItem value="Site Manager">Site Manager</SelectItem>
                         <SelectItem value="Admin">Admin</SelectItem>
                       </SelectContent>

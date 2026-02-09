@@ -1,3 +1,4 @@
+
 "use client";
 import * as React from "react";
 import { useForm } from "react-hook-form";
@@ -88,13 +89,13 @@ export default function PtwListPage() {
   const [viewerState, setViewerState] = React.useState<{ attachments: Attachment[]; startIndex: number } | null>(null);
 
   const { data: userProfile } = useDoc(useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]));
-  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com';
+  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com' || user?.email === 'khalil@adityagreenenergy.com';
   const userRole = isAdmin ? "Admin" : userProfile?.role;
 
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole) return null;
     const base = collection(firestore, 'permits_to_work');
-    if (userRole === 'SiteEngineer') return query(base, where('siteEngineerId', '==', user?.uid));
+    if (userRole === 'Site Engineer') return query(base, where('siteEngineerId', '==', user?.uid));
     if (userRole === 'Site Manager') return query(base, where('siteManagerId', '==', user?.uid));
     return base;
   }, [firestore, userRole, user]);
@@ -199,7 +200,7 @@ export default function PtwListPage() {
                             <Button size="sm" variant="destructive" onClick={() => setActionState({permit, status: 'Rejected'})}>Reject</Button>
                         </>
                     )}
-                    {userRole === 'SiteEngineer' && permit.status === 'Rejected' && (
+                    {userRole === 'Site Engineer' && permit.status === 'Rejected' && (
                         <Button size="sm" variant="outline" onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}><FilePen className="h-4 w-4 mr-2" /> Resubmit</Button>
                     )}
                   </TableCell>

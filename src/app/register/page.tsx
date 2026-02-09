@@ -1,3 +1,4 @@
+
 'use client'
 
 import Link from "next/link"
@@ -21,7 +22,7 @@ const registerSchema = z.object({
   username: z.string().min(1, { message: "Username is required." }),
   email: z.string().email({ message: "Invalid email address." }),
   mobile: z.string().min(1, { message: "Mobile number is required." }),
-  role: z.enum(['SiteEngineer', 'Site Manager'], { required_error: "Please select a role." }),
+  role: z.enum(['Site Engineer', 'Site Manager'], { required_error: "Please select a role." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string()
 }).refine(data => data.password === data.confirmPassword, {
@@ -77,7 +78,6 @@ export default function RegisterPage() {
         title: "Registration successful!",
         description: "Your account has been created and is pending approval.",
       })
-      // The AppShell logic in layout.tsx will handle the pending approval state
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -156,7 +156,7 @@ export default function RegisterPage() {
                             </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                            <SelectItem value="SiteEngineer">Site Engineer</SelectItem>
+                            <SelectItem value="Site Engineer">Site Engineer</SelectItem>
                             <SelectItem value="Site Manager">Site Manager</SelectItem>
                         </SelectContent>
                     </Select>

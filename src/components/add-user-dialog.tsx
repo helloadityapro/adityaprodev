@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -34,7 +35,7 @@ const addUserSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
   email: z.string().email('Invalid email address.'),
   mobile: z.string().min(1, 'Mobile number is required.'),
-  role: z.enum(['Admin', 'Site Manager', 'SiteEngineer'], { required_error: 'Role is required' }),
+  role: z.enum(['Admin', 'Site Manager', 'Site Engineer'], { required_error: 'Role is required' }),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
 });
 
@@ -55,7 +56,7 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
       email: '',
       mobile: '',
       password: '',
-      role: 'SiteEngineer',
+      role: 'Site Engineer',
     },
   });
 
@@ -170,7 +171,7 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="SiteEngineer">Site Engineer</SelectItem>
+                      <SelectItem value="Site Engineer">Site Engineer</SelectItem>
                       <SelectItem value="Site Manager">Site Manager</SelectItem>
                       <SelectItem value="Admin">Admin</SelectItem>
                     </SelectContent>
