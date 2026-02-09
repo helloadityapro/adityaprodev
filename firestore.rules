@@ -59,7 +59,11 @@ service cloud.firestore {
     function isAdmin() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       let userIsAdminRole = userDoc != null && 'role' in userDoc.data && userDoc.data.role == 'Admin';
-      return isSignedIn() && (userIsAdminRole || request.auth.token.email == 'abhijeet.agepl@gmail.com');
+      return isSignedIn() && (
+        userIsAdminRole || 
+        request.auth.token.email == 'abhijeet.agepl@gmail.com' ||
+        request.auth.token.email == 'abhijeetsb22@gmail.com'
+      );
     }
 
     /**
@@ -190,7 +194,7 @@ service cloud.firestore {
      * @description Stores Permit to Work requests.
      * - READ: Admins/Supervisors can read all. Site Engineers can read their own.
      * - LIST: Any authenticated user can list, but GET rules still apply to each doc.
-     * - CREATE: Only Site Engineers can create, setting themselves as the owner.
+     * - CREATE: Only Site Engineers or Admins can create, setting themselves as the owner.
      * - UPDATE: Role-based state machine. Admins can always update. Supervisors can action 'Pending' or 'Corrected' permits.
      *           Engineers can resubmit 'Rejected' permits.
      * - DELETE: Only Admins can delete.

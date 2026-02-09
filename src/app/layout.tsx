@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from "react";
@@ -80,8 +79,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
+  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com';
+
   React.useEffect(() => {
-    if (user && user.email === 'abhijeet.agepl@gmail.com' && !isProfileLoading) {
+    if (user && (user.email === 'abhijeet.agepl@gmail.com' || user.email === 'abhijeetsb22@gmail.com') && !isProfileLoading) {
       if (!userProfile || userProfile.role !== 'Admin') {
         const adminUserDoc = {
           id: user.uid,
@@ -101,7 +102,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection(ptwTypesCollectionRef);
 
   React.useEffect(() => {
-    if (ptwTypesCollectionRef && !ptwTypesLoading && ptwTypes && ptwTypes.length === 0) {
+    // Only admins are allowed to seed the database
+    if (isAdmin && ptwTypesCollectionRef && !ptwTypesLoading && ptwTypes && ptwTypes.length === 0) {
         const defaultPtwTypes = [
             { name: 'MMS columns concreting/erection work' },
             { name: 'Cables cutting' },
@@ -112,14 +114,15 @@ function AppShell({ children }: { children: React.ReactNode }) {
             addDocumentNonBlocking(ptwTypesCollectionRef, type);
         });
     }
-  }, [ptwTypes, ptwTypesLoading, ptwTypesCollectionRef]);
+  }, [ptwTypes, ptwTypesLoading, ptwTypesCollectionRef, isAdmin]);
 
   const sitesCollectionRef = useMemoFirebase(() => (user ? collection(firestore, 'sites') : null), [firestore, user]);
   const { data: sites, isLoading: sitesLoading } = useCollection(sitesCollectionRef);
 
   React.useEffect(() => {
     const seedSites = async () => {
-      if (sitesCollectionRef && !sitesLoading && sites && sites.length === 0) {
+      // Only admins are allowed to seed the database
+      if (isAdmin && sitesCollectionRef && !sitesLoading && sites && sites.length === 0) {
           try {
             const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vT8JE2-QFEjU_CVprrrBPivhxoygAtkC8S6JFPTK8-R28EL9XuTTv7aJ3Onejmsp55_RQEvF8g7Ku1p/pub?gid=1131066411&single=true&output=csv');
             if (response.ok) {
@@ -135,9 +138,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
       }
     }
     seedSites();
-  }, [sites, sitesLoading, sitesCollectionRef]);
+  }, [sites, sitesLoading, sitesCollectionRef, isAdmin]);
 
-  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com';
   const userRole = isAdmin ? "Admin" : userProfile?.role || "SiteEngineer";
   
   const ptwQueryForBadge = useMemoFirebase(() => {
@@ -233,7 +235,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
     return <FullPageLoader />;
   }
 
-  if (userProfile && userProfile.registrationRequest && user?.email !== 'abhijeet.agepl@gmail.com') {
+  if (userProfile && userProfile.registrationRequest && !isAdmin) {
      return (
       <div className="flex flex-col min-h-screen items-center justify-center text-center gap-6 p-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="space-y-2">
