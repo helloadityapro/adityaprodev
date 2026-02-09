@@ -1,4 +1,3 @@
-
 "use client";
 import * as React from "react";
 import { useForm } from "react-hook-form";
@@ -262,6 +261,10 @@ export default function PtwListPage() {
       {/* Media Viewer */}
       <Dialog open={!!viewerState} onOpenChange={() => setViewerState(null)}>
           <DialogContent className="max-w-4xl">
+              <DialogHeader className="sr-only">
+                  <DialogTitle>Media Viewer</DialogTitle>
+                  <DialogDescription>Viewing permit attachments</DialogDescription>
+              </DialogHeader>
               <Carousel opts={{ startIndex: viewerState?.startIndex || 0 }}>
                   <CarouselContent>
                       {viewerState?.attachments.map((a, i) => (
