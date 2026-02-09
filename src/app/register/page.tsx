@@ -1,4 +1,3 @@
-
 'use client'
 
 import Link from "next/link"
@@ -138,7 +137,7 @@ export default function RegisterPage() {
                   <FormItem>
                     <FormLabel>Mobile Number</FormLabel>
                     <FormControl>
-                      <Input placeholder="+1 234 567 890" {...field} />
+                      <Input placeholder="8989898989" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

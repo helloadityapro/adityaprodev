@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -152,7 +151,7 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
                 <FormItem>
                   <FormLabel>Mobile Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="+1 234 567 890" {...field} />
+                    <Input placeholder="8989898989" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
