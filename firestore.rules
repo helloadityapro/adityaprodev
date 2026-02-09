@@ -7,23 +7,14 @@ service cloud.firestore {
     // Helper Functions
     // --------------------------------
 
-    /**
-     * Authenticates that the user is signed in.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * Checks if the requesting user's UID matches the provided userId.
-     */
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    /**
-     * Checks if the requesting user has the Admin role.
-     */
     function isAdmin() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       let userIsAdminRole = userDoc != null && 'role' in userDoc.data && userDoc.data.role == 'Admin';
@@ -31,9 +22,6 @@ service cloud.firestore {
       return isSignedIn() && (userIsAdminRole || isSuperAdminEmail);
     }
 
-    /**
-     * Checks if the requesting user has the Site Manager role.
-     */
     function isSiteManager() {
         let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
         return isSignedIn()
@@ -42,9 +30,6 @@ service cloud.firestore {
                && userDoc.data.role == 'Site Manager';
     }
 
-    /**
-     * Checks if the requesting user has the SiteEngineer role.
-     */
     function isSiteEngineer() {
         let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
         return isSignedIn()
@@ -53,44 +38,14 @@ service cloud.firestore {
                && userDoc.data.role == 'SiteEngineer';
     }
 
-
-    /**
-     * Checks if the user is an owner of an existing document.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * Retrieves the authenticated user's own user document.
-     */
-    function userRecord() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
-
-
-    /**
-     * Checks if the authenticated user is assigned to a specific project.
-     */
-    function isAssignedToProject(projectId) {
-      return isSignedIn() && userRecord() != null && 'assignedProjectIds' in userRecord().data && projectId in userRecord().data.assignedProjectIds;
-    }
-    
-    /**
-     * Validates a user can create their own user document.
-     */
     function canCreateOwnUser(userId) {
       return isOwner(userId) && request.resource.data.id == userId;
     }
 
-    /**
-     * Validates that a user can update their own profile data.
-     */
     function canUpdateOwnUser() {
       let isChangingProtectedFields = request.resource.data.id != resource.data.id
                                       || request.resource.data.role != resource.data.role
-                                      || request.resource.data.registrationRequest != resource.data.registrationRequest
-                                      || request.resource.data.assignedProjectIds != resource.data.assignedProjectIds;
+                                      || request.resource.data.registrationRequest != resource.data.registrationRequest;
       return !isChangingProtectedFields;
     }
 
@@ -100,16 +55,15 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow get: if isSignedIn();
-      allow list: if isAdmin();
+      allow list: if isSignedIn(); // Allow listing for mapping
       allow create: if canCreateOwnUser(userId) || isAdmin();
-      allow update: if (isExistingOwner(userId) && canUpdateOwnUser()) || isAdmin();
-      allow delete: if isAdmin() && resource != null;
+      allow update: if (isOwner(userId) && canUpdateOwnUser()) || isAdmin();
+      allow delete: if isAdmin();
     }
 
     match /projects/{projectId} {
-      allow get: if isAssignedToProject(projectId) || isAdmin();
-      allow list: if isAdmin();
-      allow create, update, delete: if isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /sites/{siteId} {
@@ -123,12 +77,7 @@ service cloud.firestore {
     }
 
     match /permits_to_work/{permitId} {
-      allow get: if isSignedIn() && (
-        isAdmin() ||
-        isSiteManager() ||
-        (resource != null && request.auth.uid == resource.data.siteEngineerId)
-      );
-
+      allow get: if isSignedIn();
       allow list: if isSignedIn();
 
       allow create: if (isSiteEngineer() || isAdmin()) &&
@@ -137,11 +86,11 @@ service cloud.firestore {
 
       allow update: if isSignedIn() && resource != null && (
         isAdmin() ||
-        (isSiteManager() && (resource.data.status == 'Pending' || resource.data.status == 'Corrected')) ||
-        (request.auth.uid == resource.data.siteEngineerId && resource.data.status == 'Rejected')
+        (isSiteManager() && request.auth.uid == resource.data.siteManagerId && (resource.data.status == 'Pending' || resource.data.status == 'Corrected')) ||
+        (isSiteEngineer() && request.auth.uid == resource.data.siteEngineerId && resource.data.status == 'Rejected')
       );
       
-      allow delete: if isAdmin() && resource != null;
+      allow delete: if isAdmin();
     }
 
     match /notifications/{notificationId} {

@@ -32,6 +32,10 @@
           "type": "boolean",
           "description": "Indicates whether the user's registration request is pending approval."
         },
+        "siteManagerId": {
+          "type": "string",
+          "description": "Reference to the Site Manager this Site Engineer is assigned to. (Only for SiteEngineer role)"
+        },
         "assignedProjectIds": {
           "type": "array",
           "description": "References to Projects assigned to the user. (Relationship: User N:N Project)",
@@ -170,13 +174,17 @@
           "type": "string",
           "description": "Remarks added by the admin during the approval/rejection process."
         },
+        "managerRemarks": {
+          "type": "string",
+          "description": "Remarks added by the site manager during the first level approval/rejection process."
+        },
         "status": {
           "type": "string",
-          "description": "The status of the permit (e.g., Submitted, Approved, Rejected, Corrected)."
+          "description": "The status of the permit (e.g., Submitted, ManagerApproved, Approved, Rejected, Corrected)."
         },
         "isNew": {
           "type": "boolean",
-          "description": "Indicates if the permit is new and has not been seen by an admin/site manager yet. Used for notification badges."
+          "description": "Indicates if the permit is new and has not been seen by an admin/site manager yet."
         },
         "requestDate": {
           "type": "string",
@@ -186,19 +194,19 @@
         "statusChangeDate": {
           "type": "string",
           "format": "date-time",
-          "description": "Timestamp of the last status change (e.g., approval, rejection, correction)."
+          "description": "Timestamp of the last status change."
         },
         "siteEngineerId": {
           "type": "string",
-          "description": "Reference to User (Site Engineer) who raised the request. (Relationship: User 1:N PermitToWork)"
+          "description": "Reference to User (Site Engineer) who raised the request."
         },
         "siteManagerId": {
           "type": "string",
-          "description": "Reference to User (Site Manager) who reviewed the request. (Relationship: User 1:N PermitToWork)"
+          "description": "Reference to User (Site Manager) who reviewed the request."
         },
         "adminId": {
           "type": "string",
-          "description": "Reference to User (Admin) who approved/rejected the request. (Relationship: User 1:N PermitToWork)"
+          "description": "Reference to User (Admin) who gave final approval."
         },
         "latitude": {
           "type": "number",
@@ -216,6 +224,7 @@
         "descriptionOfWork",
         "status",
         "siteEngineerId",
+        "siteManagerId",
         "requestDate"
       ]
     },
@@ -280,7 +289,7 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user profiles. Includes denormalized 'assignedProjectIds' for authorization independence and a 'role' for role-based access control.",
+          "description": "Stores user profiles.",
           "params": [
             {
               "name": "userId",
@@ -328,7 +337,7 @@
           "schema": {
             "$ref": "#/backend/entities/PtwType"
           },
-          "description": "Stores the available types for Permits to Work, managed by the admin.",
+          "description": "Stores the available types for Permits to Work.",
           "params": [
             {
               "name": "ptwTypeId",
@@ -369,7 +378,6 @@
           ]
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to support the PermitFlow application's core features, including user management, project/site management, and Permit to Work (PtW) request workflows. Authorization Independence is achieved by denormalizing project membership into the user documents ('assignedProjectIds') and storing user roles directly on the user document. This allows for clear and secure rule logic. Structural Segregation is implemented by separating user-related data into `/users/{userId}` and PtW data into `/permits_to_work/{permitId}`, ensuring homogeneous security postures. Access Modeling employs path-based ownership for user data and role-based access control, validated by reading the user's document within security rules. Explicit state modeling is used for PtW status, and predictable schemas are enforced for data clarity. The structure supports QAPs by allowing listing of permits and users based on assigned roles."
+    ]
   }
 }

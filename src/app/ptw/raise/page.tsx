@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Paperclip } from "lucide-react"
+import { Paperclip, AlertTriangle } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp, doc } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -49,58 +49,6 @@ type Site = {
   dcCapacity: string;
 };
 
-
-function RaisePtwSkeleton() {
-    return (
-        <div className="animate-pulse">
-            <Skeleton className="h-9 w-72 mb-6" />
-            <Card className="w-full max-w-3xl mx-auto">
-                <CardHeader>
-                    <Skeleton className="h-8 w-56" />
-                    <Skeleton className="h-4 w-full max-w-sm mt-1" />
-                </CardHeader>
-                <CardContent className="grid gap-6">
-                    <div className="grid gap-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-10 w-full" />
-                    </div>
-                    <div className="grid gap-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-10 w-full" />
-                    </div>
-                    <div className="grid gap-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-10 w-full" />
-                    </div>
-                    <div className="grid gap-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-20 w-full" />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                            <Skeleton className="h-4 w-48" />
-                            <Skeleton className="h-10 w-full" />
-                        </div>
-                        <div className="grid gap-2">
-                            <Skeleton className="h-4 w-48" />
-                            <Skeleton className="h-10 w-full" />
-                        </div>
-                    </div>
-                    <div className="grid gap-2">
-                        <Skeleton className="h-4 w-48" />
-                        <Skeleton className="h-20 w-full" />
-                    </div>
-                    <Skeleton className="h-24 w-full rounded-md" />
-                    <div className="flex justify-end">
-                        <Skeleton className="h-10 w-32" />
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-    )
-}
-
-
 export default function RaisePtwPage() {
   const firestore = useFirestore()
   const firebaseApp = useFirebaseApp()
@@ -111,18 +59,15 @@ export default function RaisePtwPage() {
   const permitIdToCorrect = searchParams.get('correct')
   const isCorrectionMode = !!permitIdToCorrect;
 
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+
   const permitToCorrectRef = useMemoFirebase(() => {
     if (!permitIdToCorrect || !firestore) return null;
     return doc(firestore, 'permits_to_work', permitIdToCorrect);
   }, [firestore, permitIdToCorrect]);
 
   const { data: permitToCorrect, isLoading: isLoadingPermit } = useDoc(permitToCorrectRef);
-
-  const userProfileRef = useMemoFirebase(() => {
-    if (!user) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [firestore, user]);
-  const { data: userProfile } = useDoc(userProfileRef);
 
   const ptwTypesQuery = useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]);
   const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection<PtwType>(ptwTypesQuery);
@@ -161,37 +106,26 @@ export default function RaisePtwPage() {
         ptwType: permitToCorrect.ptwType,
         descriptionOfWork: permitToCorrect.descriptionOfWork,
         commentsAndRemarks: permitToCorrect.commentsAndRemarks || "",
-        undertaking: false, // Force re-agreement
+        undertaking: false,
       });
       const site = uniqueSites.find(s => s.name === permitToCorrect.siteName);
       setSelectedSite(site || null);
     }
   }, [isCorrectionMode, permitToCorrect, form, uniqueSites]);
 
+  const hasManagerMapping = !!userProfile?.siteManagerId || userProfile?.role === 'Admin';
+
   const getCurrentLocation = (): Promise<{ latitude: number; longitude: number } | null> => {
     return new Promise((resolve) => {
         if (!navigator.geolocation) {
-            toast({
-                variant: 'destructive',
-                title: 'Geolocation Not Supported',
-                description: 'Your browser does not support this feature.',
-            });
+            toast({ variant: 'destructive', title: 'Geolocation Not Supported' });
             resolve(null);
             return;
         }
         navigator.geolocation.getCurrentPosition(
-            (position) => {
-                resolve({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                });
-            },
+            (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
             (error) => {
-                toast({
-                    variant: 'destructive',
-                    title: 'Location Error',
-                    description: `Could not get location: ${error.message}. Please enable location services.`,
-                });
+                toast({ variant: 'destructive', title: 'Location Error', description: 'Could not get location. Please enable location services.' });
                 resolve(null);
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -200,54 +134,33 @@ export default function RaisePtwPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof raisePtwSchema>) => {
-    if (!user) {
-        toast({ variant: "destructive", title: "You must be logged in to submit a permit." });
+    if (!user || !userProfile) return;
+    if (!hasManagerMapping) {
+        toast({ variant: "destructive", title: "No Manager Assigned", description: "You cannot submit a permit until an Admin assigns you to a Site Manager." });
         return;
     }
     if(!selectedSite) {
-        form.setError('siteName', { type: 'manual', message: 'Please select a valid site from the list.' });
+        form.setError('siteName', { type: 'manual', message: 'Please select a valid site.' });
         return;
     }
 
     setIsProcessing(true);
-    setIsSubmitted(false);
-    setUploadProgress({});
-
-    toast({ title: "Capturing location..." });
     const location = await getCurrentLocation();
 
     if (!location) {
-        toast({
-            variant: "destructive",
-            title: "Location Required",
-            description: "Could not capture your location. Please enable location services and try again."
-        });
         setIsProcessing(false);
         return;
     }
-
-    toast({ title: "Location captured!", description: "Proceeding with file uploads..." });
 
     const uploadFile = (file: File, path: string): Promise<{ url: string; contentType: string; name: string; }> => {
         return new Promise((resolve, reject) => {
             const storage = getStorage(firebaseApp);
             const storageRef = ref(storage, path);
             const uploadTask = uploadBytesResumable(storageRef, file);
-
             uploadTask.on('state_changed',
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
-                },
-                (error) => {
-                    console.error("Upload failed:", error);
-                    reject(error);
-                },
-                () => {
-                    getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-                        resolve({ url: downloadURL, contentType: file.type, name: file.name });
-                    });
-                }
+                (snapshot) => setUploadProgress(prev => ({ ...prev, [file.name]: (snapshot.bytesTransferred / snapshot.totalBytes) * 100 })),
+                reject,
+                () => getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve({ url, contentType: file.type, name: file.name }))
             );
         });
     };
@@ -255,148 +168,86 @@ export default function RaisePtwPage() {
     try {
         const timestamp = Date.now();
         let allFilesToUpload: File[] = [...files];
-        if (vlogFile) {
-          const attestationVlogFile = new File([vlogFile], `attestation-${vlogFile.name}`, { type: vlogFile.type, lastModified: vlogFile.lastModified });
-          allFilesToUpload.push(attestationVlogFile);
-        }
+        if (vlogFile) allFilesToUpload.push(new File([vlogFile], `attestation-${vlogFile.name}`, { type: vlogFile.type }));
 
-        const compressionPromises = allFilesToUpload.map(async (file) => {
-          if (file.type.startsWith('image/')) {
-            try {
-              const options = {
-                maxSizeMB: 1,
-                maxWidthOrHeight: 1920,
-                useWebWorker: true,
-              };
-              const compressedFile = await imageCompression(file, options);
-              return compressedFile;
-            } catch (compressionError) {
-              console.error('Image compression error:', compressionError);
-              toast({
-                variant: 'destructive',
-                title: 'Compression Failed',
-                description: `Could not compress ${file.name}. It will be uploaded in its original size.`,
-              });
-              return file;
-            }
-          }
+        const processedFiles = await Promise.all(allFilesToUpload.map(async (file) => {
+          if (file.type.startsWith('image/')) return imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
           return file;
-        });
+        }));
 
-        const processedFiles = await Promise.all(compressionPromises);
-
-        const attachmentPromises = processedFiles.map(file => {
-            const filePath = `uploads/${user.uid}/${timestamp}-${file.name}`;
-            return uploadFile(file, filePath);
-        });
-
-        const attachments = await Promise.all(attachmentPromises);
-
+        const attachments = await Promise.all(processedFiles.map(file => uploadFile(file, `uploads/${user.uid}/${timestamp}-${file.name}`)));
         const { undertaking, ...permitValues } = values;
 
         if (isCorrectionMode && permitIdToCorrect) {
-            const permitRef = doc(firestore, "permits_to_work", permitIdToCorrect);
-            const updatedData = {
+            updateDocumentNonBlocking(doc(firestore, "permits_to_work", permitIdToCorrect), {
                 ...permitValues,
                 latitude: location.latitude,
                 longitude: location.longitude,
-                status: "Corrected" as const,
+                status: "Pending",
                 attachments: [...(permitToCorrect.attachments || []), ...attachments],
                 statusChangeDate: serverTimestamp(),
                 isNew: true,
-            };
-            updateDocumentNonBlocking(permitRef, updatedData);
+            });
         } else {
-            const permitData = {
+            addDocumentNonBlocking(collection(firestore, "permits_to_work"), {
               ...permitValues,
               siteEngineerId: user.uid,
-              status: "Pending" as const,
+              siteManagerId: userProfile.siteManagerId,
+              status: "Pending",
               requestDate: serverTimestamp(),
               attachments,
               latitude: location.latitude,
               longitude: location.longitude,
               isNew: true,
-            };
-
-            const permitsCollection = collection(firestore, "permits_to_work");
-            addDocumentNonBlocking(permitsCollection, permitData);
+            });
         }
 
-        // Successfully reached the end of logic
         setIsSubmitted(true);
         setIsProcessing(false);
-        toast({ title: "Success", description: "Your permit request has been submitted." });
-
-        // Add a small delay to allow the animation to play before redirect
-        setTimeout(() => {
-          router.push('/ptw/list');
-        }, 2500);
-
+        toast({ title: "Success", description: "Your permit request has been submitted to your manager." });
+        setTimeout(() => router.push('/ptw/list'), 2500);
     } catch (error: any) {
-        toast({
-            variant: "destructive",
-            title: "Submission Failed",
-            description: error.message || "Could not submit permit request."
-        });
+        toast({ variant: "destructive", title: "Submission Failed", description: error.message });
         setIsProcessing(false);
-        setIsSubmitted(false);
     }
   }
 
-  const pageTitle = isCorrectionMode ? "Correct and Resubmit PtW" : "Raise a Permit to Work";
-  const cardTitle = isCorrectionMode ? "Correct PtW Request" : "New PtW Request";
-  const cardDescription = isCorrectionMode ? "Update the form below to resubmit your permit." : "Fill out the form below to submit a new permit request.";
-
-  if (isLoadingPermit || ptwTypesLoading || sitesLoading) {
-    return <RaisePtwSkeleton />;
-  }
+  if (isProfileLoading || isLoadingPermit || ptwTypesLoading || sitesLoading) return <RaisePtwSkeleton />;
 
   return (
-    <>
+    <div className="space-y-6">
       {isCorrectionMode && permitToCorrect?.adminRemarks && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertTitle>Rejection Remarks</AlertTitle>
-          <AlertDescription className="whitespace-pre-wrap">
-            {permitToCorrect.adminRemarks}
+        <Alert variant="destructive"><AlertTitle>Rejection Remarks</AlertTitle><AlertDescription>{permitToCorrect.adminRemarks}</AlertDescription></Alert>
+      )}
+
+      {!hasManagerMapping && (
+        <Alert variant="destructive" className="bg-red-50 dark:bg-red-950/20">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Action Required</AlertTitle>
+          <AlertDescription>
+            You are not mapped to any Site Manager. Please contact your Admin to complete your team mapping before raising a PTW.
           </AlertDescription>
         </Alert>
       )}
 
-      <h1 className="text-lg font-headline font-semibold md:text-2xl">{pageTitle}</h1>
-      <Card className="w-full max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold font-headline">Raise a Permit to Work</h1>
+      <Card className="max-w-3xl mx-auto">
         <CardHeader>
-          <CardTitle>{cardTitle}</CardTitle>
-          <CardDescription>{cardDescription}</CardDescription>
+          <CardTitle>{isCorrectionMode ? "Correct PtW Request" : "New PtW Request"}</CardTitle>
+          <CardDescription>Fill out the form below to submit for approval.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6">
-              <div className="grid gap-2">
-                <Label>Requesting Engineer</Label>
-                <Input readOnly value={userProfile?.username || user?.email || ''} className="bg-muted"/>
-              </div>
-
               <FormField
                   control={form.control}
                   name="siteName"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Site Name</FormLabel>
-                       <Select onValueChange={(value) => {
-                          field.onChange(value);
-                          const site = uniqueSites?.find(s => s.name === value);
-                          setSelectedSite(site || null);
-                      }} value={field.value} disabled={isProcessing || isSubmitted}>
-                          <FormControl>
-                          <SelectTrigger>
-                              <SelectValue placeholder="Select a site" />
-                          </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                              {uniqueSites?.map((site) => (
-                              <SelectItem key={site.id} value={site.name}>{site.name}</SelectItem>
-                              ))}
-                          </SelectContent>
+                       <Select onValueChange={(value) => { field.onChange(value); setSelectedSite(uniqueSites?.find(s => s.name === value) || null); }} value={field.value} disabled={isProcessing || isSubmitted || !hasManagerMapping}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Select a site" /></SelectTrigger></FormControl>
+                          <SelectContent>{uniqueSites?.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
@@ -404,23 +255,10 @@ export default function RaisePtwPage() {
               />
               
               {selectedSite && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Site Details</CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <p className="text-muted-foreground">Project Company</p>
-                        <p className="font-medium">{selectedSite.projectCompany}</p>
-                    </div>
-                     <div>
-                        <p className="text-muted-foreground">AC Capacity</p>
-                        <p className="font-medium">{selectedSite.acCapacity}</p>
-                    </div>
-                    <div>
-                        <p className="text-muted-foreground">DC Capacity</p>
-                        <p className="font-medium">{selectedSite.dcCapacity}</p>
-                    </div>
+                <Card className="bg-muted/30">
+                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm py-4">
+                    <div><p className="text-muted-foreground">Project Company</p><p className="font-medium">{selectedSite.projectCompany}</p></div>
+                    <div><p className="text-muted-foreground">AC / DC Capacity</p><p className="font-medium">{selectedSite.acCapacity} / {selectedSite.dcCapacity}</p></div>
                   </CardContent>
                 </Card>
               )}
@@ -431,17 +269,9 @@ export default function RaisePtwPage() {
                   render={({ field }) => (
                       <FormItem>
                           <FormLabel>PTW for</FormLabel>
-                           <Select onValueChange={field.onChange} value={field.value} disabled={isProcessing || isSubmitted}>
-                              <FormControl>
-                              <SelectTrigger>
-                                  <SelectValue placeholder="Select a permit type" />
-                              </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                  {ptwTypes?.map((type) => (
-                                  <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
-                                  ))}
-                              </SelectContent>
+                           <Select onValueChange={field.onChange} value={field.value} disabled={isProcessing || isSubmitted || !hasManagerMapping}>
+                              <FormControl><SelectTrigger><SelectValue placeholder="Select a permit type" /></SelectTrigger></FormControl>
+                              <SelectContent>{ptwTypes?.map((t) => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}</SelectContent>
                           </Select>
                           <FormMessage />
                       </FormItem>
@@ -454,89 +284,31 @@ export default function RaisePtwPage() {
                   render={({ field }) => (
                       <FormItem>
                           <FormLabel>Description of Work</FormLabel>
-                          <FormControl>
-                              <Textarea placeholder="Provide a detailed description of the work to be performed." rows={4} {...field} disabled={isProcessing || isSubmitted} />
-                          </FormControl>
+                          <FormControl><Textarea placeholder="Detail the work to be performed." rows={4} {...field} disabled={isProcessing || isSubmitted || !hasManagerMapping} /></FormControl>
                           <FormMessage />
                       </FormItem>
                   )}
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                    <Label htmlFor="work-files">Attach files (videos, photos)</Label>
-                    <div className="flex items-center gap-2">
-                        <Paperclip className="h-5 w-5 text-muted-foreground"/>
-                        <Input id="work-files" type="file" className="border-dashed" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} />
-                    </div>
-                    {files.length > 0 && (
-                        <div className="mt-2 space-y-2">
-                          <div className="flex justify-between items-center">
-                            <Label>Selected Files:</Label>
-                            <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setFiles([])} disabled={isProcessing || isSubmitted}>Clear all</Button>
-                          </div>
-                          {files.map((file, index) => (
-                              <div key={index} className="text-sm">
-                              <p className="truncate">{file.name}</p>
-                              {uploadProgress[file.name] != null && <Progress value={uploadProgress[file.name]} className="w-full mt-1" />}
-                              </div>
-                          ))}
-                        </div>
-                    )}
+                <div className="space-y-2">
+                    <Label>Attach Files</Label>
+                    <Input type="file" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted || !hasManagerMapping} />
                 </div>
-                <div className="grid gap-2">
-                    <Label htmlFor="vlog">Self attestation file</Label>
-                    <div className="flex items-center gap-2">
-                        <Paperclip className="h-5 w-5 text-muted-foreground"/>
-                        <Input id="vlog" type="file" className="border-dashed" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isProcessing || isSubmitted} />
-                    </div>
-                    {vlogFile && (
-                        <div className="mt-2 space-y-2">
-                            <div className="flex justify-between items-center">
-                              <Label>Selected Attestation File:</Label>
-                              <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setVlogFile(null)} disabled={isProcessing || isSubmitted}>Clear</Button>
-                            </div>
-                            <div className="text-sm">
-                                <p className="truncate">{vlogFile.name}</p>
-                                {uploadProgress[`attestation-${vlogFile.name}`] != null && <Progress value={uploadProgress[`attestation-${vlogFile.name}`]} className="w-full mt-1" />}
-                            </div>
-                        </div>
-                    )}
+                <div className="space-y-2">
+                    <Label>Self Attestation</Label>
+                    <Input type="file" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isProcessing || isSubmitted || !hasManagerMapping} />
                 </div>
               </div>
 
-
-              <FormField
-                  control={form.control}
-                  name="commentsAndRemarks"
-                  render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Additional Comments and Remarks</FormLabel>
-                          <FormControl>
-                              <Textarea placeholder="Any additional comments or remarks." {...field} disabled={isProcessing || isSubmitted}/>
-                          </FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )}
-              />
-              
               <FormField
                   control={form.control}
                   name="undertaking"
                   render={({ field }) => (
                       <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
-                          <FormControl>
-                              <Checkbox
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                  id="undertaking"
-                                  disabled={isProcessing || isSubmitted}
-                              />
-                          </FormControl>
+                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isProcessing || isSubmitted || !hasManagerMapping} /></FormControl>
                           <div className="space-y-1 leading-none">
-                              <FormLabel htmlFor="undertaking" className="text-sm font-normal">
-                                  I, <span className="font-semibold">{userProfile?.username || user?.email}</span>, hereby undertake that the work for which I am requesting a Permit to Work (PTW) will be carried out in accordance with the approved Standard Operating Procedures. Kindly grant approval to proceed with the work.
-                              </FormLabel>
+                              <FormLabel className="text-sm font-normal">I hereby undertake that the work will be carried out in accordance with approved Standard Operating Procedures.</FormLabel>
                               <FormMessage />
                           </div>
                       </FormItem>
@@ -546,41 +318,32 @@ export default function RaisePtwPage() {
               <div className="flex justify-end mt-4">
                 <button
                   type="submit"
-                  disabled={isProcessing || isSubmitted}
+                  disabled={isProcessing || isSubmitted || !hasManagerMapping}
                   className={cn(
-                    "relative h-10 px-6 border-none outline-none bg-[#2f2f2f] text-white text-sm font-medium rounded-md text-center shadow-sm overflow-hidden cursor-pointer transition-all duration-500 flex items-center justify-center font-body",
+                    "relative h-10 px-6 border-none outline-none bg-[#2f2f2f] text-white text-sm font-medium rounded-md text-center shadow-sm overflow-hidden cursor-pointer transition-all duration-500 flex items-center justify-center font-body disabled:opacity-50 disabled:cursor-not-allowed",
                     isSubmitted && "bg-[#556EA2]"
                   )}
                 >
                   <p className={cn("transition-all duration-500", isSubmitted && "mr-6")}>
-                    {isSubmitted ? "Submitted" : isProcessing ? "Submitting..." : "Submit"}
+                    {isSubmitted ? "Submitted" : isProcessing ? "Submitting..." : "Submit for Approval"}
                   </p>
-                  <div
-                    className={cn(
-                      "absolute top-0 right-[-20px] w-10 h-10 rounded-md opacity-0 transition-all duration-500 flex items-center justify-center",
-                      isSubmitted && "right-0 opacity-100"
-                    )}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" className="w-5 h-5">
-                      <path
-                        fill="transparent"
-                        d="M14.1 27.2l7.1 7.2 16.7-16.8"
-                        stroke="white"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        className={cn(
-                          "transition-all duration-500 [stroke-dasharray:34] [stroke-dashoffset:34]",
-                          isSubmitted && "delay-500 [stroke-dashoffset:0]"
-                        )}
-                      />
-                    </svg>
-                  </div>
+                  {isSubmitted && (
+                    <div className="absolute right-2 opacity-100 transition-all duration-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" className="w-5 h-5">
+                        <path fill="transparent" d="M14.1 27.2l7.1 7.2 16.7-16.8" stroke="white" strokeWidth="3" strokeLinecap="round" className="[stroke-dasharray:34] [stroke-dashoffset:0]" />
+                      </svg>
+                    </div>
+                  )}
                 </button>
               </div>
             </form>
           </Form>
         </CardContent>
       </Card>
-    </>
+    </div>
   )
+}
+
+function RaisePtwSkeleton() {
+    return <div className="space-y-6"><Skeleton className="h-9 w-72" /><Skeleton className="h-[600px] w-full" /></div>
 }

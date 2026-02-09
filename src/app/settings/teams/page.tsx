@@ -1,0 +1,179 @@
+
+'use client';
+
+import * as React from 'react';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc, query, where } from 'firebase/firestore';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useRouter } from 'next/navigation';
+import { UserPlus, Trash2, Users } from 'lucide-react';
+
+type User = {
+  id: string;
+  username: string;
+  email: string;
+  role: 'Admin' | 'Site Manager' | 'SiteEngineer';
+  siteManagerId?: string;
+};
+
+export default function TeamMappingPage() {
+  const firestore = useFirestore();
+  const { user } = useUser();
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+
+  const isAdmin = userProfile?.role === 'Admin' || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com';
+
+  React.useEffect(() => {
+    if (!isProfileLoading && !isAdmin) {
+      router.replace('/ptw/raise');
+    }
+  }, [isProfileLoading, isAdmin, router]);
+
+  const managersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), where('role', '==', 'Site Manager')), [firestore]);
+  const { data: managers, isLoading: managersLoading } = useCollection<User>(managersQuery);
+
+  const engineersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), where('role', '==', 'SiteEngineer')), [firestore]);
+  const { data: engineers, isLoading: engineersLoading } = useCollection<User>(engineersQuery);
+
+  const [selectedManagerId, setSelectedManagerId] = React.useState<string | null>(null);
+  const [selectedEngineerId, setSelectedEngineerId] = React.useState<string | null>(null);
+
+  const handleAssign = () => {
+    if (!selectedManagerId || !selectedEngineerId) return;
+
+    const engineerRef = doc(firestore, 'users', selectedEngineerId);
+    updateDocumentNonBlocking(engineerRef, { siteManagerId: selectedManagerId });
+
+    toast({
+      title: 'Engineer Assigned',
+      description: 'The site engineer has been successfully mapped to the manager.',
+    });
+    
+    setSelectedEngineerId(null);
+  };
+
+  const handleRemoveMapping = (engineerId: string) => {
+    const engineerRef = doc(firestore, 'users', engineerId);
+    updateDocumentNonBlocking(engineerRef, { siteManagerId: null });
+
+    toast({
+      title: 'Mapping Removed',
+      description: 'The engineer mapping has been cleared.',
+    });
+  };
+
+  if (isProfileLoading || managersLoading || engineersLoading) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <Skeleton className="h-9 w-64" />
+        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) return null;
+
+  const mappedEngineers = engineers?.filter(e => e.siteManagerId) || [];
+  const unmappedEngineers = engineers?.filter(e => !e.siteManagerId) || [];
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold tracking-tight">Team Mapping</h1>
+      <p className="text-muted-foreground">Assign Site Engineers to Site Managers for PTW approvals.</p>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Map Engineer to Manager</CardTitle>
+          <CardDescription>Select a manager and then an engineer to create a mapping.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div className="space-y-2">
+              <Label>Site Manager</Label>
+              <Select value={selectedManagerId || ''} onValueChange={setSelectedManagerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a Manager" />
+                </SelectTrigger>
+                <SelectContent>
+                  {managers?.map(m => (
+                    <SelectItem key={m.id} value={m.id}>{m.username}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Site Engineer</Label>
+              <Select value={selectedEngineerId || ''} onValueChange={setSelectedEngineerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an Engineer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {unmappedEngineers.map(e => (
+                    <SelectItem key={e.id} value={e.id}>{e.username}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleAssign} disabled={!selectedManagerId || !selectedEngineerId}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Assign Mapping
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Current Mappings</CardTitle>
+          <CardDescription>A list of all engineers and their assigned managers.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {mappedEngineers.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Engineer Name</TableHead>
+                  <TableHead>Assigned Manager</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {mappedEngineers.map(e => {
+                  const manager = managers?.find(m => m.id === e.siteManagerId);
+                  return (
+                    <TableRow key={e.id}>
+                      <TableCell className="font-medium">{e.username}</TableCell>
+                      <TableCell>{manager?.username || 'Unknown Manager'}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => handleRemoveMapping(e.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <span className="sr-only">Remove</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border rounded-lg border-dashed">
+              <Users className="h-12 w-12 mb-4 opacity-20" />
+              <p>No engineer mappings found.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
