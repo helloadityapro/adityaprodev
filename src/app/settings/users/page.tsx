@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react";
@@ -39,7 +40,7 @@ type User = {
   username: string;
   email: string;
   mobile: string;
-  role: 'Admin' | 'Supervisor' | 'SiteEngineer';
+  role: 'Admin' | 'Site Manager' | 'SiteEngineer';
   registrationRequest: boolean;
   avatarUrl?: string;
   createdAt?: any;

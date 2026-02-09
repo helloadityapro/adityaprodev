@@ -1,3 +1,4 @@
+
 "use client";
 import * as React from "react";
 import { useForm } from "react-hook-form";
@@ -68,7 +69,7 @@ type Permit = {
   descriptionOfWork: string;
   status: 'Pending' | 'Approved' | 'Rejected' | 'Corrected';
   siteEngineerId: string;
-  supervisorId?: string;
+  siteManagerId?: string;
   adminId?: string;
   requestDate: any; // Should be a timestamp
   statusChangeDate?: any;
@@ -195,7 +196,7 @@ const PermitListTable = React.memo(function PermitListTable({ permits, onAction,
                           </Button>
                       )}
                       
-                      {(userRole === 'Admin' || userRole === 'Supervisor') && (
+                      {(userRole === 'Admin' || userRole === 'Site Manager') && (
                           <>
                               {(permit.status === 'Pending' || permit.status === 'Corrected') && (
                                   <>
@@ -311,7 +312,7 @@ function PermitDetailsDialog({ permit, open, onOpenChange, onAttachmentView }: {
                 <div><Label>{permit.status} On</Label><p>{formatTimestamp(permit.statusChangeDate)}</p></div>
             )}
             <div className="flex items-center gap-2"><Label>Requested By</Label><UserDisplay userId={permit.siteEngineerId} /></div>
-             {permit.supervisorId && <div className="flex items-center gap-2"><Label>Reviewed By (Supervisor)</Label><UserDisplay userId={permit.supervisorId} /></div>}
+             {permit.siteManagerId && <div className="flex items-center gap-2"><Label>Reviewed By (Site Manager)</Label><UserDisplay userId={permit.siteManagerId} /></div>}
             {permit.adminId && <div className="flex items-center gap-2"><Label>Reviewed By (Admin)</Label><UserDisplay userId={permit.adminId} /></div>}
             {permit.commentsAndRemarks && <div className="col-span-2"><Label>Engineer's Remarks</Label><p className="whitespace-pre-wrap">{permit.commentsAndRemarks}</p></div>}
             {permit.adminRemarks && <div className="col-span-2"><Label>Admin's Remarks</Label><p className="whitespace-pre-wrap">{permit.adminRemarks}</p></div>}
@@ -573,7 +574,7 @@ export default function PtwListPage() {
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
 
   React.useEffect(() => {
-    if (permits && (userRole === 'Admin' || userRole === 'Supervisor')) {
+    if (permits && (userRole === 'Admin' || userRole === 'Site Manager')) {
       const newPermits = permits.filter(p => p.isNew);
       if (newPermits.length > 0) {
         const batch = writeBatch(firestore);
@@ -609,8 +610,8 @@ export default function PtwListPage() {
   const handlePermitAction = (permit: Permit, status: Permit['status'], adminRemarks: string) => {
     const permitRef = doc(firestore, "permits_to_work", permit.id);
     let updateData: any = { status, adminRemarks, statusChangeDate: serverTimestamp() };
-    if (userRole === 'Supervisor') {
-        updateData.supervisorId = user?.uid;
+    if (userRole === 'Site Manager') {
+        updateData.siteManagerId = user?.uid;
     }
     if (userRole === 'Admin') {
         updateData.adminId = user?.uid;
@@ -754,7 +755,7 @@ export default function PtwListPage() {
       </Card>
 
 
-      {(userRole === 'Admin' || userRole === 'Supervisor') && (
+      {(userRole === 'Admin' || userRole === 'Site Manager') && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card onClick={() => setStatusFilter('all')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", statusFilter === 'all' && "border-primary border-2")}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

@@ -53,7 +53,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 List of PtW
               </Link>
             </SidebarMenuButton>
-            {(userRole === 'Admin' || userRole === 'Supervisor') && pendingPtwCount > 0 && (
+            {(userRole === 'Admin' || userRole === 'Site Manager') && pendingPtwCount > 0 && (
                 <SidebarMenuBadge className="bg-red-500 text-white">
                     {pendingPtwCount}
                 </SidebarMenuBadge>

@@ -1,34 +1,4 @@
-/**
- * Core Philosophy: This ruleset enforces a role-based and project-based security model
- * for a permit management application. Access is primarily determined by a user's role
- * (Admin, Supervisor) and their explicit assignment to projects. It prioritizes strict
- * authorization to ensure users can only access data relevant to their role and assigned tasks.
- *
- * Data Structure:
- * - /users/{userId}: Stores private user profiles, including a critical 'assignedProjectIds'
- *   list that drives project-related permissions and a 'role' field for RBAC.
- * - /projects/{projectId}: Top-level collection for project data.
- * - /sites/{siteId}: Site data, managed by admins.
- * - /ptw_types/{ptwTypeId}: PTW type data, managed by admins.
- * - /permits_to_work/{permitId}: The core transactional data, containing references to the
- *   various users (engineer, supervisor) involved in the workflow.
- *
- * Key Security Decisions:
- * - Admin Supremacy: Users with an 'Admin' role have universal read/write access to facilitate
- *   system management.
- * - Role-Based Access: User roles ('Admin', 'Supervisor', 'SiteEngineer') are stored on the /users/{userId}
- *   document. Security rules read this document to grant permissions, ensuring a single source of
- *   truth for a user's role.
- * - Project Access via Denormalization: A user's access to /projects and their sub-collections
- *   is determined by checking the 'assignedProjectIds' array stored directly on their own
- *   /users/{userId} document. This avoids complex, slow, and costly cross-collection lookups
- *   in rules.
- * - Secure Listing: Listing entire collections is restricted. Admins and Supervisors can list
- *   permits. Site Engineers can list permits they have created. Non-admin users must rely on
- *   targeted queries secured by more granular 'get' rules.
- * - Immutable Ownership: Critical relational IDs (e.g., the creator of a permit) are enforced
- *   as immutable after creation to maintain data integrity and a clear audit trail.
- */
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -46,15 +16,13 @@ service cloud.firestore {
 
     /**
      * Checks if the requesting user's UID matches the provided userId.
-     * This is the foundation of the ownership model.
      */
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
     /**
-     * Checks if the requesting user has the Admin role by reading their user document
-     * or by checking for a specific admin email.
+     * Checks if the requesting user has the Admin role.
      */
     function isAdmin() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
@@ -64,18 +32,18 @@ service cloud.firestore {
     }
 
     /**
-     * Checks if the requesting user has the Supervisor role by reading their user document.
+     * Checks if the requesting user has the Site Manager role.
      */
-    function isSupervisor() {
+    function isSiteManager() {
         let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
         return isSignedIn()
                && userDoc != null
                && 'role' in userDoc.data
-               && userDoc.data.role == 'Supervisor';
+               && userDoc.data.role == 'Site Manager';
     }
 
     /**
-     * Checks if the requesting user has the SiteEngineer role by reading their user document.
+     * Checks if the requesting user has the SiteEngineer role.
      */
     function isSiteEngineer() {
         let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
@@ -88,7 +56,6 @@ service cloud.firestore {
 
     /**
      * Checks if the user is an owner of an existing document.
-     * Used for safe update and delete operations.
      */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
@@ -96,7 +63,6 @@ service cloud.firestore {
 
     /**
      * Retrieves the authenticated user's own user document.
-     * Used to access denormalized authorization data like 'assignedProjectIds'.
      */
     function userRecord() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
@@ -105,27 +71,22 @@ service cloud.firestore {
 
     /**
      * Checks if the authenticated user is assigned to a specific project.
-     * Reads the 'assignedProjectIds' array from the user's own document.
      */
     function isAssignedToProject(projectId) {
       return isSignedIn() && userRecord() != null && 'assignedProjectIds' in userRecord().data && projectId in userRecord().data.assignedProjectIds;
     }
     
     /**
-     * Validates a user can create their own user document, ensuring the
-     * document ID in the path matches the ID in the document body.
+     * Validates a user can create their own user document.
      */
     function canCreateOwnUser(userId) {
       return isOwner(userId) && request.resource.data.id == userId;
     }
 
     /**
-     * Validates that a user can update their own profile data, but prevents
-     * them from escalating their privileges or changing their project assignments.
-     * Admins are exempt from these restrictions.
+     * Validates that a user can update their own profile data.
      */
     function canUpdateOwnUser() {
-      // User cannot change their own ID, role, registration status, or project assignments.
       let isChangingProtectedFields = request.resource.data.id != resource.data.id
                                       || request.resource.data.role != resource.data.role
                                       || request.resource.data.registrationRequest != resource.data.registrationRequest
@@ -137,15 +98,6 @@ service cloud.firestore {
     // Collection Rules
     // --------------------------------
 
-    /**
-     * @description Manages user profile data. A user can read and update their own profile,
-     * but cannot change their own role or project assignments. Admins have full access and can list all users.
-     * @path /users/{userId}
-     * @allow (get) An authenticated user reads their own document: auth.uid == 'user_abc', path == '/users/user_abc'.
-     * @allow (list) An Admin user lists all user documents.
-     * @deny (update) A user tries to change their own role from 'SiteEngineer' to 'Admin'.
-     * @principle Restricts access to a user's own data tree and prevents privilege escalation, while allowing admins to manage users.
-     */
     match /users/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
@@ -154,52 +106,26 @@ service cloud.firestore {
       allow delete: if isAdmin() && resource != null;
     }
 
-    /**
-     * @description Stores project information. Access is granted only to users who are
-     * explicitly assigned to the project or are Admins. Only Admins can create or modify projects.
-     * @path /projects/{projectId}
-     * @allow (get) A user assigned to 'project_123' reads that project document.
-     * @deny (get) A user not assigned to 'project_123' tries to read it.
-     * @deny (list) A non-admin user tries to list all projects.
-     * @principle Enforces authorization based on denormalized membership data (assignedProjectIds).
-     */
     match /projects/{projectId} {
       allow get: if isAssignedToProject(projectId) || isAdmin();
       allow list: if isAdmin();
       allow create, update, delete: if isAdmin();
     }
 
-    /**
-     * @description Stores site information. Any signed-in user can read, but only admins can modify.
-     * @path /sites/{siteId}
-     */
     match /sites/{siteId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
     
-    /**
-     * @description Stores PTW types. Any signed-in user can read, but only admins can modify.
-     * @path /ptw_types/{ptwTypeId}
-     */
     match /ptw_types/{ptwTypeId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    /**
-     * @description Stores Permit to Work requests.
-     * - READ: Admins/Supervisors can read all. Site Engineers can read their own.
-     * - LIST: Any authenticated user can list, but GET rules still apply to each doc.
-     * - CREATE: Only Site Engineers or Admins can create, setting themselves as the owner.
-     * - UPDATE: Role-based state machine. Admins can always update. Supervisors can action 'Pending' or 'Corrected' permits.
-     *           Engineers can resubmit 'Rejected' permits.
-     * - DELETE: Only Admins can delete.
-     */
     match /permits_to_work/{permitId} {
       allow get: if isSignedIn() && (
         isAdmin() ||
-        isSupervisor() ||
+        isSiteManager() ||
         (resource != null && request.auth.uid == resource.data.siteEngineerId)
       );
 
@@ -211,38 +137,17 @@ service cloud.firestore {
 
       allow update: if isSignedIn() && resource != null && (
         isAdmin() ||
-        (isSupervisor() && (resource.data.status == 'Pending' || resource.data.status == 'Corrected')) ||
+        (isSiteManager() && (resource.data.status == 'Pending' || resource.data.status == 'Corrected')) ||
         (request.auth.uid == resource.data.siteEngineerId && resource.data.status == 'Rejected')
       );
       
       allow delete: if isAdmin() && resource != null;
     }
 
-    /**
-     * @description Manages user notifications. This is a more secure rule set that ensures users can only
-     * list and read their own notifications.
-     * @path /notifications/{notificationId}
-     * @allow (get) A user can get their own notification.
-     * @allow (list) A user can list their own notifications (the query must filter by userId).
-     * @allow (update) A user can update their own notification (e.g., mark as read).
-     * @allow (create) An admin/supervisor creates a notification for a site engineer after a permit status change.
-     * @deny (delete) Notifications are not user-deletable to maintain an audit trail.
-     */
     match /notifications/{notificationId} {
-      // A user can read (get or list) a notification only if they are the owner.
-      // This rule is checked for single document gets, and for each document that a query would return.
-      // Crucially, we check for the existence of 'userId' to prevent errors on malformed data.
       allow get: if isSignedIn() && 'userId' in resource.data && resource.data.userId == request.auth.uid;
-      
-      // A user can query the notifications collection.
-      // The actual data they receive will be filtered by the `get` rule above.
-      // This requires the client query to have a `where('userId', '==', auth.uid)` clause.
       allow list: if isSignedIn();
-      
-      // A user can update their own notification (e.g., to mark as read), with the same data check.
       allow update: if isSignedIn() && 'userId' in resource.data && resource.data.userId == request.auth.uid;
-
-      // Any signed-in user (e.g., the system/backend functions triggered by an action) can create a notification.
       allow create: if isSignedIn();
     }
   }

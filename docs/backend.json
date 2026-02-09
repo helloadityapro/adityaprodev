@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -25,7 +26,7 @@
         },
         "role": {
           "type": "string",
-          "description": "The role of the user (Admin, Supervisor, SiteEngineer)."
+          "description": "The role of the user (Admin, Site Manager, SiteEngineer)."
         },
         "registrationRequest": {
           "type": "boolean",
@@ -175,7 +176,7 @@
         },
         "isNew": {
           "type": "boolean",
-          "description": "Indicates if the permit is new and has not been seen by an admin/supervisor yet. Used for notification badges."
+          "description": "Indicates if the permit is new and has not been seen by an admin/site manager yet. Used for notification badges."
         },
         "requestDate": {
           "type": "string",
@@ -191,9 +192,9 @@
           "type": "string",
           "description": "Reference to User (Site Engineer) who raised the request. (Relationship: User 1:N PermitToWork)"
         },
-        "supervisorId": {
+        "siteManagerId": {
           "type": "string",
-          "description": "Reference to User (Supervisor) who reviewed the request. (Relationship: User 1:N PermitToWork)"
+          "description": "Reference to User (Site Manager) who reviewed the request. (Relationship: User 1:N PermitToWork)"
         },
         "adminId": {
           "type": "string",

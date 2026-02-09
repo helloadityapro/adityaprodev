@@ -1,3 +1,4 @@
+
 export type Project = {
   id: string;
   name: string;
@@ -26,7 +27,7 @@ export type User = {
   username: string;
   email: string;
   mobile: string;
-  role: 'Admin' | 'Supervisor' | 'Site Engineer';
+  role: 'Admin' | 'Site Manager' | 'Site Engineer';
   status: 'Active' | 'Pending';
   avatarUrl: string;
 };

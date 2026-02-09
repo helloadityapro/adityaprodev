@@ -22,7 +22,7 @@ const registerSchema = z.object({
   username: z.string().min(1, { message: "Username is required." }),
   email: z.string().email({ message: "Invalid email address." }),
   mobile: z.string().min(1, { message: "Mobile number is required." }),
-  role: z.enum(['SiteEngineer', 'Supervisor'], { required_error: "Please select a role." }),
+  role: z.enum(['SiteEngineer', 'Site Manager'], { required_error: "Please select a role." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string()
 }).refine(data => data.password === data.confirmPassword, {
@@ -92,7 +92,7 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
+      <Card className="mx-auto w-full max-md animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="text-center">
             <div className="mb-4 flex justify-center">
                 <AppLogo />
@@ -158,7 +158,7 @@ export default function RegisterPage() {
                         </FormControl>
                         <SelectContent>
                             <SelectItem value="SiteEngineer">Site Engineer</SelectItem>
-                            <SelectItem value="Supervisor">Supervisor</SelectItem>
+                            <SelectItem value="Site Manager">Site Manager</SelectItem>
                         </SelectContent>
                     </Select>
                     <FormMessage />

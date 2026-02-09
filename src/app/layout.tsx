@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -82,7 +83,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const userRole = isAdmin ? "Admin" : userProfile?.role || "SiteEngineer";
   
   const ptwQueryForBadge = useMemoFirebase(() => {
-    if (userRole === 'Admin' || userRole === 'Supervisor') {
+    if (userRole === 'Admin' || userRole === 'Site Manager') {
       return query(
         collection(firestore, 'permits_to_work'),
         where('isNew', '==', true)

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -26,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, setDocumentNonBlocking } from '@/firebase';
 import { doc, serverTimestamp } from 'firebase/firestore';
-import { initializeApp, deleteApp, getApps } from 'firebase/app';
+import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
 
@@ -34,7 +35,7 @@ const addUserSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
   email: z.string().email('Invalid email address.'),
   mobile: z.string().min(1, 'Mobile number is required.'),
-  role: z.enum(['Admin', 'Supervisor', 'SiteEngineer'], { required_error: 'Role is required' }),
+  role: z.enum(['Admin', 'Site Manager', 'SiteEngineer'], { required_error: 'Role is required' }),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
 });
 
@@ -171,7 +172,7 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="SiteEngineer">Site Engineer</SelectItem>
-                      <SelectItem value="Supervisor">Supervisor</SelectItem>
+                      <SelectItem value="Site Manager">Site Manager</SelectItem>
                       <SelectItem value="Admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
