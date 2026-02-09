@@ -1,5 +1,3 @@
-
-
 "use client";
 import * as React from "react";
 import { useForm } from "react-hook-form";
@@ -544,7 +542,7 @@ export default function PtwListPage() {
   }, [firestore, user]);
 
   const { data: userProfile } = useDoc(userProfileRef);
-  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com';
+  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com';
   const userRole = isAdmin ? "Admin" : userProfile?.role;
   
   const [actionState, setActionState] = React.useState<{permit: Permit, status: 'Approved' | 'Rejected'} | null>(null);
@@ -680,7 +678,7 @@ export default function PtwListPage() {
     }
   }, [statusFilter]);
 
-  if (isLoading || engineersLoading || ptwTypesLoading || sitesLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com')) {
+  if (isLoading || engineersLoading || ptwTypesLoading || sitesLoading || (!userProfile && user?.email !== 'abhijeet.agepl@gmail.com' && user?.email !== 'abhijeetsb22@gmail.com')) {
     return <PermitListSkeleton />
   }
 

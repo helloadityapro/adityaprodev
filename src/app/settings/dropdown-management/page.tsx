@@ -121,7 +121,7 @@ export default function AdminSettingsPage() {
   }, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  const isAdmin = userProfile?.role === 'Admin' || user?.email === 'abhijeet.agepl@gmail.com';
+  const isAdmin = userProfile?.role === 'Admin' || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com';
 
   React.useEffect(() => {
     if (!isUserLoading && !isProfileLoading && !isAdmin) {
