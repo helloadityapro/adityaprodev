@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -60,7 +59,7 @@ export default function TeamMappingPage() {
   const [managerSearch, setManagerSearch] = React.useState('');
 
   // Sort state
-  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'engineer', direction: 'asc' });
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
 
   const handleAssign = () => {
     if (!selectedManagerId || !selectedEngineerId) return;
@@ -115,11 +114,11 @@ export default function TeamMappingPage() {
         let valB = '';
 
         if (key === 'engineer') {
-            valA = a.username.toLowerCase();
-            valB = b.username.toLowerCase();
+            valA = (a.username || '').toLowerCase();
+            valB = (b.username || '').toLowerCase();
         } else {
-            valA = managers.find(m => m.id === a.siteManagerId)?.username.toLowerCase() || '';
-            valB = managers.find(m => m.id === b.siteManagerId)?.username.toLowerCase() || '';
+            valA = (managers.find(m => m.id === a.siteManagerId)?.username || '').toLowerCase();
+            valB = (managers.find(m => m.id === b.siteManagerId)?.username || '').toLowerCase();
         }
 
         if (valA < valB) return direction === 'asc' ? -1 : 1;
@@ -200,23 +199,6 @@ export default function TeamMappingPage() {
                 <TableRow>
                   <TableHead className="min-w-[200px]">
                     <div className="flex flex-col gap-2 py-2">
-                      <div className="flex items-center cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('engineer')}>
-                        <span>Engineer Name</span>
-                        <SortIcon column="engineer" />
-                      </div>
-                      <div className="relative">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Filter engineers..."
-                          value={engineerSearch}
-                          onChange={(e) => setEngineerSearch(e.target.value)}
-                          className="h-8 pl-8 text-xs"
-                        />
-                      </div>
-                    </div>
-                  </TableHead>
-                  <TableHead className="min-w-[200px]">
-                    <div className="flex flex-col gap-2 py-2">
                       <div className="flex items-center cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('manager')}>
                         <span>Assigned Manager</span>
                         <SortIcon column="manager" />
@@ -232,7 +214,24 @@ export default function TeamMappingPage() {
                       </div>
                     </div>
                   </TableHead>
-                  <TableHead className="text-right align-bottom pb-4">Action</TableHead>
+                  <TableHead className="min-w-[200px]">
+                    <div className="flex flex-col gap-2 py-2">
+                      <div className="flex items-center cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('engineer')}>
+                        <span>Engineer Name</span>
+                        <SortIcon column="engineer" />
+                      </div>
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Filter engineers..."
+                          value={engineerSearch}
+                          onChange={(e) => setEngineerSearch(e.target.value)}
+                          className="h-8 pl-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-right align-bottom pb-4 px-4">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -241,9 +240,9 @@ export default function TeamMappingPage() {
                     const manager = managers?.find(m => m.id === e.siteManagerId);
                     return (
                       <TableRow key={e.id}>
-                        <TableCell className="font-medium">{e.username}</TableCell>
-                        <TableCell>{manager?.username || 'Unknown Manager'}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="font-medium px-4">{manager?.username || 'Unknown Manager'}</TableCell>
+                        <TableCell className="px-4">{e.username || 'Unknown Engineer'}</TableCell>
+                        <TableCell className="text-right px-4">
                           <Button variant="ghost" size="icon" onClick={() => handleRemoveMapping(e.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                             <span className="sr-only">Remove</span>
@@ -254,9 +253,11 @@ export default function TeamMappingPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={3} className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                      <Users className="h-12 w-12 mb-4 opacity-20" />
-                      <p>No engineer mappings found matching your filters.</p>
+                    <TableCell colSpan={3} className="text-center py-12 text-muted-foreground">
+                      <div className="flex flex-col items-center justify-center">
+                        <Users className="h-12 w-12 mb-4 opacity-20" />
+                        <p>No engineer mappings found matching your filters.</p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}
