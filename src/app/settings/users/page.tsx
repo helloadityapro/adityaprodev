@@ -70,11 +70,9 @@ function UsersPageSkeleton() {
                 <Skeleton className="h-9 w-48" />
                 <Skeleton className="h-10 w-24" />
             </div>
-
             <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
                 {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
             </div>
-
             <Card>
                 <CardHeader>
                     <Skeleton className="h-8 w-40" />
@@ -123,20 +121,23 @@ type SortKey = 'username' | 'role' | 'registrationRequest' | 'createdAt';
 export default function UsersPage() {
     const firestore = useFirestore();
     const router = useRouter();
-    const { user, isUserLoading } = useUser();
+    const { user: currentUser, isUserLoading } = useUser();
     const { toast } = useToast();
 
     const userProfileRef = useMemoFirebase(() => {
-        if (!user) return null;
-        return doc(firestore, 'users', user.uid);
-    }, [firestore, user]);
+        if (!currentUser) return null;
+        return doc(firestore, 'users', currentUser.uid);
+    }, [firestore, currentUser]);
     const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-    const isAdmin = userProfile?.role === 'Admin' || 
-                    user?.email === 'abhijeet.agepl@gmail.com' || 
-                    user?.email === 'abhijeetsb22@gmail.com' || 
-                    user?.email === 'khalil@adityagreenenergy.com' || 
-                    user?.email === 'prafulrana143@gmail.com';
+    const SUPER_ADMIN_EMAILS = [
+      'abhijeet.agepl@gmail.com',
+      'abhijeetsb22@gmail.com',
+      'khalil@adityagreenenergy.com',
+      'prafulrana143@gmail.com'
+    ];
+
+    const isAdmin = userProfile?.role === 'Admin' || (currentUser?.email && SUPER_ADMIN_EMAILS.includes(currentUser.email));
 
     React.useEffect(() => {
         if (!isUserLoading && !isProfileLoading && !isAdmin) {
@@ -165,14 +166,22 @@ export default function UsersPage() {
         toast({ title: 'User Approved', description: 'The user registration has been approved.' });
     }
     
-    const handleRejectClick = (user: User) => {
+    const handleRejectClick = (u: User) => {
         setIsRejecting(true);
-        setUserToDelete(user);
+        setUserToDelete(u);
     }
 
-    const handleDeleteClick = (user: User) => {
+    const handleDeleteClick = (u: User) => {
+        if (u.id === currentUser?.uid) {
+            toast({
+                variant: "destructive",
+                title: "Action Restricted",
+                description: "You cannot delete your own account from the management portal."
+            });
+            return;
+        }
         setIsRejecting(false);
-        setUserToDelete(user);
+        setUserToDelete(u);
     }
     
     const handleConfirmDelete = (userId: string) => {
@@ -281,65 +290,65 @@ export default function UsersPage() {
 
             <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
                 <Card onClick={() => setFilter('all')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'all' && "ring-2 ring-primary bg-primary/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
                         <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Users</CardTitle>
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-4 pt-0">
                         <div className="text-2xl font-bold">{summary.totalUsers}</div>
                     </CardContent>
                 </Card>
 
                 <Card onClick={() => setFilter('pending')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'pending' && "ring-2 ring-yellow-500 bg-yellow-500/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
                         <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pending</CardTitle>
                         <UserPlus className="h-4 w-4 text-yellow-500" />
                     </CardHeader>
-                    <CardContent className="flex items-center justify-between">
+                    <CardContent className="p-4 pt-0 flex flex-col gap-1">
                         <div className="text-2xl font-bold">{summary.pending}</div>
                         {summary.pending > 0 && (
-                            <Badge variant="outline" className="text-yellow-600 bg-yellow-50 border-yellow-200">Needs Review</Badge>
+                            <Badge variant="outline" className="text-yellow-600 bg-yellow-50 border-yellow-200 w-fit">Review</Badge>
                         )}
                     </CardContent>
                 </Card>
 
                 <Card onClick={() => setFilter('Admin')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'Admin' && "ring-2 ring-blue-500 bg-blue-500/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
                         <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Admins</CardTitle>
                         <Shield className="h-4 w-4 text-blue-500" />
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-4 pt-0">
                         <div className="text-2xl font-bold">{summary.admins}</div>
                     </CardContent>
                 </Card>
 
                 <Card onClick={() => setFilter('Site Manager')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'Site Manager' && "ring-2 ring-purple-500 bg-purple-500/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
                         <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Managers</CardTitle>
                         <UserCog className="h-4 w-4 text-purple-500" />
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-4 pt-0">
                         <div className="text-2xl font-bold">{summary.managers}</div>
                     </CardContent>
                 </Card>
 
                 <Card onClick={() => setFilter('Site Engineer')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'Site Engineer' && "ring-2 ring-orange-500 bg-orange-500/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
                         <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Engineers</CardTitle>
                         <HardHat className="h-4 w-4 text-orange-500" />
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-4 pt-0">
                         <div className="text-2xl font-bold">{summary.engineers}</div>
                     </CardContent>
                 </Card>
 
                 {summary.other > 0 && (
                     <Card onClick={() => setFilter('other')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'other' && "ring-2 ring-slate-500 bg-slate-500/5")}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
                             <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Other</CardTitle>
                             <HelpCircle className="h-4 w-4 text-slate-500" />
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="p-4 pt-0">
                             <div className="text-2xl font-bold">{summary.other}</div>
                         </CardContent>
                     </Card>

@@ -77,21 +77,17 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  const isAdmin = userProfile?.role === "Admin" || 
-                  user?.email === 'abhijeet.agepl@gmail.com' || 
-                  user?.email === 'abhijeetsb22@gmail.com' ||
-                  user?.email === 'khalil@adityagreenenergy.com' ||
-                  user?.email === 'prafulrana143@gmail.com';
+  const SUPER_ADMIN_EMAILS = [
+    'abhijeet.agepl@gmail.com',
+    'abhijeetsb22@gmail.com',
+    'khalil@adityagreenenergy.com',
+    'prafulrana143@gmail.com'
+  ];
+
+  const isAdmin = userProfile?.role === "Admin" || (user?.email && SUPER_ADMIN_EMAILS.includes(user.email));
 
   React.useEffect(() => {
-    const isSuperAdminEmail = user?.email === 'abhijeet.agepl@gmail.com' || 
-                              user?.email === 'abhijeetsb22@gmail.com' ||
-                              user?.email === 'khalil@adityagreenenergy.com' ||
-                              user?.email === 'prafulrana143@gmail.com';
-
-    if (user && isSuperAdminEmail && !isProfileLoading) {
-      // Improved logic: Only update if the role is not Admin or registration is pending.
-      // Crucially, we do NOT overwrite the username if it's already set in Firestore.
+    if (user && user.email && SUPER_ADMIN_EMAILS.includes(user.email) && !isProfileLoading) {
       const needsInitialization = !userProfile || userProfile.role !== 'Admin' || userProfile.registrationRequest === true;
       
       if (needsInitialization) {
@@ -103,7 +99,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
           assignedProjectIds: userProfile?.assignedProjectIds || [],
         };
         
-        // Only set default values if they are missing in Firestore
         if (!userProfile?.username) {
           updateData.username = user.displayName || 'Admin User';
         }

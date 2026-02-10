@@ -36,10 +36,10 @@ const editUserSchema = z.object({
 
 type User = {
   id: string;
-  username: string;
-  email: string;
-  mobile: string;
-  role: 'Admin' | 'Site Manager' | 'Site Engineer';
+  username?: string;
+  email?: string;
+  mobile?: string;
+  role?: 'Admin' | 'Site Manager' | 'Site Engineer';
 };
 
 interface EditUserDialogProps {
@@ -55,14 +55,19 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
 
   const form = useForm<z.infer<typeof editUserSchema>>({
     resolver: zodResolver(editUserSchema),
+    defaultValues: {
+      username: '',
+      mobile: '',
+      role: 'Site Engineer',
+    }
   });
 
   React.useEffect(() => {
     if (user) {
       form.reset({
-        username: user.username,
-        mobile: user.mobile,
-        role: user.role,
+        username: user.username || '',
+        mobile: user.mobile || '',
+        role: user.role || 'Site Engineer',
       });
     }
   }, [user, form]);
@@ -83,7 +88,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
     } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'Uh oh! Something went wrong.',
+        title: 'Update Failed',
         description: error.message || 'Could not update user.',
       });
     } finally {
@@ -124,7 +129,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
               />
               <FormItem>
                 <FormLabel>Email</FormLabel>
-                <Input readOnly disabled value={user.email} />
+                <Input readOnly disabled value={user.email || 'N/A'} />
               </FormItem>
               <FormField
                 control={form.control}
@@ -145,7 +150,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a role" />
