@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -11,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { MapPin, Trash2, Loader2, PlusCircle } from 'lucide-react';
+import { Trash2, Loader2, PlusCircle } from 'lucide-react';
 
 type User = {
   id: string;
@@ -49,11 +50,9 @@ export default function SiteAssignmentPage() {
     }
   }, [isProfileLoading, isAdmin, isManager, router]);
 
-  // Fetch all sites
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
-  // Fetch users based on role
   const usersQuery = useMemoFirebase(() => {
     if (isAdmin) return collection(firestore, 'users');
     if (isManager) return query(collection(firestore, 'users'), where('siteManagerId', '==', user?.uid));
@@ -121,7 +120,6 @@ export default function SiteAssignmentPage() {
       return u.role === 'Site Engineer';
   }) || [];
 
-  // Filter out sites that are already assigned for the "Add" dropdown
   const availableSitesToAssign = sites?.filter(site => !localAssignedSites.includes(site.id)) || [];
 
   return (
