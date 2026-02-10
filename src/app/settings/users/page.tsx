@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Eye, Edit, Trash2, Users, UserPlus } from "lucide-react"
+import { Eye, Edit, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
@@ -35,12 +35,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 
+type UserRole = 'Admin' | 'Site Manager' | 'Site Engineer';
+
 type User = {
   id: string;
   username: string;
   email: string;
   mobile: string;
-  role: 'Admin' | 'Site Manager' | 'Site Engineer';
+  role: UserRole;
   registrationRequest: boolean;
   avatarUrl?: string;
   createdAt?: any;
@@ -68,7 +70,10 @@ function UsersPageSkeleton() {
                 <Skeleton className="h-10 w-24" />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
                 <Skeleton className="h-28" />
                 <Skeleton className="h-28" />
             </div>
@@ -120,6 +125,8 @@ function UsersPageSkeleton() {
     )
 }
 
+type FilterType = 'all' | 'pending' | UserRole;
+
 export default function UsersPage() {
     const firestore = useFirestore();
     const router = useRouter();
@@ -149,7 +156,7 @@ export default function UsersPage() {
     }, [firestore, isAdmin]);
     const { data: users, isLoading: isUsersLoading } = useCollection<User>(usersQuery);
 
-    const [filter, setFilter] = React.useState<'all' | 'pending'>('all');
+    const [filter, setFilter] = React.useState<FilterType>('all');
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
     const [userToEdit, setUserToEdit] = React.useState<User | null>(null);
     const [userToView, setUserToView] = React.useState<User | null>(null);
@@ -195,10 +202,13 @@ export default function UsersPage() {
     }, [users]);
 
     const summary = React.useMemo(() => {
-        if (!sortedUsers) return { totalUsers: 0, pendingRegistrations: 0 };
+        if (!sortedUsers) return { totalUsers: 0, pendingRegistrations: 0, admins: 0, managers: 0, engineers: 0 };
         return {
             totalUsers: sortedUsers.length,
             pendingRegistrations: sortedUsers.filter(u => u.registrationRequest).length,
+            admins: sortedUsers.filter(u => u.role === 'Admin').length,
+            managers: sortedUsers.filter(u => u.role === 'Site Manager').length,
+            engineers: sortedUsers.filter(u => u.role === 'Site Engineer').length,
         };
     }, [sortedUsers]);
     
@@ -207,7 +217,10 @@ export default function UsersPage() {
         if (filter === 'pending') {
             return sortedUsers.filter(u => u.registrationRequest);
         }
-        return sortedUsers;
+        if (filter === 'all') {
+            return sortedUsers;
+        }
+        return sortedUsers.filter(u => u.role === filter);
     }, [sortedUsers, filter]);
 
 
@@ -227,31 +240,87 @@ export default function UsersPage() {
                     <Button onClick={() => setIsAddUserDialogOpen(true)}>Add User</Button>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <Card onClick={() => setFilter('all')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'all' && "border-primary border-2")}>
+                <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                    <Card onClick={() => setFilter('all')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'all' && "ring-2 ring-primary bg-primary/5")}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Users</CardTitle>
                             <Users className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">{summary.totalUsers}</div>
                         </CardContent>
                     </Card>
-                    <Card onClick={() => setFilter('pending')} className={cn("cursor-pointer transition-colors hover:bg-muted/50", filter === 'pending' && "border-yellow-500 border-2")}>
+
+                    <Card onClick={() => setFilter('pending')} className={cn("cursor-pointer transition-all hover:bg-muted/50 relative overflow-hidden", filter === 'pending' && "ring-2 ring-yellow-500 bg-yellow-500/5")}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Pending Registrations</CardTitle>
+                            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pending</CardTitle>
                             <UserPlus className="h-4 w-4 text-yellow-500" />
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="flex items-center justify-between">
                             <div className="text-2xl font-bold">{summary.pendingRegistrations}</div>
+                            {summary.pendingRegistrations > 0 && (
+                                <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="h-7 px-2 text-[10px] text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setFilter('pending');
+                                    }}
+                                >
+                                    Review <CheckCircle2 className="ml-1 h-3 w-3" />
+                                </Button>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card onClick={() => setFilter('Admin')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'Admin' && "ring-2 ring-blue-500 bg-blue-500/5")}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Admins</CardTitle>
+                            <Shield className="h-4 w-4 text-blue-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{summary.admins}</div>
+                        </CardContent>
+                    </Card>
+
+                    <Card onClick={() => setFilter('Site Manager')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'Site Manager' && "ring-2 ring-purple-500 bg-purple-500/5")}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Managers</CardTitle>
+                            <UserCog className="h-4 w-4 text-purple-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{summary.managers}</div>
+                        </CardContent>
+                    </Card>
+
+                    <Card onClick={() => setFilter('Site Engineer')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'Site Engineer' && "ring-2 ring-orange-500 bg-orange-500/5")}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Engineers</CardTitle>
+                            <HardHat className="h-4 w-4 text-orange-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{summary.engineers}</div>
                         </CardContent>
                     </Card>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>{filter === 'all' ? 'All Users' : 'Pending Registrations'}</CardTitle>
-                        <CardDescription>A list of all users in the system.</CardDescription>
+                        <CardTitle>
+                            {filter === 'all' && 'All Users'}
+                            {filter === 'pending' && 'Pending Registrations'}
+                            {filter === 'Admin' && 'Admins'}
+                            {filter === 'Site Manager' && 'Site Managers'}
+                            {filter === 'Site Engineer' && 'Site Engineers'}
+                        </CardTitle>
+                        <CardDescription>
+                            {filter === 'all' && 'Showing every user registered in the system.'}
+                            {filter === 'pending' && 'Users awaiting approval from an administrator.'}
+                            {filter === 'Admin' && 'Users with administrative privileges.'}
+                            {filter === 'Site Manager' && 'Users responsible for first-level permit approvals.'}
+                            {filter === 'Site Engineer' && 'Users who raise permit requests at sites.'}
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                         {filteredUsers.length > 0 ? (
@@ -262,7 +331,7 @@ export default function UsersPage() {
                                         <TableHead>Role</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead className="hidden md:table-cell">Mobile</TableHead>
-                                        <TableHead>Actions</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -280,29 +349,33 @@ export default function UsersPage() {
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{user.role}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className="font-normal capitalize">
+                                                    {user.role}
+                                                </Badge>
+                                            </TableCell>
                                             <TableCell>
                                                 <StatusBadge isPending={user.registrationRequest} />
                                             </TableCell>
                                             <TableCell className="hidden md:table-cell">{user.mobile}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
+                                            <TableCell className="text-right">
+                                                <div className="flex items-center justify-end gap-2">
                                                     {user.registrationRequest ? (
                                                         <>
-                                                            <Button variant="outline" size="sm" onClick={() => handleApproveRegistration(user.id)}>Approve</Button>
-                                                            <Button variant="destructive" size="sm" onClick={() => handleRejectClick(user)}>Reject</Button>
+                                                            <Button variant="outline" size="sm" className="h-8" onClick={() => handleApproveRegistration(user.id)}>Approve</Button>
+                                                            <Button variant="destructive" size="sm" className="h-8" onClick={() => handleRejectClick(user)}>Reject</Button>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <Button variant="ghost" size="icon" onClick={() => setUserToView(user)}>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setUserToView(user)}>
                                                                 <Eye className="h-4 w-4" />
                                                                 <span className="sr-only">View</span>
                                                             </Button>
-                                                            <Button variant="ghost" size="icon" onClick={() => setUserToEdit(user)}>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setUserToEdit(user)}>
                                                                 <Edit className="h-4 w-4" />
                                                                 <span className="sr-only">Edit</span>
                                                             </Button>
-                                                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(user)}>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteClick(user)}>
                                                                 <Trash2 className="h-4 w-4" />
                                                                 <span className="sr-only">Delete</span>
                                                             </Button>
@@ -316,7 +389,8 @@ export default function UsersPage() {
                             </Table>
                         ) : (
                             <div className="text-center py-12 text-muted-foreground">
-                               <p>No {filter === 'pending' ? 'pending' : ''} users found.</p>
+                               <p>No {filter === 'pending' ? 'pending' : ''} users found matching the selected filter.</p>
+                               <Button variant="link" onClick={() => setFilter('all')}>View all users</Button>
                             </div>
                         )}
                     </CardContent>
@@ -339,7 +413,7 @@ export default function UsersPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => userToDelete && handleConfirmDelete(userToDelete.id)}>
+                    <AlertDialogAction onClick={() => userToDelete && handleConfirmDelete(userToDelete.id)} className={cn(isRejecting ? "bg-red-600 hover:bg-red-700" : "bg-destructive hover:bg-destructive/90")}>
                          {isRejecting ? 'Yes, Reject' : 'Delete'}
                     </AlertDialogAction>
                     </AlertDialogFooter>
