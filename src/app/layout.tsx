@@ -22,7 +22,7 @@ import { UserNotifications } from "@/components/user-notifications";
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
-import { Loader2 } from "lucide-react";
+import { Loader2, Sun, Moon } from "lucide-react";
 
 function FullPageLoader() {
   return (
@@ -44,15 +44,31 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
 
   React.useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    const isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (isDark) {
       document.documentElement.classList.add('dark');
+      setTheme('dark');
     } else {
       document.documentElement.classList.remove('dark');
+      setTheme('light');
     }
   }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    if (nextTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
   const userProfileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -210,6 +226,15 @@ function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarTrigger />
           <div className="w-full flex-1">
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="h-8 w-8 rounded-full"
+            title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+          >
+            {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+          </Button>
           <UserNotifications />
           <UserNav />
         </header>
