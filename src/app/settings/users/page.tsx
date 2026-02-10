@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react";
@@ -14,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Eye, Edit, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
 import { collection, doc } from "firebase/firestore"
 import { AddUserDialog } from "@/components/add-user-dialog";
@@ -196,9 +197,11 @@ export default function UsersPage() {
 
     const sortedAndFilteredUsers = React.useMemo(() => {
         if (!users) return [];
+        
+        // Start with the raw collection
         let result = [...users];
 
-        // Apply Search Filter (Case-insensitive, trimmed)
+        // 1. Search Filter
         const term = searchTerm.trim().toLowerCase();
         if (term) {
             result = result.filter(u => 
@@ -207,14 +210,14 @@ export default function UsersPage() {
             );
         }
         
-        // Apply Role/Pending Filter
+        // 2. Category Filter
         if (filter === 'pending') {
             result = result.filter(u => u.registrationRequest === true);
         } else if (filter !== 'all') {
             result = result.filter(u => u.role === filter);
         }
 
-        // Apply Sorting
+        // 3. Sorting
         return result.sort((a, b) => {
             const { key, direction } = sortConfig;
             let valA: any = a[key] ?? '';
@@ -271,7 +274,7 @@ export default function UsersPage() {
                     </CardContent>
                 </Card>
 
-                <Card onClick={() => setFilter('pending')} className={cn("cursor-pointer transition-all hover:bg-muted/50 relative overflow-hidden", filter === 'pending' && "ring-2 ring-yellow-500 bg-yellow-500/5")}>
+                <Card onClick={() => setFilter('pending')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'pending' && "ring-2 ring-yellow-500 bg-yellow-500/5")}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Pending</CardTitle>
                         <UserPlus className="h-4 w-4 text-yellow-500" />
@@ -279,17 +282,7 @@ export default function UsersPage() {
                     <CardContent className="flex items-center justify-between">
                         <div className="text-2xl font-bold">{summary.pendingRegistrations}</div>
                         {summary.pendingRegistrations > 0 && (
-                            <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                className="h-7 px-2 text-[10px] text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setFilter('pending');
-                                }}
-                            >
-                                Review <CheckCircle2 className="ml-1 h-3 w-3" />
-                            </Button>
+                            <Badge variant="outline" className="text-yellow-600 bg-yellow-50 border-yellow-200">Needs Review</Badge>
                         )}
                     </CardContent>
                 </Card>
@@ -328,12 +321,13 @@ export default function UsersPage() {
             <Card>
                 <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <CardTitle>
+                        <CardTitle className="flex items-center gap-2">
                             {filter === 'all' && 'All Users'}
                             {filter === 'pending' && 'Pending Registrations'}
                             {filter === 'Admin' && 'Admins'}
                             {filter === 'Site Manager' && 'Site Managers'}
                             {filter === 'Site Engineer' && 'Site Engineers'}
+                            <Badge variant="secondary" className="ml-2">{sortedAndFilteredUsers.length} of {summary.totalUsers}</Badge>
                         </CardTitle>
                         <CardDescription>
                             {filter === 'all' && 'Showing every user registered in the system.'}
@@ -377,7 +371,7 @@ export default function UsersPage() {
                                         <TableCell>
                                             <div className="flex items-center gap-3">
                                                 <Avatar className="h-9 w-9">
-                                                    <AvatarFallback>{(u.username || 'U').charAt(0).toUpperCase()}</AvatarFallback>
+                                                    <AvatarFallback className="bg-primary/10 text-primary">{(u.username || u.email || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                                                 </Avatar>
                                                 <div className="grid gap-0.5">
                                                     <p className="font-medium">{u.username || 'Unknown User'}</p>
@@ -425,6 +419,7 @@ export default function UsersPage() {
                         </Table>
                     ) : (
                         <div className="text-center py-12 text-muted-foreground">
+                           <Users className="h-12 w-12 mx-auto mb-4 opacity-20" />
                            <p>No users found matching your search or filter.</p>
                            <Button variant="link" onClick={() => { setFilter('all'); setSearchTerm(''); }}>Clear all filters</Button>
                         </div>
@@ -457,3 +452,5 @@ export default function UsersPage() {
         </div>
     )
 }
+
+    
