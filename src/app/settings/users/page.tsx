@@ -40,11 +40,11 @@ type UserRole = 'Admin' | 'Site Manager' | 'Site Engineer';
 
 type User = {
   id: string;
-  username: string;
-  email: string;
-  mobile: string;
-  role: UserRole;
-  registrationRequest: boolean;
+  username?: string;
+  email?: string;
+  mobile?: string;
+  role?: UserRole;
+  registrationRequest?: boolean;
   avatarUrl?: string;
   createdAt?: any;
 };
@@ -208,12 +208,12 @@ export default function UsersPage() {
         if (!users) return [];
         let result = [...users];
 
-        // Apply Search Filter
+        // Apply Search Filter with defensive checks
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             result = result.filter(u => 
-                u.username.toLowerCase().includes(term) || 
-                u.email.toLowerCase().includes(term)
+                (u.username || '').toLowerCase().includes(term) || 
+                (u.email || '').toLowerCase().includes(term)
             );
         }
         
@@ -224,15 +224,18 @@ export default function UsersPage() {
             result = result.filter(u => u.role === filter);
         }
 
-        // Apply Sorting
+        // Apply Sorting with defensive checks
         return result.sort((a, b) => {
             const { key, direction } = sortConfig;
-            let valA: any = a[key];
-            let valB: any = b[key];
+            let valA: any = a[key] ?? '';
+            let valB: any = b[key] ?? '';
 
             if (key === 'createdAt') {
                 valA = a.createdAt?.toDate()?.getTime() || 0;
                 valB = b.createdAt?.toDate()?.getTime() || 0;
+            } else if (typeof valA === 'string' && typeof valB === 'string') {
+                valA = valA.toLowerCase();
+                valB = valB.toLowerCase();
             }
 
             if (valA < valB) return direction === 'asc' ? -1 : 1;
@@ -386,23 +389,23 @@ export default function UsersPage() {
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="h-9 w-9">
                                                         {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.username} data-ai-hint="person face" />}
-                                                        <AvatarFallback>{user.username.charAt(0).toUpperCase()}</AvatarFallback>
+                                                        <AvatarFallback>{(user.username || 'U').charAt(0).toUpperCase()}</AvatarFallback>
                                                     </Avatar>
                                                     <div className="grid gap-0.5">
-                                                        <p className="font-medium">{user.username}</p>
-                                                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                                                        <p className="font-medium">{user.username || 'Unknown User'}</p>
+                                                        <p className="text-sm text-muted-foreground">{user.email || 'No Email'}</p>
                                                     </div>
                                                 </div>
                                             </TableCell>
                                             <TableCell>
                                                 <Badge variant="outline" className="font-normal capitalize">
-                                                    {user.role}
+                                                    {user.role || 'Unassigned'}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                <StatusBadge isPending={user.registrationRequest} />
+                                                <StatusBadge isPending={!!user.registrationRequest} />
                                             </TableCell>
-                                            <TableCell className="hidden md:table-cell">{user.mobile}</TableCell>
+                                            <TableCell className="hidden md:table-cell">{user.mobile || 'N/A'}</TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     {user.registrationRequest ? (
@@ -412,11 +415,11 @@ export default function UsersPage() {
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setUserToView(user)}>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setUserToView(user as any)}>
                                                                 <Eye className="h-4 w-4" />
                                                                 <span className="sr-only">View</span>
                                                             </Button>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setUserToEdit(user)}>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setUserToEdit(user as any)}>
                                                                 <Edit className="h-4 w-4" />
                                                                 <span className="sr-only">Edit</span>
                                                             </Button>
@@ -442,8 +445,8 @@ export default function UsersPage() {
                 </Card>
             </div>
             <AddUserDialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen} />
-            <EditUserDialog user={userToEdit} open={!!userToEdit} onOpenChange={() => setUserToEdit(null)} />
-            <ViewUserDialog user={userToView} open={!!userToView} onOpenChange={() => setUserToView(null)} />
+            <EditUserDialog user={userToEdit as any} open={!!userToEdit} onOpenChange={() => setUserToEdit(null)} />
+            <ViewUserDialog user={userToView as any} open={!!userToView} onOpenChange={() => setUserToView(null)} />
             <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
