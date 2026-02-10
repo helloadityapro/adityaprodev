@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Eye, Edit, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { Eye, Edit, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
 
 type UserRole = 'Admin' | 'Site Manager' | 'Site Engineer';
 
@@ -114,8 +115,7 @@ function UsersPageSkeleton() {
                                             <Skeleton className="h-8 w-20" />
                                             <Skeleton className="h-8 w-20" />
                                         </div>
-                                    </TableCell>
-                                </TableRow>
+                                    </TableRow>
                             ))}
                         </TableBody>
                     </Table>
@@ -158,6 +158,7 @@ export default function UsersPage() {
     const { data: users, isLoading: isUsersLoading } = useCollection<User>(usersQuery);
 
     const [filter, setFilter] = React.useState<FilterType>('all');
+    const [searchTerm, setSearchTerm] = React.useState('');
     const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
     const [userToEdit, setUserToEdit] = React.useState<User | null>(null);
@@ -204,13 +205,24 @@ export default function UsersPage() {
     const sortedAndFilteredUsers = React.useMemo(() => {
         if (!users) return [];
         let result = [...users];
+
+        // Apply Search Filter
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            result = result.filter(u => 
+                u.username.toLowerCase().includes(term) || 
+                u.email.toLowerCase().includes(term)
+            );
+        }
         
+        // Apply Role Filter
         if (filter === 'pending') {
             result = result.filter(u => u.registrationRequest);
         } else if (filter !== 'all') {
             result = result.filter(u => u.role === filter);
         }
 
+        // Apply Sorting
         return result.sort((a, b) => {
             const { key, direction } = sortConfig;
             let valA: any = a[key];
@@ -225,7 +237,7 @@ export default function UsersPage() {
             if (valA > valB) return direction === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [users, filter, sortConfig]);
+    }, [users, filter, sortConfig, searchTerm]);
 
     const summary = React.useMemo(() => {
         if (!users) return { totalUsers: 0, pendingRegistrations: 0, admins: 0, managers: 0, engineers: 0 };
@@ -320,21 +332,32 @@ export default function UsersPage() {
                 </div>
 
                 <Card>
-                    <CardHeader>
-                        <CardTitle>
-                            {filter === 'all' && 'All Users'}
-                            {filter === 'pending' && 'Pending Registrations'}
-                            {filter === 'Admin' && 'Admins'}
-                            {filter === 'Site Manager' && 'Site Managers'}
-                            {filter === 'Site Engineer' && 'Site Engineers'}
-                        </CardTitle>
-                        <CardDescription>
-                            {filter === 'all' && 'Showing every user registered in the system.'}
-                            {filter === 'pending' && 'Users awaiting approval from an administrator.'}
-                            {filter === 'Admin' && 'Users with administrative privileges.'}
-                            {filter === 'Site Manager' && 'Users responsible for first-level permit approvals.'}
-                            {filter === 'Site Engineer' && 'Users who raise permit requests at sites.'}
-                        </CardDescription>
+                    <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <CardTitle>
+                                {filter === 'all' && 'All Users'}
+                                {filter === 'pending' && 'Pending Registrations'}
+                                {filter === 'Admin' && 'Admins'}
+                                {filter === 'Site Manager' && 'Site Managers'}
+                                {filter === 'Site Engineer' && 'Site Engineers'}
+                            </CardTitle>
+                            <CardDescription>
+                                {filter === 'all' && 'Showing every user registered in the system.'}
+                                {filter === 'pending' && 'Users awaiting approval from an administrator.'}
+                                {filter === 'Admin' && 'Users with administrative privileges.'}
+                                {filter === 'Site Manager' && 'Users responsible for first-level permit approvals.'}
+                                {filter === 'Site Engineer' && 'Users who raise permit requests at sites.'}
+                            </CardDescription>
+                        </div>
+                        <div className="relative w-full md:w-72">
+                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by name or email..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-8"
+                            />
+                        </div>
                     </CardHeader>
                     <CardContent>
                         {sortedAndFilteredUsers.length > 0 ? (
@@ -409,8 +432,8 @@ export default function UsersPage() {
                             </Table>
                         ) : (
                             <div className="text-center py-12 text-muted-foreground">
-                               <p>No {filter === 'pending' ? 'pending' : ''} users found matching the selected filter.</p>
-                               <Button variant="link" onClick={() => setFilter('all')}>View all users</Button>
+                               <p>No users found matching your search or filter.</p>
+                               <Button variant="link" onClick={() => { setFilter('all'); setSearchTerm(''); }}>Clear all filters</Button>
                             </div>
                         )}
                     </CardContent>
