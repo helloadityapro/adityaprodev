@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react";
@@ -115,7 +114,8 @@ function UsersPageSkeleton() {
                                             <Skeleton className="h-8 w-20" />
                                             <Skeleton className="h-8 w-20" />
                                         </div>
-                                    </TableRow>
+                                    </TableCell>
+                                </TableRow>
                             ))}
                         </TableBody>
                     </Table>
