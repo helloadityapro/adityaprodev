@@ -90,17 +90,28 @@ function AppShell({ children }: { children: React.ReactNode }) {
                               user?.email === 'prafulrana143@gmail.com';
 
     if (user && isSuperAdminEmail && !isProfileLoading) {
-      if (!userProfile || userProfile.role !== 'Admin') {
-        const adminUserDoc = {
+      // Improved logic: Only update if the role is not Admin or registration is pending.
+      // Crucially, we do NOT overwrite the username if it's already set in Firestore.
+      const needsInitialization = !userProfile || userProfile.role !== 'Admin' || userProfile.registrationRequest === true;
+      
+      if (needsInitialization) {
+        const updateData: any = {
           id: user.uid,
-          username: user.displayName || 'Admin User',
           email: user.email,
-          mobile: user.phoneNumber || '0000000000',
           role: 'Admin',
           registrationRequest: false,
-          assignedProjectIds: [],
+          assignedProjectIds: userProfile?.assignedProjectIds || [],
         };
-        setDocumentNonBlocking(doc(firestore, "users", user.uid), adminUserDoc, { merge: true });
+        
+        // Only set default values if they are missing in Firestore
+        if (!userProfile?.username) {
+          updateData.username = user.displayName || 'Admin User';
+        }
+        if (!userProfile?.mobile) {
+          updateData.mobile = user.phoneNumber || '0000000000';
+        }
+
+        setDocumentNonBlocking(doc(firestore, "users", user.uid), updateData, { merge: true });
       }
     }
   }, [user, userProfile, isProfileLoading, firestore]);
