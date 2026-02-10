@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Eye, Edit, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react"
+import { Eye, Edit, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown, Search, HelpCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
@@ -71,8 +71,8 @@ function UsersPageSkeleton() {
                 <Skeleton className="h-10 w-24" />
             </div>
 
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+                {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
             </div>
 
             <Card>
@@ -117,7 +117,7 @@ function UsersPageSkeleton() {
     )
 }
 
-type FilterType = 'all' | 'pending' | UserRole;
+type FilterType = 'all' | 'pending' | 'other' | UserRole;
 type SortKey = 'username' | 'role' | 'registrationRequest' | 'createdAt';
 
 export default function UsersPage() {
@@ -195,13 +195,40 @@ export default function UsersPage() {
         return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
     };
 
+    const summary = React.useMemo(() => {
+        if (!users) return { totalUsers: 0, pending: 0, admins: 0, managers: 0, engineers: 0, other: 0 };
+        
+        const counts = {
+            totalUsers: users.length,
+            pending: 0,
+            admins: 0,
+            managers: 0,
+            engineers: 0,
+            other: 0,
+        };
+
+        users.forEach(u => {
+            if (u.registrationRequest === true) {
+                counts.pending++;
+            } else if (u.role === 'Admin') {
+                counts.admins++;
+            } else if (u.role === 'Site Manager') {
+                counts.managers++;
+            } else if (u.role === 'Site Engineer') {
+                counts.engineers++;
+            } else {
+                counts.other++;
+            }
+        });
+
+        return counts;
+    }, [users]);
+
     const sortedAndFilteredUsers = React.useMemo(() => {
         if (!users) return [];
         
-        // Start with the raw collection
         let result = [...users];
 
-        // 1. Search Filter
         const term = searchTerm.trim().toLowerCase();
         if (term) {
             result = result.filter(u => 
@@ -210,14 +237,14 @@ export default function UsersPage() {
             );
         }
         
-        // 2. Category Filter
         if (filter === 'pending') {
             result = result.filter(u => u.registrationRequest === true);
+        } else if (filter === 'other') {
+            result = result.filter(u => !u.registrationRequest && u.role !== 'Admin' && u.role !== 'Site Manager' && u.role !== 'Site Engineer');
         } else if (filter !== 'all') {
-            result = result.filter(u => u.role === filter);
+            result = result.filter(u => u.role === filter && !u.registrationRequest);
         }
 
-        // 3. Sorting
         return result.sort((a, b) => {
             const { key, direction } = sortConfig;
             let valA: any = a[key] ?? '';
@@ -237,17 +264,6 @@ export default function UsersPage() {
         });
     }, [users, filter, sortConfig, searchTerm]);
 
-    const summary = React.useMemo(() => {
-        if (!users) return { totalUsers: 0, pendingRegistrations: 0, admins: 0, managers: 0, engineers: 0 };
-        return {
-            totalUsers: users.length,
-            pendingRegistrations: users.filter(u => u.registrationRequest === true).length,
-            admins: users.filter(u => u.role === 'Admin').length,
-            managers: users.filter(u => u.role === 'Site Manager').length,
-            engineers: users.filter(u => u.role === 'Site Engineer').length,
-        };
-    }, [users]);
-
     if(isUserLoading || isProfileLoading || (isAdmin && isUsersLoading)) {
         return <UsersPageSkeleton />
     }
@@ -263,7 +279,7 @@ export default function UsersPage() {
                 <Button onClick={() => setIsAddUserDialogOpen(true)}>Add User</Button>
             </div>
 
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
                 <Card onClick={() => setFilter('all')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'all' && "ring-2 ring-primary bg-primary/5")}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total Users</CardTitle>
@@ -280,8 +296,8 @@ export default function UsersPage() {
                         <UserPlus className="h-4 w-4 text-yellow-500" />
                     </CardHeader>
                     <CardContent className="flex items-center justify-between">
-                        <div className="text-2xl font-bold">{summary.pendingRegistrations}</div>
-                        {summary.pendingRegistrations > 0 && (
+                        <div className="text-2xl font-bold">{summary.pending}</div>
+                        {summary.pending > 0 && (
                             <Badge variant="outline" className="text-yellow-600 bg-yellow-50 border-yellow-200">Needs Review</Badge>
                         )}
                     </CardContent>
@@ -316,6 +332,18 @@ export default function UsersPage() {
                         <div className="text-2xl font-bold">{summary.engineers}</div>
                     </CardContent>
                 </Card>
+
+                {summary.other > 0 && (
+                    <Card onClick={() => setFilter('other')} className={cn("cursor-pointer transition-all hover:bg-muted/50", filter === 'other' && "ring-2 ring-slate-500 bg-slate-500/5")}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Other</CardTitle>
+                            <HelpCircle className="h-4 w-4 text-slate-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{summary.other}</div>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
 
             <Card>
@@ -327,6 +355,7 @@ export default function UsersPage() {
                             {filter === 'Admin' && 'Admins'}
                             {filter === 'Site Manager' && 'Site Managers'}
                             {filter === 'Site Engineer' && 'Site Engineers'}
+                            {filter === 'other' && 'Other/Unassigned Users'}
                             <Badge variant="secondary" className="ml-2">{sortedAndFilteredUsers.length} of {summary.totalUsers}</Badge>
                         </CardTitle>
                         <CardDescription>
@@ -335,6 +364,7 @@ export default function UsersPage() {
                             {filter === 'Admin' && 'Users with administrative privileges.'}
                             {filter === 'Site Manager' && 'Users responsible for first-level permit approvals.'}
                             {filter === 'Site Engineer' && 'Users who raise permit requests at sites.'}
+                            {filter === 'other' && 'Users without a valid role or in an unknown state.'}
                         </CardDescription>
                     </div>
                     <div className="relative w-full md:w-72">
@@ -452,5 +482,3 @@ export default function UsersPage() {
         </div>
     )
 }
-
-    
