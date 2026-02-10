@@ -40,7 +40,8 @@ export default function SiteAssignmentPage() {
   const isAdmin = userProfile?.role === 'Admin' || 
                   user?.email === 'abhijeet.agepl@gmail.com' || 
                   user?.email === 'abhijeetsb22@gmail.com' ||
-                  user?.email === 'khalil@adityagreenenergy.com';
+                  user?.email === 'khalil@adityagreenenergy.com' ||
+                  user?.email === 'prafulrana143@gmail.com';
   
   const isManager = userProfile?.role === 'Site Manager';
 

@@ -37,7 +37,8 @@ export default function TeamMappingPage() {
   const isAdmin = userProfile?.role === 'Admin' || 
                   user?.email === 'abhijeet.agepl@gmail.com' || 
                   user?.email === 'abhijeetsb22@gmail.com' ||
-                  user?.email === 'khalil@adityagreenenergy.com';
+                  user?.email === 'khalil@adityagreenenergy.com' ||
+                  user?.email === 'prafulrana143@gmail.com';
 
   React.useEffect(() => {
     if (!isProfileLoading && !isAdmin) {

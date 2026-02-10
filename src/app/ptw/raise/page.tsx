@@ -1,5 +1,5 @@
 
-"use client"
+'use client';
 
 import * as React from "react"
 import { useSearchParams } from "next/navigation"
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Paperclip, AlertTriangle } from "lucide-react"
+import { Paperclip, AlertTriangle, MapPin } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp, doc } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -83,7 +83,8 @@ export default function RaisePtwPage() {
     const isAdmin = userProfile.role === 'Admin' || 
                     user?.email === 'abhijeet.agepl@gmail.com' || 
                     user?.email === 'abhijeetsb22@gmail.com' ||
-                    user?.email === 'khalil@adityagreenenergy.com';
+                    user?.email === 'khalil@adityagreenenergy.com' ||
+                    user?.email === 'prafulrana143@gmail.com';
     
     if (isAdmin) {
         return Array.from(new Map(allSites.map(site => [site.name, site])).values());

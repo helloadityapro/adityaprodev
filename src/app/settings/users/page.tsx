@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react";
@@ -14,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Eye, Edit, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
 import { collection, doc } from "firebase/firestore"
 import { AddUserDialog } from "@/components/add-user-dialog";
@@ -143,7 +144,8 @@ export default function UsersPage() {
     const isAdmin = userProfile?.role === 'Admin' || 
                     user?.email === 'abhijeet.agepl@gmail.com' || 
                     user?.email === 'abhijeetsb22@gmail.com' ||
-                    user?.email === 'khalil@adityagreenenergy.com';
+                    user?.email === 'khalil@adityagreenenergy.com' ||
+                    user?.email === 'prafulrana143@gmail.com';
 
     React.useEffect(() => {
         if (!isUserLoading && !isProfileLoading && !isAdmin) {
