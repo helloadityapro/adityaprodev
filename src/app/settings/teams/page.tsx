@@ -104,7 +104,7 @@ export default function TeamMappingPage() {
       .filter(e => e.siteManagerId)
       .filter(e => {
         const manager = managers.find(m => m.id === e.siteManagerId);
-        const matchesEngineer = e.username.toLowerCase().includes(engineerSearch.toLowerCase());
+        const matchesEngineer = (e.username || '').toLowerCase().includes(engineerSearch.toLowerCase());
         const matchesManager = manager?.username.toLowerCase().includes(managerSearch.toLowerCase()) ?? false;
         return matchesEngineer && matchesManager;
       })
@@ -148,8 +148,8 @@ export default function TeamMappingPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Map Engineer to Manager</CardTitle>
-          <CardDescription>Select a manager and then an engineer to create a mapping.</CardDescription>
+          <CardTitle>Assign Site Engineer to Site Manager</CardTitle>
+          <CardDescription>Select a manager and then an engineer to Assign and Make a Team.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -189,7 +189,7 @@ export default function TeamMappingPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Current Mappings</CardTitle>
+          <CardTitle>Teams</CardTitle>
           <CardDescription>A list of all engineers and their assigned managers.</CardDescription>
         </CardHeader>
         <CardContent>
