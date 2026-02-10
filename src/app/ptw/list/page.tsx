@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Check, X, FileText, Paperclip, Calendar as CalendarIcon, FilterX, MapPin, Film, Video, Image } from "lucide-react"
+import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Check, X, FileText, Paperclip, Calendar as CalendarIcon, FilterX, MapPin, Film, Video, Image, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, writeBatch } from "firebase/firestore";
@@ -74,7 +74,7 @@ function UserDisplay({ userId }: { userId: string }) {
   return <span>{user?.username || '...'}</span>;
 }
 
-const actionSchema = z.object({ remarks: z.string().min(1, "Remarks are required.") });
+type SortKey = 'ptwType' | 'siteName' | 'requestDate' | 'status';
 
 export default function PtwListPage() {
   const firestore = useFirestore();
@@ -87,6 +87,7 @@ export default function PtwListPage() {
   const [actionState, setActionState] = React.useState<{permit: Permit, status: 'Approved' | 'Rejected' | 'ManagerApproved'} | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [viewerState, setViewerState] = React.useState<{ attachments: Attachment[]; startIndex: number } | null>(null);
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
 
   const { data: userProfile } = useDoc(useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]));
   const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com' || user?.email === 'khalil@adityagreenenergy.com';
@@ -130,6 +131,18 @@ export default function PtwListPage() {
     });
   };
 
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
+  };
+
   const filteredPermits = React.useMemo(() => {
     if (!permits) return [];
     return permits.filter(p => {
@@ -138,8 +151,21 @@ export default function PtwListPage() {
       const matchSite = !filters.siteName || p.siteName === filters.siteName;
       const matchDate = !filters.date || (p.requestDate?.toDate && isSameDay(p.requestDate.toDate(), filters.date));
       return matchStatus && matchType && matchSite && matchDate;
-    }).sort((a, b) => (b.requestDate?.toDate?.()?.getTime() || 0) - (a.requestDate?.toDate?.()?.getTime() || 0));
-  }, [permits, statusFilter, filters]);
+    }).sort((a, b) => {
+      const { key, direction } = sortConfig;
+      let valA = a[key];
+      let valB = b[key];
+
+      if (key === 'requestDate') {
+        valA = a.requestDate?.toDate?.()?.getTime() || 0;
+        valB = b.requestDate?.toDate?.()?.getTime() || 0;
+      }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [permits, statusFilter, filters, sortConfig]);
 
   if (isLoading || !userRole) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
@@ -172,10 +198,19 @@ export default function PtwListPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>PTW Type</TableHead>
-                <TableHead>Site</TableHead>
+                <TableHead onClick={() => handleSort('ptwType')} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center">PTW Type <SortIcon column="ptwType" /></div>
+                </TableHead>
+                <TableHead onClick={() => handleSort('siteName')} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center">Site <SortIcon column="siteName" /></div>
+                </TableHead>
                 <TableHead>Engineer</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead onClick={() => handleSort('status')} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center">Status <SortIcon column="status" /></div>
+                </TableHead>
+                <TableHead onClick={() => handleSort('requestDate')} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center">Date <SortIcon column="requestDate" /></div>
+                </TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -186,6 +221,7 @@ export default function PtwListPage() {
                   <TableCell>{permit.siteName}</TableCell>
                   <TableCell><UserDisplay userId={permit.siteEngineerId} /></TableCell>
                   <TableCell><StatusBadge status={permit.status} /></TableCell>
+                  <TableCell>{formatTimestamp(permit.requestDate)}</TableCell>
                   <TableCell className="text-right flex items-center justify-end gap-2">
                     <Button variant="ghost" size="icon" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
                     {userRole === 'Site Manager' && (permit.status === 'Pending' || permit.status === 'Corrected') && (
@@ -206,6 +242,11 @@ export default function PtwListPage() {
                   </TableCell>
                 </TableRow>
               ))}
+              {filteredPermits.length === 0 && (
+                  <TableRow>
+                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No permits found.</TableCell>
+                  </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Eye, Edit, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CheckCircle2 } from "lucide-react"
+import { Eye, Edit, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
@@ -126,6 +126,7 @@ function UsersPageSkeleton() {
 }
 
 type FilterType = 'all' | 'pending' | UserRole;
+type SortKey = 'username' | 'role' | 'registrationRequest' | 'createdAt';
 
 export default function UsersPage() {
     const firestore = useFirestore();
@@ -157,6 +158,7 @@ export default function UsersPage() {
     const { data: users, isLoading: isUsersLoading } = useCollection<User>(usersQuery);
 
     const [filter, setFilter] = React.useState<FilterType>('all');
+    const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
     const [userToEdit, setUserToEdit] = React.useState<User | null>(null);
     const [userToView, setUserToView] = React.useState<User | null>(null);
@@ -187,42 +189,54 @@ export default function UsersPage() {
         setUserToDelete(null);
     };
 
-    const onDialogClose = () => {
-        setUserToDelete(null);
-        setIsRejecting(false);
-    }
+    const handleSort = (key: SortKey) => {
+        setSortConfig(prev => ({
+            key,
+            direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
 
-    const sortedUsers = React.useMemo(() => {
+    const SortIcon = ({ column }: { column: SortKey }) => {
+        if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
+        return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
+    };
+
+    const sortedAndFilteredUsers = React.useMemo(() => {
         if (!users) return [];
-        return [...users].sort((a, b) => {
-          const dateA = a.createdAt?.toDate()?.getTime() || 0;
-          const dateB = b.createdAt?.toDate()?.getTime() || 0;
-          return dateB - dateA;
+        let result = [...users];
+        
+        if (filter === 'pending') {
+            result = result.filter(u => u.registrationRequest);
+        } else if (filter !== 'all') {
+            result = result.filter(u => u.role === filter);
+        }
+
+        return result.sort((a, b) => {
+            const { key, direction } = sortConfig;
+            let valA: any = a[key];
+            let valB: any = b[key];
+
+            if (key === 'createdAt') {
+                valA = a.createdAt?.toDate()?.getTime() || 0;
+                valB = b.createdAt?.toDate()?.getTime() || 0;
+            }
+
+            if (valA < valB) return direction === 'asc' ? -1 : 1;
+            if (valA > valB) return direction === 'asc' ? 1 : -1;
+            return 0;
         });
-    }, [users]);
+    }, [users, filter, sortConfig]);
 
     const summary = React.useMemo(() => {
-        if (!sortedUsers) return { totalUsers: 0, pendingRegistrations: 0, admins: 0, managers: 0, engineers: 0 };
+        if (!users) return { totalUsers: 0, pendingRegistrations: 0, admins: 0, managers: 0, engineers: 0 };
         return {
-            totalUsers: sortedUsers.length,
-            pendingRegistrations: sortedUsers.filter(u => u.registrationRequest).length,
-            admins: sortedUsers.filter(u => u.role === 'Admin').length,
-            managers: sortedUsers.filter(u => u.role === 'Site Manager').length,
-            engineers: sortedUsers.filter(u => u.role === 'Site Engineer').length,
+            totalUsers: users.length,
+            pendingRegistrations: users.filter(u => u.registrationRequest).length,
+            admins: users.filter(u => u.role === 'Admin').length,
+            managers: users.filter(u => u.role === 'Site Manager').length,
+            engineers: users.filter(u => u.role === 'Site Engineer').length,
         };
-    }, [sortedUsers]);
-    
-    const filteredUsers = React.useMemo(() => {
-        if (!sortedUsers) return [];
-        if (filter === 'pending') {
-            return sortedUsers.filter(u => u.registrationRequest);
-        }
-        if (filter === 'all') {
-            return sortedUsers;
-        }
-        return sortedUsers.filter(u => u.role === filter);
-    }, [sortedUsers, filter]);
-
+    }, [users]);
 
     if(isUserLoading || isProfileLoading || (isAdmin && isUsersLoading)) {
         return <UsersPageSkeleton />
@@ -323,19 +337,25 @@ export default function UsersPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        {filteredUsers.length > 0 ? (
+                        {sortedAndFilteredUsers.length > 0 ? (
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>User</TableHead>
-                                        <TableHead>Role</TableHead>
-                                        <TableHead>Status</TableHead>
+                                        <TableHead onClick={() => handleSort('username')} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                                            <div className="flex items-center">User <SortIcon column="username" /></div>
+                                        </TableHead>
+                                        <TableHead onClick={() => handleSort('role')} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                                            <div className="flex items-center">Role <SortIcon column="role" /></div>
+                                        </TableHead>
+                                        <TableHead onClick={() => handleSort('registrationRequest')} className="cursor-pointer hover:bg-muted/50 transition-colors">
+                                            <div className="flex items-center">Status <SortIcon column="registrationRequest" /></div>
+                                        </TableHead>
                                         <TableHead className="hidden md:table-cell">Mobile</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {filteredUsers.map((user) => (
+                                    {sortedAndFilteredUsers.map((user) => (
                                         <TableRow key={user.id}>
                                             <TableCell>
                                                 <div className="flex items-center gap-3">
@@ -399,7 +419,7 @@ export default function UsersPage() {
             <AddUserDialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen} />
             <EditUserDialog user={userToEdit} open={!!userToEdit} onOpenChange={() => setUserToEdit(null)} />
             <ViewUserDialog user={userToView} open={!!userToView} onOpenChange={() => setUserToView(null)} />
-            <AlertDialog open={!!userToDelete} onOpenChange={onDialogClose}>
+            <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>

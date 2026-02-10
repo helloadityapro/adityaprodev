@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -12,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Trash2, Users, Search } from 'lucide-react';
+import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 type User = {
   id: string;
@@ -21,6 +22,8 @@ type User = {
   role: 'Admin' | 'Site Manager' | 'Site Engineer';
   siteManagerId?: string;
 };
+
+type SortKey = 'engineer' | 'manager';
 
 export default function TeamMappingPage() {
   const firestore = useFirestore();
@@ -55,6 +58,9 @@ export default function TeamMappingPage() {
   const [engineerSearch, setEngineerSearch] = React.useState('');
   const [managerSearch, setManagerSearch] = React.useState('');
 
+  // Sort state
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'engineer', direction: 'asc' });
+
   const handleAssign = () => {
     if (!selectedManagerId || !selectedEngineerId) return;
 
@@ -79,6 +85,18 @@ export default function TeamMappingPage() {
     });
   };
 
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
+  };
+
   const filteredMappings = React.useMemo(() => {
     if (!engineers || !managers) return [];
     
@@ -89,8 +107,25 @@ export default function TeamMappingPage() {
         const matchesEngineer = e.username.toLowerCase().includes(engineerSearch.toLowerCase());
         const matchesManager = manager?.username.toLowerCase().includes(managerSearch.toLowerCase()) ?? false;
         return matchesEngineer && matchesManager;
+      })
+      .sort((a, b) => {
+        const { key, direction } = sortConfig;
+        let valA = '';
+        let valB = '';
+
+        if (key === 'engineer') {
+            valA = a.username.toLowerCase();
+            valB = b.username.toLowerCase();
+        } else {
+            valA = managers.find(m => m.id === a.siteManagerId)?.username.toLowerCase() || '';
+            valB = managers.find(m => m.id === b.siteManagerId)?.username.toLowerCase() || '';
+        }
+
+        if (valA < valB) return direction === 'asc' ? -1 : 1;
+        if (valA > valB) return direction === 'asc' ? 1 : -1;
+        return 0;
       });
-  }, [engineers, managers, engineerSearch, managerSearch]);
+  }, [engineers, managers, engineerSearch, managerSearch, sortConfig]);
 
   if (isProfileLoading || managersLoading || engineersLoading) {
     return (
@@ -164,7 +199,10 @@ export default function TeamMappingPage() {
                 <TableRow>
                   <TableHead className="min-w-[200px]">
                     <div className="flex flex-col gap-2 py-2">
-                      <span>Engineer Name</span>
+                      <div className="flex items-center cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('engineer')}>
+                        <span>Engineer Name</span>
+                        <SortIcon column="engineer" />
+                      </div>
                       <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -178,7 +216,10 @@ export default function TeamMappingPage() {
                   </TableHead>
                   <TableHead className="min-w-[200px]">
                     <div className="flex flex-col gap-2 py-2">
-                      <span>Assigned Manager</span>
+                      <div className="flex items-center cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('manager')}>
+                        <span>Assigned Manager</span>
+                        <SortIcon column="manager" />
+                      </div>
                       <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
