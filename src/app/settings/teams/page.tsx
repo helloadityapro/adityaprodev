@@ -144,7 +144,7 @@ export default function TeamMappingPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Team Mapping</h1>
+      <h1 className="text-3xl font-bold tracking-tight">Teams</h1>
       <p className="text-muted-foreground">Assign Site Engineers to Site Managers for PTW approvals.</p>
 
       <Card>

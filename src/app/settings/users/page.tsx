@@ -284,7 +284,7 @@ export default function UsersPage() {
     return (
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-lg font-headline font-semibold md:text-2xl">User Management</h1>
+                <h1 className="text-lg font-headline font-semibold md:text-2xl">Users</h1>
                 <Button onClick={() => setIsAddUserDialogOpen(true)}>Add User</Button>
             </div>
 

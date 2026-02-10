@@ -93,18 +93,18 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="User Management" isActive={pathname.startsWith('/settings/users')}>
+              <SidebarMenuButton asChild tooltip="Users" isActive={pathname.startsWith('/settings/users')}>
                 <Link href="/settings/users">
                   <Users />
-                  Users management
+                  Users
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Team Mapping" isActive={pathname === '/settings/teams'}>
+              <SidebarMenuButton asChild tooltip="Teams" isActive={pathname === '/settings/teams'}>
                 <Link href="/settings/teams">
                   <UsersRound />
-                  Team Mapping
+                  Teams
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
