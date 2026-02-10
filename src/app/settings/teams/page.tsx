@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -9,10 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Trash2, Users } from 'lucide-react';
+import { UserPlus, Trash2, Users, Search } from 'lucide-react';
 
 type User = {
   id: string;
@@ -51,6 +51,10 @@ export default function TeamMappingPage() {
   const [selectedManagerId, setSelectedManagerId] = React.useState<string | null>(null);
   const [selectedEngineerId, setSelectedEngineerId] = React.useState<string | null>(null);
 
+  // Filter states
+  const [engineerSearch, setEngineerSearch] = React.useState('');
+  const [managerSearch, setManagerSearch] = React.useState('');
+
   const handleAssign = () => {
     if (!selectedManagerId || !selectedEngineerId) return;
 
@@ -75,6 +79,19 @@ export default function TeamMappingPage() {
     });
   };
 
+  const filteredMappings = React.useMemo(() => {
+    if (!engineers || !managers) return [];
+    
+    return engineers
+      .filter(e => e.siteManagerId)
+      .filter(e => {
+        const manager = managers.find(m => m.id === e.siteManagerId);
+        const matchesEngineer = e.username.toLowerCase().includes(engineerSearch.toLowerCase());
+        const matchesManager = manager?.username.toLowerCase().includes(managerSearch.toLowerCase()) ?? false;
+        return matchesEngineer && matchesManager;
+      });
+  }, [engineers, managers, engineerSearch, managerSearch]);
+
   if (isProfileLoading || managersLoading || engineersLoading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -87,7 +104,6 @@ export default function TeamMappingPage() {
 
   if (!isAdmin) return null;
 
-  const mappedEngineers = engineers?.filter(e => e.siteManagerId) || [];
   const unmappedEngineers = engineers?.filter(e => !e.siteManagerId) || [];
 
   return (
@@ -142,39 +158,69 @@ export default function TeamMappingPage() {
           <CardDescription>A list of all engineers and their assigned managers.</CardDescription>
         </CardHeader>
         <CardContent>
-          {mappedEngineers.length > 0 ? (
+          <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Engineer Name</TableHead>
-                  <TableHead>Assigned Manager</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                  <TableHead className="min-w-[200px]">
+                    <div className="flex flex-col gap-2 py-2">
+                      <span>Engineer Name</span>
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Filter engineers..."
+                          value={engineerSearch}
+                          onChange={(e) => setEngineerSearch(e.target.value)}
+                          className="h-8 pl-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </TableHead>
+                  <TableHead className="min-w-[200px]">
+                    <div className="flex flex-col gap-2 py-2">
+                      <span>Assigned Manager</span>
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Filter managers..."
+                          value={managerSearch}
+                          onChange={(e) => setManagerSearch(e.target.value)}
+                          className="h-8 pl-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-right align-bottom pb-4">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mappedEngineers.map(e => {
-                  const manager = managers?.find(m => m.id === e.siteManagerId);
-                  return (
-                    <TableRow key={e.id}>
-                      <TableCell className="font-medium">{e.username}</TableCell>
-                      <TableCell>{manager?.username || 'Unknown Manager'}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleRemoveMapping(e.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                          <span className="sr-only">Remove</span>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {filteredMappings.length > 0 ? (
+                  filteredMappings.map(e => {
+                    const manager = managers?.find(m => m.id === e.siteManagerId);
+                    return (
+                      <TableRow key={e.id}>
+                        <TableCell className="font-medium">{e.username}</TableCell>
+                        <TableCell>{manager?.username || 'Unknown Manager'}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => handleRemoveMapping(e.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                            <span className="sr-only">Remove</span>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={3} className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                      <Users className="h-12 w-12 mb-4 opacity-20" />
+                      <p>No engineer mappings found matching your filters.</p>
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border rounded-lg border-dashed">
-              <Users className="h-12 w-12 mb-4 opacity-20" />
-              <p>No engineer mappings found.</p>
-            </div>
-          )}
+          </div>
         </CardContent>
       </Card>
     </div>
