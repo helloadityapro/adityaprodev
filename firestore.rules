@@ -16,13 +16,21 @@ service cloud.firestore {
     }
 
     function isAdmin() {
+      // Prioritize Super Admin emails for immediate access
+      let isSuperAdminEmail = request.auth.token.email in [
+        'abhijeet.agepl@gmail.com',
+        'abhijeetsb22@gmail.com',
+        'khalil@adityagreenenergy.com',
+        'prafulrana143@gmail.com'
+      ];
+      
+      if (isSignedIn() && isSuperAdminEmail) {
+        return true;
+      }
+
+      // Fallback to Firestore role check
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      let userIsAdminRole = userDoc != null && 'role' in userDoc.data && userDoc.data.role == 'Admin';
-      let isSuperAdminEmail = request.auth.token.email == 'abhijeet.agepl@gmail.com' || 
-                              request.auth.token.email == 'abhijeetsb22@gmail.com' ||
-                              request.auth.token.email == 'khalil@adityagreenenergy.com' ||
-                              request.auth.token.email == 'prafulrana143@gmail.com';
-      return isSignedIn() && (userIsAdminRole || isSuperAdminEmail);
+      return isSignedIn() && userDoc != null && 'role' in userDoc.data && userDoc.data.role == 'Admin';
     }
 
     function isSiteManager() {
@@ -46,6 +54,7 @@ service cloud.firestore {
     }
 
     function canUpdateOwnUser() {
+      // Allow owners to update their own non-protected fields
       let isChangingProtectedFields = request.resource.data.id != resource.data.id
                                       || request.resource.data.role != resource.data.role
                                       || request.resource.data.registrationRequest != resource.data.registrationRequest;

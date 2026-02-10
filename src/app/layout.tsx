@@ -4,7 +4,7 @@
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection } from "@/firebase";
-import { collection, doc, query, where } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import AppLogo from "@/components/app-logo";
 import { MainNav } from "@/components/main-nav";
@@ -36,6 +36,13 @@ function FullPageLoader() {
 }
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
+
+const SUPER_ADMIN_EMAILS = [
+  'abhijeet.agepl@gmail.com',
+  'abhijeetsb22@gmail.com',
+  'khalil@adityagreenenergy.com',
+  'prafulrana143@gmail.com'
+];
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -77,33 +84,38 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  const SUPER_ADMIN_EMAILS = [
-    'abhijeet.agepl@gmail.com',
-    'abhijeetsb22@gmail.com',
-    'khalil@adityagreenenergy.com',
-    'prafulrana143@gmail.com'
-  ];
-
   const isAdmin = userProfile?.role === "Admin" || (user?.email && SUPER_ADMIN_EMAILS.includes(user.email));
 
+  // Initialize or update user profile on login
   React.useEffect(() => {
-    if (user && user.email && SUPER_ADMIN_EMAILS.includes(user.email) && !isProfileLoading) {
-      const needsInitialization = !userProfile || userProfile.role !== 'Admin' || userProfile.registrationRequest === true;
+    if (user && !isProfileLoading) {
+      const isSuperAdmin = user.email && SUPER_ADMIN_EMAILS.includes(user.email);
+      const docMissing = !userProfile;
+      const roleMismatched = isSuperAdmin && (userProfile?.role !== 'Admin' || userProfile?.registrationRequest === true);
       
-      if (needsInitialization) {
+      if (docMissing || roleMismatched) {
         const updateData: any = {
           id: user.uid,
           email: user.email,
-          role: 'Admin',
-          registrationRequest: false,
-          assignedProjectIds: userProfile?.assignedProjectIds || [],
+          updatedAt: serverTimestamp(),
         };
-        
-        if (!userProfile?.username) {
-          updateData.username = user.displayName || 'Admin User';
-        }
-        if (!userProfile?.mobile) {
-          updateData.mobile = user.phoneNumber || '0000000000';
+
+        if (docMissing) {
+          updateData.createdAt = serverTimestamp();
+          updateData.username = user.displayName || user.email?.split('@')[0] || 'New User';
+          updateData.mobile = user.phoneNumber || 'N/A';
+          updateData.assignedProjectIds = [];
+          
+          if (isSuperAdmin) {
+            updateData.role = 'Admin';
+            updateData.registrationRequest = false;
+          } else {
+            updateData.role = 'Site Engineer';
+            updateData.registrationRequest = true; // Non-admins require approval
+          }
+        } else if (roleMismatched) {
+          updateData.role = 'Admin';
+          updateData.registrationRequest = false;
         }
 
         setDocumentNonBlocking(doc(firestore, "users", user.uid), updateData, { merge: true });
