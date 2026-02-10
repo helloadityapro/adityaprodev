@@ -1,30 +1,23 @@
 
 "use client";
 import * as React from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { FileCheck, Clock, FileX, List as ListIcon, Eye, FilePen, Check, X, FileText, Paperclip, Calendar as CalendarIcon, FilterX, MapPin, Film, Video, Image, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { FileCheck, Clock, FileX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, FilterX } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, writeBatch } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, isSameDay } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from "@/components/ui/carousel";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 
 type Attachment = { url: string; contentType: string; name: string; };
 
@@ -50,18 +43,18 @@ type Permit = {
 
 function StatusBadge({ status }: { status: Permit["status"] }) {
     const statusConfig = {
-        Pending: { icon: Clock, className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-        ManagerApproved: { icon: FileCheck, className: 'bg-blue-100 text-blue-800 border-blue-300' },
-        Approved: { icon: FileCheck, className: 'bg-green-100 text-green-800 border-green-300' },
-        Rejected: { icon: FileX, className: 'bg-red-100 text-red-800 border-red-300' },
-        Corrected: { icon: FileCheck, className: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
+        Pending: { label: 'Pending with Manager', icon: Clock, className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+        ManagerApproved: { label: 'Pending with Admin', icon: Clock, className: 'bg-blue-100 text-blue-800 border-blue-300' },
+        Approved: { label: 'Approved', icon: FileCheck, className: 'bg-green-100 text-green-800 border-green-300' },
+        Rejected: { label: 'Rejected', icon: FileX, className: 'bg-red-100 text-red-800 border-red-300' },
+        Corrected: { label: 'Corrected (Pending)', icon: Clock, className: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
     };
     const config = statusConfig[status];
     if (!config) return null;
     const Icon = config.icon;
     return (
         <Badge className={cn("flex items-center gap-1.5 text-xs font-medium w-fit border", config.className)}>
-            <Icon className="h-3 w-3" /> {status === 'ManagerApproved' ? 'Manager Approved' : status}
+            <Icon className="h-3 w-3" /> {config.label}
         </Badge>
     );
 }
@@ -90,7 +83,7 @@ export default function PtwListPage() {
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
 
   const { data: userProfile } = useDoc(useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]));
-  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com' || user?.email === 'khalil@adityagreenenergy.com';
+  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com' || user?.email === 'khalil@adityagreenenergy.com' || user?.email === 'prafulrana143@gmail.com';
   const userRole = isAdmin ? "Admin" : userProfile?.role;
 
   const permitsQuery = useMemoFirebase(() => {
@@ -111,24 +104,47 @@ export default function PtwListPage() {
         isNew: true
     };
     
+    let notificationMessage = `Your permit for "${permit.siteName}" status changed to ${targetStatus}.`;
+
     if (userRole === 'Site Manager') {
         updateData.managerRemarks = remarks;
         updateData.siteManagerId = user?.uid;
+        if (targetStatus === 'Rejected') {
+            notificationMessage = `Your permit for "${permit.siteName}" was rejected by the Site Manager: ${remarks}`;
+        }
     } else if (userRole === 'Admin') {
         updateData.adminRemarks = remarks;
         updateData.adminId = user?.uid;
+        if (targetStatus === 'Rejected') {
+            notificationMessage = `Your permit for "${permit.siteName}" was rejected by the Admin: ${remarks}`;
+            
+            // Also notify the manager if admin rejects
+            if (permit.siteManagerId) {
+                addDocumentNonBlocking(collection(firestore, 'notifications'), {
+                    userId: permit.siteManagerId,
+                    title: `Permit Final Rejection`,
+                    description: `An engineer's permit you approved for "${permit.siteName}" was rejected by the Admin: ${remarks}`,
+                    link: `/ptw/list`,
+                    read: false,
+                    createdAt: serverTimestamp(),
+                });
+            }
+        }
     }
     
     updateDocumentNonBlocking(permitRef, updateData);
 
+    // Notify the Site Engineer
     addDocumentNonBlocking(collection(firestore, 'notifications'), {
         userId: permit.siteEngineerId,
-        title: `Permit Update`,
-        description: `Your permit for "${permit.siteName}" status changed to ${targetStatus}.`,
+        title: `Permit Status Update`,
+        description: notificationMessage,
         link: `/ptw/list`,
         read: false,
         createdAt: serverTimestamp(),
     });
+
+    toast({ title: "Status Updated", description: `The permit has been marked as ${targetStatus}.` });
   };
 
   const handleSort = (key: SortKey) => {
@@ -173,18 +189,18 @@ export default function PtwListPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight">PTW List</h1>
-        <p className="text-muted-foreground">Manage and track your permit requests.</p>
+        <p className="text-muted-foreground">Manage and track your permit requests through the approval levels.</p>
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Filters</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-sm font-medium">Quick Filters</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger><SelectValue placeholder="All Status" /></SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="Pending">Pending Manager</SelectItem>
-                <SelectItem value="ManagerApproved">Manager Approved</SelectItem>
+                <SelectItem value="ManagerApproved">Pending Admin</SelectItem>
                 <SelectItem value="Approved">Fully Approved</SelectItem>
                 <SelectItem value="Rejected">Rejected</SelectItem>
             </SelectContent>
@@ -193,7 +209,7 @@ export default function PtwListPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -223,19 +239,25 @@ export default function PtwListPage() {
                   <TableCell><StatusBadge status={permit.status} /></TableCell>
                   <TableCell>{formatTimestamp(permit.requestDate)}</TableCell>
                   <TableCell className="text-right flex items-center justify-end gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" title="View Details" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
+                    
+                    {/* Site Manager Actions */}
                     {userRole === 'Site Manager' && (permit.status === 'Pending' || permit.status === 'Corrected') && (
                         <>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setActionState({permit, status: 'ManagerApproved'})}>Approve</Button>
                             <Button size="sm" variant="destructive" onClick={() => setActionState({permit, status: 'Rejected'})}>Reject</Button>
                         </>
                     )}
+                    
+                    {/* Admin Actions */}
                     {userRole === 'Admin' && permit.status === 'ManagerApproved' && (
                         <>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setActionState({permit, status: 'Approved'})}>Final Approve</Button>
                             <Button size="sm" variant="destructive" onClick={() => setActionState({permit, status: 'Rejected'})}>Reject</Button>
                         </>
                     )}
+                    
+                    {/* Engineer Actions (Resubmit) */}
                     {userRole === 'Site Engineer' && permit.status === 'Rejected' && (
                         <Button size="sm" variant="outline" onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}><FilePen className="h-4 w-4 mr-2" /> Resubmit</Button>
                     )}
@@ -244,7 +266,7 @@ export default function PtwListPage() {
               ))}
               {filteredPermits.length === 0 && (
                   <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No permits found.</TableCell>
+                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No permits found in this category.</TableCell>
                   </TableRow>
               )}
             </TableBody>
@@ -252,45 +274,72 @@ export default function PtwListPage() {
         </CardContent>
       </Card>
 
-      {/* Action Dialog */}
+      {/* Action Dialog (Approve/Reject with Remarks) */}
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent>
-            <DialogHeader><DialogTitle>{actionState?.status === 'Rejected' ? 'Reject' : 'Approve'} Permit</DialogTitle></DialogHeader>
-            <div className="py-4"><Label>Remarks</Label><Textarea id="remarks" placeholder="Add your comments here..." /></div>
+            <DialogHeader>
+              <DialogTitle>{actionState?.status === 'Rejected' ? 'Reject' : 'Approve'} Permit Request</DialogTitle>
+              <DialogDescription>
+                Please provide your remarks for this action.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-2">
+                <Label htmlFor="action-remarks">Remarks/Comments</Label>
+                <Textarea id="action-remarks" placeholder="Explain the reason for your decision..." />
+            </div>
             <DialogFooter>
                 <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                 <Button onClick={() => {
-                    const remarks = (document.getElementById('remarks') as HTMLTextAreaElement).value;
+                    const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement).value;
                     if (remarks) {
                         handleAction(actionState!.permit, actionState!.status, remarks);
                         setActionState(null);
                     } else {
-                        toast({ variant: 'destructive', title: 'Remarks Required' });
+                        toast({ variant: 'destructive', title: 'Remarks Required', description: 'Please enter a comment to proceed.' });
                     }
-                }}>Confirm</Button>
+                }}>{actionState?.status === 'Rejected' ? 'Confirm Rejection' : 'Confirm Approval'}</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Details Dialog */}
+      {/* Details View Dialog */}
       <Dialog open={!!detailsPermit} onOpenChange={() => setDetailsPermit(null)}>
           <DialogContent className="max-w-2xl">
-              <DialogHeader><DialogTitle>Permit Details</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>Permit Request Details</DialogTitle>
+                <DialogDescription>Full summary of the permit and its approval history.</DialogDescription>
+              </DialogHeader>
               {detailsPermit && (
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div><Label>Site</Label><p>{detailsPermit.siteName}</p></div>
-                      <div><Label>Type</Label><p>{detailsPermit.ptwType}</p></div>
-                      <div className="col-span-2"><Label>Description</Label><p>{detailsPermit.descriptionOfWork}</p></div>
-                      <div><Label>Status</Label><StatusBadge status={detailsPermit.status} /></div>
-                      <div><Label>Date</Label><p>{formatTimestamp(detailsPermit.requestDate)}</p></div>
-                      {detailsPermit.managerRemarks && <div className="col-span-2"><Label>Manager Remarks</Label><p className="italic">{detailsPermit.managerRemarks}</p></div>}
-                      {detailsPermit.adminRemarks && <div className="col-span-2"><Label>Admin Remarks</Label><p className="italic text-red-600">{detailsPermit.adminRemarks}</p></div>}
-                      {detailsPermit.attachments && (
-                          <div className="col-span-2 space-y-2">
-                              <Label>Attachments</Label>
-                              <div className="flex gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm py-4">
+                      <div className="space-y-1"><Label className="text-xs text-muted-foreground">Site</Label><p className="font-medium text-base">{detailsPermit.siteName}</p></div>
+                      <div className="space-y-1"><Label className="text-xs text-muted-foreground">Permit Type</Label><p className="font-medium text-base">{detailsPermit.ptwType}</p></div>
+                      <div className="col-span-full space-y-1"><Label className="text-xs text-muted-foreground">Description of Work</Label><p className="p-3 bg-muted rounded-md border">{detailsPermit.descriptionOfWork}</p></div>
+                      
+                      <div className="space-y-1"><Label className="text-xs text-muted-foreground">Current Status</Label><div><StatusBadge status={detailsPermit.status} /></div></div>
+                      <div className="space-y-1"><Label className="text-xs text-muted-foreground">Submission Date</Label><p>{formatTimestamp(detailsPermit.requestDate)}</p></div>
+                      
+                      {detailsPermit.managerRemarks && (
+                        <div className="col-span-full space-y-1 p-3 bg-blue-50/50 border border-blue-100 rounded-md">
+                          <Label className="text-xs text-blue-800">Site Manager Remarks</Label>
+                          <p className="italic text-blue-900">{detailsPermit.managerRemarks}</p>
+                        </div>
+                      )}
+                      
+                      {detailsPermit.adminRemarks && (
+                        <div className="col-span-full space-y-1 p-3 bg-red-50/50 border border-red-100 rounded-md">
+                          <Label className="text-xs text-red-800">Admin Rejection Remarks</Label>
+                          <p className="italic text-red-900">{detailsPermit.adminRemarks}</p>
+                        </div>
+                      )}
+                      
+                      {detailsPermit.attachments && detailsPermit.attachments.length > 0 && (
+                          <div className="col-span-full space-y-2">
+                              <Label className="text-xs text-muted-foreground">Attachments & Media</Label>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                   {detailsPermit.attachments.map((a, i) => (
-                                      <Button key={i} variant="outline" size="sm" onClick={() => setViewerState({attachments: detailsPermit.attachments!, startIndex: i})}>File {i+1}</Button>
+                                      <Button key={i} variant="outline" size="sm" className="w-full truncate" onClick={() => setViewerState({attachments: detailsPermit.attachments!, startIndex: i})}>
+                                        {a.contentType.startsWith('image') ? 'Photo' : 'Video'} {i+1}
+                                      </Button>
                                   ))}
                               </div>
                           </div>
@@ -300,25 +349,32 @@ export default function PtwListPage() {
           </DialogContent>
       </Dialog>
       
-      {/* Media Viewer */}
+      {/* Media Gallery Viewer */}
       <Dialog open={!!viewerState} onOpenChange={() => setViewerState(null)}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black/95 border-none">
               <DialogHeader className="sr-only">
                   <DialogTitle>Media Viewer</DialogTitle>
                   <DialogDescription>Viewing permit attachments</DialogDescription>
               </DialogHeader>
-              <Carousel opts={{ startIndex: viewerState?.startIndex || 0 }}>
+              <Carousel opts={{ startIndex: viewerState?.startIndex || 0 }} className="w-full">
                   <CarouselContent>
                       {viewerState?.attachments.map((a, i) => (
-                          <CarouselItem key={i} className="flex flex-col items-center justify-center min-h-[50vh]">
-                              {a.contentType.startsWith('image') ? <img src={a.url} className="max-h-[60vh] object-contain" /> : <video src={a.url} controls className="max-h-[60vh]" />}
-                              <p className="mt-2 text-sm text-muted-foreground">{a.name}</p>
+                          <CarouselItem key={i} className="flex flex-col items-center justify-center min-h-[60vh] p-4">
+                              {a.contentType.startsWith('image') ? (
+                                <img src={a.url} className="max-h-[70vh] max-w-full object-contain shadow-2xl rounded-sm" alt={a.name} />
+                              ) : (
+                                <video src={a.url} controls className="max-h-[70vh] max-w-full shadow-2xl rounded-sm" />
+                              )}
+                              <p className="mt-6 text-sm text-white/70 font-medium">{a.name}</p>
                           </CarouselItem>
                       ))}
                   </CarouselContent>
-                  <CarouselPrevious />
-                  <CarouselNext />
+                  <CarouselPrevious className="left-4 text-white hover:text-white bg-white/10 hover:bg-white/20 border-white/20" />
+                  <CarouselNext className="right-4 text-white hover:text-white bg-white/10 hover:bg-white/20 border-white/20" />
               </Carousel>
+              <div className="p-4 flex justify-center border-t border-white/10">
+                <DialogClose asChild><Button variant="ghost" className="text-white hover:bg-white/10">Close Viewer</Button></DialogClose>
+              </div>
           </DialogContent>
       </Dialog>
     </div>
