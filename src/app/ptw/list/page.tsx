@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, FilterX, History, User } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, FilterX, History, User, ExternalLink, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, arrayUnion } from "firebase/firestore";
@@ -148,17 +148,6 @@ export default function PtwListPage() {
       read: false,
       createdAt: serverTimestamp(),
     });
-
-    if (userRole === 'Admin' && targetStatus === 'Rejected' && permit.siteManagerId) {
-      addDocumentNonBlocking(collection(firestore, 'notifications'), {
-        userId: permit.siteManagerId,
-        title: "Admin Rejected Subordinate Permit",
-        description: `The permit for "${permit.siteName}" that you approved was rejected by Admin: ${remarks}`,
-        link: `/ptw/list`,
-        read: false,
-        createdAt: serverTimestamp(),
-      });
-    }
 
     toast({ title: "Status Updated", description: `Permit marked as ${targetStatus}.` });
   };
@@ -368,13 +357,30 @@ export default function PtwListPage() {
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <Label className="text-xs text-muted-foreground uppercase">Attachments & Media</Label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {detailsPermit.attachments.map((a, i) => (
-                        <Button key={i} variant="outline" size="sm" className="w-full truncate h-12 justify-start px-3" onClick={() => setViewerState({ attachments: detailsPermit.attachments!, startIndex: i })}>
-                          {a.contentType.startsWith('image') ? 'Photo' : 'Video'} {i + 1}
-                        </Button>
-                      ))}
+                    <Label className="text-xs text-muted-foreground uppercase">Attachments & Documents</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {detailsPermit.attachments.map((a, i) => {
+                        const isMedia = a.contentType.startsWith('image') || a.contentType.startsWith('video');
+                        return (
+                          <div key={i} className="flex items-center gap-2 p-2 rounded-md border bg-muted/20">
+                            <div className="flex-1 truncate">
+                              <p className="text-xs font-medium truncate">{a.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{a.contentType}</p>
+                            </div>
+                            {isMedia ? (
+                              <Button variant="outline" size="sm" onClick={() => setViewerState({ attachments: detailsPermit.attachments!, startIndex: i })}>
+                                <Eye className="h-3 w-3 mr-1" /> View
+                              </Button>
+                            ) : (
+                              <Button variant="outline" size="sm" asChild>
+                                <a href={a.url} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink className="h-3 w-3 mr-1" /> Open
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </>
