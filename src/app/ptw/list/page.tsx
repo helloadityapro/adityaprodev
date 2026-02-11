@@ -326,7 +326,7 @@ export default function PtwListPage() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <History className="h-4 w-4 text-primary" />
-                  <h3 className="font-bold text-sm uppercase tracking-wider">Lifecycle Timeline</h3>
+                  <h3 className="font-bold text-sm uppercase tracking-wider">PtW Activity Log</h3>
                 </div>
                 <div className="relative space-y-4 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-primary/20 before:via-primary/50 before:to-primary/20">
                   {detailsPermit.timeline && detailsPermit.timeline.length > 0 ? (
