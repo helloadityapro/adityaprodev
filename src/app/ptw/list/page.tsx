@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -109,7 +108,7 @@ export default function PtwListPage() {
 
     const timelineEntry: TimelineEntry = {
       status: targetStatus,
-      timestamp: new Date(), // Local for immediate UI, Firestore handles it during push
+      timestamp: new Date(),
       userId: user.uid,
       userName: userProfile.username || user.email || 'System',
       remarks: remarks,
@@ -130,7 +129,6 @@ export default function PtwListPage() {
 
     updateDocumentNonBlocking(permitRef, updateData);
 
-    // Notification
     let notificationTitle = "Permit Status Update";
     let notificationDescription = `Your permit for "${permit.siteName}" has been updated to ${targetStatus}.`;
 
@@ -151,7 +149,6 @@ export default function PtwListPage() {
       createdAt: serverTimestamp(),
     });
 
-    // Notify manager if admin rejects
     if (userRole === 'Admin' && targetStatus === 'Rejected' && permit.siteManagerId) {
       addDocumentNonBlocking(collection(firestore, 'notifications'), {
         userId: permit.siteManagerId,

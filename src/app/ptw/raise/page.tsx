@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -12,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Paperclip, TriangleAlert, MapPin, Loader2, CheckCircle2 } from "lucide-react"
+import { TriangleAlert, Loader2, CheckCircle2 } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp, doc, arrayUnion } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -23,7 +22,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import imageCompression from 'browser-image-compression';
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -342,7 +340,9 @@ export default function RaisePtwPage() {
                     <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isProcessing || isSubmitted} /></FormControl>
                     <div className="space-y-1 leading-none">
                       <FormLabel className="text-sm font-semibold text-primary">Safety Undertaking</FormLabel>
-                      <p className="text-xs text-muted-foreground">I hereby undertake that the work will be carried out safely as per company SOPs and PPE will be used at all times.</p>
+                      <p className="text-xs text-muted-foreground">
+                        I, <strong>{userProfile?.username || user?.email || 'the undersigned'}</strong>, hereby undertake that the work will be carried out safely as per company SOPs and PPE will be used at all times.
+                      </p>
                       <FormMessage />
                     </div>
                   </FormItem>
