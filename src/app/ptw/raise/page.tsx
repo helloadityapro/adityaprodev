@@ -15,7 +15,7 @@ import { TriangleAlert, Loader2, CheckCircle2, Search, ChevronsUpDown, Check, Fi
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp, doc, arrayUnion } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/form"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { Checkbox } from "@/components/ui/checkbox"
