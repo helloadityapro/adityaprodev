@@ -14,7 +14,7 @@ import { collection, doc, query, where, serverTimestamp, arrayUnion } from "fire
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, isSameDay } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -92,9 +92,8 @@ function WhatsAppReminder({ userId, permit }: { userId: string | undefined, perm
     const triggerWhatsApp = () => {
         if (!targetUser?.mobile) return;
         const cleanMobile = targetUser.mobile.replace(/\D/g, '');
-        // Add +91 if it's a 10 digit number
         const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
-        const message = `Reminder: PtW request ${permit.serialNumber} for "${permit.siteName}" is pending your review.\nStatus: ${permit.status}\nLink: ${window.location.origin}/ptw/list`;
+        const message = `Reminder: PtW request ${permit.serialNumber} for "${permit.siteName}" is pending your review.\nStatus: ${permit.status}\nLink: ${window.location.origin}/ptw/list?view=${permit.id}`;
         const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
     };
@@ -120,6 +119,7 @@ export default function PtwListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [statusFilter, setStatusFilter] = React.useState('all');
@@ -142,6 +142,17 @@ export default function PtwListPage() {
   }, [firestore, userRole, user]);
 
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
+
+  // Deep linking: open modal if ?view=ID is present
+  React.useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId && permits) {
+      const permit = permits.find(p => p.id === viewId);
+      if (permit) {
+        setDetailsPermit(permit);
+      }
+    }
+  }, [searchParams, permits]);
 
   const handleAction = (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
     if (!user || !userProfile) return;
@@ -181,23 +192,21 @@ export default function PtwListPage() {
       notificationDescription = `Great news! Your permit ${permit.serialNumber} for "${permit.siteName}" is now fully approved and active.`;
     }
 
-    // Notify Site Engineer
     addDocumentNonBlocking(collection(firestore, 'notifications'), {
       userId: permit.siteEngineerId,
       title: notificationTitle,
       description: notificationDescription,
-      link: `/ptw/list`,
+      link: `/ptw/list?view=${permit.id}`,
       read: false,
       createdAt: serverTimestamp(),
     });
 
-    // Notify Site Manager of Admin actions (Final Approval/Rejection)
     if (userRole === 'Admin' && permit.siteManagerId) {
       addDocumentNonBlocking(collection(firestore, 'notifications'), {
         userId: permit.siteManagerId,
         title: `Engineer Permit: ${targetStatus}`,
         description: `Final Admin action on permit ${permit.serialNumber} for ${permit.siteName}: ${targetStatus}.`,
-        link: `/ptw/list`,
+        link: `/ptw/list?view=${permit.id}`,
         read: false,
         createdAt: serverTimestamp(),
       });
@@ -373,8 +382,8 @@ export default function PtwListPage() {
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="icon" title="View Details" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
 
-                      {userRole === 'Site Engineer' && permit.status === 'Pending' && (
-                        <WhatsAppReminder userId={permit.siteManagerId} permit={permit} />
+                      {userRole === 'Site Engineer' && (permit.status === 'Pending' || permit.status === 'ManagerApproved') && (
+                        <WhatsAppReminder userId={permit.status === 'Pending' ? permit.siteManagerId : undefined} permit={permit} />
                       )}
 
                       {userRole === 'Site Manager' && permit.status === 'Pending' && (
@@ -556,8 +565,23 @@ export default function PtwListPage() {
                 </div>
             )}
           </div>
-          <DialogFooter className="no-print">
+          <DialogFooter className="no-print gap-2">
+            <div className="flex-1" />
             <DialogClose asChild><Button variant="outline">Close Details</Button></DialogClose>
+            
+            {userRole === 'Site Manager' && detailsPermit?.status === 'Pending' && (
+                <>
+                    <Button variant="destructive" onClick={() => { setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>Reject</Button>
+                    <Button className="bg-green-600 hover:bg-green-700" onClick={() => { setActionState({ permit: detailsPermit, status: 'ManagerApproved' }); }}>Approve</Button>
+                </>
+            )}
+
+            {userRole === 'Admin' && detailsPermit?.status === 'ManagerApproved' && (
+                <>
+                    <Button variant="destructive" onClick={() => { setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>Reject</Button>
+                    <Button className="bg-green-600 hover:bg-green-700" onClick={() => { setActionState({ permit: detailsPermit, status: 'Approved' }); }}>Final Approve</Button>
+                </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

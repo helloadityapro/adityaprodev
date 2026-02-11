@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { TriangleAlert, Loader2, CheckCircle2, Search, ChevronsUpDown, Check, FileUp, MessageCircle } from "lucide-react"
-import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
+import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, setDocumentNonBlocking, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp, doc, arrayUnion, getDoc, query, where, getDocs, Timestamp } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -100,7 +100,7 @@ export default function RaisePtwPage() {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [uploadProgress, setUploadProgress] = React.useState<{ [key: string]: number }>({});
-  const [lastSubmittedDetails, setLastSubmittedDetails] = React.useState<{ serialNumber: string, siteName: string, managerMobile?: string } | null>(null);
+  const [lastSubmittedDetails, setLastSubmittedDetails] = React.useState<{ id: string, serialNumber: string, siteName: string, managerMobile?: string } | null>(null);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
@@ -166,12 +166,11 @@ export default function RaisePtwPage() {
     });
   };
 
-  const triggerWhatsApp = (serial: string, site: string, mobile?: string) => {
+  const triggerWhatsApp = (serial: string, site: string, permitId: string, mobile?: string) => {
     if (!mobile) return;
     const cleanMobile = mobile.replace(/\D/g, '');
-    // Add +91 if it's a 10 digit number
     const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
-    const message = `Hello, I've submitted a new PtW request.\nSerial: ${serial}\nSite: ${site}\nLink: ${window.location.origin}/ptw/list`;
+    const message = `Hello, I've submitted a new PtW request.\nSerial: ${serial}\nSite: ${site}\nLink: ${window.location.origin}/ptw/list?view=${permitId}`;
     const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -194,6 +193,13 @@ export default function RaisePtwPage() {
       setIsProcessing(false);
       return;
     }
+
+    // Pre-generate the document reference to get the ID for the deep link
+    const permitRef = isCorrectionMode && permitIdToCorrect 
+      ? doc(firestore, "permits_to_work", permitIdToCorrect)
+      : doc(collection(firestore, "permits_to_work"));
+    
+    const permitId = permitRef.id;
 
     // Determine serial number and sequence
     let serialNumber = "";
@@ -220,12 +226,10 @@ export default function RaisePtwPage() {
         const countToday = snapshotToday.size;
         serialNumber = `AGEPL/PtW/${year}/${month}/${day}/${String(countToday + 1).padStart(2, '0')}`;
       } catch (e) {
-        // Fallback to timestamp if counting fails
         serialNumber = `AGEPL/PtW/${year}/${month}/${day}/${Date.now().toString().slice(-4)}`;
       }
     }
 
-    // Determine current submission index
     let currentSubmissionIndex = 1;
     if (isCorrectionMode && permitToCorrect?.attachments) {
       const indices = permitToCorrect.attachments.map((a: any) => a.submissionIndex || 1);
@@ -273,32 +277,29 @@ export default function RaisePtwPage() {
         action: isCorrectionMode ? `Resubmitted (v${currentSubmissionIndex})` : "Created"
       };
 
-      if (isCorrectionMode && permitIdToCorrect) {
-        updateDocumentNonBlocking(doc(firestore, "permits_to_work", permitIdToCorrect), {
-          ...permitValues,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          status: "Pending",
-          attachments: arrayUnion(...newAttachments),
-          statusChangeDate: serverTimestamp(),
-          timeline: arrayUnion(timelineEntry)
-        });
+      const permitData: any = {
+        ...permitValues,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        status: "Pending",
+        statusChangeDate: serverTimestamp(),
+        timeline: arrayUnion(timelineEntry)
+      };
+
+      if (isCorrectionMode) {
+        permitData.attachments = arrayUnion(...newAttachments);
+        updateDocumentNonBlocking(permitRef, permitData);
       } else {
-        addDocumentNonBlocking(collection(firestore, "permits_to_work"), {
-          ...permitValues,
-          serialNumber: serialNumber,
-          siteEngineerId: user.uid,
-          siteManagerId: userProfile.siteManagerId,
-          status: "Pending",
-          requestDate: serverTimestamp(),
-          attachments: newAttachments,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          timeline: [timelineEntry]
-        });
+        permitData.id = permitId;
+        permitData.serialNumber = serialNumber;
+        permitData.siteEngineerId = user.uid;
+        permitData.siteManagerId = userProfile.siteManagerId;
+        permitData.requestDate = serverTimestamp();
+        permitData.attachments = newAttachments;
+        permitData.timeline = [timelineEntry];
+        setDocumentNonBlocking(permitRef, permitData, { merge: true });
       }
 
-      // Fetch manager mobile for WhatsApp
       let managerMobile;
       if (userProfile.siteManagerId) {
         const managerDoc = await getDoc(doc(firestore, 'users', userProfile.siteManagerId));
@@ -310,20 +311,19 @@ export default function RaisePtwPage() {
           userId: userProfile.siteManagerId,
           title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
           description: `${userProfile.username || user.email} has ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit (${serialNumber}) for "${values.siteName}".`,
-          link: `/ptw/list`,
+          link: `/ptw/list?view=${permitId}`,
           read: false,
           createdAt: serverTimestamp(),
         });
       }
 
-      setLastSubmittedDetails({ serialNumber, siteName: values.siteName, managerMobile });
+      setLastSubmittedDetails({ id: permitId, serialNumber, siteName: values.siteName, managerMobile });
       setIsSubmitted(true);
       setIsProcessing(false);
       toast({ title: "Success", description: `Permit ${isCorrectionMode ? 'resubmitted' : 'submitted'} for review.` });
       
-      // Auto-trigger WhatsApp if possible
       if (managerMobile) {
-        triggerWhatsApp(serialNumber, values.siteName, managerMobile);
+        triggerWhatsApp(serialNumber, values.siteName, permitId, managerMobile);
       }
 
       setTimeout(() => router.push('/ptw/list'), 5000);
@@ -445,7 +445,7 @@ export default function RaisePtwPage() {
                   name="ptwType"
                   render={({ field }) => (
                     <FormItem className="space-y-2">
-                      <FormLabel>PTW Type</FormLabel>
+                      <FormLabel>PTW Type</Label>
                       <Popover open={isPtwTypePopoverOpen} onOpenChange={setIsPtwTypePopoverOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -597,7 +597,7 @@ export default function RaisePtwPage() {
                 <Button type="button" variant="ghost" onClick={() => router.push('/ptw/list')} disabled={isProcessing || isSubmitted}>Cancel</Button>
                 <div className="flex gap-2">
                   {isSubmitted && lastSubmittedDetails?.managerMobile && (
-                    <Button type="button" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50" onClick={() => triggerWhatsApp(lastSubmittedDetails.serialNumber, lastSubmittedDetails.siteName, lastSubmittedDetails.managerMobile)}>
+                    <Button type="button" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50" onClick={() => triggerWhatsApp(lastSubmittedDetails.serialNumber, lastSubmittedDetails.siteName, lastSubmittedDetails.id, lastSubmittedDetails.managerMobile)}>
                       <MessageCircle className="mr-2 h-4 w-4" /> Send WhatsApp Again
                     </Button>
                   )}
