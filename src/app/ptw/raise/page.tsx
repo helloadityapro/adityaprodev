@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -484,6 +485,7 @@ export default function RaisePtwPage() {
                     <div className="flex flex-col gap-2">
                       <Input 
                         type="file" 
+                        accept="video/*"
                         onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} 
                         disabled={isProcessing || isSubmitted} 
                         className={FILE_INPUT_STYLES}
@@ -502,7 +504,7 @@ export default function RaisePtwPage() {
                     <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isProcessing || isSubmitted} /></FormControl>
                     <div className="space-y-1 leading-none">
                       <FormLabel className="text-sm font-semibold text-primary">Safety Undertaking</FormLabel>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-sm text-muted-foreground">
                         I, <strong>{userProfile?.username || user?.email || 'the undersigned'}</strong>, hereby undertake that the work will be carried out safely as per company SOPs and PPE will be used at all times.
                       </p>
                       <FormMessage />
