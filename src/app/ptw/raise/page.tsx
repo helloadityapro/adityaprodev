@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { TriangleAlert, Loader2, CheckCircle2, Search, ChevronsUpDown, Check } from "lucide-react"
+import { TriangleAlert, Loader2, CheckCircle2, Search, ChevronsUpDown, Check, FileUp } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp, doc, arrayUnion } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -48,6 +48,8 @@ type Site = {
   acCapacity: string;
   dcCapacity: string;
 };
+
+const FILE_INPUT_STYLES = "cursor-pointer h-auto py-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 transition-all";
 
 export default function RaisePtwPage() {
   const firestore = useFirestore()
@@ -281,7 +283,7 @@ export default function RaisePtwPage() {
                   control={form.control}
                   name="siteName"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="space-y-2">
                       <FormLabel>Site Name</FormLabel>
                       <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                         <PopoverTrigger asChild>
@@ -352,7 +354,7 @@ export default function RaisePtwPage() {
                   control={form.control}
                   name="ptwType"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="space-y-2">
                       <FormLabel>PTW Type</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value} disabled={isProcessing || isSubmitted}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select a type" /></SelectTrigger></FormControl>
@@ -386,25 +388,42 @@ export default function RaisePtwPage() {
 
               <div className="space-y-6">
                 <div className="space-y-3">
-                  <Label>Reference Documents</Label>
+                  <Label className="flex items-center gap-2"><FileUp className="h-4 w-4 text-primary" /> Reference Documents</Label>
                   <div className="flex flex-col gap-2">
-                    <Input type="file" multiple onChange={(e) => setReferenceDocs(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className="cursor-pointer" />
+                    <Input 
+                      type="file" 
+                      multiple 
+                      onChange={(e) => setReferenceDocs(prev => [...prev, ...Array.from(e.target.files || [])])} 
+                      disabled={isProcessing || isSubmitted} 
+                      className={FILE_INPUT_STYLES}
+                    />
                     <p className="text-[10px] text-muted-foreground">Attach PDFs, drawings, or safety manuals.</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-3">
-                    <Label>Additional Attachments</Label>
+                    <Label className="flex items-center gap-2"><FileUp className="h-4 w-4 text-primary" /> Additional Attachments</Label>
                     <div className="flex flex-col gap-2">
-                      <Input type="file" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className="cursor-pointer" />
+                      <Input 
+                        type="file" 
+                        multiple 
+                        onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} 
+                        disabled={isProcessing || isSubmitted} 
+                        className={FILE_INPUT_STYLES}
+                      />
                       <p className="text-[10px] text-muted-foreground">Attach images or videos of the site.</p>
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <Label>Self Attestation (Vlog)</Label>
+                    <Label className="flex items-center gap-2"><FileUp className="h-4 w-4 text-primary" /> Self Attestation (Vlog)</Label>
                     <div className="flex flex-col gap-2">
-                      <Input type="file" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isProcessing || isSubmitted} className="cursor-pointer" />
+                      <Input 
+                        type="file" 
+                        onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} 
+                        disabled={isProcessing || isSubmitted} 
+                        className={FILE_INPUT_STYLES}
+                      />
                       <p className="text-[10px] text-muted-foreground">A short video explaining safety measures.</p>
                     </div>
                   </div>
