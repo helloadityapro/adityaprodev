@@ -169,8 +169,10 @@ export default function RaisePtwPage() {
   const triggerWhatsApp = (serial: string, site: string, mobile?: string) => {
     if (!mobile) return;
     const cleanMobile = mobile.replace(/\D/g, '');
+    // Add +91 if it's a 10 digit number
+    const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
     const message = `Hello, I've submitted a new PtW request.\nSerial: ${serial}\nSite: ${site}\nLink: ${window.location.origin}/ptw/list`;
-    const url = `https://wa.me/${cleanMobile}?text=${encodeURIComponent(message)}`;
+    const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 

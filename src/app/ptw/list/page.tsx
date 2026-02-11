@@ -92,8 +92,10 @@ function WhatsAppReminder({ userId, permit }: { userId: string | undefined, perm
     const triggerWhatsApp = () => {
         if (!targetUser?.mobile) return;
         const cleanMobile = targetUser.mobile.replace(/\D/g, '');
+        // Add +91 if it's a 10 digit number
+        const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
         const message = `Reminder: PtW request ${permit.serialNumber} for "${permit.siteName}" is pending your review.\nStatus: ${permit.status}\nLink: ${window.location.origin}/ptw/list`;
-        const url = `https://wa.me/${cleanMobile}?text=${encodeURIComponent(message)}`;
+        const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
     };
 
