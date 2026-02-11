@@ -260,7 +260,7 @@ export default function RaisePtwPage() {
         <Alert variant="destructive" className="bg-red-50 dark:bg-red-950/20">
           <TriangleAlert className="h-4 w-4" />
           <AlertTitle>Action Required</AlertTitle>
-          <AlertDescription>You are not mapped to any Site Manager. Please contact Admin before raising a permit.</AlertDescription>
+          <AlertDescription>You are not assigned to any Site Manager. Please contact Admin before raising a permit.</AlertDescription>
         </Alert>
       )}
 
