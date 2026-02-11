@@ -28,6 +28,9 @@ type User = {
 type Site = {
   id: string;
   name: string;
+  projectCompany: string;
+  acCapacity: string;
+  dcCapacity: string;
 };
 
 export default function SiteAssignmentPage() {
@@ -303,6 +306,9 @@ export default function SiteAssignmentPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Site Name</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>AC Capacity</TableHead>
+                      <TableHead>DC Capacity</TableHead>
                       <TableHead className="w-[100px] text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -313,6 +319,9 @@ export default function SiteAssignmentPage() {
                         return (
                           <TableRow key={siteId}>
                             <TableCell className="font-medium">{site?.name || 'Unknown Site'}</TableCell>
+                            <TableCell>{site?.projectCompany || 'N/A'}</TableCell>
+                            <TableCell>{site?.acCapacity || 'N/A'}</TableCell>
+                            <TableCell>{site?.dcCapacity || 'N/A'}</TableCell>
                             <TableCell className="text-right">
                               <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleRemoveSite(siteId)}>
                                 <Trash2 className="h-4 w-4" />
@@ -324,7 +333,7 @@ export default function SiteAssignmentPage() {
                       })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={2} className="h-24 text-center text-muted-foreground italic">
+                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground italic">
                           No sites assigned to this user yet.
                         </TableCell>
                       </TableRow>
