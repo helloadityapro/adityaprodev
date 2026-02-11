@@ -6,13 +6,15 @@ import { collection, doc, query, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 type User = {
   id: string;
@@ -54,9 +56,15 @@ export default function TeamMappingPage() {
   const [selectedManagerId, setSelectedManagerId] = React.useState<string | null>(null);
   const [selectedEngineerId, setSelectedEngineerId] = React.useState<string | null>(null);
 
-  // Filter states
-  const [engineerSearch, setEngineerSearch] = React.useState('');
-  const [managerSearch, setManagerSearch] = React.useState('');
+  // Popover & Search states
+  const [isManagerPopoverOpen, setIsManagerPopoverOpen] = React.useState(false);
+  const [managerSearchQuery, setManagerSearchQuery] = React.useState("");
+  const [isEngineerPopoverOpen, setIsEngineerPopoverOpen] = React.useState(false);
+  const [engineerSearchQuery, setEngineerSearchQuery] = React.useState("");
+
+  // Table filter states
+  const [tableEngineerSearch, setTableEngineerSearch] = React.useState('');
+  const [tableManagerSearch, setTableManagerSearch] = React.useState('');
 
   // Sort state
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
@@ -97,6 +105,26 @@ export default function TeamMappingPage() {
     return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
+  const filteredManagers = React.useMemo(() => {
+    if (!managers) return [];
+    return managers.filter(m => 
+      m.username.toLowerCase().includes(managerSearchQuery.toLowerCase()) ||
+      m.email.toLowerCase().includes(managerSearchQuery.toLowerCase())
+    );
+  }, [managers, managerSearchQuery]);
+
+  const unmappedEngineers = React.useMemo(() => {
+    if (!engineers) return [];
+    return engineers.filter(e => !e.siteManagerId);
+  }, [engineers]);
+
+  const filteredUnmappedEngineers = React.useMemo(() => {
+    return unmappedEngineers.filter(e => 
+      e.username.toLowerCase().includes(engineerSearchQuery.toLowerCase()) ||
+      e.email.toLowerCase().includes(engineerSearchQuery.toLowerCase())
+    );
+  }, [unmappedEngineers, engineerSearchQuery]);
+
   const filteredMappings = React.useMemo(() => {
     if (!engineers || !managers) return [];
     
@@ -104,8 +132,8 @@ export default function TeamMappingPage() {
       .filter(e => e.siteManagerId)
       .filter(e => {
         const manager = managers.find(m => m.id === e.siteManagerId);
-        const matchesEngineer = (e.username || '').toLowerCase().includes(engineerSearch.toLowerCase());
-        const matchesManager = manager?.username.toLowerCase().includes(managerSearch.toLowerCase()) ?? false;
+        const matchesEngineer = (e.username || '').toLowerCase().includes(tableEngineerSearch.toLowerCase());
+        const matchesManager = manager?.username.toLowerCase().includes(tableManagerSearch.toLowerCase()) ?? false;
         return matchesEngineer && matchesManager;
       })
       .sort((a, b) => {
@@ -125,7 +153,7 @@ export default function TeamMappingPage() {
         if (valA > valB) return direction === 'asc' ? 1 : -1;
         return 0;
       });
-  }, [engineers, managers, engineerSearch, managerSearch, sortConfig]);
+  }, [engineers, managers, tableEngineerSearch, tableManagerSearch, sortConfig]);
 
   if (isProfileLoading || managersLoading || engineersLoading) {
     return (
@@ -139,8 +167,6 @@ export default function TeamMappingPage() {
 
   if (!isAdmin) return null;
 
-  const unmappedEngineers = engineers?.filter(e => !e.siteManagerId) || [];
-
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">Teams</h1>
@@ -149,36 +175,130 @@ export default function TeamMappingPage() {
       <Card>
         <CardHeader>
           <CardTitle>Assign Site Engineer to Site Manager</CardTitle>
-          <CardDescription>Select a manager and then an engineer to Assign and Make a Team.</CardDescription>
+          <CardDescription>Select a manager and then an engineer to assign and make a team.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div className="space-y-2">
               <Label>Site Manager</Label>
-              <Select value={selectedManagerId || ''} onValueChange={setSelectedManagerId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a Manager" />
-                </SelectTrigger>
-                <SelectContent>
-                  {managers?.map(m => (
-                    <SelectItem key={m.id} value={m.id}>{m.username}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={isManagerPopoverOpen} onOpenChange={setIsManagerPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className={cn(
+                      "w-full justify-between font-normal",
+                      !selectedManagerId && "text-muted-foreground"
+                    )}
+                  >
+                    {selectedManagerId
+                      ? managers?.find((m) => m.id === selectedManagerId)?.username
+                      : "Select a Manager..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <div className="flex items-center border-b px-3">
+                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                    <Input
+                      placeholder="Search managers..."
+                      className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm"
+                      value={managerSearchQuery}
+                      onChange={(e) => setManagerSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <ScrollArea className="h-[250px]">
+                    <div className="p-1">
+                      {filteredManagers.length > 0 ? (
+                        filteredManagers.map((m) => (
+                          <Button
+                            key={m.id}
+                            variant="ghost"
+                            className="w-full justify-start font-normal"
+                            onClick={() => {
+                              setSelectedManagerId(m.id);
+                              setIsManagerPopoverOpen(false);
+                              setManagerSearchQuery("");
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                m.id === selectedManagerId ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {m.username}
+                          </Button>
+                        ))
+                      ) : (
+                        <p className="p-4 text-center text-sm text-muted-foreground">No manager found.</p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             </div>
+            
             <div className="space-y-2">
               <Label>Site Engineer</Label>
-              <Select value={selectedEngineerId || ''} onValueChange={setSelectedEngineerId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select an Engineer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {unmappedEngineers.map(e => (
-                    <SelectItem key={e.id} value={e.id}>{e.username}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={isEngineerPopoverOpen} onOpenChange={setIsEngineerPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className={cn(
+                      "w-full justify-between font-normal",
+                      !selectedEngineerId && "text-muted-foreground"
+                    )}
+                  >
+                    {selectedEngineerId
+                      ? engineers?.find((e) => e.id === selectedEngineerId)?.username
+                      : "Select an Engineer..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <div className="flex items-center border-b px-3">
+                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                    <Input
+                      placeholder="Search unmapped engineers..."
+                      className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm"
+                      value={engineerSearchQuery}
+                      onChange={(e) => setEngineerSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <ScrollArea className="h-[250px]">
+                    <div className="p-1">
+                      {filteredUnmappedEngineers.length > 0 ? (
+                        filteredUnmappedEngineers.map((e) => (
+                          <Button
+                            key={e.id}
+                            variant="ghost"
+                            className="w-full justify-start font-normal"
+                            onClick={() => {
+                              setSelectedEngineerId(e.id);
+                              setIsEngineerPopoverOpen(false);
+                              setEngineerSearchQuery("");
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                e.id === selectedEngineerId ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {e.username}
+                          </Button>
+                        ))
+                      ) : (
+                        <p className="p-4 text-center text-sm text-muted-foreground">No unmapped engineers found.</p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             </div>
+
             <Button onClick={handleAssign} disabled={!selectedManagerId || !selectedEngineerId}>
               <UserPlus className="mr-2 h-4 w-4" />
               Assign Mapping
@@ -207,8 +327,8 @@ export default function TeamMappingPage() {
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                           placeholder="Filter managers..."
-                          value={managerSearch}
-                          onChange={(e) => setManagerSearch(e.target.value)}
+                          value={tableManagerSearch}
+                          onChange={(e) => setTableManagerSearch(e.target.value)}
                           className="h-8 pl-8 text-xs"
                         />
                       </div>
@@ -224,8 +344,8 @@ export default function TeamMappingPage() {
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                           placeholder="Filter engineers..."
-                          value={engineerSearch}
-                          onChange={(e) => setEngineerSearch(e.target.value)}
+                          value={tableEngineerSearch}
+                          onChange={(e) => setTableEngineerSearch(e.target.value)}
                           className="h-8 pl-8 text-xs"
                         />
                       </div>
