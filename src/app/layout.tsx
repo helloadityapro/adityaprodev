@@ -86,7 +86,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
 
   const isAdmin = userProfile?.role === "Admin" || (user?.email && SUPER_ADMIN_EMAILS.includes(user.email));
 
-  // Initialize or update user profile on login
   React.useEffect(() => {
     if (user && !isProfileLoading) {
       const isSuperAdmin = user.email && SUPER_ADMIN_EMAILS.includes(user.email);
@@ -111,7 +110,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
             updateData.registrationRequest = false;
           } else {
             updateData.role = 'Site Engineer';
-            updateData.registrationRequest = true; // Non-admins require approval
+            updateData.registrationRequest = true;
           }
         } else if (roleMismatched) {
           updateData.role = 'Admin';
@@ -136,17 +135,11 @@ function AppShell({ children }: { children: React.ReactNode }) {
   }, [firestore, userRole]);
   const { data: permitsForBadge } = useCollection(ptwQueryForBadge);
 
-  const pendingPtwCount = React.useMemo(() => {
-    if (!permitsForBadge) return 0;
-    return permitsForBadge.length;
-  }, [permitsForBadge]);
+  const pendingPtwCount = React.useMemo(() => permitsForBadge?.length || 0, [permitsForBadge]);
 
   const notificationsQuery = useMemoFirebase(() => {
     if (!user) return null;
-    return query(
-        collection(firestore, 'notifications'), 
-        where('userId', '==', user.uid)
-    );
+    return query(collection(firestore, 'notifications'), where('userId', '==', user.uid));
   }, [user, firestore]);
   const { data: unsortedNotifications } = useCollection(notificationsQuery);
 
@@ -164,116 +157,67 @@ function AppShell({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     try {
       const storedIds = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
-      if (storedIds) {
-        setDisplayedNotifIds(new Set(JSON.parse(storedIds)));
-      }
-    } catch (e) {
-      console.error("Could not parse sessionStorage for notifications:", e);
-    }
+      if (storedIds) setDisplayedNotifIds(new Set(JSON.parse(storedIds)));
+    } catch (e) {}
   }, []);
 
   React.useEffect(() => {
       if (notifications) {
           const newDisplayedIds = new Set(displayedNotifIds);
           let wasUpdated = false;
-
           notifications.forEach(notif => {
               if (!notif.read && !displayedNotifIds.has(notif.id)) {
-                  let variant: 'default' | 'destructive' | 'success' = 'default';
-                  if (notif.title.includes('Approved')) {
-                    variant = 'success';
-                  } else if (notif.title.includes('Rejected')) {
-                    variant = 'destructive';
-                  }
-
-                  toast({
-                      title: notif.title,
-                      description: notif.description,
-                      variant,
-                  });
+                  toast({ title: notif.title, description: notif.description, variant: notif.title.includes('Approved') ? 'success' : notif.title.includes('Rejected') ? 'destructive' : 'default' });
                   newDisplayedIds.add(notif.id);
                   wasUpdated = true;
               }
           });
-
           if (wasUpdated) {
               setDisplayedNotifIds(newDisplayedIds);
-              try {
-                sessionStorage.setItem(DISPLAYED_NOTIFS_KEY, JSON.stringify(Array.from(newDisplayedIds)));
-              } catch(e) {
-                console.error("Could not update sessionStorage for notifications:", e);
-              }
+              sessionStorage.setItem(DISPLAYED_NOTIFS_KEY, JSON.stringify(Array.from(newDisplayedIds)));
           }
       }
   }, [notifications, toast, displayedNotifIds]);
 
-
   React.useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.replace('/login');
-    }
+    if (!isUserLoading && !user) router.replace('/login');
   }, [user, isUserLoading, router]);
 
-  if (isUserLoading || !user) {
-    return <FullPageLoader />;
-  }
+  if (isUserLoading || !user) return <FullPageLoader />;
 
-  if (userProfile && userProfile.registrationRequest && !isAdmin) {
+  if (userProfile?.registrationRequest && !isAdmin) {
      return (
-      <div className="flex flex-col min-h-screen items-center justify-center text-center gap-6 p-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight">Registration Pending</h1>
-          <p className="text-muted-foreground">Your account is awaiting administrator approval. You will be notified once approved.</p>
-        </div>
+      <div className="flex flex-col min-h-screen items-center justify-center text-center gap-6 p-4">
+        <h1 className="text-2xl font-bold">Registration Pending</h1>
+        <p className="text-muted-foreground">Account awaiting approval.</p>
         <Button variant="outline" onClick={() => auth.signOut()}>Sign Out</Button>
       </div>
     );
   }
 
-
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader>
-          <AppLogo />
-        </SidebarHeader>
-        <SidebarContent>
-          <MainNav userRole={userRole} pendingPtwCount={pendingPtwCount} />
-        </SidebarContent>
+        <SidebarHeader><AppLogo /></SidebarHeader>
+        <SidebarContent><MainNav userRole={userRole} pendingPtwCount={pendingPtwCount} /></SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 sticky top-0 z-10">
+        <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6 sticky top-0 z-10">
           <SidebarTrigger />
-          <div className="w-full flex-1">
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            className="h-8 w-8 rounded-full"
-            title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
-          >
+          <div className="flex-1" />
+          <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
             {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </Button>
           <UserNotifications />
           <UserNav />
         </header>
-        <main 
-          key={pathname}
-          className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40 animate-in fade-in slide-in-from-bottom-2 duration-500"
-        >
-          {children}
-        </main>
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
   
@@ -281,12 +225,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <title>Aditya Pro</title>
-        <meta name="description" content="A platform for managing Permits to Work." />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className="font-body antialiased selection:bg-primary/20">
+      <body className="antialiased font-sans">
         <FirebaseClientProvider>
           {isAuthPage ? children : <AppShell>{children}</AppShell>}
         </FirebaseClientProvider>

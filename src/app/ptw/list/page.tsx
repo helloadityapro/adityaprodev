@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { FileCheck, Clock, FileX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, FilterX } from "lucide-react"
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, FilterX } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
@@ -45,12 +45,11 @@ function StatusBadge({ status }: { status: Permit["status"] }) {
     const statusConfig = {
         Pending: { label: 'Pending with Manager', icon: Clock, className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
         ManagerApproved: { label: 'Pending with Admin', icon: Clock, className: 'bg-blue-100 text-blue-800 border-blue-300' },
-        Approved: { label: 'Approved', icon: FileCheck, className: 'bg-green-100 text-green-800 border-green-300' },
-        Rejected: { label: 'Rejected', icon: FileX, className: 'bg-red-100 text-red-800 border-red-300' },
+        Approved: { label: 'Approved', icon: CircleCheck, className: 'bg-green-100 text-green-800 border-green-300' },
+        Rejected: { label: 'Rejected', icon: CircleX, className: 'bg-red-100 text-red-800 border-red-300' },
         Corrected: { label: 'Corrected (Pending)', icon: Clock, className: 'bg-indigo-100 text-indigo-800 border-indigo-300' },
     };
-    const config = statusConfig[status];
-    if (!config) return null;
+    const config = statusConfig[status] || statusConfig.Pending;
     const Icon = config.icon;
     return (
         <Badge className={cn("flex items-center gap-1.5 text-xs font-medium w-fit border", config.className)}>
@@ -118,7 +117,6 @@ export default function PtwListPage() {
         if (targetStatus === 'Rejected') {
             notificationMessage = `Your permit for "${permit.siteName}" was rejected by the Admin: ${remarks}`;
             
-            // Also notify the manager if admin rejects
             if (permit.siteManagerId) {
                 addDocumentNonBlocking(collection(firestore, 'notifications'), {
                     userId: permit.siteManagerId,
@@ -134,7 +132,6 @@ export default function PtwListPage() {
     
     updateDocumentNonBlocking(permitRef, updateData);
 
-    // Notify the Site Engineer
     addDocumentNonBlocking(collection(firestore, 'notifications'), {
         userId: permit.siteEngineerId,
         title: `Permit Status Update`,
@@ -169,8 +166,8 @@ export default function PtwListPage() {
       return matchStatus && matchType && matchSite && matchDate;
     }).sort((a, b) => {
       const { key, direction } = sortConfig;
-      let valA = a[key];
-      let valB = b[key];
+      let valA = a[key] || '';
+      let valB = b[key] || '';
 
       if (key === 'requestDate') {
         valA = a.requestDate?.toDate?.()?.getTime() || 0;
@@ -189,7 +186,7 @@ export default function PtwListPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight">PTW List</h1>
-        <p className="text-muted-foreground">Manage and track your permit requests through the approval levels.</p>
+        <p className="text-muted-foreground">Manage and track permit requests through the approval levels.</p>
       </div>
 
       <Card>
@@ -241,7 +238,6 @@ export default function PtwListPage() {
                   <TableCell className="text-right flex items-center justify-end gap-2">
                     <Button variant="ghost" size="icon" title="View Details" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
                     
-                    {/* Site Manager Actions */}
                     {userRole === 'Site Manager' && (permit.status === 'Pending' || permit.status === 'Corrected') && (
                         <>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setActionState({permit, status: 'ManagerApproved'})}>Approve</Button>
@@ -249,7 +245,6 @@ export default function PtwListPage() {
                         </>
                     )}
                     
-                    {/* Admin Actions */}
                     {userRole === 'Admin' && permit.status === 'ManagerApproved' && (
                         <>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setActionState({permit, status: 'Approved'})}>Final Approve</Button>
@@ -257,7 +252,6 @@ export default function PtwListPage() {
                         </>
                     )}
                     
-                    {/* Engineer Actions (Resubmit) */}
                     {userRole === 'Site Engineer' && permit.status === 'Rejected' && (
                         <Button size="sm" variant="outline" onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}><FilePen className="h-4 w-4 mr-2" /> Resubmit</Button>
                     )}
@@ -266,7 +260,7 @@ export default function PtwListPage() {
               ))}
               {filteredPermits.length === 0 && (
                   <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No permits found in this category.</TableCell>
+                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">No permits found.</TableCell>
                   </TableRow>
               )}
             </TableBody>
@@ -274,40 +268,36 @@ export default function PtwListPage() {
         </CardContent>
       </Card>
 
-      {/* Action Dialog (Approve/Reject with Remarks) */}
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent>
             <DialogHeader>
               <DialogTitle>{actionState?.status === 'Rejected' ? 'Reject' : 'Approve'} Permit Request</DialogTitle>
-              <DialogDescription>
-                Please provide your remarks for this action.
-              </DialogDescription>
+              <DialogDescription>Provide remarks for this action.</DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-2">
                 <Label htmlFor="action-remarks">Remarks/Comments</Label>
-                <Textarea id="action-remarks" placeholder="Explain the reason for your decision..." />
+                <Textarea id="action-remarks" placeholder="Explain your decision..." />
             </div>
             <DialogFooter>
                 <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                 <Button onClick={() => {
-                    const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement).value;
-                    if (remarks) {
+                    const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "";
+                    if (remarks.trim()) {
                         handleAction(actionState!.permit, actionState!.status, remarks);
                         setActionState(null);
                     } else {
-                        toast({ variant: 'destructive', title: 'Remarks Required', description: 'Please enter a comment to proceed.' });
+                        toast({ variant: 'destructive', title: 'Remarks Required', description: 'Please enter a comment.' });
                     }
                 }}>{actionState?.status === 'Rejected' ? 'Confirm Rejection' : 'Confirm Approval'}</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Details View Dialog */}
       <Dialog open={!!detailsPermit} onOpenChange={() => setDetailsPermit(null)}>
           <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Permit Request Details</DialogTitle>
-                <DialogDescription>Full summary of the permit and its approval history.</DialogDescription>
+                <DialogDescription>Full summary of the permit and approval history.</DialogDescription>
               </DialogHeader>
               {detailsPermit && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm py-4">
@@ -349,7 +339,6 @@ export default function PtwListPage() {
           </DialogContent>
       </Dialog>
       
-      {/* Media Gallery Viewer */}
       <Dialog open={!!viewerState} onOpenChange={() => setViewerState(null)}>
           <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black/95 border-none">
               <DialogHeader className="sr-only">
