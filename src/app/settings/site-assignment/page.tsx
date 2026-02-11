@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -7,12 +6,15 @@ import { collection, doc, query, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { Trash2, Loader2, PlusCircle } from 'lucide-react';
+import { Trash2, Loader2, PlusCircle, Search, ChevronsUpDown, Check } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type User = {
   id: string;
@@ -67,6 +69,12 @@ export default function SiteAssignmentPage() {
   const [localAssignedSites, setLocalAssignedSites] = React.useState<string[]>([]);
   const [isSaving, setIsSaving] = React.useState(false);
 
+  // Search/Popover States
+  const [isUserPopoverOpen, setIsUserPopoverOpen] = React.useState(false);
+  const [userSearchQuery, setUserSearchQuery] = React.useState("");
+  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
+  const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
+
   React.useEffect(() => {
     if (selectedUser) {
       setLocalAssignedSites(selectedUser.assignedProjectIds || []);
@@ -74,6 +82,25 @@ export default function SiteAssignmentPage() {
       setLocalAssignedSites([]);
     }
   }, [selectedUser]);
+
+  const filteredUsers = React.useMemo(() => {
+    const list = users?.filter(u => {
+      if (isAdmin) return u.role !== 'Admin' || u.id === user?.uid;
+      return u.role === 'Site Engineer';
+    }) || [];
+    
+    return list.filter(u => 
+      u.username.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      u.email.toLowerCase().includes(userSearchQuery.toLowerCase())
+    );
+  }, [users, isAdmin, user, userSearchQuery]);
+
+  const availableSitesToAssign = React.useMemo(() => {
+    const list = sites?.filter(site => !localAssignedSites.includes(site.id)) || [];
+    return list.filter(site => 
+      site.name.toLowerCase().includes(siteSearchQuery.toLowerCase())
+    );
+  }, [sites, localAssignedSites, siteSearchQuery]);
 
   const handleAddSite = () => {
     if (!selectedSiteToAdd) return;
@@ -116,13 +143,6 @@ export default function SiteAssignmentPage() {
 
   if (!isAdmin && !isManager) return null;
 
-  const filteredUsers = users?.filter(u => {
-      if (isAdmin) return u.role !== 'Admin' || u.id === user?.uid;
-      return u.role === 'Site Engineer';
-  }) || [];
-
-  const availableSitesToAssign = sites?.filter(site => !localAssignedSites.includes(site.id)) || [];
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
@@ -140,18 +160,65 @@ export default function SiteAssignmentPage() {
         <CardContent>
           <div className="max-w-md space-y-2">
             <Label>User</Label>
-            <Select value={selectedUserId || ''} onValueChange={setSelectedUserId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a User" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredUsers.map(u => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.username} ({u.role})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className={cn(
+                    "w-full justify-between font-normal",
+                    !selectedUserId && "text-muted-foreground"
+                  )}
+                >
+                  {selectedUserId
+                    ? users?.find((u) => u.id === selectedUserId)?.username
+                    : "Select a user..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <div className="flex items-center border-b px-3">
+                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Input
+                    placeholder="Search users..."
+                    className="h-9 w-full border-none focus-visible:ring-0 px-0"
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                  />
+                </div>
+                <ScrollArea className="h-[250px]">
+                  <div className="p-1">
+                    {filteredUsers.length > 0 ? (
+                      filteredUsers.map((u) => (
+                        <Button
+                          key={u.id}
+                          variant="ghost"
+                          className="w-full justify-start font-normal"
+                          onClick={() => {
+                            setSelectedUserId(u.id);
+                            setIsUserPopoverOpen(false);
+                            setUserSearchQuery("");
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              u.id === selectedUserId ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <div className="flex flex-col items-start">
+                            <span>{u.username}</span>
+                            <span className="text-[10px] text-muted-foreground">{u.role}</span>
+                          </div>
+                        </Button>
+                      ))
+                    ) : (
+                      <p className="p-4 text-center text-sm text-muted-foreground">No user found.</p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
           </div>
         </CardContent>
       </Card>
@@ -166,16 +233,62 @@ export default function SiteAssignmentPage() {
             <div className="flex flex-col sm:flex-row items-end gap-4 p-4 border rounded-lg bg-muted/20">
               <div className="flex-1 space-y-2 w-full">
                 <Label>Add New Site</Label>
-                <Select value={selectedSiteToAdd || ''} onValueChange={setSelectedSiteToAdd}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={availableSitesToAssign.length > 0 ? "Select a site to add" : "No more sites available"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableSitesToAssign.map(site => (
-                      <SelectItem key={site.id} value={site.id}>{site.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn(
+                        "w-full justify-between font-normal",
+                        !selectedSiteToAdd && "text-muted-foreground"
+                      )}
+                    >
+                      {selectedSiteToAdd
+                        ? sites?.find((s) => s.id === selectedSiteToAdd)?.name
+                        : availableSitesToAssign.length > 0 ? "Select a site to add" : "No more sites available"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <div className="flex items-center border-b px-3">
+                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                      <Input
+                        placeholder="Search sites..."
+                        className="h-9 w-full border-none focus-visible:ring-0 px-0"
+                        value={siteSearchQuery}
+                        onChange={(e) => setSiteSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    <ScrollArea className="h-[250px]">
+                      <div className="p-1">
+                        {availableSitesToAssign.length > 0 ? (
+                          availableSitesToAssign.map((site) => (
+                            <Button
+                              key={site.id}
+                              variant="ghost"
+                              className="w-full justify-start font-normal"
+                              onClick={() => {
+                                setSelectedSiteToAdd(site.id);
+                                setIsSitePopoverOpen(false);
+                                setSiteSearchQuery("");
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  site.id === selectedSiteToAdd ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {site.name}
+                            </Button>
+                          ))
+                        ) : (
+                          <p className="p-4 text-center text-sm text-muted-foreground">No available sites found.</p>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
               </div>
               <Button onClick={handleAddSite} disabled={!selectedSiteToAdd} className="w-full sm:w-auto">
                 <PlusCircle className="mr-2 h-4 w-4" />
