@@ -264,7 +264,7 @@ export default function RaisePtwPage() {
       )}
 
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold font-headline tracking-tight">{isCorrectionMode ? "Correct PtW Request" : "Raise a Permit to Work"}</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{isCorrectionMode ? "Correct PtW Request" : "Raise a Permit to Work"}</h1>
         <p className="text-muted-foreground">Complete the form below to initiate the approval lifecycle.</p>
       </div>
 
@@ -276,12 +276,12 @@ export default function RaisePtwPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                 <FormField
                   control={form.control}
                   name="siteName"
                   render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem>
                       <FormLabel>Site Name</FormLabel>
                       <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                         <PopoverTrigger asChild>
@@ -353,9 +353,9 @@ export default function RaisePtwPage() {
                   name="ptwType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>PTW for (Type of Work)</FormLabel>
+                      <FormLabel>PTW Type</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value} disabled={isProcessing || isSubmitted}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select a permit type" /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select a type" /></SelectTrigger></FormControl>
                         <SelectContent>{ptwTypes?.map((t) => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}</SelectContent>
                       </Select>
                       <FormMessage />
