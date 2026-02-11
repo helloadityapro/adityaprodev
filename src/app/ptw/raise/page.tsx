@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { TriangleAlert, Loader2, CheckCircle2, Search, ChevronsUpDown, Check, FileUp, MessageCircle } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
-import { collection, serverTimestamp, doc, arrayUnion, getDoc } from "firebase/firestore"
+import { collection, serverTimestamp, doc, arrayUnion, getDoc, query, where, getDocs, Timestamp } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
@@ -193,6 +193,36 @@ export default function RaisePtwPage() {
       return;
     }
 
+    // Determine serial number and sequence
+    let serialNumber = "";
+    if (isCorrectionMode && permitToCorrect) {
+      serialNumber = permitToCorrect.serialNumber;
+    } else {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date();
+      endOfDay.setHours(23, 59, 59, 999);
+
+      try {
+        const qToday = query(
+          collection(firestore, "permits_to_work"),
+          where("requestDate", ">=", Timestamp.fromDate(startOfDay)),
+          where("requestDate", "<=", Timestamp.fromDate(endOfDay))
+        );
+        const snapshotToday = await getDocs(qToday);
+        const countToday = snapshotToday.size;
+        serialNumber = `AGEPL/PtW/${year}/${month}/${day}/${String(countToday + 1).padStart(2, '0')}`;
+      } catch (e) {
+        // Fallback to timestamp if counting fails
+        serialNumber = `AGEPL/PtW/${year}/${month}/${day}/${Date.now().toString().slice(-4)}`;
+      }
+    }
+
     // Determine current submission index
     let currentSubmissionIndex = 1;
     if (isCorrectionMode && permitToCorrect?.attachments) {
@@ -221,8 +251,6 @@ export default function RaisePtwPage() {
 
     try {
       const timestamp = Date.now();
-      const serialNumber = isCorrectionMode ? permitToCorrect.serialNumber : `PTW-${timestamp}`;
-
       let allFilesToUpload: File[] = [...files, ...referenceDocs];
       if (vlogFile) allFilesToUpload.push(new File([vlogFile], `attestation-${vlogFile.name}`, { type: vlogFile.type }));
 
