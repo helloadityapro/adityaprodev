@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, arrayUnion } from "firebase/firestore";
@@ -83,6 +83,33 @@ function UserDisplay({ userId }: { userId: string }) {
   const firestore = useFirestore();
   const { data: user } = useDoc(useMemoFirebase(() => userId ? doc(firestore, 'users', userId) : null, [firestore, userId]));
   return <span>{user?.username || '...'}</span>;
+}
+
+function WhatsAppReminder({ userId, permit }: { userId: string | undefined, permit: Permit }) {
+    const firestore = useFirestore();
+    const { data: targetUser } = useDoc(useMemoFirebase(() => userId ? doc(firestore, 'users', userId) : null, [firestore, userId]));
+    
+    const triggerWhatsApp = () => {
+        if (!targetUser?.mobile) return;
+        const cleanMobile = targetUser.mobile.replace(/\D/g, '');
+        const message = `Reminder: PtW request ${permit.serialNumber} for "${permit.siteName}" is pending your review.\nStatus: ${permit.status}\nLink: ${window.location.origin}/ptw/list`;
+        const url = `https://wa.me/${cleanMobile}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+    };
+
+    if (!targetUser?.mobile) return null;
+
+    return (
+        <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-green-600 hover:text-green-700 hover:bg-green-50" 
+            title="Send WhatsApp Reminder"
+            onClick={triggerWhatsApp}
+        >
+            <MessageCircle className="h-4 w-4" />
+        </Button>
+    );
 }
 
 type SortKey = 'serialNumber' | 'ptwType' | 'siteName' | 'requestDate' | 'status';
@@ -341,8 +368,12 @@ export default function PtwListPage() {
                   <TableCell><StatusBadge status={permit.status} /></TableCell>
                   <TableCell>{formatTimestamp(permit.requestDate)}</TableCell>
                   <TableCell className="text-right px-6">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="icon" title="View Details" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
+
+                      {userRole === 'Site Engineer' && permit.status === 'Pending' && (
+                        <WhatsAppReminder userId={permit.siteManagerId} permit={permit} />
+                      )}
 
                       {userRole === 'Site Manager' && permit.status === 'Pending' && (
                         <>
