@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { TriangleAlert, Loader2, CheckCircle2, Search, ChevronsUpDown, Check, FileUp } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
@@ -104,11 +103,21 @@ export default function RaisePtwPage() {
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
 
+  const [isPtwTypePopoverOpen, setIsPtwTypePopoverOpen] = React.useState(false);
+  const [ptwTypeSearchQuery, setPtwTypeSearchQuery] = React.useState("");
+
   const filteredAccessibleSites = React.useMemo(() => {
     return accessibleSites.filter(site => 
       site.name.toLowerCase().includes(siteSearchQuery.toLowerCase())
     );
   }, [accessibleSites, siteSearchQuery]);
+
+  const filteredPtwTypesList = React.useMemo(() => {
+    if (!ptwTypes) return [];
+    return ptwTypes.filter(type => 
+      type.name.toLowerCase().includes(ptwTypeSearchQuery.toLowerCase())
+    );
+  }, [ptwTypes, ptwTypeSearchQuery]);
 
   const form = useForm<z.infer<typeof raisePtwSchema>>({
     resolver: zodResolver(raisePtwSchema),
@@ -356,10 +365,65 @@ export default function RaisePtwPage() {
                   render={({ field }) => (
                     <FormItem className="space-y-2">
                       <FormLabel>PTW Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isProcessing || isSubmitted}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select a type" /></SelectTrigger></FormControl>
-                        <SelectContent>{ptwTypes?.map((t) => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <Popover open={isPtwTypePopoverOpen} onOpenChange={setIsPtwTypePopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              disabled={isProcessing || isSubmitted}
+                            >
+                              {field.value
+                                ? ptwTypes?.find((type) => type.name === field.value)?.name
+                                : "Select a type..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <div className="flex items-center border-b px-3">
+                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                            <Input
+                              placeholder="Search types..."
+                              className="h-9 w-full border-none focus-visible:ring-0 px-0"
+                              value={ptwTypeSearchQuery}
+                              onChange={(e) => setPtwTypeSearchQuery(e.target.value)}
+                            />
+                          </div>
+                          <ScrollArea className="h-[200px]">
+                            <div className="p-1">
+                              {filteredPtwTypesList.length > 0 ? (
+                                filteredPtwTypesList.map((type) => (
+                                  <Button
+                                    key={type.id}
+                                    variant="ghost"
+                                    className="w-full justify-start font-normal"
+                                    onClick={() => {
+                                      field.onChange(type.name);
+                                      setIsPtwTypePopoverOpen(false);
+                                      setPtwTypeSearchQuery("");
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        type.name === field.value ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {type.name}
+                                  </Button>
+                                ))
+                              ) : (
+                                <p className="p-4 text-center text-sm text-muted-foreground">No type found.</p>
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
