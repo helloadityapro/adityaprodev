@@ -104,7 +104,7 @@
       ]
     },
     "PtwType": {
-      "title": "PTW Type",
+      "title": "Ptw Type",
       "type": "object",
       "description": "Represents a type of Permit to Work, used in dropdowns.",
       "properties": {
@@ -141,7 +141,7 @@
         },
         "attachments": {
           "type": "array",
-          "description": "An array of media files attached to the permit.",
+          "description": "An array of media files attached to the permit with submission history tracking.",
           "items": {
             "type": "object",
             "properties": {
@@ -157,12 +157,22 @@
               "name": {
                 "type": "string",
                 "description": "The name of the media file."
+              },
+              "submissionIndex": {
+                "type": "number",
+                "description": "The iteration number of this submission (1, 2, 3...)."
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When this file was uploaded."
               }
             },
             "required": [
               "url",
               "contentType",
-              "name"
+              "name",
+              "submissionIndex"
             ]
           }
         },

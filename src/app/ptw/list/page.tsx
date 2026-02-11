@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -6,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, FilterX, History, User, ExternalLink, FileText } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, FilterX, History, User, ExternalLink, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, arrayUnion } from "firebase/firestore";
@@ -20,7 +21,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Separator } from "@/components/ui/separator";
 
-type Attachment = { url: string; contentType: string; name: string; };
+type Attachment = { 
+  url: string; 
+  contentType: string; 
+  name: string; 
+  submissionIndex?: number;
+  timestamp?: string;
+};
 
 type TimelineEntry = {
   status: string;
@@ -65,7 +72,11 @@ function StatusBadge({ status }: { status: Permit["status"] }) {
   );
 }
 
-const formatTimestamp = (ts: any) => (ts?.toDate ? format(ts.toDate(), 'dd/MM/yyyy HH:mm') : 'N/A');
+const formatTimestamp = (ts: any) => {
+  if (!ts) return 'N/A';
+  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
+  return format(date, 'dd/MM/yyyy HH:mm');
+};
 
 function UserDisplay({ userId }: { userId: string }) {
   const firestore = useFirestore();
@@ -188,6 +199,17 @@ export default function PtwListPage() {
     });
   }, [permits, statusFilter, filters, sortConfig]);
 
+  const groupedAttachments = React.useMemo(() => {
+    if (!detailsPermit?.attachments) return {};
+    const grouped: Record<number, Attachment[]> = {};
+    detailsPermit.attachments.forEach(att => {
+      const idx = att.submissionIndex || 1;
+      if (!grouped[idx]) grouped[idx] = [];
+      grouped[idx].push(att);
+    });
+    return grouped;
+  }, [detailsPermit]);
+
   if (isLoading || !userRole) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   return (
@@ -306,7 +328,7 @@ export default function PtwListPage() {
       </Dialog>
 
       <Dialog open={!!detailsPermit} onOpenChange={() => setDetailsPermit(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Permit Request Details</DialogTitle>
             <DialogDescription>Full summary and lifecycle timeline.</DialogDescription>
@@ -353,31 +375,58 @@ export default function PtwListPage() {
                 </div>
               </div>
 
-              {detailsPermit.attachments && detailsPermit.attachments.length > 0 && (
+              {Object.keys(groupedAttachments).length > 0 && (
                 <>
                   <Separator />
-                  <div className="space-y-3">
-                    <Label className="text-xs text-muted-foreground uppercase">Attachments & Documents</Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {detailsPermit.attachments.map((a, i) => {
-                        const isMedia = a.contentType.startsWith('image') || a.contentType.startsWith('video');
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <ExternalLink className="h-4 w-4 text-primary" />
+                      <h3 className="font-bold text-sm uppercase tracking-wider">Submission History & Files</h3>
+                    </div>
+                    
+                    <div className="space-y-6">
+                      {Object.keys(groupedAttachments).sort((a, b) => Number(b) - Number(a)).map(idx => {
+                        const submissionIdx = Number(idx);
+                        const files = groupedAttachments[submissionIdx];
+                        const firstFileTimestamp = files[0]?.timestamp;
+                        
                         return (
-                          <div key={i} className="flex items-center gap-2 p-2 rounded-md border bg-muted/20">
-                            <div className="flex-1 truncate">
-                              <p className="text-xs font-medium truncate">{a.name}</p>
-                              <p className="text-[10px] text-muted-foreground">{a.contentType}</p>
+                          <div key={idx} className="space-y-3 p-4 rounded-lg border bg-muted/5 relative">
+                            <div className="flex items-center justify-between border-b pb-2 mb-2">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="px-2">Submission {submissionIdx}</Badge>
+                                {firstFileTimestamp && (
+                                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                    <CalendarDays className="h-3 w-3" /> {formatTimestamp(firstFileTimestamp)}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            {isMedia ? (
-                              <Button variant="outline" size="sm" onClick={() => setViewerState({ attachments: detailsPermit.attachments!, startIndex: i })}>
-                                <Eye className="h-3 w-3 mr-1" /> View
-                              </Button>
-                            ) : (
-                              <Button variant="outline" size="sm" asChild>
-                                <a href={a.url} target="_blank" rel="noopener noreferrer">
-                                  <ExternalLink className="h-3 w-3 mr-1" /> Open
-                                </a>
-                              </Button>
-                            )}
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {files.map((a, i) => {
+                                const isMedia = a.contentType.startsWith('image') || a.contentType.startsWith('video');
+                                return (
+                                  <div key={i} className="flex items-center gap-2 p-2 rounded-md border bg-background hover:border-primary/50 transition-colors">
+                                    <div className="flex-1 truncate">
+                                      <p className="text-xs font-medium truncate">{a.name}</p>
+                                      <p className="text-[10px] text-muted-foreground">{a.contentType}</p>
+                                    </div>
+                                    {isMedia ? (
+                                      <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => setViewerState({ attachments: detailsPermit.attachments!, startIndex: detailsPermit.attachments!.indexOf(a) })}>
+                                        <Eye className="h-3 w-3 mr-1" /> View
+                                      </Button>
+                                    ) : (
+                                      <Button variant="outline" size="sm" className="h-7 text-[10px]" asChild>
+                                        <a href={a.url} target="_blank" rel="noopener noreferrer">
+                                          <ExternalLink className="h-3 w-3 mr-1" /> Open
+                                        </a>
+                                      </Button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         );
                       })}
@@ -405,7 +454,12 @@ export default function PtwListPage() {
                   ) : (
                     <video src={a.url} controls className="max-h-[70vh] max-w-full shadow-2xl rounded-sm" />
                   )}
-                  <p className="mt-6 text-sm text-white/70 font-medium">{a.name}</p>
+                  <div className="mt-6 flex flex-col items-center gap-1">
+                    <p className="text-sm text-white font-medium">{a.name}</p>
+                    {a.submissionIndex && (
+                       <Badge variant="secondary" className="text-[10px]">Submission {a.submissionIndex}</Badge>
+                    )}
+                  </div>
                 </CarouselItem>
               ))}
             </CarouselContent>

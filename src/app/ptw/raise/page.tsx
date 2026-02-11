@@ -184,7 +184,14 @@ export default function RaisePtwPage() {
       return;
     }
 
-    const uploadFile = (file: File, path: string): Promise<{ url: string; contentType: string; name: string; }> => {
+    // Determine current submission index
+    let currentSubmissionIndex = 1;
+    if (isCorrectionMode && permitToCorrect?.attachments) {
+      const indices = permitToCorrect.attachments.map((a: any) => a.submissionIndex || 1);
+      currentSubmissionIndex = Math.max(...indices) + 1;
+    }
+
+    const uploadFile = (file: File, path: string): Promise<{ url: string; contentType: string; name: string; submissionIndex: number; timestamp: string }> => {
       return new Promise((resolve, reject) => {
         const storage = getStorage(firebaseApp);
         const storageRef = ref(storage, path);
@@ -192,7 +199,13 @@ export default function RaisePtwPage() {
         uploadTask.on('state_changed',
           (snapshot) => setUploadProgress(prev => ({ ...prev, [file.name]: (snapshot.bytesTransferred / snapshot.totalBytes) * 100 })),
           reject,
-          () => getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve({ url, contentType: file.type, name: file.name }))
+          () => getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve({ 
+            url, 
+            contentType: file.type, 
+            name: file.name,
+            submissionIndex: currentSubmissionIndex,
+            timestamp: new Date().toISOString()
+          }))
         );
       });
     };
@@ -216,7 +229,7 @@ export default function RaisePtwPage() {
         userId: user.uid,
         userName: userProfile.username || user.email || 'Engineer',
         remarks: permitValues.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with corrections." : "Permit initially submitted."),
-        action: isCorrectionMode ? "Resubmitted" : "Created"
+        action: isCorrectionMode ? `Resubmitted (v${currentSubmissionIndex})` : "Created"
       };
 
       if (isCorrectionMode && permitIdToCorrect) {
@@ -245,7 +258,7 @@ export default function RaisePtwPage() {
 
       setIsSubmitted(true);
       setIsProcessing(false);
-      toast({ title: "Success", description: "Permit submitted to manager for review." });
+      toast({ title: "Success", description: `Permit ${isCorrectionMode ? 'resubmitted' : 'submitted'} for review.` });
       setTimeout(() => router.push('/ptw/list'), 2000);
     } catch (error: any) {
       toast({ variant: "destructive", title: "Submission Failed", description: error.message });
