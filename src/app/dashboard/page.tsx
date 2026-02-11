@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Search } from 'lucide-react';
 
 // Define the type for our site data
 type SiteData = {
@@ -52,8 +54,13 @@ function DashboardSkeleton() {
         </div>
         <Card>
             <CardHeader>
-                <Skeleton className="h-8 w-32" />
-                <Skeleton className="h-4 w-64 mt-1" />
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <Skeleton className="h-8 w-32" />
+                    <Skeleton className="h-4 w-64 mt-1" />
+                  </div>
+                  <Skeleton className="h-10 w-full md:w-72" />
+                </div>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -84,6 +91,7 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   const [sites, setSites] = useState<SiteData[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,18 +115,39 @@ export default function DashboardPage() {
     fetchData();
   }, []);
 
+  const filteredSites = useMemo(() => {
+    return sites.filter(site => 
+      site['Project Company'].toLowerCase().includes(searchTerm.toLowerCase()) ||
+      site['Project name'].toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [sites, searchTerm]);
+
   if (isLoading) return <DashboardSkeleton />;
   if (error) return <p>Error: {error}</p>;
 
   return (
     <>
       <div className="flex items-center">
-        <h1 className="text-lg font-headline font-semibold md:text-2xl">Site Projects</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Site Projects</h1>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Site Details</CardTitle>
-          <CardDescription>An overview of sites from the connected Google Sheet.</CardDescription>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <CardTitle>Site Details</CardTitle>
+              <CardDescription>An overview of sites from the connected Google Sheet.</CardDescription>
+            </div>
+            <div className="relative w-full md:w-72">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search projects or companies..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -131,8 +160,8 @@ export default function DashboardPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sites.length > 0 ? (
-                sites.map((site, index) => (
+              {filteredSites.length > 0 ? (
+                filteredSites.map((site, index) => (
                   <TableRow key={index}>
                     <TableCell className="font-medium">{site['Project Company']}</TableCell>
                     <TableCell>{site['Project name']}</TableCell>
@@ -142,8 +171,8 @@ export default function DashboardPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">
-                    No site data found in the Google Sheet.
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    {searchTerm ? `No results found for "${searchTerm}"` : "No site data found in the Google Sheet."}
                   </TableCell>
                 </TableRow>
               )}
