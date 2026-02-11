@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -88,29 +89,22 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       const docMissing = !userProfile;
       const roleMismatched = isSuperAdmin && (userProfile?.role !== 'Admin' || userProfile?.registrationRequest === true);
       
-      if (docMissing || roleMismatched) {
+      // ONLY bootstrap if it's a Super Admin who needs fixing or is missing.
+      // Regular users are handled by the RegisterPage to avoid race conditions and permission errors.
+      if (isSuperAdmin && (docMissing || roleMismatched)) {
         const updateData: any = {
           id: user.uid,
           email: user.email,
           updatedAt: serverTimestamp(),
+          role: 'Admin',
+          registrationRequest: false,
         };
 
         if (docMissing) {
           updateData.createdAt = serverTimestamp();
-          updateData.username = user.displayName || user.email?.split('@')[0] || 'New User';
+          updateData.username = user.displayName || user.email?.split('@')[0] || 'Admin';
           updateData.mobile = user.phoneNumber || 'N/A';
           updateData.assignedProjectIds = [];
-          
-          if (isSuperAdmin) {
-            updateData.role = 'Admin';
-            updateData.registrationRequest = false;
-          } else {
-            updateData.role = 'Site Engineer';
-            updateData.registrationRequest = true;
-          }
-        } else if (roleMismatched) {
-          updateData.role = 'Admin';
-          updateData.registrationRequest = false;
         }
 
         setDocumentNonBlocking(doc(firestore, "users", user.uid), updateData, { merge: true });
