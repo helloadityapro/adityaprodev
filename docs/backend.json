@@ -127,6 +127,10 @@
           "type": "string",
           "description": "Unique identifier for the permit to work request."
         },
+        "serialNumber": {
+          "type": "string",
+          "description": "Auto-generated human-readable serial number for the permit."
+        },
         "siteName": {
           "type": "string",
           "description": "The name of the site."

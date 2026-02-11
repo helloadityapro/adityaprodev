@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -211,6 +212,8 @@ export default function RaisePtwPage() {
 
     try {
       const timestamp = Date.now();
+      const serialNumber = `PTW-${timestamp}`; // Auto serial number generation
+
       let allFilesToUpload: File[] = [...files, ...referenceDocs];
       if (vlogFile) allFilesToUpload.push(new File([vlogFile], `attestation-${vlogFile.name}`, { type: vlogFile.type }));
 
@@ -244,6 +247,7 @@ export default function RaisePtwPage() {
       } else {
         addDocumentNonBlocking(collection(firestore, "permits_to_work"), {
           ...permitValues,
+          serialNumber: serialNumber,
           siteEngineerId: user.uid,
           siteManagerId: userProfile.siteManagerId,
           status: "Pending",
@@ -260,7 +264,7 @@ export default function RaisePtwPage() {
         addDocumentNonBlocking(collection(firestore, 'notifications'), {
           userId: userProfile.siteManagerId,
           title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
-          description: `${userProfile.username || user.email} has ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit for "${values.siteName}".`,
+          description: `${userProfile.username || user.email} has ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit (${isCorrectionMode ? permitToCorrect?.serialNumber : serialNumber}) for "${values.siteName}".`,
           link: `/ptw/list`,
           read: false,
           createdAt: serverTimestamp(),
@@ -294,7 +298,7 @@ export default function RaisePtwPage() {
           <CheckCircle2 className="h-4 w-4" />
           <AlertTitle>Correction Mode</AlertTitle>
           <AlertDescription>
-            You are editing a rejected permit for <strong>{permitToCorrect.siteName}</strong>.
+            You are editing a rejected permit (<strong>{permitToCorrect.serialNumber}</strong>) for <strong>{permitToCorrect.siteName}</strong>.
           </AlertDescription>
         </Alert>
       )}
