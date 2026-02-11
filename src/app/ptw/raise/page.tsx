@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { TriangleAlert, Loader2, CheckCircle2, Search, ChevronsUpDown, Check, FileText } from "lucide-react"
+import { TriangleAlert, Loader2, CheckCircle2, Search, ChevronsUpDown, Check } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp, doc, arrayUnion } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -384,14 +384,7 @@ export default function RaisePtwPage() {
                 )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-3">
-                  <Label>Additional Attachments</Label>
-                  <div className="flex flex-col gap-2">
-                    <Input type="file" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className="cursor-pointer" />
-                    <p className="text-[10px] text-muted-foreground">Attach images or videos of the site.</p>
-                  </div>
-                </div>
+              <div className="space-y-6">
                 <div className="space-y-3">
                   <Label>Reference Documents</Label>
                   <div className="flex flex-col gap-2">
@@ -399,11 +392,21 @@ export default function RaisePtwPage() {
                     <p className="text-[10px] text-muted-foreground">Attach PDFs, drawings, or safety manuals.</p>
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <Label>Self Attestation (Vlog)</Label>
-                  <div className="flex flex-col gap-2">
-                    <Input type="file" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isProcessing || isSubmitted} className="cursor-pointer" />
-                    <p className="text-[10px] text-muted-foreground">A short video explaining safety measures.</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label>Additional Attachments</Label>
+                    <div className="flex flex-col gap-2">
+                      <Input type="file" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className="cursor-pointer" />
+                      <p className="text-[10px] text-muted-foreground">Attach images or videos of the site.</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <Label>Self Attestation (Vlog)</Label>
+                    <div className="flex flex-col gap-2">
+                      <Input type="file" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isProcessing || isSubmitted} className="cursor-pointer" />
+                      <p className="text-[10px] text-muted-foreground">A short video explaining safety measures.</p>
+                    </div>
                   </div>
                 </div>
               </div>
