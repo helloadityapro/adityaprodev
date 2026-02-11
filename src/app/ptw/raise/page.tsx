@@ -11,9 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { TriangleAlert, Loader2, CheckCircle2, Search, ChevronsUpDown, Check, FileUp } from "lucide-react"
+import { TriangleAlert, Loader2, CheckCircle2, Search, ChevronsUpDown, Check, FileUp, MessageCircle } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
-import { collection, serverTimestamp, doc, arrayUnion } from "firebase/firestore"
+import { collection, serverTimestamp, doc, arrayUnion, getDoc } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
@@ -100,6 +100,7 @@ export default function RaisePtwPage() {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [uploadProgress, setUploadProgress] = React.useState<{ [key: string]: number }>({});
+  const [lastSubmittedDetails, setLastSubmittedDetails] = React.useState<{ serialNumber: string, siteName: string, managerMobile?: string } | null>(null);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
@@ -165,6 +166,14 @@ export default function RaisePtwPage() {
     });
   };
 
+  const triggerWhatsApp = (serial: string, site: string, mobile?: string) => {
+    if (!mobile) return;
+    const cleanMobile = mobile.replace(/\D/g, '');
+    const message = `Hello, I've submitted a new PtW request.\nSerial: ${serial}\nSite: ${site}\nLink: ${window.location.origin}/ptw/list`;
+    const url = `https://wa.me/${cleanMobile}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   const onSubmit = async (values: z.infer<typeof raisePtwSchema>) => {
     if (!user || !userProfile) return;
     if (!hasManagerMapping) {
@@ -212,7 +221,7 @@ export default function RaisePtwPage() {
 
     try {
       const timestamp = Date.now();
-      const serialNumber = `PTW-${timestamp}`; // Auto serial number generation
+      const serialNumber = isCorrectionMode ? permitToCorrect.serialNumber : `PTW-${timestamp}`;
 
       let allFilesToUpload: File[] = [...files, ...referenceDocs];
       if (vlogFile) allFilesToUpload.push(new File([vlogFile], `attestation-${vlogFile.name}`, { type: vlogFile.type }));
@@ -259,22 +268,35 @@ export default function RaisePtwPage() {
         });
       }
 
-      // Notify Site Manager
+      // Fetch manager mobile for WhatsApp
+      let managerMobile;
       if (userProfile.siteManagerId) {
+        const managerDoc = await getDoc(doc(firestore, 'users', userProfile.siteManagerId));
+        if (managerDoc.exists()) {
+          managerMobile = managerDoc.data().mobile;
+        }
+
         addDocumentNonBlocking(collection(firestore, 'notifications'), {
           userId: userProfile.siteManagerId,
           title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
-          description: `${userProfile.username || user.email} has ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit (${isCorrectionMode ? permitToCorrect?.serialNumber : serialNumber}) for "${values.siteName}".`,
+          description: `${userProfile.username || user.email} has ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit (${serialNumber}) for "${values.siteName}".`,
           link: `/ptw/list`,
           read: false,
           createdAt: serverTimestamp(),
         });
       }
 
+      setLastSubmittedDetails({ serialNumber, siteName: values.siteName, managerMobile });
       setIsSubmitted(true);
       setIsProcessing(false);
       toast({ title: "Success", description: `Permit ${isCorrectionMode ? 'resubmitted' : 'submitted'} for review.` });
-      setTimeout(() => router.push('/ptw/list'), 2000);
+      
+      // Auto-trigger WhatsApp if possible
+      if (managerMobile) {
+        triggerWhatsApp(serialNumber, values.siteName, managerMobile);
+      }
+
+      setTimeout(() => router.push('/ptw/list'), 5000);
     } catch (error: any) {
       toast({ variant: "destructive", title: "Submission Failed", description: error.message });
       setIsProcessing(false);
@@ -543,15 +565,22 @@ export default function RaisePtwPage() {
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <Button type="button" variant="ghost" onClick={() => router.push('/ptw/list')} disabled={isProcessing || isSubmitted}>Cancel</Button>
-                <Button type="submit" size="lg" disabled={isProcessing || isSubmitted || !hasManagerMapping} className="min-w-[200px]">
-                  {isProcessing ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
-                  ) : isSubmitted ? (
-                    <><CheckCircle2 className="mr-2 h-4 w-4" /> Submitted</>
-                  ) : (
-                    isCorrectionMode ? "Update & Resubmit" : "Submit for Approval"
+                <div className="flex gap-2">
+                  {isSubmitted && lastSubmittedDetails?.managerMobile && (
+                    <Button type="button" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50" onClick={() => triggerWhatsApp(lastSubmittedDetails.serialNumber, lastSubmittedDetails.siteName, lastSubmittedDetails.managerMobile)}>
+                      <MessageCircle className="mr-2 h-4 w-4" /> Send WhatsApp Again
+                    </Button>
                   )}
-                </Button>
+                  <Button type="submit" size="lg" disabled={isProcessing || isSubmitted || !hasManagerMapping} className="min-w-[200px]">
+                    {isProcessing ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
+                    ) : isSubmitted ? (
+                      <><CheckCircle2 className="mr-2 h-4 w-4" /> Submitted</>
+                    ) : (
+                      isCorrectionMode ? "Update & Resubmit" : "Submit for Approval"
+                    )}
+                  </Button>
+                </div>
               </div>
             </form>
           </Form>
