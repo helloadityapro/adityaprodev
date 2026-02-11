@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -253,6 +252,18 @@ export default function RaisePtwPage() {
           latitude: location.latitude,
           longitude: location.longitude,
           timeline: [timelineEntry]
+        });
+      }
+
+      // Notify Site Manager
+      if (userProfile.siteManagerId) {
+        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+          userId: userProfile.siteManagerId,
+          title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
+          description: `${userProfile.username || user.email} has ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit for "${values.siteName}".`,
+          link: `/ptw/list`,
+          read: false,
+          createdAt: serverTimestamp(),
         });
       }
 

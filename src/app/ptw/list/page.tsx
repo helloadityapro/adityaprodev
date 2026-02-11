@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -151,6 +150,7 @@ export default function PtwListPage() {
       notificationDescription = `Great news! Your permit for "${permit.siteName}" is now fully approved and active.`;
     }
 
+    // Notify Site Engineer
     addDocumentNonBlocking(collection(firestore, 'notifications'), {
       userId: permit.siteEngineerId,
       title: notificationTitle,
@@ -159,6 +159,18 @@ export default function PtwListPage() {
       read: false,
       createdAt: serverTimestamp(),
     });
+
+    // Notify Site Manager of Admin actions (Final Approval/Rejection)
+    if (userRole === 'Admin' && permit.siteManagerId) {
+      addDocumentNonBlocking(collection(firestore, 'notifications'), {
+        userId: permit.siteManagerId,
+        title: `Engineer Permit: ${targetStatus}`,
+        description: `Final Admin action on ${permit.siteName}: ${targetStatus}.`,
+        link: `/ptw/list`,
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+    }
 
     toast({ title: "Status Updated", description: `Permit marked as ${targetStatus}.` });
   };
