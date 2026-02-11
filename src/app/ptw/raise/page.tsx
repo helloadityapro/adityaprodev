@@ -12,9 +12,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Paperclip, TriangleAlert, MapPin } from "lucide-react"
+import { Paperclip, TriangleAlert, MapPin, Loader2, CheckCircle2 } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
-import { collection, serverTimestamp, doc } from "firebase/firestore"
+import { collection, serverTimestamp, doc, arrayUnion } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
@@ -73,27 +73,24 @@ export default function RaisePtwPage() {
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
-  
+
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-    
-    const isAdmin = userProfile.role === 'Admin' || 
-                    user?.email === 'abhijeet.agepl@gmail.com' || 
-                    user?.email === 'abhijeetsb22@gmail.com' ||
-                    user?.email === 'khalil@adityagreenenergy.com' ||
-                    user?.email === 'prafulrana143@gmail.com';
-    
-    if (isAdmin) {
-        return Array.from(new Map(allSites.map(site => [site.name, site])).values());
-    }
+    const isAdmin = userProfile.role === 'Admin' ||
+      user?.email === 'abhijeet.agepl@gmail.com' ||
+      user?.email === 'abhijeetsb22@gmail.com' ||
+      user?.email === 'khalil@adityagreenenergy.com' ||
+      user?.email === 'prafulrana143@gmail.com';
 
+    if (isAdmin) {
+      return Array.from(new Map(allSites.map(site => [site.name, site])).values());
+    }
     const assignedIds = userProfile.assignedProjectIds || [];
     const filtered = allSites.filter(s => assignedIds.includes(s.id));
     return Array.from(new Map(filtered.map(site => [site.name, site])).values());
   }, [allSites, userProfile, user]);
 
   const [selectedSite, setSelectedSite] = React.useState<Site | null>(null);
-  
   const [files, setFiles] = React.useState<File[]>([]);
   const [vlogFile, setVlogFile] = React.useState<File | null>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
@@ -129,98 +126,107 @@ export default function RaisePtwPage() {
 
   const getCurrentLocation = (): Promise<{ latitude: number; longitude: number } | null> => {
     return new Promise((resolve) => {
-        if (!navigator.geolocation) {
-            toast({ variant: 'destructive', title: 'Geolocation Not Supported' });
-            resolve(null);
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
-            (error) => {
-                toast({ variant: 'destructive', title: 'Location Error', description: 'Could not get location.' });
-                resolve(null);
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
+      if (!navigator.geolocation) {
+        toast({ variant: 'destructive', title: 'Geolocation Not Supported' });
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+        (error) => {
+          toast({ variant: 'destructive', title: 'Location Error', description: 'Could not get location.' });
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
     });
   };
 
   const onSubmit = async (values: z.infer<typeof raisePtwSchema>) => {
     if (!user || !userProfile) return;
     if (!hasManagerMapping) {
-        toast({ variant: "destructive", title: "No Manager Assigned", description: "Contact Admin for team mapping." });
-        return;
+      toast({ variant: "destructive", title: "No Manager Assigned", description: "Contact Admin for team mapping." });
+      return;
     }
-    if(!selectedSite) {
-        form.setError('siteName', { type: 'manual', message: 'Select a valid site.' });
-        return;
+    if (!selectedSite) {
+      form.setError('siteName', { type: 'manual', message: 'Select a valid site.' });
+      return;
     }
 
     setIsProcessing(true);
     const location = await getCurrentLocation();
 
     if (!location) {
-        setIsProcessing(false);
-        return;
+      setIsProcessing(false);
+      return;
     }
 
     const uploadFile = (file: File, path: string): Promise<{ url: string; contentType: string; name: string; }> => {
-        return new Promise((resolve, reject) => {
-            const storage = getStorage(firebaseApp);
-            const storageRef = ref(storage, path);
-            const uploadTask = uploadBytesResumable(storageRef, file);
-            uploadTask.on('state_changed',
-                (snapshot) => setUploadProgress(prev => ({ ...prev, [file.name]: (snapshot.bytesTransferred / snapshot.totalBytes) * 100 })),
-                reject,
-                () => getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve({ url, contentType: file.type, name: file.name }))
-            );
-        });
+      return new Promise((resolve, reject) => {
+        const storage = getStorage(firebaseApp);
+        const storageRef = ref(storage, path);
+        const uploadTask = uploadBytesResumable(storageRef, file);
+        uploadTask.on('state_changed',
+          (snapshot) => setUploadProgress(prev => ({ ...prev, [file.name]: (snapshot.bytesTransferred / snapshot.totalBytes) * 100 })),
+          reject,
+          () => getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve({ url, contentType: file.type, name: file.name }))
+        );
+      });
     };
 
     try {
-        const timestamp = Date.now();
-        let allFilesToUpload: File[] = [...files];
-        if (vlogFile) allFilesToUpload.push(new File([vlogFile], `attestation-${vlogFile.name}`, { type: vlogFile.type }));
+      const timestamp = Date.now();
+      let allFilesToUpload: File[] = [...files];
+      if (vlogFile) allFilesToUpload.push(new File([vlogFile], `attestation-${vlogFile.name}`, { type: vlogFile.type }));
 
-        const processedFiles = await Promise.all(allFilesToUpload.map(async (file) => {
-          if (file.type.startsWith('image/')) return imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
-          return file;
-        }));
+      const processedFiles = await Promise.all(allFilesToUpload.map(async (file) => {
+        if (file.type.startsWith('image/')) return imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
+        return file;
+      }));
 
-        const attachments = await Promise.all(processedFiles.map(file => uploadFile(file, `uploads/${user.uid}/${timestamp}-${file.name}`)));
-        const { undertaking, ...permitValues } = values;
+      const newAttachments = await Promise.all(processedFiles.map(file => uploadFile(file, `uploads/${user.uid}/${timestamp}-${file.name}`)));
+      const { undertaking, ...permitValues } = values;
 
-        if (isCorrectionMode && permitIdToCorrect) {
-            updateDocumentNonBlocking(doc(firestore, "permits_to_work", permitIdToCorrect), {
-                ...permitValues,
-                latitude: location.latitude,
-                longitude: location.longitude,
-                status: "Pending",
-                attachments: [...(permitToCorrect.attachments || []), ...attachments],
-                statusChangeDate: serverTimestamp(),
-                isNew: true,
-            });
-        } else {
-            addDocumentNonBlocking(collection(firestore, "permits_to_work"), {
-              ...permitValues,
-              siteEngineerId: user.uid,
-              siteManagerId: userProfile.siteManagerId,
-              status: "Pending",
-              requestDate: serverTimestamp(),
-              attachments,
-              latitude: location.latitude,
-              longitude: location.longitude,
-              isNew: true,
-            });
-        }
+      const timelineEntry = {
+        status: "Pending",
+        timestamp: new Date(),
+        userId: user.uid,
+        userName: userProfile.username || user.email || 'Engineer',
+        remarks: permitValues.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with corrections." : "Permit initially submitted."),
+        action: isCorrectionMode ? "Resubmitted" : "Created"
+      };
 
-        setIsSubmitted(true);
-        setIsProcessing(false);
-        toast({ title: "Success", description: "Submitted to manager." });
-        setTimeout(() => router.push('/ptw/list'), 2500);
+      if (isCorrectionMode && permitIdToCorrect) {
+        updateDocumentNonBlocking(doc(firestore, "permits_to_work", permitIdToCorrect), {
+          ...permitValues,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          status: "Pending",
+          attachments: arrayUnion(...newAttachments),
+          statusChangeDate: serverTimestamp(),
+          timeline: arrayUnion(timelineEntry)
+        });
+      } else {
+        addDocumentNonBlocking(collection(firestore, "permits_to_work"), {
+          ...permitValues,
+          siteEngineerId: user.uid,
+          siteManagerId: userProfile.siteManagerId,
+          status: "Pending",
+          requestDate: serverTimestamp(),
+          attachments: newAttachments,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          timeline: [timelineEntry]
+        });
+      }
+
+      setIsSubmitted(true);
+      setIsProcessing(false);
+      toast({ title: "Success", description: "Permit submitted to manager for review." });
+      setTimeout(() => router.push('/ptw/list'), 2000);
     } catch (error: any) {
-        toast({ variant: "destructive", title: "Submission Failed", description: error.message });
-        setIsProcessing(false);
+      toast({ variant: "destructive", title: "Submission Failed", description: error.message });
+      setIsProcessing(false);
     }
   }
 
@@ -228,106 +234,131 @@ export default function RaisePtwPage() {
 
   return (
     <div className="space-y-6">
-      {isCorrectionMode && permitToCorrect?.adminRemarks && (
-        <Alert variant="destructive"><AlertTitle>Rejection Remarks</AlertTitle><AlertDescription>{permitToCorrect.adminRemarks}</AlertDescription></Alert>
-      )}
-
       {!hasManagerMapping && (
         <Alert variant="destructive" className="bg-red-50 dark:bg-red-950/20">
           <TriangleAlert className="h-4 w-4" />
           <AlertTitle>Action Required</AlertTitle>
-          <AlertDescription>You are not mapped to any Site Manager.</AlertDescription>
+          <AlertDescription>You are not mapped to any Site Manager. Please contact Admin before raising a permit.</AlertDescription>
         </Alert>
       )}
 
-      <h1 className="text-2xl font-bold font-headline">Raise a Permit to Work</h1>
-      <Card className="max-w-3xl mx-auto">
+      {isCorrectionMode && permitToCorrect && (
+        <Alert className="bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertTitle>Correction Mode</AlertTitle>
+          <AlertDescription>
+            You are editing a rejected permit for <strong>{permitToCorrect.siteName}</strong>.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex flex-col gap-1">
+        <h1 className="text-3xl font-bold font-headline tracking-tight">{isCorrectionMode ? "Correct PtW Request" : "Raise a Permit to Work"}</h1>
+        <p className="text-muted-foreground">Complete the form below to initiate the approval lifecycle.</p>
+      </div>
+
+      <Card className="max-w-4xl">
         <CardHeader>
-          <CardTitle>{isCorrectionMode ? "Correct PtW Request" : "New PtW Request"}</CardTitle>
-          <CardDescription>Fill out the form below for approval.</CardDescription>
+          <CardTitle>Permit Details</CardTitle>
+          <CardDescription>All fields are required for safety and compliance.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6">
-              <FormField
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
                   control={form.control}
                   name="siteName"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Site Name</FormLabel>
-                       <Select onValueChange={(value) => { field.onChange(value); setSelectedSite(accessibleSites.find(s => s.name === value) || null); }} value={field.value} disabled={isProcessing || isSubmitted || !hasManagerMapping}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Select a site" /></SelectTrigger></FormControl>
-                          <SelectContent>{accessibleSites.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
+                      <Select onValueChange={(value) => { field.onChange(value); setSelectedSite(accessibleSites.find(s => s.name === value) || null); }} value={field.value} disabled={isProcessing || isSubmitted || !hasManagerMapping || isCorrectionMode}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select a site" /></SelectTrigger></FormControl>
+                        <SelectContent>{accessibleSites.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
                   )}
-              />
-              
-              {selectedSite && (
-                <Card className="bg-muted/30">
-                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm py-4">
-                    <div><p className="text-muted-foreground">Project Company</p><p className="font-medium">{selectedSite.projectCompany}</p></div>
-                    <div><p className="text-muted-foreground">AC / DC Capacity</p><p className="font-medium">{selectedSite.acCapacity} / {selectedSite.dcCapacity}</p></div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              <FormField
+                />
+
+                <FormField
                   control={form.control}
                   name="ptwType"
                   render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>PTW for</FormLabel>
-                           <Select onValueChange={field.onChange} value={field.value} disabled={isProcessing || isSubmitted}>
-                              <FormControl><SelectTrigger><SelectValue placeholder="Select a permit type" /></SelectTrigger></FormControl>
-                              <SelectContent>{ptwTypes?.map((t) => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}</SelectContent>
-                          </Select>
-                          <FormMessage />
-                      </FormItem>
+                    <FormItem>
+                      <FormLabel>PTW for (Type of Work)</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isProcessing || isSubmitted}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select a permit type" /></SelectTrigger></FormControl>
+                        <SelectContent>{ptwTypes?.map((t) => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}</SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
                   )}
-              />
+                />
+              </div>
+
+              {selectedSite && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg border text-sm">
+                  <div><p className="text-muted-foreground mb-1 uppercase text-[10px] font-bold">Company</p><p className="font-semibold">{selectedSite.projectCompany}</p></div>
+                  <div><p className="text-muted-foreground mb-1 uppercase text-[10px] font-bold">AC Capacity</p><p className="font-semibold">{selectedSite.acCapacity}</p></div>
+                  <div><p className="text-muted-foreground mb-1 uppercase text-[10px] font-bold">DC Capacity</p><p className="font-semibold">{selectedSite.dcCapacity}</p></div>
+                </div>
+              )}
 
               <FormField
-                  control={form.control}
-                  name="descriptionOfWork"
-                  render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Description of Work</FormLabel>
-                          <FormControl><Textarea placeholder="Detail the work." rows={4} {...field} disabled={isProcessing || isSubmitted} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )}
+                control={form.control}
+                name="descriptionOfWork"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description of Work</FormLabel>
+                    <FormControl><Textarea placeholder="Describe exactly what work will be performed, including safety precautions." rows={5} {...field} disabled={isProcessing || isSubmitted} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label>Attach Files</Label>
-                    <Input type="file" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Label>Additional Attachments</Label>
+                  <div className="flex flex-col gap-2">
+                    <Input type="file" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className="cursor-pointer" />
+                    <p className="text-[10px] text-muted-foreground">Attach images or videos related to the site or work area.</p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                    <Label>Self Attestation</Label>
-                    <Input type="file" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isProcessing || isSubmitted} />
+                <div className="space-y-3">
+                  <Label>Self Attestation (Vlog)</Label>
+                  <div className="flex flex-col gap-2">
+                    <Input type="file" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isProcessing || isSubmitted} className="cursor-pointer" />
+                    <p className="text-[10px] text-muted-foreground">A short video explaining the safety measures taken.</p>
+                  </div>
                 </div>
               </div>
 
               <FormField
-                  control={form.control}
-                  name="undertaking"
-                  render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
-                          <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isProcessing || isSubmitted} /></FormControl>
-                          <div className="space-y-1 leading-none">
-                              <FormLabel className="text-sm font-normal">I hereby undertake that the work will be carried out safely.</FormLabel>
-                              <FormMessage />
-                          </div>
-                      </FormItem>
-                  )}
+                control={form.control}
+                name="undertaking"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-5 shadow-sm bg-primary/5 border-primary/20">
+                    <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isProcessing || isSubmitted} /></FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel className="text-sm font-semibold text-primary">Safety Undertaking</FormLabel>
+                      <p className="text-xs text-muted-foreground">I hereby undertake that the work will be carried out safely as per company SOPs and PPE will be used at all times.</p>
+                      <FormMessage />
+                    </div>
+                  </FormItem>
+                )}
               />
 
-              <div className="flex justify-end mt-4">
-                <Button type="submit" disabled={isProcessing || isSubmitted || !hasManagerMapping}>
-                  {isSubmitted ? "Submitted" : isProcessing ? "Submitting..." : "Submit for Approval"}
+              <div className="flex items-center justify-between pt-4 border-t">
+                <Button type="button" variant="ghost" onClick={() => router.push('/ptw/list')} disabled={isProcessing || isSubmitted}>Cancel</Button>
+                <Button type="submit" size="lg" disabled={isProcessing || isSubmitted || !hasManagerMapping} className="min-w-[200px]">
+                  {isProcessing ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
+                  ) : isSubmitted ? (
+                    <><CheckCircle2 className="mr-2 h-4 w-4" /> Submitted</>
+                  ) : (
+                    isCorrectionMode ? "Update & Resubmit" : "Submit for Approval"
+                  )}
                 </Button>
               </div>
             </form>

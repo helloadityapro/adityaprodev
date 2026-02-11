@@ -170,26 +170,14 @@
           "type": "string",
           "description": "Comments and remarks related to the permit."
         },
-        "adminRemarks": {
-          "type": "string",
-          "description": "Remarks added by the admin during the approval/rejection process."
-        },
-        "managerRemarks": {
-          "type": "string",
-          "description": "Remarks added by the site manager during the first level approval/rejection process."
-        },
         "status": {
           "type": "string",
-          "description": "The status of the permit (e.g., Submitted, ManagerApproved, Approved, Rejected, Corrected)."
-        },
-        "isNew": {
-          "type": "boolean",
-          "description": "Indicates if the permit is new and has not been seen by an admin/site manager yet."
+          "description": "The status of the permit (e.g., Pending, ManagerApproved, Approved, Rejected)."
         },
         "requestDate": {
           "type": "string",
           "format": "date-time",
-          "description": "Timestamp when the permit was requested."
+          "description": "Timestamp when the permit was first requested."
         },
         "statusChangeDate": {
           "type": "string",
@@ -202,11 +190,11 @@
         },
         "siteManagerId": {
           "type": "string",
-          "description": "Reference to User (Site Manager) who reviewed the request."
+          "description": "Reference to User (Site Manager) who is/was responsible for first-level review."
         },
         "adminId": {
           "type": "string",
-          "description": "Reference to User (Admin) who gave final approval."
+          "description": "Reference to User (Admin) who gave/is giving final approval."
         },
         "latitude": {
           "type": "number",
@@ -215,6 +203,21 @@
         "longitude": {
           "type": "number",
           "description": "The longitude of the user when submitting the request."
+        },
+        "timeline": {
+          "type": "array",
+          "description": "A log of all actions taken on this permit.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" },
+              "userId": { "type": "string" },
+              "userName": { "type": "string" },
+              "remarks": { "type": "string" },
+              "action": { "type": "string" }
+            }
+          }
         }
       },
       "required": [
@@ -224,7 +227,6 @@
         "descriptionOfWork",
         "status",
         "siteEngineerId",
-        "siteManagerId",
         "requestDate"
       ]
     },
