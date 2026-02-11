@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { TriangleAlert, Loader2, CheckCircle2 } from "lucide-react"
+import { TriangleAlert, Loader2, CheckCircle2, Search, ChevronsUpDown, Check } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp, doc, arrayUnion } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -22,6 +22,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import imageCompression from 'browser-image-compression';
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -94,6 +97,15 @@ export default function RaisePtwPage() {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [uploadProgress, setUploadProgress] = React.useState<{ [key: string]: number }>({});
+
+  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
+  const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
+
+  const filteredAccessibleSites = React.useMemo(() => {
+    return accessibleSites.filter(site => 
+      site.name.toLowerCase().includes(siteSearchQuery.toLowerCase())
+    );
+  }, [accessibleSites, siteSearchQuery]);
 
   const form = useForm<z.infer<typeof raisePtwSchema>>({
     resolver: zodResolver(raisePtwSchema),
@@ -268,12 +280,68 @@ export default function RaisePtwPage() {
                   control={form.control}
                   name="siteName"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col">
                       <FormLabel>Site Name</FormLabel>
-                      <Select onValueChange={(value) => { field.onChange(value); setSelectedSite(accessibleSites.find(s => s.name === value) || null); }} value={field.value} disabled={isProcessing || isSubmitted || !hasManagerMapping || isCorrectionMode}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select a site" /></SelectTrigger></FormControl>
-                        <SelectContent>{accessibleSites.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
-                      </Select>
+                      <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              disabled={isProcessing || isSubmitted || !hasManagerMapping || isCorrectionMode}
+                            >
+                              {field.value
+                                ? accessibleSites.find((site) => site.name === field.value)?.name
+                                : "Select a site..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <div className="flex items-center border-b px-3">
+                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                            <Input
+                              placeholder="Search sites..."
+                              className="h-9 w-full border-none focus-visible:ring-0 px-0"
+                              value={siteSearchQuery}
+                              onChange={(e) => setSiteSearchQuery(e.target.value)}
+                            />
+                          </div>
+                          <ScrollArea className="h-[200px]">
+                            <div className="p-1">
+                              {filteredAccessibleSites.length > 0 ? (
+                                filteredAccessibleSites.map((site) => (
+                                  <Button
+                                    key={site.id}
+                                    variant="ghost"
+                                    className="w-full justify-start font-normal"
+                                    onClick={() => {
+                                      field.onChange(site.name);
+                                      setSelectedSite(site);
+                                      setIsSitePopoverOpen(false);
+                                      setSiteSearchQuery("");
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        site.name === field.value ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {site.name}
+                                  </Button>
+                                ))
+                              ) : (
+                                <p className="p-4 text-center text-sm text-muted-foreground">No site found.</p>
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
