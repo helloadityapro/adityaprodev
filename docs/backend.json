@@ -111,6 +111,13 @@
         "name": {
           "type": "string",
           "description": "The name of the PTW type."
+        },
+        "allowedApproverIds": {
+          "type": "array",
+          "description": "IDs of users (Managers/Admins) authorized to approve this type.",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [

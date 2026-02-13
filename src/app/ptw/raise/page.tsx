@@ -99,7 +99,6 @@ export default function RaisePtwPage() {
   const [vlogFile, setVlogFile] = React.useState<File | null>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
-  const [uploadProgress, setUploadProgress] = React.useState<{ [key: string]: number }>({});
   const [lastSubmittedDetails, setLastSubmittedDetails] = React.useState<{ id: string, serialNumber: string, siteName: string, managerMobile?: string } | null>(null);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
@@ -109,16 +108,12 @@ export default function RaisePtwPage() {
   const [ptwTypeSearchQuery, setPtwTypeSearchQuery] = React.useState("");
 
   const filteredAccessibleSites = React.useMemo(() => {
-    return accessibleSites.filter(site => 
-      site.name.toLowerCase().includes(siteSearchQuery.toLowerCase())
-    );
+    return accessibleSites.filter(site => site.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
   }, [accessibleSites, siteSearchQuery]);
 
   const filteredPtwTypesList = React.useMemo(() => {
     if (!ptwTypes) return [];
-    return ptwTypes.filter(type => 
-      type.name.toLowerCase().includes(ptwTypeSearchQuery.toLowerCase())
-    );
+    return ptwTypes.filter(type => type.name.toLowerCase().includes(ptwTypeSearchQuery.toLowerCase()));
   }, [ptwTypes, ptwTypeSearchQuery]);
 
   const form = useForm<z.infer<typeof raisePtwSchema>>({
@@ -146,7 +141,7 @@ export default function RaisePtwPage() {
     }
   }, [isCorrectionMode, permitToCorrect, form, accessibleSites]);
 
-  const hasManagerMapping = !!userProfile?.siteManagerId || userProfile?.role === 'Admin';
+  const hasManagerMapping = userProfile?.role === 'Site Manager' || userProfile?.role === 'Admin' || !!userProfile?.siteManagerId;
 
   const getCurrentLocation = (): Promise<{ latitude: number; longitude: number } | null> => {
     return new Promise((resolve) => {
@@ -157,7 +152,7 @@ export default function RaisePtwPage() {
       }
       navigator.geolocation.getCurrentPosition(
         (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
-        (error) => {
+        () => {
           toast({ variant: 'destructive', title: 'Location Error', description: 'Could not get location.' });
           resolve(null);
         },
@@ -178,7 +173,7 @@ export default function RaisePtwPage() {
   const onSubmit = async (values: z.infer<typeof raisePtwSchema>) => {
     if (!user || !userProfile) return;
     if (!hasManagerMapping) {
-      toast({ variant: "destructive", title: "No Manager Assigned", description: "Contact Admin for team mapping." });
+      toast({ variant: "destructive", title: "Mapping Required", description: "Contact Admin for supervisor assignment." });
       return;
     }
     if (!selectedSite) {
@@ -188,45 +183,32 @@ export default function RaisePtwPage() {
 
     setIsProcessing(true);
     const location = await getCurrentLocation();
-
     if (!location) {
       setIsProcessing(false);
       return;
     }
 
-    // Pre-generate the document reference to get the ID for the deep link
     const permitRef = isCorrectionMode && permitIdToCorrect 
       ? doc(firestore, "permits_to_work", permitIdToCorrect)
       : doc(collection(firestore, "permits_to_work"));
     
     const permitId = permitRef.id;
 
-    // Determine serial number and sequence
     let serialNumber = "";
     if (isCorrectionMode && permitToCorrect) {
       serialNumber = permitToCorrect.serialNumber;
     } else {
       const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
+      const dateStr = format(now, 'yyyy/MM/dd');
+      const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+      const endOfDay = new Date(); endOfDay.setHours(23,59,59,999);
 
       try {
-        const qToday = query(
-          collection(firestore, "permits_to_work"),
-          where("requestDate", ">=", Timestamp.fromDate(startOfDay)),
-          where("requestDate", "<=", Timestamp.fromDate(endOfDay))
-        );
+        const qToday = query(collection(firestore, "permits_to_work"), where("requestDate", ">=", Timestamp.fromDate(startOfDay)), where("requestDate", "<=", Timestamp.fromDate(endOfDay)));
         const snapshotToday = await getDocs(qToday);
-        const countToday = snapshotToday.size;
-        serialNumber = `AGEPL/PtW/${year}/${month}/${day}/${String(countToday + 1).padStart(2, '0')}`;
+        serialNumber = `AGEPL/PtW/${dateStr}/${String(snapshotToday.size + 1).padStart(2, '0')}`;
       } catch (e) {
-        serialNumber = `AGEPL/PtW/${year}/${month}/${day}/${Date.now().toString().slice(-4)}`;
+        serialNumber = `AGEPL/PtW/${dateStr}/${Date.now().toString().slice(-4)}`;
       }
     }
 
@@ -236,22 +218,18 @@ export default function RaisePtwPage() {
       currentSubmissionIndex = Math.max(...indices) + 1;
     }
 
-    const uploadFile = (file: File, path: string): Promise<{ url: string; contentType: string; name: string; submissionIndex: number; timestamp: string }> => {
+    const uploadFile = (file: File, path: string): Promise<any> => {
       return new Promise((resolve, reject) => {
         const storage = getStorage(firebaseApp);
         const storageRef = ref(storage, path);
         const uploadTask = uploadBytesResumable(storageRef, file);
-        uploadTask.on('state_changed',
-          (snapshot) => setUploadProgress(prev => ({ ...prev, [file.name]: (snapshot.bytesTransferred / snapshot.totalBytes) * 100 })),
-          reject,
-          () => getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve({ 
-            url, 
-            contentType: file.type, 
-            name: file.name,
-            submissionIndex: currentSubmissionIndex,
-            timestamp: new Date().toISOString()
-          }))
-        );
+        uploadTask.on('state_changed', null, reject, () => getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve({ 
+          url, 
+          contentType: file.type, 
+          name: file.name,
+          submissionIndex: currentSubmissionIndex,
+          timestamp: new Date().toISOString()
+        })));
       });
     };
 
@@ -273,8 +251,8 @@ export default function RaisePtwPage() {
         timestamp: new Date(),
         userId: user.uid,
         userName: userProfile.username || user.email || 'Engineer',
-        remarks: permitValues.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with corrections." : "Permit initially submitted."),
-        action: isCorrectionMode ? `Resubmitted (v${currentSubmissionIndex})` : "Created"
+        remarks: permitValues.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted." : "Permit raised."),
+        action: isCorrectionMode ? `Resubmitted` : "Created"
       };
 
       const permitData: any = {
@@ -293,7 +271,7 @@ export default function RaisePtwPage() {
         permitData.id = permitId;
         permitData.serialNumber = serialNumber;
         permitData.siteEngineerId = user.uid;
-        permitData.siteManagerId = userProfile.siteManagerId;
+        permitData.siteManagerId = userProfile.siteManagerId || null;
         permitData.requestDate = serverTimestamp();
         permitData.attachments = newAttachments;
         permitData.timeline = [timelineEntry];
@@ -303,14 +281,12 @@ export default function RaisePtwPage() {
       let managerMobile;
       if (userProfile.siteManagerId) {
         const managerDoc = await getDoc(doc(firestore, 'users', userProfile.siteManagerId));
-        if (managerDoc.exists()) {
-          managerMobile = managerDoc.data().mobile;
-        }
+        if (managerDoc.exists()) managerMobile = managerDoc.data().mobile;
 
         addDocumentNonBlocking(collection(firestore, 'notifications'), {
           userId: userProfile.siteManagerId,
-          title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
-          description: `${userProfile.username || user.email} has ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit (${serialNumber}) for "${values.siteName}".`,
+          title: "New Permit Request",
+          description: `${userProfile.username || user.email} raised a permit (${serialNumber}) for "${values.siteName}".`,
           link: `/ptw/list?view=${permitId}`,
           read: false,
           createdAt: serverTimestamp(),
@@ -320,13 +296,9 @@ export default function RaisePtwPage() {
       setLastSubmittedDetails({ id: permitId, serialNumber, siteName: values.siteName, managerMobile });
       setIsSubmitted(true);
       setIsProcessing(false);
-      toast({ title: "Success", description: `Permit ${isCorrectionMode ? 'resubmitted' : 'submitted'} for review.` });
-      
-      if (managerMobile) {
-        triggerWhatsApp(serialNumber, values.siteName, permitId, managerMobile);
-      }
-
-      setTimeout(() => router.push('/ptw/list'), 5000);
+      toast({ title: "Submitted", description: `Permit ${serialNumber} raised successfully.` });
+      if (managerMobile) triggerWhatsApp(serialNumber, values.siteName, permitId, managerMobile);
+      setTimeout(() => router.push('/ptw/list'), 3000);
     } catch (error: any) {
       toast({ variant: "destructive", title: "Submission Failed", description: error.message });
       setIsProcessing(false);
@@ -337,102 +309,36 @@ export default function RaisePtwPage() {
 
   return (
     <div className="space-y-6">
-      {!hasManagerMapping && (
-        <Alert variant="destructive" className="bg-red-50 dark:bg-red-950/20">
-          <TriangleAlert className="h-4 w-4" />
-          <AlertTitle>Action Required</AlertTitle>
-          <AlertDescription>You are not assigned to any Site Manager. Please contact Admin before raising a permit.</AlertDescription>
-        </Alert>
-      )}
-
-      {isCorrectionMode && permitToCorrect && (
-        <Alert className="bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300">
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertTitle>Correction Mode</AlertTitle>
-          <AlertDescription>
-            You are editing a rejected permit (<strong>{permitToCorrect.serialNumber}</strong>) for <strong>{permitToCorrect.siteName}</strong>.
-          </AlertDescription>
-        </Alert>
+      {!hasManagerMapping && userProfile?.role === 'Site Engineer' && (
+        <Alert variant="destructive"><TriangleAlert className="h-4 w-4" /><AlertTitle>Action Required</AlertTitle><AlertDescription>Contact Admin for team mapping before raising a permit.</AlertDescription></Alert>
       )}
 
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight">{isCorrectionMode ? "Correct PtW Request" : "Raise a Permit to Work"}</h1>
-        <p className="text-muted-foreground">Complete the form below to initiate the approval lifecycle.</p>
+        <p className="text-muted-foreground">Ensure all safety measures are in place before submission.</p>
       </div>
 
       <Card className="max-w-4xl">
-        <CardHeader>
-          <CardTitle>Permit Details</CardTitle>
-          <CardDescription>All fields are required for safety and compliance.</CardDescription>
-        </CardHeader>
+        <CardHeader><CardTitle>Permit Details</CardTitle><CardDescription>All fields are required for compliance.</CardDescription></CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                <FormField
-                  control={form.control}
-                  name="siteName"
-                  render={({ field }) => (
+                <FormField control={form.control} name="siteName" render={({ field }) => (
                     <FormItem className="space-y-2">
                       <FormLabel>Site Name</FormLabel>
                       <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={cn(
-                                "w-full justify-between font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                              disabled={isProcessing || isSubmitted || !hasManagerMapping || isCorrectionMode}
-                            >
-                              {field.value
-                                ? accessibleSites.find((site) => site.name === field.value)?.name
-                                : "Select a site..."}
+                            <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal", !field.value && "text-muted-foreground")} disabled={isProcessing || isSubmitted || isCorrectionMode}>
+                              {field.value || "Select a site..."}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                          <div className="flex items-center border-b px-3">
-                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                            <Input
-                              placeholder="Search sites..."
-                              className="h-9 w-full border-none focus-visible:ring-0 px-0"
-                              value={siteSearchQuery}
-                              onChange={(e) => setSiteSearchQuery(e.target.value)}
-                            />
-                          </div>
-                          <ScrollArea className="h-[200px]">
-                            <div className="p-1">
-                              {filteredAccessibleSites.length > 0 ? (
-                                filteredAccessibleSites.map((site) => (
-                                  <Button
-                                    key={site.id}
-                                    variant="ghost"
-                                    className="w-full justify-start font-normal"
-                                    onClick={() => {
-                                      field.onChange(site.name);
-                                      setSelectedSite(site);
-                                      setIsSitePopoverOpen(false);
-                                      setSiteSearchQuery("");
-                                    }}
-                                  >
-                                    <Check
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        site.name === field.value ? "opacity-100" : "opacity-0"
-                                      )}
-                                    />
-                                    {site.name}
-                                  </Button>
-                                ))
-                              ) : (
-                                <p className="p-4 text-center text-sm text-muted-foreground">No site found.</p>
-                              )}
-                            </div>
-                          </ScrollArea>
+                          <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={siteSearchQuery} onChange={(e) => setSiteSearchQuery(e.target.value)} /></div>
+                          <ScrollArea className="h-[200px]">{filteredAccessibleSites.map((site) => (<Button key={site.id} variant="ghost" className="w-full justify-start font-normal" onClick={() => { field.onChange(site.name); setSelectedSite(site); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4", site.name === field.value ? "opacity-100" : "opacity-0")} />{site.name}</Button>))}</ScrollArea>
                         </PopoverContent>
                       </Popover>
                       <FormMessage />
@@ -440,69 +346,21 @@ export default function RaisePtwPage() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="ptwType"
-                  render={({ field }) => (
+                <FormField control={form.control} name="ptwType" render={({ field }) => (
                     <FormItem className="space-y-2">
-                      <FormLabel>PTW Type</Label>
+                      <FormLabel>PTW Type</FormLabel>
                       <Popover open={isPtwTypePopoverOpen} onOpenChange={setIsPtwTypePopoverOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={cn(
-                                "w-full justify-between font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                              disabled={isProcessing || isSubmitted}
-                            >
-                              {field.value
-                                ? ptwTypes?.find((type) => type.name === field.value)?.name
-                                : "Select a type..."}
+                            <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal", !field.value && "text-muted-foreground")} disabled={isProcessing || isSubmitted}>
+                              {field.value || "Select a type..."}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                          <div className="flex items-center border-b px-3">
-                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                            <Input
-                              placeholder="Search types..."
-                              className="h-9 w-full border-none focus-visible:ring-0 px-0"
-                              value={ptwTypeSearchQuery}
-                              onChange={(e) => setPtwTypeSearchQuery(e.target.value)}
-                            />
-                          </div>
-                          <ScrollArea className="h-[200px]">
-                            <div className="p-1">
-                              {filteredPtwTypesList.length > 0 ? (
-                                filteredPtwTypesList.map((type) => (
-                                  <Button
-                                    key={type.id}
-                                    variant="ghost"
-                                    className="w-full justify-start font-normal"
-                                    onClick={() => {
-                                      field.onChange(type.name);
-                                      setIsPtwTypePopoverOpen(false);
-                                      setPtwTypeSearchQuery("");
-                                    }}
-                                  >
-                                    <Check
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        type.name === field.value ? "opacity-100" : "opacity-0"
-                                      )}
-                                    />
-                                    {type.name}
-                                  </Button>
-                                ))
-                              ) : (
-                                <p className="p-4 text-center text-sm text-muted-foreground">No type found.</p>
-                              )}
-                            </div>
-                          </ScrollArea>
+                          <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search types..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={ptwTypeSearchQuery} onChange={(e) => setPtwTypeSearchQuery(e.target.value)} /></div>
+                          <ScrollArea className="h-[200px]">{filteredPtwTypesList.map((type) => (<Button key={type.id} variant="ghost" className="w-full justify-start font-normal" onClick={() => { field.onChange(type.name); setIsPtwTypePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4", type.name === field.value ? "opacity-100" : "opacity-0")} />{type.name}</Button>))}</ScrollArea>
                         </PopoverContent>
                       </Popover>
                       <FormMessage />
@@ -519,74 +377,34 @@ export default function RaisePtwPage() {
                 </div>
               )}
 
-              <FormField
-                control={form.control}
-                name="descriptionOfWork"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description of Work</FormLabel>
-                    <FormControl><Textarea placeholder="Describe exactly what work will be performed, including safety precautions." rows={5} {...field} disabled={isProcessing || isSubmitted} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
+              <FormField control={form.control} name="descriptionOfWork" render={({ field }) => (
+                  <FormItem><FormLabel>Description of Work</FormLabel><FormControl><Textarea placeholder="Describe exact work scope..." rows={5} {...field} disabled={isProcessing || isSubmitted} /></FormControl><FormMessage /></FormItem>
                 )}
               />
 
               <div className="space-y-6">
                 <div className="space-y-3">
                   <Label className="flex items-center gap-2"><FileUp className="h-4 w-4 text-primary" /> Reference Documents</Label>
-                  <div className="flex flex-col gap-2">
-                    <Input 
-                      type="file" 
-                      multiple 
-                      onChange={(e) => setReferenceDocs(prev => [...prev, ...Array.from(e.target.files || [])])} 
-                      disabled={isProcessing || isSubmitted} 
-                      className={FILE_INPUT_STYLES}
-                    />
-                    <p className="text-[10px] text-muted-foreground">Attach PDFs, drawings, or safety manuals.</p>
-                  </div>
+                  <Input type="file" multiple onChange={(e) => setReferenceDocs(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-3">
                     <Label className="flex items-center gap-2"><FileUp className="h-4 w-4 text-primary" /> Additional Attachments</Label>
-                    <div className="flex flex-col gap-2">
-                      <Input 
-                        type="file" 
-                        multiple 
-                        onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} 
-                        disabled={isProcessing || isSubmitted} 
-                        className={FILE_INPUT_STYLES}
-                      />
-                      <p className="text-[10px] text-muted-foreground">Attach images or videos of the site.</p>
-                    </div>
+                    <Input type="file" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
                   </div>
                   <div className="space-y-3">
                     <Label className="flex items-center gap-2"><FileUp className="h-4 w-4 text-primary" /> Self Attestation (Vlog)</Label>
-                    <div className="flex flex-col gap-2">
-                      <Input 
-                        type="file" 
-                        accept="video/*"
-                        onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} 
-                        disabled={isProcessing || isSubmitted} 
-                        className={FILE_INPUT_STYLES}
-                      />
-                      <p className="text-[10px] text-muted-foreground">A short video explaining safety measures.</p>
-                    </div>
+                    <Input type="file" accept="video/*" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
                   </div>
                 </div>
               </div>
 
-              <FormField
-                control={form.control}
-                name="undertaking"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-5 shadow-sm bg-primary/5 border-primary/20">
+              <FormField control={form.control} name="undertaking" render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-5 bg-primary/5 border-primary/20 shadow-sm">
                     <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isProcessing || isSubmitted} /></FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel className="text-sm font-semibold text-primary">Safety Undertaking</FormLabel>
-                      <p className="text-sm text-muted-foreground">
-                        I, <strong>{userProfile?.username || user?.email || 'the undersigned'}</strong>, hereby undertake that the work will be carried out safely as per company SOPs and PPE will be used at all times.
-                      </p>
+                    <div className="space-y-1">
+                      <FormLabel className="text-sm font-semibold text-primary uppercase">Safety Undertaking</FormLabel>
+                      <p className="text-sm text-muted-foreground">I, <strong>khalil</strong>, hereby undertake that the work will be carried out safely as per company SOPs and PPE will be used at all times.</p>
                       <FormMessage />
                     </div>
                   </FormItem>
@@ -595,22 +413,9 @@ export default function RaisePtwPage() {
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <Button type="button" variant="ghost" onClick={() => router.push('/ptw/list')} disabled={isProcessing || isSubmitted}>Cancel</Button>
-                <div className="flex gap-2">
-                  {isSubmitted && lastSubmittedDetails?.managerMobile && (
-                    <Button type="button" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50" onClick={() => triggerWhatsApp(lastSubmittedDetails.serialNumber, lastSubmittedDetails.siteName, lastSubmittedDetails.id, lastSubmittedDetails.managerMobile)}>
-                      <MessageCircle className="mr-2 h-4 w-4" /> Send WhatsApp Again
-                    </Button>
-                  )}
-                  <Button type="submit" size="lg" disabled={isProcessing || isSubmitted || !hasManagerMapping} className="min-w-[200px]">
-                    {isProcessing ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
-                    ) : isSubmitted ? (
-                      <><CheckCircle2 className="mr-2 h-4 w-4" /> Submitted</>
-                    ) : (
-                      isCorrectionMode ? "Update & Resubmit" : "Submit for Approval"
-                    )}
-                  </Button>
-                </div>
+                <Button type="submit" size="lg" disabled={isProcessing || isSubmitted} className="min-w-[200px]">
+                  {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : isSubmitted ? "Submitted" : "Submit for Approval"}
+                </Button>
               </div>
             </form>
           </Form>
