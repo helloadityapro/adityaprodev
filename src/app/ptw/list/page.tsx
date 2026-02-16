@@ -70,7 +70,7 @@ function StatusBadge({ permit }: { permit: Permit }) {
 
   const statusConfig = {
     Pending: { 
-      label: managerProfile ? `Pending: ${managerProfile.username}` : 'Pending Manager', 
+      label: managerProfile ? `Pending with ${managerProfile.username}` : 'Pending with Manager', 
       icon: Clock, 
       className: 'bg-yellow-100 text-yellow-800 border-yellow-300' 
     },
