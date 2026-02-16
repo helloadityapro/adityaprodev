@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, arrayUnion, or } from "firebase/firestore";
@@ -77,7 +77,7 @@ function StatusBadge({ permit }: { permit: Permit }) {
 
   const statusConfig = {
     Pending: { 
-      label: managerProfile ? `Pending with ${managerProfile.username}` : 'Pending with Manager', 
+      label: managerProfile ? `Pending with ${managerProfile.username}` : 'Pending Manager', 
       icon: Clock, 
       className: 'bg-yellow-100 text-yellow-800 border-yellow-300' 
     },
@@ -107,9 +107,9 @@ function WhatsAppReminder({ userId, permit }: { userId: string | undefined, perm
     const triggerWhatsApp = () => {
         if (!targetUser?.mobile) return;
         const cleanMobile = targetUser.mobile.replace(/\D/g, '');
-        const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
+        const formattedMobile = cleanMobile.length === 10 ? `+91${cleanMobile}` : (cleanMobile.startsWith('91') ? `+${cleanMobile}` : cleanMobile);
         const message = `Reminder: PtW request ${permit.serialNumber} for "${permit.siteName}" is pending your review.\nStatus: ${permit.status}\nLink: ${window.location.origin}/ptw/list?view=${permit.id}`;
-        const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
+        const url = `https://wa.me/${formattedMobile.replace('+', '')}?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
     };
 
@@ -148,9 +148,7 @@ export default function PtwListPage() {
 
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole || !user) return null;
-    const base = collection(firestore, 'permits_to_work');
-    if (userRole === 'Admin') return base;
-    return base;
+    return collection(firestore, 'permits_to_work');
   }, [firestore, userRole, user]);
 
   const { data: allPermits, isLoading } = useCollection<Permit>(permitsQuery);
@@ -167,7 +165,7 @@ export default function PtwListPage() {
 
   React.useEffect(() => {
     const viewId = searchParams.get('view');
-    if (viewId && permits) {
+    if (viewId && permits.length > 0) {
       const permit = permits.find(p => p.id === viewId);
       if (permit) {
         setDetailsPermit(permit);
@@ -179,8 +177,8 @@ export default function PtwListPage() {
     if (!user) return false;
     if (isAdmin) return true;
     const typeDoc = ptwTypes?.find(t => t.name === typeName);
-    if (!typeDoc) return false;
-    return typeDoc.allowedApproverIds?.includes(user.uid) ?? false;
+    if (!typeDoc) return true; // Default to true if not explicitly restricted
+    return typeDoc.allowedApproverIds?.includes(user.uid) ?? true;
   };
 
   const handleAction = (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
@@ -455,6 +453,26 @@ export default function PtwListPage() {
                         </div>
                         <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
                         <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Submission Date</Label><p className="font-medium">{formatTimestamp(detailsPermit.requestDate)}</p></div>
+                        <div className="space-y-1">
+                          <Label className="text-xs uppercase font-bold tracking-tight">Submission Location</Label>
+                          {detailsPermit.latitude && detailsPermit.longitude ? (
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude.toFixed(6)}</p>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary no-print" asChild>
+                                <a 
+                                  href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  title="Open in Google Maps"
+                                >
+                                  <MapPin className="h-4 w-4" />
+                                </a>
+                              </Button>
+                            </div>
+                          ) : (
+                            <p className="text-muted-foreground italic">No location data recorded</p>
+                          )}
+                        </div>
                     </div>
 
                     <Separator className="my-2" />
