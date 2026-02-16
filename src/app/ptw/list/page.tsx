@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Map } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, arrayUnion, or } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, arrayUnion } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -70,7 +70,7 @@ type PtwType = {
     allowedApproverIds?: string[];
 };
 
-function StatusBadge({ permit }: { permit: Permit }) {
+function StatusBadge({ permit, className }: { permit: Permit, className?: string }) {
   const firestore = useFirestore();
   const managerRef = useMemoFirebase(() => (permit.status === 'Pending' && permit.siteManagerId) ? doc(firestore, 'users', permit.siteManagerId) : null, [firestore, permit.siteManagerId, permit.status]);
   const { data: managerProfile } = useDoc(managerRef);
@@ -88,7 +88,7 @@ function StatusBadge({ permit }: { permit: Permit }) {
   const config = statusConfig[permit.status] || statusConfig.Pending;
   const Icon = config.icon;
   return (
-    <Badge className={cn("flex items-center gap-1.5 text-xs font-medium w-fit border", config.className)}>
+    <Badge variant="outline" className={cn("flex items-center gap-1.5 text-xs font-semibold w-fit border rounded-sm", config.className, className)}>
       <Icon className="h-3 w-3" /> {config.label}
     </Badge>
   );
@@ -107,9 +107,9 @@ function WhatsAppReminder({ userId, permit }: { userId: string | undefined, perm
     const triggerWhatsApp = () => {
         if (!targetUser?.mobile) return;
         const cleanMobile = targetUser.mobile.replace(/\D/g, '');
-        const formattedMobile = cleanMobile.length === 10 ? `+91${cleanMobile}` : (cleanMobile.startsWith('91') ? `+${cleanMobile}` : cleanMobile);
+        const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : (cleanMobile.startsWith('91') ? cleanMobile : `91${cleanMobile}`);
         const message = `Reminder: PtW request ${permit.serialNumber} for "${permit.siteName}" is pending your review.\nStatus: ${permit.status}\nLink: ${window.location.origin}/ptw/list?view=${permit.id}`;
-        const url = `https://wa.me/${formattedMobile.replace('+', '')}?text=${encodeURIComponent(message)}`;
+        const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
         window.open(url, '_blank');
     };
 
@@ -177,7 +177,6 @@ export default function PtwListPage() {
     if (!user) return false;
     if (isAdmin) return true;
     const typeDoc = ptwTypes?.find(t => t.name === typeName);
-    // If no specific restrictions are set (empty list), allow all managers
     if (!typeDoc || !typeDoc.allowedApproverIds || typeDoc.allowedApproverIds.length === 0) {
       return true;
     }
@@ -187,7 +186,7 @@ export default function PtwListPage() {
   const handleAction = (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
     if (!user || !userProfile) return;
     const permitRef = doc(firestore, "permits_to_work", permit.id);
-    const currentIteration = Math.max(1, ...(permit.attachments?.map(a => a.submissionIndex || 0) || []));
+    const currentSubmission = Math.max(1, ...(permit.attachments?.map(a => a.submissionIndex || 0) || []));
 
     const timelineEntry: TimelineEntry = {
       status: targetStatus,
@@ -196,7 +195,7 @@ export default function PtwListPage() {
       userName: userProfile.username || user.email || 'System',
       remarks: remarks,
       action: targetStatus === 'Rejected' ? `Rejected by ${userRole}` : (targetStatus === 'ManagerApproved' ? 'Approved by Manager' : 'Final Approval by Admin'),
-      submissionIndex: currentIteration
+      submissionIndex: currentSubmission
     };
 
     const updateData: any = {
@@ -292,28 +291,28 @@ export default function PtwListPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-primary/5 border-primary/20">
+        <Card className="bg-primary/5 border-primary/20 rounded-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-primary">Total Permits</CardTitle>
             <FileText className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent><div className="text-2xl font-bold">{stats.total}</div></CardContent>
         </Card>
-        <Card className="bg-yellow-500/5 border-yellow-500/20">
+        <Card className="bg-yellow-500/5 border-yellow-500/20 rounded-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-yellow-600">Pending Actions</CardTitle>
             <Clock className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent><div className="text-2xl font-bold">{stats.pending}</div></CardContent>
         </Card>
-        <Card className="bg-green-500/5 border-green-500/20">
+        <Card className="bg-green-500/5 border-green-500/20 rounded-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-green-600">Fully Approved</CardTitle>
             <CircleCheck className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent><div className="text-2xl font-bold">{stats.approved}</div></CardContent>
         </Card>
-        <Card className="bg-destructive/5 border-destructive/20">
+        <Card className="bg-destructive/5 border-destructive/20 rounded-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-destructive">Rejected</CardTitle>
             <CircleX className="h-4 w-4 text-destructive" />
@@ -322,7 +321,7 @@ export default function PtwListPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="rounded-md">
         <CardHeader className="flex flex-row items-center justify-between">
             <div className="space-y-1">
                 <CardTitle className="text-sm font-medium">Filter by Status</CardTitle>
@@ -340,7 +339,7 @@ export default function PtwListPage() {
         </CardHeader>
       </Card>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden rounded-md">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -373,21 +372,21 @@ export default function PtwListPage() {
 
                         {userRole === 'Site Manager' && permit.status === 'Pending' && isAuthorized && permit.siteManagerId === user?.uid && (
                           <>
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setActionState({ permit, status: 'ManagerApproved' })}>Approve</Button>
-                            <Button size="sm" variant="destructive" onClick={() => setActionState({ permit, status: 'Rejected' })}>Reject</Button>
+                            <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'ManagerApproved' })}>Approve</Button>
+                            <Button size="sm" variant="destructive" className="h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'Rejected' })}>Reject</Button>
                           </>
                         )}
 
                         {userRole === 'Admin' && (permit.status === 'ManagerApproved' || (permit.status === 'Pending' && !permit.siteManagerId)) && isAuthorized && (
                           <>
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setActionState({ permit, status: 'Approved' })}>Final Approve</Button>
-                            <Button size="sm" variant="destructive" onClick={() => setActionState({ permit, status: 'Rejected' })}>Reject</Button>
+                            <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'Approved' })}>Approve</Button>
+                            <Button size="sm" variant="destructive" className="h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'Rejected' })}>Reject</Button>
                           </>
                         )}
 
                         {userRole === 'Site Engineer' && permit.status === 'Rejected' && (
-                          <Button size="sm" variant="outline" onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}>
-                            <FilePen className="h-4 w-4 mr-2" /> Resubmit
+                          <Button size="sm" variant="outline" className="h-8 rounded-sm" onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}>
+                            <FilePen className="h-3 w-3 mr-1.5" /> Resubmit
                           </Button>
                         )}
                       </div>
@@ -400,19 +399,11 @@ export default function PtwListPage() {
         </CardContent>
       </Card>
 
-      <style jsx global>{`
-        @media print {
-          body * { visibility: hidden; }
-          #printable-permit-area, #printable-permit-area * { visibility: visible; }
-          #printable-permit-area { position: absolute; left: 0; top: 0; width: 100%; }
-          .no-print { display: none !important; }
-        }
-      `}</style>
-
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{actionState?.status === 'Rejected' ? 'Reject' : 'Approve'} Permit Request</DialogTitle>
+            <DialogDescription className="sr-only">Decision processing for permit {actionState?.permit?.serialNumber}</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-2">
             <Label htmlFor="action-remarks">Remarks/Comments</Label>
@@ -434,205 +425,185 @@ export default function PtwListPage() {
       </Dialog>
 
       <Dialog open={!!detailsPermit} onOpenChange={() => setDetailsPermit(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <div id="printable-permit-area">
-            <DialogHeader className="flex flex-row items-center justify-between border-b pb-4 mb-6">
-              <div className="space-y-1">
-                <DialogTitle className="text-2xl font-bold">Permit to Work Details</DialogTitle>
-                <DialogDescription className="font-mono text-primary font-semibold">{detailsPermit?.serialNumber}</DialogDescription>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-none">
+          <div id="printable-permit-area" className="bg-background">
+            {/* Minimalist Header */}
+            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4 flex items-center justify-between no-print">
+              <div className="flex flex-col">
+                <DialogTitle className="text-xl font-bold tracking-tight">Permit to Work Details</DialogTitle>
+                <DialogDescription className="text-xs font-mono text-primary font-semibold">{detailsPermit?.serialNumber}</DialogDescription>
               </div>
-              <div className="flex gap-2 no-print">
-                <Button variant="outline" size="sm" onClick={handlePrint}><Printer className="h-4 w-4 mr-2" /> Print</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="h-8 text-xs font-bold rounded-sm" onClick={handlePrint}><Printer className="h-3.5 w-3.5 mr-1.5" /> Print</Button>
+                <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8"><CircleX className="h-4 w-4" /></Button></DialogClose>
               </div>
-            </DialogHeader>
+            </div>
+
             {detailsPermit && (
-                <div className="space-y-8 py-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                        <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Site Name</Label><p className="font-semibold text-lg">{detailsPermit.siteName}</p></div>
-                        <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Permit Type</Label><p className="font-semibold text-lg">{detailsPermit.ptwType}</p></div>
-                        <div className="col-span-full space-y-2">
-                            <Label className="text-xs uppercase font-bold tracking-tight">Scope of Work</Label>
-                            <p className="p-4 bg-muted/30 rounded-lg border leading-relaxed whitespace-pre-wrap">{detailsPermit.descriptionOfWork}</p>
-                        </div>
-                        <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
-                        <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Submission Date</Label><p className="font-medium">{formatTimestamp(detailsPermit.requestDate)}</p></div>
-                        <div className="space-y-1">
-                          <Label className="text-xs uppercase font-bold tracking-tight">Submission Location</Label>
-                          {detailsPermit.latitude && detailsPermit.longitude ? (
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude.toFixed(6)}</p>
+              <div className="p-6 space-y-8">
+                {/* Summary Section */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="md:col-span-3 space-y-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                      <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Site Name</Label><p className="font-semibold text-sm">{detailsPermit.siteName}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Permit Type</Label><p className="font-semibold text-sm">{detailsPermit.ptwType}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Submission Date</Label><p className="text-sm font-medium">{formatTimestamp(detailsPermit.requestDate)}</p></div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Scope of Work</Label>
+                      <div className="p-4 bg-muted/20 rounded-md border text-sm leading-relaxed whitespace-pre-wrap">{detailsPermit.descriptionOfWork}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Status</Label><div><StatusBadge permit={detailsPermit} className="text-[10px] px-2" /></div></div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Location</Label>
+                      <div className="p-3 bg-primary/5 rounded-md border border-primary/20 flex flex-col gap-2">
+                        {detailsPermit.latitude && detailsPermit.longitude ? (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-mono font-medium">{detailsPermit.latitude.toFixed(5)}, {detailsPermit.longitude.toFixed(5)}</span>
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-primary no-print" asChild>
-                                <a 
-                                  href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  title="Open in Google Maps"
-                                >
-                                  <MapPin className="h-4 w-4" />
+                                <a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer">
+                                  <MapPin className="h-3.5 w-3.5" />
                                 </a>
                               </Button>
                             </div>
-                          ) : (
-                            <p className="text-muted-foreground italic">No location data recorded</p>
-                          )}
-                        </div>
-                    </div>
-
-                    <Separator className="my-2" />
-
-                    <div className="space-y-6">
-                        <div className="flex items-center gap-2">
-                          <Layers className="h-5 w-5 text-primary" />
-                          <h3 className="font-bold text-base uppercase tracking-wider">Submission Documentation History</h3>
-                        </div>
-                        
-                        {Object.keys(groupedAttachments).length > 0 ? (
-                          <div className="space-y-10">
-                            {Object.entries(groupedAttachments).sort(([a], [b]) => Number(a) - Number(b)).map(([index, files]) => {
-                              const images = files.filter(f => f.contentType.startsWith('image/'));
-                              const videos = files.filter(f => f.contentType.startsWith('video/'));
-                              const others = files.filter(f => !f.contentType.startsWith('image/') && !f.contentType.startsWith('video/'));
-
-                              return (
-                                <div key={index} className="space-y-4">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="secondary" className="px-3 py-1 text-xs">Submission {index}</Badge>
-                                    {index === "1" ? (
-                                      <span className="text-xs font-medium text-muted-foreground italic">Initial Submission</span>
-                                    ) : (
-                                      <span className="text-xs font-medium text-muted-foreground italic">Correction / Resubmission Documents</span>
-                                    )}
-                                  </div>
-
-                                  {images.length > 0 && (
-                                    <div className="px-12 py-4 bg-muted/10 rounded-xl border border-dashed relative">
-                                      <div className="absolute top-2 left-2 flex items-center gap-1 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                                        <ImageIcon className="h-3 w-3" /> Photo Gallery
-                                      </div>
-                                      <Carousel className="w-full max-w-2xl mx-auto">
-                                        <CarouselContent>
-                                          {images.map((img, idx) => (
-                                            <CarouselItem key={idx} className="md:basis-1/2">
-                                              <div className="p-1">
-                                                <Card className="overflow-hidden border-2 hover:border-primary transition-colors cursor-pointer group">
-                                                  <CardContent className="flex aspect-video items-center justify-center p-0 relative">
-                                                    <img 
-                                                      src={img.url} 
-                                                      alt={img.name} 
-                                                      className="object-cover w-full h-full"
-                                                    />
-                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                                       <Button variant="secondary" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full shadow-lg" asChild>
-                                                          <a href={img.url} target="_blank" rel="noopener noreferrer">
-                                                            <ExternalLink className="h-4 w-4" />
-                                                          </a>
-                                                       </Button>
-                                                    </div>
-                                                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-1.5 text-white text-[9px] truncate backdrop-blur-sm">
-                                                      {img.name}
-                                                    </div>
-                                                  </CardContent>
-                                                </Card>
-                                              </div>
-                                            </CarouselItem>
-                                          ))}
-                                        </CarouselContent>
-                                        <CarouselPrevious className="-left-6" />
-                                        <CarouselNext className="-right-6" />
-                                      </Carousel>
-                                    </div>
-                                  )}
-
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {videos.map((vid, idx) => (
-                                      <Card key={idx} className="overflow-hidden hover:shadow-md transition-shadow bg-black/5 border-2 group">
-                                        <CardContent className="p-0">
-                                          <div className="aspect-video bg-black relative flex items-center justify-center">
-                                            <video 
-                                              src={vid.url} 
-                                              className="w-full h-full object-contain" 
-                                              preload="metadata"
-                                            />
-                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-[2px]">
-                                               <Button variant="secondary" size="sm" className="rounded-full font-bold text-[10px]" asChild>
-                                                  <a href={vid.url} target="_blank" rel="noopener noreferrer">
-                                                    <Film className="h-3 w-3 mr-1.5" /> Play Video
-                                                  </a>
-                                               </Button>
-                                            </div>
-                                            <div className="absolute top-2 right-2">
-                                               <Badge className="bg-red-600/80 text-[8px] h-4 py-0">VIDEO</Badge>
-                                            </div>
-                                          </div>
-                                          <div className="p-2 border-t bg-background flex items-center justify-between gap-2">
-                                             <span className="text-[10px] font-bold truncate text-muted-foreground">{vid.name}</span>
-                                             <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                                          </div>
-                                        </CardContent>
-                                      </Card>
-                                    ))}
-
-                                    {others.map((file, idx) => (
-                                      <Card key={idx} className="overflow-hidden hover:shadow-md transition-shadow bg-background/50 border-2 border-dashed">
-                                        <CardContent className="p-3 space-y-3">
-                                          <div className="flex items-center gap-3">
-                                            <div className="bg-primary/10 p-2 rounded-lg shrink-0">
-                                              <FileText className="h-5 w-5 text-primary" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                              <p className="text-xs font-bold truncate uppercase tracking-tight" title={file.name}>{file.name.split('.').pop()} Document</p>
-                                              <p className="text-[9px] text-muted-foreground truncate">{file.name}</p>
-                                            </div>
-                                          </div>
-                                          <Button variant="outline" size="sm" className="w-full h-8 text-[10px] font-bold" asChild>
-                                            <a href={file.url} target="_blank" rel="noopener noreferrer">
-                                              <ExternalLink className="h-3 w-3 mr-2" /> Open File
-                                            </a>
-                                          </Button>
-                                        </CardContent>
-                                      </Card>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                            <Button variant="outline" size="sm" className="w-full h-7 text-[10px] font-bold rounded-sm no-print" asChild>
+                              <a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
+                            </Button>
+                          </>
                         ) : (
-                          <p className="text-sm text-muted-foreground italic bg-muted/30 p-4 rounded-lg text-center border-dashed border-2">No attachments available for this permit.</p>
+                          <p className="text-[10px] text-muted-foreground italic">No location recorded</p>
                         )}
+                      </div>
                     </div>
-
-                    <Separator className="my-2" />
-                    
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2"><History className="h-5 w-5 text-primary" /><h3 className="font-bold text-base uppercase tracking-wider">Activity Log</h3></div>
-                        <div className="space-y-4">
-                        {detailsPermit.timeline?.map((entry, idx) => (
-                            <div key={idx} className="flex gap-4 items-start p-4 bg-muted/20 rounded-lg border border-primary/10">
-                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20"><User className="h-5 w-5 text-primary" /></div>
-                                <div className="flex-1">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-bold text-sm text-primary">{entry.action}</span>
-                                          {entry.submissionIndex && (
-                                            <Badge variant="outline" className="text-[9px] h-4 py-0 px-1 border-primary/30">Subm {entry.submissionIndex}</Badge>
-                                          )}
-                                        </div>
-                                        <span className="text-[10px] text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded">{formatTimestamp(entry.timestamp)}</span>
-                                    </div>
-                                    <p className="text-sm italic text-foreground/80 leading-relaxed mb-1">"{entry.remarks}"</p>
-                                    <p className="text-[10px] font-semibold text-muted-foreground">— {entry.userName}</p>
-                                </div>
-                            </div>
-                        ))}
-                        </div>
-                    </div>
+                  </div>
                 </div>
+
+                <Separator />
+
+                {/* Documentation History */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase tracking-widest">Documentation History</h3></div>
+                  
+                  {Object.keys(groupedAttachments).length > 0 ? (
+                    <div className="space-y-8">
+                      {Object.entries(groupedAttachments).sort(([a], [b]) => Number(a) - Number(b)).map(([index, files]) => {
+                        const images = files.filter(f => f.contentType.startsWith('image/'));
+                        const videos = files.filter(f => f.contentType.startsWith('video/'));
+                        const others = files.filter(f => !f.contentType.startsWith('image/') && !f.contentType.startsWith('video/'));
+
+                        return (
+                          <div key={index} className="p-4 rounded-md border bg-muted/5 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <Badge variant="secondary" className="px-2 py-0.5 text-[10px] font-bold rounded-sm">Submission {index}</Badge>
+                              <span className="text-[10px] text-muted-foreground italic">{index === "1" ? "Initial submission" : "Correction/Resubmission"}</span>
+                            </div>
+
+                            {images.length > 0 && (
+                              <div className="space-y-2">
+                                <Label className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><ImageIcon className="h-3 w-3" /> Photo Gallery</Label>
+                                <Carousel className="w-full max-w-lg mx-auto">
+                                  <CarouselContent>
+                                    {images.map((img, idx) => (
+                                      <CarouselItem key={idx} className="md:basis-1/2">
+                                        <Card className="overflow-hidden border group rounded-sm">
+                                          <CardContent className="p-0 aspect-video relative flex items-center justify-center">
+                                            <img src={img.url} alt={img.name} className="object-cover w-full h-full" />
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                                              <Button variant="secondary" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 rounded-full" asChild>
+                                                <a href={img.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3 w-3" /></a>
+                                              </Button>
+                                            </div>
+                                          </CardContent>
+                                        </Card>
+                                      </CarouselItem>
+                                    ))}
+                                  </CarouselContent>
+                                  <CarouselPrevious className="-left-4 h-6 w-6" />
+                                  <CarouselNext className="-right-4 h-6 w-6" />
+                                </Carousel>
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                              {videos.map((vid, idx) => (
+                                <div key={idx} className="space-y-2">
+                                  <Label className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><Film className="h-3 w-3" /> Video</Label>
+                                  <Card className="overflow-hidden group rounded-sm">
+                                    <div className="aspect-video bg-black relative flex items-center justify-center">
+                                      <video src={vid.url} className="w-full h-full object-contain" />
+                                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="secondary" size="sm" className="h-7 text-[10px] font-bold rounded-sm" asChild>
+                                          <a href={vid.url} target="_blank" rel="noopener noreferrer">View Full</a>
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    <div className="p-1.5 border-t bg-background text-[10px] truncate font-medium">{vid.name}</div>
+                                  </Card>
+                                </div>
+                              ))}
+
+                              {others.map((file, idx) => (
+                                <div key={idx} className="space-y-2">
+                                  <Label className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><Paperclip className="h-3 w-3" /> Document</Label>
+                                  <Card className="p-2 flex items-center gap-2 border-dashed rounded-sm">
+                                    <FileText className="h-4 w-4 text-primary" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[10px] font-bold truncate">{file.name}</p>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                                      <a href={file.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3 w-3" /></a>
+                                    </Button>
+                                  </Card>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center p-8 bg-muted/10 rounded-md border border-dashed text-xs text-muted-foreground">No attachments provided.</div>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Activity Log */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2"><History className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase tracking-widest">Activity Log</h3></div>
+                  <div className="space-y-0 relative border-l-2 border-muted ml-3 pl-6">
+                    {detailsPermit.timeline?.map((entry, idx) => (
+                      <div key={idx} className="relative pb-6">
+                        <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-primary">{entry.action}</span>
+                              {entry.submissionIndex && (
+                                <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-primary/30 rounded-sm">Subm {entry.submissionIndex}</Badge>
+                              )}
+                            </div>
+                            <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(entry.timestamp)}</span>
+                          </div>
+                          <p className="text-sm italic leading-relaxed text-foreground/80">"{entry.remarks}"</p>
+                          <p className="text-[10px] font-semibold text-muted-foreground">— {entry.userName}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
-          <DialogFooter className="no-print">
-            <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
-          </DialogFooter>
+          <div className="p-4 border-t bg-muted/20 flex justify-end no-print">
+            <DialogClose asChild><Button variant="outline" className="h-8 text-xs font-bold rounded-sm">Close</Button></DialogClose>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
