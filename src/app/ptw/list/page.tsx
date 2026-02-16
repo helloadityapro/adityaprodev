@@ -149,16 +149,13 @@ export default function PtwListPage() {
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole || !user) return null;
     const base = collection(firestore, 'permits_to_work');
-    // Admin sees all
     if (userRole === 'Admin') return base;
-    // For Managers and Engineers, we fetch all and filter client-side to avoid composite index issues with 'OR' in prototype environments
     return base;
   }, [firestore, userRole, user]);
 
   const { data: allPermits, isLoading } = useCollection<Permit>(permitsQuery);
   const { data: ptwTypes } = useCollection<PtwType>(useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]));
 
-  // In-memory filter based on user role and hierarchy
   const permits = React.useMemo(() => {
     if (!allPermits || !userRole || !user) return [];
     if (userRole === 'Admin') return allPermits;
@@ -180,7 +177,6 @@ export default function PtwListPage() {
 
   const isAuthorizedForType = (typeName: string) => {
     if (!user) return false;
-    // Admins are globally authorized
     if (isAdmin) return true;
     const typeDoc = ptwTypes?.find(t => t.name === typeName);
     if (!typeDoc) return false;
@@ -190,7 +186,6 @@ export default function PtwListPage() {
   const handleAction = (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
     if (!user || !userProfile) return;
     const permitRef = doc(firestore, "permits_to_work", permit.id);
-
     const currentIteration = Math.max(1, ...(permit.attachments?.map(a => a.submissionIndex || 0) || []));
 
     const timelineEntry: TimelineEntry = {
@@ -238,7 +233,7 @@ export default function PtwListPage() {
 
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" : <ArrowDown className="ml-2 h-4 w-4" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
   const filteredPermits = React.useMemo(() => {
