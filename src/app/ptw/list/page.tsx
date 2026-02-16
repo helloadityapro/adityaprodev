@@ -63,14 +63,22 @@ type PtwType = {
     allowedApproverIds?: string[];
 };
 
-function StatusBadge({ status }: { status: Permit["status"] }) {
+function StatusBadge({ permit }: { permit: Permit }) {
+  const firestore = useFirestore();
+  const managerRef = useMemoFirebase(() => (permit.status === 'Pending' && permit.siteManagerId) ? doc(firestore, 'users', permit.siteManagerId) : null, [firestore, permit.siteManagerId, permit.status]);
+  const { data: managerProfile } = useDoc(managerRef);
+
   const statusConfig = {
-    Pending: { label: 'Pending Manager', icon: Clock, className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+    Pending: { 
+      label: managerProfile ? `Pending: ${managerProfile.username}` : 'Pending Manager', 
+      icon: Clock, 
+      className: 'bg-yellow-100 text-yellow-800 border-yellow-300' 
+    },
     ManagerApproved: { label: 'Pending Admin', icon: Clock, className: 'bg-blue-100 text-blue-800 border-blue-300' },
     Approved: { label: 'Approved', icon: CircleCheck, className: 'bg-green-100 text-green-800 border-green-300' },
     Rejected: { label: 'Rejected', icon: CircleX, className: 'bg-red-100 text-red-800 border-red-300' },
   };
-  const config = statusConfig[status] || statusConfig.Pending;
+  const config = statusConfig[permit.status] || statusConfig.Pending;
   const Icon = config.icon;
   return (
     <Badge className={cn("flex items-center gap-1.5 text-xs font-medium w-fit border", config.className)}>
@@ -338,7 +346,7 @@ export default function PtwListPage() {
                     <TableCell className="font-mono text-xs">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
                     <TableCell className="font-medium">{permit.ptwType}</TableCell>
                     <TableCell>{permit.siteName}</TableCell>
-                    <TableCell><StatusBadge status={permit.status} /></TableCell>
+                    <TableCell><StatusBadge permit={permit} /></TableCell>
                     <TableCell>{formatTimestamp(permit.requestDate)}</TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex items-center justify-end gap-1">
@@ -376,6 +384,15 @@ export default function PtwListPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <style jsx global>{`
+        @media print {
+          body * { visibility: hidden; }
+          #printable-permit-area, #printable-permit-area * { visibility: visible; }
+          #printable-permit-area { position: absolute; left: 0; top: 0; width: 100%; }
+          .no-print { display: none !important; }
+        }
+      `}</style>
 
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent>
@@ -422,7 +439,7 @@ export default function PtwListPage() {
                             <Label className="text-xs uppercase font-bold tracking-tight">Scope of Work</Label>
                             <p className="p-4 bg-muted/30 rounded-lg border leading-relaxed whitespace-pre-wrap">{detailsPermit.descriptionOfWork}</p>
                         </div>
-                        <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Status</Label><div><StatusBadge status={detailsPermit.status} /></div></div>
+                        <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
                         <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Submission Date</Label><p className="font-medium">{formatTimestamp(detailsPermit.requestDate)}</p></div>
                     </div>
 
@@ -509,14 +526,6 @@ export default function PtwListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <style jsx global>{`
-        @media print {
-          body * { visibility: hidden; }
-          #printable-permit-area, #printable-permit-area * { visibility: visible; }
-          #printable-permit-area { position: absolute; left: 0; top: 0; width: 100%; }
-          .no-print { display: none !important; }
-        }
-      `}</style>
     </div>
   )
 }
