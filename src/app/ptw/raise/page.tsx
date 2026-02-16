@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -11,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { TriangleAlert, Loader2, Search, ChevronsUpDown, Check, FileUp } from "lucide-react"
+import { TriangleAlert, Loader2, Search, ChevronsUpDown, Check, FileUp, MessageCircle, CheckCircle2 } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, setDocumentNonBlocking, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp, doc, arrayUnion, getDoc, query, where, getDocs, Timestamp } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -100,6 +99,7 @@ export default function RaisePtwPage() {
   const [vlogFile, setVlogFile] = React.useState<File | null>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
+  const [submittedPermit, setSubmittedPermit] = React.useState<{id: string, serialNumber: string, siteName: string, managerMobile?: string} | null>(null);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
@@ -161,7 +161,10 @@ export default function RaisePtwPage() {
   };
 
   const triggerWhatsApp = (serial: string, site: string, permitId: string, mobile?: string) => {
-    if (!mobile) return;
+    if (!mobile) {
+      toast({ variant: 'destructive', title: 'No Manager Mobile', description: 'Could not find manager mobile number for notification.' });
+      return;
+    }
     const cleanMobile = mobile.replace(/\D/g, '');
     const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
     const message = `Hello, I've submitted a new PtW request.\nSerial: ${serial}\nSite: ${site}\nLink: ${window.location.origin}/ptw/list?view=${permitId}`;
@@ -197,7 +200,7 @@ export default function RaisePtwPage() {
       
       // Calculate submission index for resubmission tracking
       const maxExistingIndex = isCorrectionMode && permitToCorrect?.attachments 
-        ? Math.max(0, ...(permitToCorrect.attachments.map(a => a.submissionIndex || 0)))
+        ? Math.max(0, ...(permitToCorrect.attachments.map(a => (a as any).submissionIndex || 0)))
         : 0;
       const currentSubmissionIndex = maxExistingIndex + 1;
 
@@ -265,6 +268,23 @@ export default function RaisePtwPage() {
         statusChangeDate: serverTimestamp(),
       };
 
+      let managerMobile = "";
+      if (userProfile.siteManagerId) {
+        const managerDoc = await getDoc(doc(firestore, 'users', userProfile.siteManagerId));
+        if (managerDoc.exists()) {
+          managerMobile = managerDoc.data().mobile;
+          
+          addDocumentNonBlocking(collection(firestore, 'notifications'), {
+            userId: userProfile.siteManagerId,
+            title: "New Permit Request",
+            description: `${userProfile.username || user.email} raised a permit (${serialNumber}) for "${values.siteName}".`,
+            link: `/ptw/list?view=${permitId}`,
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+      }
+
       if (isCorrectionMode) {
         permitData.attachments = arrayUnion(...newAttachments);
         permitData.timeline = arrayUnion(timelineEntry);
@@ -280,27 +300,15 @@ export default function RaisePtwPage() {
         setDocumentNonBlocking(permitRef, permitData, { merge: true });
       }
 
-      if (userProfile.siteManagerId) {
-        const managerDoc = await getDoc(doc(firestore, 'users', userProfile.siteManagerId));
-        if (managerDoc.exists()) {
-          const managerMobile = managerDoc.data().mobile;
-          triggerWhatsApp(serialNumber, values.siteName, permitId, managerMobile);
-          
-          addDocumentNonBlocking(collection(firestore, 'notifications'), {
-            userId: userProfile.siteManagerId,
-            title: "New Permit Request",
-            description: `${userProfile.username || user.email} raised a permit (${serialNumber}) for "${values.siteName}".`,
-            link: `/ptw/list?view=${permitId}`,
-            read: false,
-            createdAt: serverTimestamp(),
-          });
-        }
-      }
-
+      setSubmittedPermit({
+        id: permitId,
+        serialNumber,
+        siteName: values.siteName,
+        managerMobile: managerMobile
+      });
       setIsSubmitted(true);
       setIsProcessing(false);
       toast({ title: "Submitted", description: `Permit ${serialNumber} raised successfully.` });
-      setTimeout(() => router.push('/ptw/list'), 2000);
     } catch (error: any) {
       toast({ variant: "destructive", title: "Submission Failed", description: error.message });
       setIsProcessing(false);
@@ -312,6 +320,51 @@ export default function RaisePtwPage() {
       <div className="space-y-6">
         <Skeleton className="h-9 w-72" />
         <Skeleton className="h-[600px] w-full" />
+      </div>
+    );
+  }
+
+  if (isSubmitted && submittedPermit) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-primary/10 p-4 rounded-full">
+                <CheckCircle2 className="h-12 w-12 text-primary" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold">Submission Successful</CardTitle>
+            <CardDescription className="text-base">
+              Permit <span className="font-mono font-bold text-primary">{submittedPermit.serialNumber}</span> has been raised and is pending review.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold" 
+              onClick={() => triggerWhatsApp(submittedPermit.serialNumber, submittedPermit.siteName, submittedPermit.id, submittedPermit.managerMobile)}
+            >
+              <MessageCircle className="mr-2 h-5 w-5" />
+              Notify Manager on WhatsApp
+            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="h-11" onClick={() => router.push('/ptw/list')}>
+                View My Permits
+              </Button>
+              <Button variant="secondary" className="h-11" onClick={() => {
+                setIsSubmitted(false);
+                setSubmittedPermit(null);
+                form.reset();
+                setSelectedSite(null);
+                setFiles([]);
+                setReferenceDocs([]);
+                setVlogFile(null);
+              }}>
+                Raise Another
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -359,9 +412,9 @@ export default function RaisePtwPage() {
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredAccessibleSites.length > 0 ? filteredAccessibleSites.map((site) => (
-                            <Button key={site.id} variant="ghost" className="w-full justify-start font-normal" onClick={() => { field.onChange(site.name); setSelectedSite(site); setIsSitePopoverOpen(false); }}>
-                              <Check className={cn("mr-2 h-4 w-4", site.name === field.value ? "opacity-100" : "opacity-0")} />
-                              {site.name}
+                            <Button key={site.id} variant="ghost" className="w-full justify-start font-normal text-left" onClick={() => { field.onChange(site.name); setSelectedSite(site); setIsSitePopoverOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4 shrink-0", site.name === field.value ? "opacity-100" : "opacity-0")} />
+                              <span className="truncate">{site.name}</span>
                             </Button>
                           )) : (
                             <div className="p-4 text-center text-sm text-muted-foreground">No sites assigned to you.</div>
@@ -392,9 +445,9 @@ export default function RaisePtwPage() {
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredPtwTypesList.map((type) => (
-                            <Button key={type.id} variant="ghost" className="w-full justify-start font-normal" onClick={() => { field.onChange(type.name); setIsPtwTypePopoverOpen(false); }}>
-                              <Check className={cn("mr-2 h-4 w-4", type.name === field.value ? "opacity-100" : "opacity-0")} />
-                              {type.name}
+                            <Button key={type.id} variant="ghost" className="w-full justify-start font-normal text-left" onClick={() => { field.onChange(type.name); setIsPtwTypePopoverOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4 shrink-0", type.name === field.value ? "opacity-100" : "opacity-0")} />
+                              <span className="truncate">{type.name}</span>
                             </Button>
                           ))}
                         </ScrollArea>
