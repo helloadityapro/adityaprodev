@@ -35,6 +35,7 @@ type TimelineEntry = {
   userName: string;
   remarks: string;
   action: string;
+  submissionIndex?: number;
 };
 
 type Permit = {
@@ -151,7 +152,7 @@ export default function PtwListPage() {
     }
   }, [searchParams, permits]);
 
-  const isUserAuthorizedForType = (typeName: string) => {
+  const isAuthorizedForType = (typeName: string) => {
     if (!user) return false;
     const typeDoc = ptwTypes?.find(t => t.name === typeName);
     if (!typeDoc) return false;
@@ -162,13 +163,17 @@ export default function PtwListPage() {
     if (!user || !userProfile) return;
     const permitRef = doc(firestore, "permits_to_work", permit.id);
 
+    // Get latest submission index to associate with this timeline action
+    const currentIteration = Math.max(1, ...(permit.attachments?.map(a => a.submissionIndex || 0) || []));
+
     const timelineEntry: TimelineEntry = {
       status: targetStatus,
       timestamp: new Date(),
       userId: user.uid,
       userName: userProfile.username || user.email || 'System',
       remarks: remarks,
-      action: targetStatus === 'Rejected' ? `Rejected by ${userRole}` : (targetStatus === 'ManagerApproved' ? 'Approved by Manager' : 'Final Approval by Admin')
+      action: targetStatus === 'Rejected' ? `Rejected by ${userRole}` : (targetStatus === 'ManagerApproved' ? 'Approved by Manager' : 'Final Approval by Admin'),
+      submissionIndex: currentIteration
     };
 
     const updateData: any = {
@@ -244,7 +249,6 @@ export default function PtwListPage() {
     }
   };
 
-  // Grouping attachments by submissionIndex
   const groupedAttachments = React.useMemo(() => {
     if (!detailsPermit?.attachments) return {};
     return detailsPermit.attachments.reduce((acc, attachment) => {
@@ -328,7 +332,7 @@ export default function PtwListPage() {
             </TableHeader>
             <TableBody>
               {filteredPermits.map(permit => {
-                const isAuthorized = isUserAuthorizedForType(permit.ptwType);
+                const isAuthorized = isAuthorizedForType(permit.ptwType);
                 return (
                   <TableRow key={permit.id}>
                     <TableCell className="font-mono text-xs">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
@@ -482,7 +486,12 @@ export default function PtwListPage() {
                                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20"><User className="h-5 w-5 text-primary" /></div>
                                 <div className="flex-1">
                                     <div className="flex justify-between items-center mb-1">
-                                        <span className="font-bold text-sm text-primary">{entry.action}</span>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-bold text-sm text-primary">{entry.action}</span>
+                                          {entry.submissionIndex && (
+                                            <Badge variant="outline" className="text-[9px] h-4 py-0 px-1 border-primary/30">Iter {entry.submissionIndex}</Badge>
+                                          )}
+                                        </div>
                                         <span className="text-[10px] text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded">{formatTimestamp(entry.timestamp)}</span>
                                     </div>
                                     <p className="text-sm italic text-foreground/80 leading-relaxed mb-1">"{entry.remarks}"</p>

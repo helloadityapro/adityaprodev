@@ -250,7 +250,8 @@ export default function RaisePtwPage() {
         userId: user.uid,
         userName: userProfile.username || user.email || 'Engineer',
         remarks: values.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with additional documents." : "Permit raised."),
-        action: isCorrectionMode ? `Resubmitted` : "Created"
+        action: isCorrectionMode ? `Resubmitted` : "Created",
+        submissionIndex: currentSubmissionIndex
       };
 
       const permitData: any = {
