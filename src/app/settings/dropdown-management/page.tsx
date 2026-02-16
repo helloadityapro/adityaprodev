@@ -14,24 +14,13 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch, query, where } from 'firebase/firestore';
-import { Trash2, Users, Search, Check, ShieldCheck } from 'lucide-react';
+import { collection, doc } from 'firebase/firestore';
+import { Trash2, Search, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
-import { cn } from '@/lib/utils';
 
 type PtwType = {
   id: string;
@@ -71,8 +60,6 @@ export default function AdminSettingsPage() {
   const router = useRouter();
   const { user, isUserLoading } = useUser();
 
-  const [statusToDelete, setStatusToDelete] = React.useState<string | null>(null);
-  const [individualPermitToDelete, setIndividualPermitToDelete] = React.useState<any | null>(null);
   const [ptwTypeToManage, setPtwTypeToManage] = React.useState<PtwType | null>(null);
   const [approverSearch, setApproverSearch] = React.useState("");
 

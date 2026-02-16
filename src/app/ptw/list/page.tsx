@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, arrayUnion } from "firebase/firestore";
@@ -16,9 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format, isSameDay } from "date-fns";
+import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Separator } from "@/components/ui/separator";
 
 type Attachment = { 
@@ -85,12 +84,6 @@ const formatTimestamp = (ts: any) => {
   return format(date, 'dd/MM/yyyy HH:mm');
 };
 
-function UserDisplay({ userId }: { userId: string }) {
-  const firestore = useFirestore();
-  const { data: user } = useDoc(useMemoFirebase(() => userId ? doc(firestore, 'users', userId) : null, [firestore, userId]));
-  return <span>{user?.username || '...'}</span>;
-}
-
 function WhatsAppReminder({ userId, permit }: { userId: string | undefined, permit: Permit }) {
     const firestore = useFirestore();
     const { data: targetUser } = useDoc(useMemoFirebase(() => userId ? doc(firestore, 'users', userId) : null, [firestore, userId]));
@@ -129,10 +122,8 @@ export default function PtwListPage() {
   const { toast } = useToast();
 
   const [statusFilter, setStatusFilter] = React.useState('all');
-  const [filters, setFilters] = React.useState({ ptwType: "", siteName: "", engineerId: "", date: undefined as Date | undefined });
   const [actionState, setActionState] = React.useState<{ permit: Permit, status: 'Approved' | 'Rejected' | 'ManagerApproved' } | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
-  const [viewerState, setViewerState] = React.useState<{ attachments: Attachment[]; startIndex: number } | null>(null);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
 
   const { data: userProfile } = useDoc(useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]));
@@ -150,7 +141,6 @@ export default function PtwListPage() {
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
   const { data: ptwTypes } = useCollection<PtwType>(useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]));
 
-  // Deep linking: open modal if ?view=ID is present
   React.useEffect(() => {
     const viewId = searchParams.get('view');
     if (viewId && permits) {
@@ -161,7 +151,7 @@ export default function PtwListPage() {
     }
   }, [searchParams, permits]);
 
-  const isUserAuthorizedForType = (typeId: string | undefined, typeName: string) => {
+  const isUserAuthorizedForType = (typeName: string) => {
     if (!user) return false;
     const typeDoc = ptwTypes?.find(t => t.name === typeName);
     if (!typeDoc) return false;
@@ -195,13 +185,10 @@ export default function PtwListPage() {
 
     updateDocumentNonBlocking(permitRef, updateData);
 
-    let notificationTitle = "Permit Status Update";
-    let notificationDescription = `Your permit ${permit.serialNumber} for "${permit.siteName}" has been updated to ${targetStatus}.`;
-
     addDocumentNonBlocking(collection(firestore, 'notifications'), {
       userId: permit.siteEngineerId,
-      title: notificationTitle,
-      description: notificationDescription,
+      title: "Permit Status Update",
+      description: `Your permit ${permit.serialNumber} for "${permit.siteName}" has been updated to ${targetStatus}.`,
       link: `/ptw/list?view=${permit.id}`,
       read: false,
       createdAt: serverTimestamp(),
@@ -330,7 +317,7 @@ export default function PtwListPage() {
             </TableHeader>
             <TableBody>
               {filteredPermits.map(permit => {
-                const isAuthorized = isUserAuthorizedForType(undefined, permit.ptwType);
+                const isAuthorized = isUserAuthorizedForType(permit.ptwType);
                 return (
                   <TableRow key={permit.id}>
                     <TableCell className="font-mono text-xs">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
@@ -422,6 +409,38 @@ export default function PtwListPage() {
                         </div>
                         <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Status</Label><div><StatusBadge status={detailsPermit.status} /></div></div>
                         <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Submission Date</Label><p className="font-medium">{formatTimestamp(detailsPermit.requestDate)}</p></div>
+                    </div>
+
+                    <Separator className="my-6" />
+
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2"><Paperclip className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase">Documents & Attachments</h3></div>
+                        {detailsPermit.attachments && detailsPermit.attachments.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {detailsPermit.attachments.map((file, idx) => (
+                                    <Card key={idx} className="overflow-hidden hover:shadow-md transition-shadow">
+                                        <CardContent className="p-3 space-y-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-primary/10 p-2 rounded-lg">
+                                                    {file.contentType.startsWith('image/') ? <ImageIcon className="h-5 w-5 text-primary" /> : file.contentType.startsWith('video/') ? <Film className="h-5 w-5 text-primary" /> : <FileText className="h-5 w-5 text-primary" />}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-semibold truncate" title={file.name}>{file.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground">{file.contentType.split('/')[1].toUpperCase()}</p>
+                                                </div>
+                                            </div>
+                                            <Button variant="secondary" size="sm" className="w-full h-8 text-xs" asChild>
+                                                <a href={file.url} target="_blank" rel="noopener noreferrer">
+                                                    <ExternalLink className="h-3 w-3 mr-2" /> View File
+                                                </a>
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground italic bg-muted/30 p-4 rounded-lg text-center">No attachments available for this permit.</p>
+                        )}
                     </div>
 
                     <Separator className="my-6" />
