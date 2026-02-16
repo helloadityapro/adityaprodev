@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, arrayUnion } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, arrayUnion, or } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -147,10 +147,10 @@ export default function PtwListPage() {
   const userRole = isAdmin ? "Admin" : userProfile?.role;
 
   const permitsQuery = useMemoFirebase(() => {
-    if (!userRole) return null;
+    if (!userRole || !user) return null;
     const base = collection(firestore, 'permits_to_work');
-    if (userRole === 'Site Engineer') return query(base, where('siteEngineerId', '==', user?.uid));
-    if (userRole === 'Site Manager') return query(base, where('siteManagerId', '==', user?.uid));
+    if (userRole === 'Site Engineer') return query(base, where('siteEngineerId', '==', user.uid));
+    if (userRole === 'Site Manager') return query(base, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)));
     return base;
   }, [firestore, userRole, user]);
 
@@ -169,6 +169,8 @@ export default function PtwListPage() {
 
   const isAuthorizedForType = (typeName: string) => {
     if (!user) return false;
+    // Admins are globally authorized
+    if (isAdmin) return true;
     const typeDoc = ptwTypes?.find(t => t.name === typeName);
     if (!typeDoc) return false;
     return typeDoc.allowedApproverIds?.includes(user.uid) ?? false;
@@ -363,14 +365,14 @@ export default function PtwListPage() {
                           <WhatsAppReminder userId={permit.status === 'Pending' ? permit.siteManagerId : undefined} permit={permit} />
                         )}
 
-                        {userRole === 'Site Manager' && permit.status === 'Pending' && isAuthorized && (
+                        {userRole === 'Site Manager' && permit.status === 'Pending' && isAuthorized && permit.siteManagerId === user?.uid && (
                           <>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setActionState({ permit, status: 'ManagerApproved' })}>Approve</Button>
                             <Button size="sm" variant="destructive" onClick={() => setActionState({ permit, status: 'Rejected' })}>Reject</Button>
                           </>
                         )}
 
-                        {userRole === 'Admin' && permit.status === 'ManagerApproved' && isAuthorized && (
+                        {userRole === 'Admin' && (permit.status === 'ManagerApproved' || (permit.status === 'Pending' && !permit.siteManagerId)) && isAuthorized && (
                           <>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => setActionState({ permit, status: 'Approved' })}>Final Approve</Button>
                             <Button size="sm" variant="destructive" onClick={() => setActionState({ permit, status: 'Rejected' })}>Reject</Button>
