@@ -19,6 +19,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { 
+  Carousel, 
+  CarouselContent, 
+  CarouselItem, 
+  CarouselNext, 
+  CarouselPrevious 
+} from "@/components/ui/carousel";
 
 type Attachment = { 
   url: string; 
@@ -452,41 +459,117 @@ export default function PtwListPage() {
                         </div>
                         
                         {Object.keys(groupedAttachments).length > 0 ? (
-                          <div className="space-y-8">
-                            {Object.entries(groupedAttachments).sort(([a], [b]) => Number(a) - Number(b)).map(([index, files]) => (
-                              <div key={index} className="space-y-4">
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="secondary" className="px-3 py-1 text-xs">Submission {index}</Badge>
-                                  {index === "1" ? (
-                                    <span className="text-xs font-medium text-muted-foreground italic">Initial Submission</span>
-                                  ) : (
-                                    <span className="text-xs font-medium text-muted-foreground italic">Correction / Resubmission Documents</span>
-                                  )}
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pl-2">
-                                  {files.map((file, idx) => (
-                                      <Card key={idx} className="overflow-hidden hover:shadow-md transition-shadow bg-background/50">
-                                          <CardContent className="p-3 space-y-3">
-                                              <div className="flex items-center gap-3">
-                                                  <div className="bg-primary/10 p-2 rounded-lg shrink-0">
-                                                      {file.contentType.startsWith('image/') ? <ImageIcon className="h-5 w-5 text-primary" /> : file.contentType.startsWith('video/') ? <Film className="h-5 w-5 text-primary" /> : <FileText className="h-5 w-5 text-primary" />}
-                                                  </div>
-                                                  <div className="flex-1 min-w-0">
-                                                      <p className="text-xs font-semibold truncate" title={file.name}>{file.name}</p>
-                                                      <p className="text-[10px] text-muted-foreground">{file.contentType.split('/')[1].toUpperCase()}</p>
-                                                  </div>
+                          <div className="space-y-10">
+                            {Object.entries(groupedAttachments).sort(([a], [b]) => Number(a) - Number(b)).map(([index, files]) => {
+                              const images = files.filter(f => f.contentType.startsWith('image/'));
+                              const videos = files.filter(f => f.contentType.startsWith('video/'));
+                              const others = files.filter(f => !f.contentType.startsWith('image/') && !f.contentType.startsWith('video/'));
+
+                              return (
+                                <div key={index} className="space-y-4">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="secondary" className="px-3 py-1 text-xs">Submission {index}</Badge>
+                                    {index === "1" ? (
+                                      <span className="text-xs font-medium text-muted-foreground italic">Initial Submission</span>
+                                    ) : (
+                                      <span className="text-xs font-medium text-muted-foreground italic">Correction / Resubmission Documents</span>
+                                    )}
+                                  </div>
+
+                                  {/* Images Carousel */}
+                                  {images.length > 0 && (
+                                    <div className="px-12 py-4 bg-muted/10 rounded-xl border border-dashed relative">
+                                      <div className="absolute top-2 left-2 flex items-center gap-1 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                                        <ImageIcon className="h-3 w-3" /> Photo Gallery
+                                      </div>
+                                      <Carousel className="w-full max-w-2xl mx-auto">
+                                        <CarouselContent>
+                                          {images.map((img, idx) => (
+                                            <CarouselItem key={idx} className="md:basis-1/2">
+                                              <div className="p-1">
+                                                <Card className="overflow-hidden border-2 hover:border-primary transition-colors cursor-pointer group">
+                                                  <CardContent className="flex aspect-video items-center justify-center p-0 relative">
+                                                    <img 
+                                                      src={img.url} 
+                                                      alt={img.name} 
+                                                      className="object-cover w-full h-full"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                                       <Button variant="secondary" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full shadow-lg" asChild>
+                                                          <a href={img.url} target="_blank" rel="noopener noreferrer">
+                                                            <ExternalLink className="h-4 w-4" />
+                                                          </a>
+                                                       </Button>
+                                                    </div>
+                                                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-1.5 text-white text-[9px] truncate backdrop-blur-sm">
+                                                      {img.name}
+                                                    </div>
+                                                  </CardContent>
+                                                </Card>
                                               </div>
-                                              <Button variant="secondary" size="sm" className="w-full h-8 text-xs" asChild>
-                                                  <a href={file.url} target="_blank" rel="noopener noreferrer">
-                                                      <ExternalLink className="h-3 w-3 mr-2" /> View File
+                                            </CarouselItem>
+                                          ))}
+                                        </CarouselContent>
+                                        <CarouselPrevious className="-left-6" />
+                                        <CarouselNext className="-right-6" />
+                                      </Carousel>
+                                    </div>
+                                  )}
+
+                                  {/* Videos & Others Grid */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {videos.map((vid, idx) => (
+                                      <Card key={idx} className="overflow-hidden hover:shadow-md transition-shadow bg-black/5 border-2 group">
+                                        <CardContent className="p-0">
+                                          <div className="aspect-video bg-black relative flex items-center justify-center">
+                                            <video 
+                                              src={vid.url} 
+                                              className="w-full h-full object-contain" 
+                                              preload="metadata"
+                                            />
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 backdrop-blur-[2px]">
+                                               <Button variant="secondary" size="sm" className="rounded-full font-bold text-[10px]" asChild>
+                                                  <a href={vid.url} target="_blank" rel="noopener noreferrer">
+                                                    <Film className="h-3 w-3 mr-1.5" /> Play Video
                                                   </a>
-                                              </Button>
-                                          </CardContent>
+                                               </Button>
+                                            </div>
+                                            <div className="absolute top-2 right-2">
+                                               <Badge className="bg-red-600/80 text-[8px] h-4 py-0">VIDEO</Badge>
+                                            </div>
+                                          </div>
+                                          <div className="p-2 border-t bg-background flex items-center justify-between gap-2">
+                                             <span className="text-[10px] font-bold truncate text-muted-foreground">{vid.name}</span>
+                                             <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                                          </div>
+                                        </CardContent>
                                       </Card>
-                                  ))}
+                                    ))}
+
+                                    {others.map((file, idx) => (
+                                      <Card key={idx} className="overflow-hidden hover:shadow-md transition-shadow bg-background/50 border-2 border-dashed">
+                                        <CardContent className="p-3 space-y-3">
+                                          <div className="flex items-center gap-3">
+                                            <div className="bg-primary/10 p-2 rounded-lg shrink-0">
+                                              <FileText className="h-5 w-5 text-primary" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                              <p className="text-xs font-bold truncate uppercase tracking-tight" title={file.name}>{file.name.split('.').pop()} Document</p>
+                                              <p className="text-[9px] text-muted-foreground truncate">{file.name}</p>
+                                            </div>
+                                          </div>
+                                          <Button variant="outline" size="sm" className="w-full h-8 text-[10px] font-bold" asChild>
+                                            <a href={file.url} target="_blank" rel="noopener noreferrer">
+                                              <ExternalLink className="h-3 w-3 mr-2" /> Open File
+                                            </a>
+                                          </Button>
+                                        </CardContent>
+                                      </Card>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground italic bg-muted/30 p-4 rounded-lg text-center border-dashed border-2">No attachments available for this permit.</p>
