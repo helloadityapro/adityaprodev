@@ -177,8 +177,11 @@ export default function PtwListPage() {
     if (!user) return false;
     if (isAdmin) return true;
     const typeDoc = ptwTypes?.find(t => t.name === typeName);
-    if (!typeDoc) return true; // Default to true if not explicitly restricted
-    return typeDoc.allowedApproverIds?.includes(user.uid) ?? true;
+    // If no specific restrictions are set (empty list), allow all managers
+    if (!typeDoc || !typeDoc.allowedApproverIds || typeDoc.allowedApproverIds.length === 0) {
+      return true;
+    }
+    return typeDoc.allowedApproverIds.includes(user.uid);
   };
 
   const handleAction = (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
