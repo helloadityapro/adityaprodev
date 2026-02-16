@@ -109,10 +109,10 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Admin Settings" isActive={pathname.startsWith('/settings/dropdown-management')}>
+              <SidebarMenuButton asChild tooltip="Settings" isActive={pathname.startsWith('/settings/dropdown-management')}>
                 <Link href="/settings/dropdown-management">
                   <SlidersHorizontal />
-                  Admin Settings
+                  Settings
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
