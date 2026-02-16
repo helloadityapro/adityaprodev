@@ -149,13 +149,24 @@ export default function PtwListPage() {
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole || !user) return null;
     const base = collection(firestore, 'permits_to_work');
-    if (userRole === 'Site Engineer') return query(base, where('siteEngineerId', '==', user.uid));
-    if (userRole === 'Site Manager') return query(base, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)));
+    // Admin sees all
+    if (userRole === 'Admin') return base;
+    // For Managers and Engineers, we fetch all and filter client-side to avoid composite index issues with 'OR' in prototype environments
     return base;
   }, [firestore, userRole, user]);
 
-  const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
+  const { data: allPermits, isLoading } = useCollection<Permit>(permitsQuery);
   const { data: ptwTypes } = useCollection<PtwType>(useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]));
+
+  // In-memory filter based on user role and hierarchy
+  const permits = React.useMemo(() => {
+    if (!allPermits || !userRole || !user) return [];
+    if (userRole === 'Admin') return allPermits;
+    if (userRole === 'Site Manager') {
+      return allPermits.filter(p => p.siteManagerId === user.uid || p.siteEngineerId === user.uid);
+    }
+    return allPermits.filter(p => p.siteEngineerId === user.uid);
+  }, [allPermits, userRole, user]);
 
   React.useEffect(() => {
     const viewId = searchParams.get('view');
@@ -180,7 +191,6 @@ export default function PtwListPage() {
     if (!user || !userProfile) return;
     const permitRef = doc(firestore, "permits_to_work", permit.id);
 
-    // Get latest submission index to associate with this timeline action
     const currentIteration = Math.max(1, ...(permit.attachments?.map(a => a.submissionIndex || 0) || []));
 
     const timelineEntry: TimelineEntry = {
@@ -228,7 +238,7 @@ export default function PtwListPage() {
 
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" : <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
   const filteredPermits = React.useMemo(() => {
@@ -478,7 +488,6 @@ export default function PtwListPage() {
                                     )}
                                   </div>
 
-                                  {/* Images Carousel */}
                                   {images.length > 0 && (
                                     <div className="px-12 py-4 bg-muted/10 rounded-xl border border-dashed relative">
                                       <div className="absolute top-2 left-2 flex items-center gap-1 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
@@ -518,7 +527,6 @@ export default function PtwListPage() {
                                     </div>
                                   )}
 
-                                  {/* Videos & Others Grid */}
                                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {videos.map((vid, idx) => (
                                       <Card key={idx} className="overflow-hidden hover:shadow-md transition-shadow bg-black/5 border-2 group">

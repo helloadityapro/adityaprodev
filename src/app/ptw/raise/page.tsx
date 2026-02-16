@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react"
@@ -198,7 +199,6 @@ export default function RaisePtwPage() {
       const permitId = permitRef.id;
       let serialNumber = "";
       
-      // Calculate submission index for resubmission tracking
       const maxExistingIndex = isCorrectionMode && permitToCorrect?.attachments 
         ? Math.max(0, ...(permitToCorrect.attachments.map(a => (a as any).submissionIndex || 0)))
         : 0;
