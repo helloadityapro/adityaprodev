@@ -439,7 +439,7 @@ export default function PtwListPage() {
                             {Object.entries(groupedAttachments).sort(([a], [b]) => Number(a) - Number(b)).map(([index, files]) => (
                               <div key={index} className="space-y-4">
                                 <div className="flex items-center gap-2">
-                                  <Badge variant="secondary" className="px-3 py-1 text-xs">Iteration {index}</Badge>
+                                  <Badge variant="secondary" className="px-3 py-1 text-xs">Submission {index}</Badge>
                                   {index === "1" ? (
                                     <span className="text-xs font-medium text-muted-foreground italic">Initial Submission</span>
                                   ) : (
@@ -489,7 +489,7 @@ export default function PtwListPage() {
                                         <div className="flex items-center gap-2">
                                           <span className="font-bold text-sm text-primary">{entry.action}</span>
                                           {entry.submissionIndex && (
-                                            <Badge variant="outline" className="text-[9px] h-4 py-0 px-1 border-primary/30">Iter {entry.submissionIndex}</Badge>
+                                            <Badge variant="outline" className="text-[9px] h-4 py-0 px-1 border-primary/30">Subm {entry.submissionIndex}</Badge>
                                           )}
                                         </div>
                                         <span className="text-[10px] text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded">{formatTimestamp(entry.timestamp)}</span>
