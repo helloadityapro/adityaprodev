@@ -195,6 +195,12 @@ export default function RaisePtwPage() {
       const permitId = permitRef.id;
       let serialNumber = "";
       
+      // Calculate submission index for resubmission tracking
+      const maxExistingIndex = isCorrectionMode && permitToCorrect?.attachments 
+        ? Math.max(0, ...(permitToCorrect.attachments.map(a => a.submissionIndex || 0)))
+        : 0;
+      const currentSubmissionIndex = maxExistingIndex + 1;
+
       if (isCorrectionMode && permitToCorrect) {
         serialNumber = permitToCorrect.serialNumber;
       } else {
@@ -221,7 +227,7 @@ export default function RaisePtwPage() {
             url, 
             contentType: file.type, 
             name: file.name,
-            submissionIndex: isCorrectionMode ? (permitToCorrect?.attachments?.length || 0) + 1 : 1,
+            submissionIndex: currentSubmissionIndex,
             timestamp: new Date().toISOString()
           })));
         });
@@ -243,7 +249,7 @@ export default function RaisePtwPage() {
         timestamp: new Date(),
         userId: user.uid,
         userName: userProfile.username || user.email || 'Engineer',
-        remarks: values.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted." : "Permit raised."),
+        remarks: values.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with additional documents." : "Permit raised."),
         action: isCorrectionMode ? `Resubmitted` : "Created"
       };
 

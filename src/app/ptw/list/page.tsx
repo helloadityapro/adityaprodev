@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, arrayUnion } from "firebase/firestore";
@@ -244,6 +244,17 @@ export default function PtwListPage() {
     }
   };
 
+  // Grouping attachments by submissionIndex
+  const groupedAttachments = React.useMemo(() => {
+    if (!detailsPermit?.attachments) return {};
+    return detailsPermit.attachments.reduce((acc, attachment) => {
+      const index = attachment.submissionIndex || 1;
+      if (!acc[index]) acc[index] = [];
+      acc[index].push(attachment);
+      return acc;
+    }, {} as Record<number, Attachment[]>);
+  }, [detailsPermit]);
+
   if (isLoading || !userRole) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   return (
@@ -399,7 +410,7 @@ export default function PtwListPage() {
               </div>
             </DialogHeader>
             {detailsPermit && (
-                <div className="space-y-6 py-4">
+                <div className="space-y-8 py-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                         <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Site Name</Label><p className="font-semibold text-lg">{detailsPermit.siteName}</p></div>
                         <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Permit Type</Label><p className="font-semibold text-lg">{detailsPermit.ptwType}</p></div>
@@ -411,52 +422,71 @@ export default function PtwListPage() {
                         <div className="space-y-1"><Label className="text-xs uppercase font-bold tracking-tight">Submission Date</Label><p className="font-medium">{formatTimestamp(detailsPermit.requestDate)}</p></div>
                     </div>
 
-                    <Separator className="my-6" />
+                    <Separator className="my-2" />
 
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2"><Paperclip className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase">Documents & Attachments</h3></div>
-                        {detailsPermit.attachments && detailsPermit.attachments.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {detailsPermit.attachments.map((file, idx) => (
-                                    <Card key={idx} className="overflow-hidden hover:shadow-md transition-shadow">
-                                        <CardContent className="p-3 space-y-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-primary/10 p-2 rounded-lg">
-                                                    {file.contentType.startsWith('image/') ? <ImageIcon className="h-5 w-5 text-primary" /> : file.contentType.startsWith('video/') ? <Film className="h-5 w-5 text-primary" /> : <FileText className="h-5 w-5 text-primary" />}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-xs font-semibold truncate" title={file.name}>{file.name}</p>
-                                                    <p className="text-[10px] text-muted-foreground">{file.contentType.split('/')[1].toUpperCase()}</p>
-                                                </div>
-                                            </div>
-                                            <Button variant="secondary" size="sm" className="w-full h-8 text-xs" asChild>
-                                                <a href={file.url} target="_blank" rel="noopener noreferrer">
-                                                    <ExternalLink className="h-3 w-3 mr-2" /> View File
-                                                </a>
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-2">
+                          <Layers className="h-5 w-5 text-primary" />
+                          <h3 className="font-bold text-base uppercase tracking-wider">Submission Documentation History</h3>
+                        </div>
+                        
+                        {Object.keys(groupedAttachments).length > 0 ? (
+                          <div className="space-y-8">
+                            {Object.entries(groupedAttachments).sort(([a], [b]) => Number(a) - Number(b)).map(([index, files]) => (
+                              <div key={index} className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="px-3 py-1 text-xs">Iteration {index}</Badge>
+                                  {index === "1" ? (
+                                    <span className="text-xs font-medium text-muted-foreground italic">Initial Submission</span>
+                                  ) : (
+                                    <span className="text-xs font-medium text-muted-foreground italic">Correction / Resubmission Documents</span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pl-2">
+                                  {files.map((file, idx) => (
+                                      <Card key={idx} className="overflow-hidden hover:shadow-md transition-shadow bg-background/50">
+                                          <CardContent className="p-3 space-y-3">
+                                              <div className="flex items-center gap-3">
+                                                  <div className="bg-primary/10 p-2 rounded-lg shrink-0">
+                                                      {file.contentType.startsWith('image/') ? <ImageIcon className="h-5 w-5 text-primary" /> : file.contentType.startsWith('video/') ? <Film className="h-5 w-5 text-primary" /> : <FileText className="h-5 w-5 text-primary" />}
+                                                  </div>
+                                                  <div className="flex-1 min-w-0">
+                                                      <p className="text-xs font-semibold truncate" title={file.name}>{file.name}</p>
+                                                      <p className="text-[10px] text-muted-foreground">{file.contentType.split('/')[1].toUpperCase()}</p>
+                                                  </div>
+                                              </div>
+                                              <Button variant="secondary" size="sm" className="w-full h-8 text-xs" asChild>
+                                                  <a href={file.url} target="_blank" rel="noopener noreferrer">
+                                                      <ExternalLink className="h-3 w-3 mr-2" /> View File
+                                                  </a>
+                                              </Button>
+                                          </CardContent>
+                                      </Card>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         ) : (
-                            <p className="text-sm text-muted-foreground italic bg-muted/30 p-4 rounded-lg text-center">No attachments available for this permit.</p>
+                          <p className="text-sm text-muted-foreground italic bg-muted/30 p-4 rounded-lg text-center border-dashed border-2">No attachments available for this permit.</p>
                         )}
                     </div>
 
-                    <Separator className="my-6" />
+                    <Separator className="my-2" />
                     
                     <div className="space-y-4">
-                        <div className="flex items-center gap-2"><History className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase">Activity Log</h3></div>
+                        <div className="flex items-center gap-2"><History className="h-5 w-5 text-primary" /><h3 className="font-bold text-base uppercase tracking-wider">Activity Log</h3></div>
                         <div className="space-y-4">
                         {detailsPermit.timeline?.map((entry, idx) => (
-                            <div key={idx} className="flex gap-4 items-start p-3 bg-muted/20 rounded-lg border">
-                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0"><User className="h-4 w-4 text-primary" /></div>
+                            <div key={idx} className="flex gap-4 items-start p-4 bg-muted/20 rounded-lg border border-primary/10">
+                                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20"><User className="h-5 w-5 text-primary" /></div>
                                 <div className="flex-1">
                                     <div className="flex justify-between items-center mb-1">
-                                        <span className="font-bold text-sm">{entry.action}</span>
-                                        <span className="text-[10px] text-muted-foreground">{formatTimestamp(entry.timestamp)}</span>
+                                        <span className="font-bold text-sm text-primary">{entry.action}</span>
+                                        <span className="text-[10px] text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded">{formatTimestamp(entry.timestamp)}</span>
                                     </div>
-                                    <p className="text-xs italic">"{entry.remarks}" - {entry.userName}</p>
+                                    <p className="text-sm italic text-foreground/80 leading-relaxed mb-1">"{entry.remarks}"</p>
+                                    <p className="text-[10px] font-semibold text-muted-foreground">— {entry.userName}</p>
                                 </div>
                             </div>
                         ))}
