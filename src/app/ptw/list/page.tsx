@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -119,7 +118,7 @@ function WhatsAppReminder({ userId, permit }: { userId: string | undefined, perm
         <Button 
             variant="ghost" 
             size="icon" 
-            className="text-green-600 hover:text-green-700 hover:bg-green-50" 
+            className="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-sm" 
             title="Send WhatsApp Reminder"
             onClick={triggerWhatsApp}
         >
@@ -328,7 +327,7 @@ export default function PtwListPage() {
                 <CardTitle className="text-sm font-medium">Filter by Status</CardTitle>
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[200px]"><SelectValue placeholder="All Status" /></SelectTrigger>
+                <SelectTrigger className="w-[200px] rounded-sm"><SelectValue placeholder="All Status" /></SelectTrigger>
                 <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="Pending">Pending Manager</SelectItem>
@@ -365,7 +364,7 @@ export default function PtwListPage() {
                     <TableCell>{formatTimestamp(permit.requestDate)}</TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" title="View Details" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="rounded-sm" title="View Details" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
 
                         {userRole === 'Site Engineer' && (permit.status === 'Pending' || permit.status === 'ManagerApproved') && (
                           <WhatsAppReminder userId={permit.status === 'Pending' ? permit.siteManagerId : undefined} permit={permit} />
@@ -401,18 +400,18 @@ export default function PtwListPage() {
       </Card>
 
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
-        <DialogContent>
+        <DialogContent className="rounded-sm">
           <DialogHeader>
             <DialogTitle>{actionState?.status === 'Rejected' ? 'Reject' : 'Approve'} Permit Request</DialogTitle>
             <DialogDescription className="sr-only">Decision processing for permit {actionState?.permit?.serialNumber}</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-2">
             <Label htmlFor="action-remarks">Remarks/Comments</Label>
-            <Textarea id="action-remarks" placeholder="Explain your decision..." className="min-h-[100px]" />
+            <Textarea id="action-remarks" placeholder="Explain your decision..." className="min-h-[100px] rounded-sm" />
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-            <Button onClick={() => {
+            <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
+            <Button className="rounded-sm" onClick={() => {
               const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "";
               if (remarks.trim()) {
                 handleAction(actionState!.permit, actionState!.status, remarks);
@@ -440,7 +439,7 @@ export default function PtwListPage() {
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="h-8 text-xs font-bold rounded-sm" onClick={handlePrint}><Printer className="h-3.5 w-3.5 mr-1.5" /> Print</Button>
-                <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8"><CircleX className="h-4 w-4" /></Button></DialogClose>
+                <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm"><CircleX className="h-4 w-4" /></Button></DialogClose>
               </div>
             </div>
 
@@ -470,7 +469,7 @@ export default function PtwListPage() {
                           <>
                             <div className="flex items-center justify-between">
                               <span className="text-[11px] font-mono font-medium">{detailsPermit.latitude.toFixed(5)}, {detailsPermit.longitude.toFixed(5)}</span>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary no-print" asChild>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary no-print rounded-sm" asChild>
                                 <a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer">
                                   <MapPin className="h-3.5 w-3.5" />
                                 </a>
@@ -525,8 +524,8 @@ export default function PtwListPage() {
                                       </CarouselItem>
                                     ))}
                                   </CarouselContent>
-                                  <CarouselPrevious className="-left-4 h-6 w-6" />
-                                  <CarouselNext className="-right-4 h-6 w-6" />
+                                  <CarouselPrevious className="-left-4 h-6 w-6 rounded-sm" />
+                                  <CarouselNext className="-right-4 h-6 w-6 rounded-sm" />
                                 </Carousel>
                               </div>
                             )}
@@ -557,7 +556,7 @@ export default function PtwListPage() {
                                     <div className="flex-1 min-w-0">
                                       <p className="text-[10px] font-bold truncate">{file.name}</p>
                                     </div>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-sm" asChild>
                                       <a href={file.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3 w-3" /></a>
                                     </Button>
                                   </Card>
@@ -617,7 +616,7 @@ export default function PtwListPage() {
             <DialogTitle>Full Screen Document Viewer</DialogTitle>
             <DialogDescription>Viewing images from submission in full size.</DialogDescription>
           </DialogHeader>
-          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 hover:bg-white/10" onClick={() => setViewerImages(null)}>
+          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 hover:bg-white/10 rounded-sm" onClick={() => setViewerImages(null)}>
             <X className="h-6 w-6" />
           </Button>
           {viewerImages && (
@@ -629,8 +628,8 @@ export default function PtwListPage() {
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <CarouselPrevious className="left-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none" />
-              <CarouselNext className="right-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none" />
+              <CarouselPrevious className="left-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none rounded-sm" />
+              <CarouselNext className="right-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none rounded-sm" />
             </Carousel>
           )}
         </DialogContent>
