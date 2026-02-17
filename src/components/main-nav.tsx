@@ -10,7 +10,7 @@ import {
   Users,
   LayoutDashboard,
   SlidersHorizontal,
-  UsersRound,
+  Workflow,
   MapPin,
 } from "lucide-react"
 import {
@@ -103,7 +103,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Teams" isActive={pathname === '/settings/teams'}>
                 <Link href="/settings/teams">
-                  <UsersRound />
+                  <Workflow />
                   Teams
                 </Link>
               </SidebarMenuButton>
