@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react"
@@ -252,7 +251,7 @@ export default function RaisePtwPage() {
         timestamp: new Date(),
         userId: user.uid,
         userName: userProfile.username || user.email || 'Engineer',
-        remarks: values.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with additional documents." : "Permit raised."),
+        remarks: values.commentsAndRemarks || (isCorrectionMode ? values.descriptionOfWork : "Permit raised."),
         action: isCorrectionMode ? `Resubmitted` : "Created",
         submissionIndex: currentSubmissionIndex
       };
