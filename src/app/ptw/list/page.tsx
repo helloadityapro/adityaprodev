@@ -513,16 +513,25 @@ export default function PtwListPage() {
                             </div>
 
                             {images.length > 0 && (
-                              <div className="space-y-2">
-                                <Label className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><ImageIcon className="h-3 w-3" /> Photo Gallery</Label>
-                                <Carousel className="w-full max-w-lg mx-auto">
-                                  <CarouselContent>
+                              <div className="space-y-3">
+                                <Label className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1.5 px-1">
+                                  <ImageIcon className="h-3.5 w-3.5" /> Photo Gallery
+                                </Label>
+                                <Carousel className="w-full" opts={{ align: "start" }}>
+                                  <CarouselContent className="-ml-2">
                                     {images.map((img, idx) => (
-                                      <CarouselItem key={idx} className="md:basis-1/2">
-                                        <Card className="overflow-hidden border group rounded-sm">
-                                          <CardContent className="p-0 aspect-video relative flex items-center justify-center">
-                                            <img src={img.url} alt={img.name} className="object-cover w-full h-full cursor-pointer" onClick={() => setViewerImages({ images, initialIndex: idx })} />
-                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center pointer-events-none">
+                                      <CarouselItem key={idx} className="pl-2 basis-1/2 md:basis-1/3 lg:basis-1/4">
+                                        <Card 
+                                          className="overflow-hidden border-none group rounded-sm shadow-sm hover:shadow-md transition-all cursor-pointer"
+                                          onClick={() => setViewerImages({ images, initialIndex: idx })}
+                                        >
+                                          <CardContent className="p-0 aspect-square relative flex items-center justify-center bg-muted/30">
+                                            <img 
+                                              src={img.url} 
+                                              alt={img.name} 
+                                              className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300" 
+                                            />
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                                               <Maximize2 className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </div>
                                           </CardContent>
@@ -530,8 +539,12 @@ export default function PtwListPage() {
                                       </CarouselItem>
                                     ))}
                                   </CarouselContent>
-                                  <CarouselPrevious className="-left-4 h-6 w-6 rounded-sm" />
-                                  <CarouselNext className="-right-4 h-6 w-6 rounded-sm" />
+                                  {images.length > 2 && (
+                                    <>
+                                      <CarouselPrevious className="h-7 w-7 rounded-full -left-3 border-muted shadow-lg bg-background/80 backdrop-blur" />
+                                      <CarouselNext className="h-7 w-7 rounded-full -right-3 border-muted shadow-lg bg-background/80 backdrop-blur" />
+                                    </>
+                                  )}
                                 </Carousel>
                               </div>
                             )}
