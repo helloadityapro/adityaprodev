@@ -19,7 +19,6 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenuBadge,
-  SidebarContent,
 } from "@/components/ui/sidebar"
 
 export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendingPtwCount: number }) {
@@ -92,7 +91,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/admin/dashboard'} className="rounded-sm">
                 <Link href="/admin/dashboard">
                   <LayoutDashboard className="h-4 w-4" />
-                  <span className="font-medium">Admin Dashboard</span>
+                  <span className="font-medium">Dashboard</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -108,7 +107,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <SidebarMenuButton asChild tooltip="Teams" isActive={pathname === '/settings/teams'} className="rounded-sm">
                 <Link href="/settings/teams">
                   <Workflow className="h-4 w-4" />
-                  <span className="font-medium">Team Mapping</span>
+                  <span className="font-medium">Teams</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
