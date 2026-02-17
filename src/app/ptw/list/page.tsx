@@ -642,13 +642,13 @@ export default function PtwListPage() {
             <Carousel className="w-full h-full flex items-center justify-center" opts={{ startIndex: viewerImages.initialIndex }}>
               <CarouselContent className="h-full">
                 {viewerImages.images.map((img, idx) => (
-                  <CarouselItem key={idx} className="flex items-center justify-center h-full">
+                  <CarouselItem key={idx} className="flex items-center justify-center h-full w-full">
                     <img src={img.url} alt={img.name} className="max-w-full max-h-full object-contain shadow-2xl" />
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <CarouselPrevious className="left-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none rounded-sm" />
-              <CarouselNext className="right-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none rounded-sm" />
+              <CarouselPrevious className="left-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none rounded-full transition-all" />
+              <CarouselNext className="right-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none rounded-full transition-all" />
             </Carousel>
           )}
         </DialogContent>
