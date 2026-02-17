@@ -100,12 +100,10 @@
   .no-print {
     display: none !important;
   }
-  /* Remove scrollbars during print */
   body, html {
     overflow: visible !important;
     height: auto !important;
   }
-  /* Force background colors/images if needed for PDF export */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
