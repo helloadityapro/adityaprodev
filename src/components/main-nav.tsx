@@ -99,7 +99,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <SidebarMenuButton asChild tooltip="Users" isActive={pathname.startsWith('/settings/users')} className="rounded-sm">
                 <Link href="/settings/users">
                   <Users className="h-4 w-4" />
-                  <span className="font-medium">User Management</span>
+                  <span className="font-medium">Users</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
