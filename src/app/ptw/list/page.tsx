@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Map } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, arrayUnion } from "firebase/firestore";
@@ -141,6 +141,7 @@ export default function PtwListPage() {
   const [actionState, setActionState] = React.useState<{ permit: Permit, status: 'Approved' | 'Rejected' | 'ManagerApproved' } | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
+  const [viewerImages, setViewerImages] = React.useState<{ images: Attachment[], initialIndex: number } | null>(null);
 
   const { data: userProfile } = useDoc(useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]));
   const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com' || user?.email === 'khalil@adityagreenenergy.com' || user?.email === 'prafulrana143@gmail.com';
@@ -291,28 +292,28 @@ export default function PtwListPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-primary/5 border-primary/20 rounded-md">
+        <Card className="bg-primary/5 border-primary/20 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-primary">Total Permits</CardTitle>
             <FileText className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent><div className="text-2xl font-bold">{stats.total}</div></CardContent>
         </Card>
-        <Card className="bg-yellow-500/5 border-yellow-500/20 rounded-md">
+        <Card className="bg-yellow-500/5 border-yellow-500/20 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-yellow-600">Pending Actions</CardTitle>
             <Clock className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent><div className="text-2xl font-bold">{stats.pending}</div></CardContent>
         </Card>
-        <Card className="bg-green-500/5 border-green-500/20 rounded-md">
+        <Card className="bg-green-500/5 border-green-500/20 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-green-600">Fully Approved</CardTitle>
             <CircleCheck className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent><div className="text-2xl font-bold">{stats.approved}</div></CardContent>
         </Card>
-        <Card className="bg-destructive/5 border-destructive/20 rounded-md">
+        <Card className="bg-destructive/5 border-destructive/20 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-destructive">Rejected</CardTitle>
             <CircleX className="h-4 w-4 text-destructive" />
@@ -321,7 +322,7 @@ export default function PtwListPage() {
         </Card>
       </div>
 
-      <Card className="rounded-md">
+      <Card className="rounded-sm">
         <CardHeader className="flex flex-row items-center justify-between">
             <div className="space-y-1">
                 <CardTitle className="text-sm font-medium">Filter by Status</CardTitle>
@@ -339,7 +340,7 @@ export default function PtwListPage() {
         </CardHeader>
       </Card>
 
-      <Card className="overflow-hidden rounded-md">
+      <Card className="overflow-hidden rounded-sm">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -425,15 +426,14 @@ export default function PtwListPage() {
       </Dialog>
 
       <Dialog open={!!detailsPermit} onOpenChange={() => setDetailsPermit(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-none">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-none rounded-sm">
           <DialogHeader className="sr-only">
             <DialogTitle>Permit to Work Details: {detailsPermit?.serialNumber}</DialogTitle>
             <DialogDescription>Full overview of site, scope, location and submission history for permit {detailsPermit?.serialNumber}.</DialogDescription>
           </DialogHeader>
           
           <div id="printable-permit-area" className="bg-background">
-            {/* Minimalist Header */}
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4 flex items-center justify-between no-print">
+            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-6 py-4 flex items-center justify-between no-print">
               <div className="flex flex-col">
                 <span className="text-xl font-bold tracking-tight">Permit to Work Details</span>
                 <span className="text-xs font-mono text-primary font-semibold">{detailsPermit?.serialNumber}</span>
@@ -446,7 +446,6 @@ export default function PtwListPage() {
 
             {detailsPermit && (
               <div className="p-6 space-y-8">
-                {/* Summary Section */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="md:col-span-3 space-y-6">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
@@ -457,7 +456,7 @@ export default function PtwListPage() {
                     
                     <div className="space-y-2">
                       <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Scope of Work</Label>
-                      <div className="p-4 bg-muted/20 rounded-md border text-sm leading-relaxed whitespace-pre-wrap">{detailsPermit.descriptionOfWork}</div>
+                      <div className="p-4 bg-muted/20 rounded-sm border text-sm leading-relaxed whitespace-pre-wrap">{detailsPermit.descriptionOfWork}</div>
                     </div>
                   </div>
 
@@ -466,7 +465,7 @@ export default function PtwListPage() {
                     
                     <div className="space-y-2">
                       <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Submission Location</Label>
-                      <div className="p-3 bg-primary/5 rounded-md border border-primary/20 flex flex-col gap-2">
+                      <div className="p-3 bg-primary/5 rounded-sm border border-primary/20 flex flex-col gap-2">
                         {detailsPermit.latitude && detailsPermit.longitude ? (
                           <>
                             <div className="flex items-center justify-between">
@@ -491,7 +490,6 @@ export default function PtwListPage() {
 
                 <Separator />
 
-                {/* Documentation History - Sorted Descending (Newest First) */}
                 <div className="space-y-6">
                   <div className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase tracking-widest">Submission Documentation History</h3></div>
                   
@@ -503,7 +501,7 @@ export default function PtwListPage() {
                         const others = files.filter(f => !f.contentType.startsWith('image/') && !f.contentType.startsWith('video/'));
 
                         return (
-                          <div key={index} className="p-4 rounded-md border bg-muted/5 space-y-4">
+                          <div key={index} className="p-4 rounded-sm border bg-muted/5 space-y-4">
                             <div className="flex items-center justify-between">
                               <Badge variant="secondary" className="px-2 py-0.5 text-[10px] font-bold rounded-sm">Submission {index}</Badge>
                               <span className="text-[10px] text-muted-foreground italic">{index === "1" ? "Initial submission" : "Correction/Resubmission"}</span>
@@ -518,11 +516,9 @@ export default function PtwListPage() {
                                       <CarouselItem key={idx} className="md:basis-1/2">
                                         <Card className="overflow-hidden border group rounded-sm">
                                           <CardContent className="p-0 aspect-video relative flex items-center justify-center">
-                                            <img src={img.url} alt={img.name} className="object-cover w-full h-full" />
-                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                                              <Button variant="secondary" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 rounded-full" asChild>
-                                                <a href={img.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3 w-3" /></a>
-                                              </Button>
+                                            <img src={img.url} alt={img.name} className="object-cover w-full h-full cursor-pointer" onClick={() => setViewerImages({ images, initialIndex: idx })} />
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center pointer-events-none">
+                                              <Maximize2 className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </div>
                                           </CardContent>
                                         </Card>
@@ -573,17 +569,20 @@ export default function PtwListPage() {
                       })}
                     </div>
                   ) : (
-                    <div className="text-center p-8 bg-muted/10 rounded-md border border-dashed text-xs text-muted-foreground">No attachments provided.</div>
+                    <div className="text-center p-8 bg-muted/10 rounded-sm border border-dashed text-xs text-muted-foreground">No attachments provided.</div>
                   )}
                 </div>
 
                 <Separator />
 
-                {/* Activity Log - Sorted Descending (Newest First) */}
                 <div className="space-y-6">
                   <div className="flex items-center gap-2"><History className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase tracking-widest">Activity Log</h3></div>
                   <div className="space-y-0 relative border-l-2 border-muted ml-3 pl-6">
-                    {[...(detailsPermit.timeline || [])].reverse().map((entry, idx) => (
+                    {[...(detailsPermit.timeline || [])].sort((a, b) => {
+                      const dateA = a.timestamp?.toDate?.().getTime() || 0;
+                      const dateB = b.timestamp?.toDate?.().getTime() || 0;
+                      return dateB - dateA;
+                    }).map((entry, idx) => (
                       <div key={idx} className="relative pb-6">
                         <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
                         <div className="flex flex-col gap-1">
@@ -609,6 +608,31 @@ export default function PtwListPage() {
           <div className="p-4 border-t bg-muted/20 flex justify-end no-print">
             <DialogClose asChild><Button variant="outline" className="h-8 text-xs font-bold rounded-sm">Close</Button></DialogClose>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewerImages} onOpenChange={() => setViewerImages(null)}>
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Full Screen Document Viewer</DialogTitle>
+            <DialogDescription>Viewing images from submission in full size.</DialogDescription>
+          </DialogHeader>
+          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 hover:bg-white/10" onClick={() => setViewerImages(null)}>
+            <X className="h-6 w-6" />
+          </Button>
+          {viewerImages && (
+            <Carousel className="w-full h-full flex items-center justify-center" opts={{ startIndex: viewerImages.initialIndex }}>
+              <CarouselContent className="h-full">
+                {viewerImages.images.map((img, idx) => (
+                  <CarouselItem key={idx} className="flex items-center justify-center h-full">
+                    <img src={img.url} alt={img.name} className="max-w-full max-h-full object-contain shadow-2xl" />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="left-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none" />
+              <CarouselNext className="right-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none" />
+            </Carousel>
+          )}
         </DialogContent>
       </Dialog>
     </div>
