@@ -42,6 +42,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "hiddenPermitIds": {
+          "type": "array",
+          "description": "IDs of permits hidden by the user (Delete for me).",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [

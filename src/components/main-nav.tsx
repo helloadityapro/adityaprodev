@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -11,6 +12,7 @@ import {
   SlidersHorizontal,
   Workflow,
   MapPin,
+  ClipboardList,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -108,6 +110,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <Link href="/settings/teams">
                   <Workflow className="h-4 w-4" />
                   <span className="font-medium">Teams</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Manage Permits" isActive={pathname === '/settings/permits'} className="rounded-sm">
+                <Link href="/settings/permits">
+                  <ClipboardList className="h-4 w-4" />
+                  <span className="font-medium">Manage Permits</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

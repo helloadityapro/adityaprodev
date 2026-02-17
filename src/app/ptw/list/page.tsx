@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -156,12 +157,17 @@ export default function PtwListPage() {
 
   const permits = React.useMemo(() => {
     if (!allPermits || !userRole || !user) return [];
-    if (userRole === 'Admin') return allPermits;
+    
+    // Filter hidden permits for the current user
+    const hiddenIds = userProfile?.hiddenPermitIds || [];
+    const visiblePermits = allPermits.filter(p => !hiddenIds.includes(p.id));
+
+    if (userRole === 'Admin') return visiblePermits;
     if (userRole === 'Site Manager') {
-      return allPermits.filter(p => p.siteManagerId === user.uid || p.siteEngineerId === user.uid);
+      return visiblePermits.filter(p => p.siteManagerId === user.uid || p.siteEngineerId === user.uid);
     }
-    return allPermits.filter(p => p.siteEngineerId === user.uid);
-  }, [allPermits, userRole, user]);
+    return visiblePermits.filter(p => p.siteEngineerId === user.uid);
+  }, [allPermits, userRole, user, userProfile]);
 
   React.useEffect(() => {
     const viewId = searchParams.get('view');
@@ -454,7 +460,7 @@ export default function PtwListPage() {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Scope of Work</Label>
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Description of Work</Label>
                       <div className="p-4 bg-muted/20 rounded-sm border text-sm leading-relaxed whitespace-pre-wrap">{detailsPermit.descriptionOfWork}</div>
                     </div>
                   </div>
