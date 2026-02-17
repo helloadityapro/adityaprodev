@@ -114,14 +114,6 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Manage Permits" isActive={pathname === '/settings/permits'} className="rounded-sm">
-                <Link href="/settings/permits">
-                  <ClipboardList className="h-4 w-4" />
-                  <span className="font-medium">Manage Permits</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Settings" isActive={pathname.startsWith('/settings/dropdown-management')} className="rounded-sm">
                 <Link href="/settings/dropdown-management">
                   <SlidersHorizontal className="h-4 w-4" />
