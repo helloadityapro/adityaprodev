@@ -360,7 +360,7 @@ export default function AdminSettingsPage() {
         <TabsContent value="permits" className="space-y-6 animate-in fade-in-50 duration-300">
           <Card className="rounded-sm">
             <CardHeader>
-              <CardTitle>Manage Permit Records</CardTitle>
+              <CardTitle>Delete Permit Records</CardTitle>
               <CardDescription>Cleanup requests and manage administrative visibility across the entire platform.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
