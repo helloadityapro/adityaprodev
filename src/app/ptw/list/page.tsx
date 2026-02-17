@@ -635,7 +635,7 @@ export default function PtwListPage() {
             <DialogTitle>Full Screen Document Viewer</DialogTitle>
             <DialogDescription>Viewing images from submission in full size.</DialogDescription>
           </DialogHeader>
-          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 hover:bg-white/10 rounded-sm" onClick={() => setViewerImages(null)}>
+          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 bg-black/20 hover:bg-black/40 rounded-full shadow-sm" onClick={() => setViewerImages(null)}>
             <X className="h-6 w-6" />
           </Button>
           {viewerImages && (
@@ -647,8 +647,8 @@ export default function PtwListPage() {
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <CarouselPrevious className="left-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none rounded-full transition-all" />
-              <CarouselNext className="right-8 h-12 w-12 bg-white/10 text-white hover:bg-white/20 border-none rounded-full transition-all" />
+              <CarouselPrevious className="left-8 h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl border-none rounded-full transition-all flex items-center justify-center" />
+              <CarouselNext className="right-8 h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl border-none rounded-full transition-all flex items-center justify-center" />
             </Carousel>
           )}
         </DialogContent>
