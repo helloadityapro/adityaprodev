@@ -79,11 +79,11 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
     Pending: { 
       label: managerProfile ? `Pending with ${managerProfile.username}` : 'Pending Manager', 
       icon: Clock, 
-      className: 'bg-yellow-100 text-yellow-800 border-yellow-300' 
+      className: 'bg-yellow-100 text-yellow-800 border-yellow-200' 
     },
-    ManagerApproved: { label: 'Pending Admin', icon: Clock, className: 'bg-blue-100 text-blue-800 border-blue-300' },
-    Approved: { label: 'Approved', icon: CircleCheck, className: 'bg-green-100 text-green-800 border-green-300' },
-    Rejected: { label: 'Rejected', icon: CircleX, className: 'bg-red-100 text-red-800 border-red-300' },
+    ManagerApproved: { label: 'Pending Admin', icon: Clock, className: 'bg-blue-100 text-blue-800 border-blue-200' },
+    Approved: { label: 'Approved', icon: CircleCheck, className: 'bg-green-100 text-green-800 border-green-200' },
+    Rejected: { label: 'Rejected', icon: CircleX, className: 'bg-red-100 text-red-800 border-red-200' },
   };
   const config = statusConfig[permit.status] || statusConfig.Pending;
   const Icon = config.icon;
@@ -426,12 +426,17 @@ export default function PtwListPage() {
 
       <Dialog open={!!detailsPermit} onOpenChange={() => setDetailsPermit(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-none">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Permit to Work Details: {detailsPermit?.serialNumber}</DialogTitle>
+            <DialogDescription>Full overview of site, scope, location and submission history for permit {detailsPermit?.serialNumber}.</DialogDescription>
+          </DialogHeader>
+          
           <div id="printable-permit-area" className="bg-background">
             {/* Minimalist Header */}
             <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b px-6 py-4 flex items-center justify-between no-print">
               <div className="flex flex-col">
-                <DialogTitle className="text-xl font-bold tracking-tight">Permit to Work Details</DialogTitle>
-                <DialogDescription className="text-xs font-mono text-primary font-semibold">{detailsPermit?.serialNumber}</DialogDescription>
+                <span className="text-xl font-bold tracking-tight">Permit to Work Details</span>
+                <span className="text-xs font-mono text-primary font-semibold">{detailsPermit?.serialNumber}</span>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" className="h-8 text-xs font-bold rounded-sm" onClick={handlePrint}><Printer className="h-3.5 w-3.5 mr-1.5" /> Print</Button>
@@ -460,7 +465,7 @@ export default function PtwListPage() {
                     <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Status</Label><div><StatusBadge permit={detailsPermit} className="text-[10px] px-2" /></div></div>
                     
                     <div className="space-y-2">
-                      <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Location</Label>
+                      <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Submission Location</Label>
                       <div className="p-3 bg-primary/5 rounded-md border border-primary/20 flex flex-col gap-2">
                         {detailsPermit.latitude && detailsPermit.longitude ? (
                           <>
@@ -486,13 +491,13 @@ export default function PtwListPage() {
 
                 <Separator />
 
-                {/* Documentation History */}
+                {/* Documentation History - Sorted Descending (Newest First) */}
                 <div className="space-y-6">
-                  <div className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase tracking-widest">Documentation History</h3></div>
+                  <div className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase tracking-widest">Submission Documentation History</h3></div>
                   
                   {Object.keys(groupedAttachments).length > 0 ? (
                     <div className="space-y-8">
-                      {Object.entries(groupedAttachments).sort(([a], [b]) => Number(a) - Number(b)).map(([index, files]) => {
+                      {Object.entries(groupedAttachments).sort(([a], [b]) => Number(b) - Number(a)).map(([index, files]) => {
                         const images = files.filter(f => f.contentType.startsWith('image/'));
                         const videos = files.filter(f => f.contentType.startsWith('video/'));
                         const others = files.filter(f => !f.contentType.startsWith('image/') && !f.contentType.startsWith('video/'));
@@ -533,7 +538,7 @@ export default function PtwListPage() {
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                               {videos.map((vid, idx) => (
                                 <div key={idx} className="space-y-2">
-                                  <Label className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><Film className="h-3 w-3" /> Video</Label>
+                                  <Label className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><Film className="h-3 w-3" /> Video Preview</Label>
                                   <Card className="overflow-hidden group rounded-sm">
                                     <div className="aspect-video bg-black relative flex items-center justify-center">
                                       <video src={vid.url} className="w-full h-full object-contain" />
@@ -574,11 +579,11 @@ export default function PtwListPage() {
 
                 <Separator />
 
-                {/* Activity Log */}
+                {/* Activity Log - Sorted Descending (Newest First) */}
                 <div className="space-y-6">
                   <div className="flex items-center gap-2"><History className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase tracking-widest">Activity Log</h3></div>
                   <div className="space-y-0 relative border-l-2 border-muted ml-3 pl-6">
-                    {detailsPermit.timeline?.map((entry, idx) => (
+                    {[...(detailsPermit.timeline || [])].reverse().map((entry, idx) => (
                       <div key={idx} className="relative pb-6">
                         <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
                         <div className="flex flex-col gap-1">
