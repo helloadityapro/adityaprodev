@@ -246,7 +246,7 @@ export default function AdminSettingsPage() {
 
       <Tabs defaultValue="configuration" className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-8 rounded-sm max-w-md">
-          <TabsTrigger value="configuration" className="flex items-center gap-2 rounded-sm"><SlidersHorizontal className="h-4 w-4" /> Configuration</TabsTrigger>
+          <TabsTrigger value="configuration" className="flex items-center gap-2 rounded-sm"><SlidersHorizontal className="h-4 w-4" /> Manage</TabsTrigger>
           <TabsTrigger value="permits" className="flex items-center gap-2 rounded-sm"><ClipboardList className="h-4 w-4" /> Delete Permits</TabsTrigger>
         </TabsList>
 
