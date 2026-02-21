@@ -496,7 +496,7 @@ export default function RaisePtwPage() {
                   <div className="space-y-1">
                     <FormLabel className="text-sm font-semibold text-primary uppercase">Safety Undertaking</FormLabel>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      I, <strong>{userProfile?.username || 'user'}</strong>, hereby undertake that the work will be carried out safely as per company SOPs and PPE will be used at all times.
+                      I, <strong className="text-primary">{userProfile?.username || 'user'}</strong>, hereby undertake that the work will be carried out safely as per company SOPs and PPE will be used at all times.
                     </p>
                     <FormMessage />
                   </div>
