@@ -6,12 +6,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
-import AppLogo from "@/components/app-logo";
 import { MainNav } from "@/components/main-nav";
 import {
   SidebarProvider,
   Sidebar,
-  SidebarHeader,
   SidebarContent,
   SidebarInset,
   SidebarTrigger,
@@ -199,7 +197,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader><AppLogo /></SidebarHeader>
         <SidebarContent><MainNav userRole={userRole} pendingPtwCount={pendingPtwCount} /></SidebarContent>
       </Sidebar>
       <SidebarInset>
