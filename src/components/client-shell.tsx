@@ -13,6 +13,7 @@ import {
   SidebarContent,
   SidebarInset,
   SidebarTrigger,
+  SidebarHeader,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -197,6 +198,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <Sidebar>
+        <SidebarHeader className="px-6 py-4 border-b">
+          <span className="text-sm font-bold tracking-widest text-primary uppercase">Aditya Pro</span>
+        </SidebarHeader>
         <SidebarContent>
           <MainNav userRole={userRole} pendingPtwCount={pendingPtwCount} />
         </SidebarContent>
