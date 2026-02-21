@@ -1,6 +1,12 @@
 {
   "placeholderImages": [
     {
+      "id": "app-logo",
+      "description": "Aditya Green Energy Logo",
+      "imageUrl": "https://images.unsplash.com/photo-1620658646854-9122040d5710?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxzdW4lMjBsb2dvfGVufDB8fHx8MTc3MTY3NTEzOXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "sun logo"
+    },
+    {
       "id": "user-avatar-1",
       "description": "Avatar for Admin User",
       "imageUrl": "https://images.unsplash.com/photo-1530268729831-4b0b9e170218?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxwZXJzb24lMjBmYWNlfGVufDB8fHx8MTc2OTY1MDE3MHww&ixlib=rb-4.1.0&q=80&w=1080",
