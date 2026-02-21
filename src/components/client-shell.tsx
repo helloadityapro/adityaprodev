@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from "react";
@@ -86,21 +85,20 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (user && !isProfileLoading) {
       const isSuperAdmin = user.email && SUPER_ADMIN_EMAILS.includes(user.email);
-      const docMissing = !userProfile;
-      const roleMismatched = isSuperAdmin && (userProfile?.role !== 'Admin' || userProfile?.registrationRequest === true);
+      if (!isSuperAdmin) return;
+
+      const needsBootstrap = !userProfile || userProfile.role !== 'Admin' || userProfile.registrationRequest === true;
       
-      // ONLY bootstrap if it's a Super Admin who needs fixing or is missing.
-      // Regular users are handled by the RegisterPage to avoid race conditions and permission errors.
-      if (isSuperAdmin && (docMissing || roleMismatched)) {
+      if (needsBootstrap) {
         const updateData: any = {
           id: user.uid,
           email: user.email,
-          updatedAt: serverTimestamp(),
           role: 'Admin',
           registrationRequest: false,
+          updatedAt: serverTimestamp(),
         };
 
-        if (docMissing) {
+        if (!userProfile) {
           updateData.createdAt = serverTimestamp();
           updateData.username = user.displayName || user.email?.split('@')[0] || 'Admin';
           updateData.mobile = user.phoneNumber || 'N/A';
