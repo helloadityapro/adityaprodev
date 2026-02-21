@@ -87,7 +87,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       const isSuperAdmin = user.email && SUPER_ADMIN_EMAILS.includes(user.email);
       if (!isSuperAdmin) return;
 
-      const needsBootstrap = !userProfile || userProfile.role !== 'Admin' || userProfile.registrationRequest === true;
+      const needsBootstrap = !userProfile || userProfile.role !== 'Admin' || userProfile.registrationRequest === true || (user.email === 'khalil@adityagreenenergy.com' && userProfile.username !== 'Khalil Choudhary');
       
       if (needsBootstrap) {
         const updateData: any = {
@@ -98,9 +98,15 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           updatedAt: serverTimestamp(),
         };
 
+        if (user.email === 'khalil@adityagreenenergy.com') {
+          updateData.username = 'Khalil Choudhary';
+        }
+
         if (!userProfile) {
           updateData.createdAt = serverTimestamp();
-          updateData.username = user.displayName || user.email?.split('@')[0] || 'Admin';
+          if (user.email !== 'khalil@adityagreenenergy.com') {
+            updateData.username = user.displayName || user.email?.split('@')[0] || 'Admin';
+          }
           updateData.mobile = user.phoneNumber || 'N/A';
           updateData.assignedProjectIds = [];
         }
