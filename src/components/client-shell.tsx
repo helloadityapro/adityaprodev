@@ -13,13 +13,11 @@ import {
   SidebarContent,
   SidebarInset,
   SidebarTrigger,
-  SidebarHeader,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { UserNotifications } from "@/components/user-notifications";
 import { Loader2, Sun, Moon } from "lucide-react";
-import AppLogo from "@/components/app-logo";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
 
@@ -141,9 +139,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const notifications = React.useMemo(() => {
     if (!unsortedNotifications) return null;
     return [...unsortedNotifications].sort((a, b) => {
-        const dateA = a.createdAt?.toDate?.().getTime() || 0;
-        const dateB = b.createdAt?.toDate?.().getTime() || 0;
-        return dateB - dateA;
+      const dateA = a.createdAt?.toDate?.().getTime() || 0;
+      const dateB = b.createdAt?.toDate?.().getTime() || 0;
+      return dateB - dateA;
     });
   }, [unsortedNotifications]);
 
@@ -199,14 +197,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <Sidebar>
-        <SidebarHeader className="flex flex-row items-center gap-3 px-4 py-6 border-b border-sidebar-border bg-sidebar-accent/30">
-          <AppLogo iconClassName="h-10 w-10 shadow-none border-none bg-transparent" />
-          <div className="flex flex-col">
-            <span className="text-lg font-bold tracking-tight text-primary leading-tight">Aditya Pro</span>
-            <span className="text-[10px] uppercase font-bold text-muted-foreground/60 tracking-wider">Permit Portal</span>
-          </div>
-        </SidebarHeader>
-        <SidebarContent><MainNav userRole={userRole} pendingPtwCount={pendingPtwCount} /></SidebarContent>
+        <SidebarContent>
+          <MainNav userRole={userRole} pendingPtwCount={pendingPtwCount} />
+        </SidebarContent>
       </Sidebar>
       <SidebarInset>
         <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6 sticky top-0 z-10">
