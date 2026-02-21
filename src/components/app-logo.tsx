@@ -23,7 +23,6 @@ export default function AppLogo({ className }: { className?: string }) {
       </div>
       <div className="flex flex-col">
         <span className="font-headline text-lg font-bold tracking-tight text-foreground leading-none">Aditya Pro</span>
-        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary mt-1">Green Energy</span>
       </div>
     </div>
   );
