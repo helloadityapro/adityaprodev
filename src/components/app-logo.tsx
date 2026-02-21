@@ -9,20 +9,22 @@ export default function AppLogo({ className }: { className?: string }) {
   const logoData = PlaceHolderImages.find(img => img.id === 'app-logo');
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <div className="relative h-10 w-10 overflow-hidden rounded-sm">
+    <div className={cn("flex items-center gap-2 p-2", className)}>
+      <div className="relative h-12 w-12 overflow-hidden rounded-sm border-2 border-primary/20 shadow-lg shadow-primary/10">
         {logoData && (
           <Image
             src={logoData.imageUrl}
             alt="Aditya Logo"
-            width={40}
-            height={40}
-            className="object-contain"
+            fill
+            className="object-cover"
             data-ai-hint={logoData.imageHint}
           />
         )}
       </div>
-      <span className="font-headline text-xl font-bold tracking-tight">Aditya Pro</span>
+      <div className="flex flex-col">
+        <span className="font-headline text-lg font-bold tracking-tight text-foreground leading-none">Aditya Pro</span>
+        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary mt-1">Green Energy</span>
+      </div>
     </div>
   );
 }
