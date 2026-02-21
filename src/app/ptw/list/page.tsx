@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, arrayUnion } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, arrayUnion, getDocs } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -218,6 +218,7 @@ export default function PtwListPage() {
 
     updateDocumentNonBlocking(permitRef, updateData);
 
+    // Notify Engineer
     addDocumentNonBlocking(collection(firestore, 'notifications'), {
       userId: permit.siteEngineerId,
       title: "Permit Status Update",
@@ -225,6 +226,24 @@ export default function PtwListPage() {
       link: `/ptw/list?view=${permit.id}`,
       read: false,
       createdAt: serverTimestamp(),
+    });
+
+    // Notify Khalil
+    const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
+    getDocs(adminsQuery).then(snapshot => {
+      snapshot.forEach(adminDoc => {
+        // Don't notify Khalil twice if he is the one performing the action
+        if (adminDoc.id === user.uid) return;
+        
+        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+          userId: adminDoc.id,
+          title: "Permit Status Update",
+          description: `Permit ${permit.serialNumber} ("${permit.siteName}") status changed to ${targetStatus} by ${userRole}.`,
+          link: `/ptw/list?view=${permit.id}`,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      });
     });
 
     toast({ title: "Status Updated", description: `Permit marked as ${targetStatus}.` });
@@ -239,7 +258,7 @@ export default function PtwListPage() {
 
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" : <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
   const filteredPermits = React.useMemo(() => {

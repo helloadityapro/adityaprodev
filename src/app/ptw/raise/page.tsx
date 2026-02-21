@@ -285,6 +285,24 @@ export default function RaisePtwPage() {
         }
       }
 
+      // Notify Khalil for all Raise/Resubmission activities
+      const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
+      getDocs(adminsQuery).then(snapshot => {
+        snapshot.forEach(adminDoc => {
+          // Don't notify Khalil if he is the one raising it
+          if (adminDoc.id === user.uid) return;
+          
+          addDocumentNonBlocking(collection(firestore, 'notifications'), {
+            userId: adminDoc.id,
+            title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
+            description: `${userProfile.username || user.email} ${isCorrectionMode ? 'resubmitted' : 'raised'} permit ${serialNumber} for "${values.siteName}".`,
+            link: `/ptw/list?view=${permitId}`,
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        });
+      });
+
       if (isCorrectionMode) {
         permitData.attachments = arrayUnion(...newAttachments);
         permitData.timeline = arrayUnion(timelineEntry);
