@@ -40,6 +40,7 @@ type TimelineEntry = {
   timestamp: any;
   userId: string;
   userName: string;
+  userRole?: string;
   remarks: string;
   action: string;
   submissionIndex?: number;
@@ -199,6 +200,7 @@ export default function PtwListPage() {
       timestamp: new Date(),
       userId: user.uid,
       userName: userProfile.username || user.email || 'System',
+      userRole: userRole,
       remarks: remarks,
       action: targetStatus === 'Rejected' ? `Rejected by ${userRole}` : (targetStatus === 'ManagerApproved' ? 'Approved by Manager' : 'Final Approval by Admin'),
       submissionIndex: currentSubmission
@@ -627,7 +629,9 @@ export default function PtwListPage() {
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-primary">{entry.action}</span>
+                                <span className="text-xs font-bold text-primary">
+                                  {entry.action} — {entry.userName} ({entry.userRole || 'Site Engineer'})
+                                </span>
                                 {entry.submissionIndex && (
                                   <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-primary/30 rounded-sm">Subm {entry.submissionIndex}</Badge>
                                 )}

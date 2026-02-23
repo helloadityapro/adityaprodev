@@ -252,6 +252,7 @@ export default function RaisePtwPage() {
         timestamp: new Date(),
         userId: user.uid,
         userName: userProfile.username || user.email || 'Engineer',
+        userRole: userProfile.role || 'Site Engineer',
         remarks: values.commentsAndRemarks || (isCorrectionMode ? values.descriptionOfWork : "Permit raised."),
         action: isCorrectionMode ? `Resubmitted` : "Created",
         submissionIndex: currentSubmissionIndex
