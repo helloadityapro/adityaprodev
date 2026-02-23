@@ -290,7 +290,6 @@ export default function RaisePtwPage() {
       const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
       getDocs(adminsQuery).then(snapshot => {
         snapshot.forEach(adminDoc => {
-          // Don't notify Khalil if he is the one raising it
           if (adminDoc.id === user.uid) return;
           
           addDocumentNonBlocking(collection(firestore, 'notifications'), {

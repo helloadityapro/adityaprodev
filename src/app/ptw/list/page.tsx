@@ -146,7 +146,7 @@ export default function PtwListPage() {
 
   const { data: userProfile } = useDoc(useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]));
   const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com' || user?.email === 'khalil@adityagreenenergy.com' || user?.email === 'prafulrana143@gmail.com';
-  const userRole = isAdmin ? "Admin" : userProfile?.role;
+  const userRole = isAdmin ? "Admin" : (userProfile?.role || "Site Engineer");
 
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole || !user) return null;
@@ -630,7 +630,7 @@ export default function PtwListPage() {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-primary">
-                                  {entry.action} — {entry.userName} ({entry.userRole || 'Site Engineer'})
+                                  {entry.action} — {entry.userName} ({entry.userRole || 'Unknown Designation'})
                                 </span>
                                 {entry.submissionIndex && (
                                   <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-primary/30 rounded-sm">Subm {entry.submissionIndex}</Badge>
