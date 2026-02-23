@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, arrayUnion, getDocs } from "firebase/firestore";
+import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -73,8 +73,18 @@ type PtwType = {
 
 function StatusBadge({ permit, className }: { permit: Permit, className?: string }) {
   const firestore = useFirestore();
+  
+  // Fetch Manager Profile if status is Pending
   const managerRef = useMemoFirebase(() => (permit.status === 'Pending' && permit.siteManagerId) ? doc(firestore, 'users', permit.siteManagerId) : null, [firestore, permit.siteManagerId, permit.status]);
   const { data: managerProfile } = useDoc(managerRef);
+
+  // Fetch Admin Profile (Khalil) if status is ManagerApproved
+  const adminsQuery = useMemoFirebase(() => {
+    if (permit.status !== 'ManagerApproved') return null;
+    return query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'), limit(1));
+  }, [firestore, permit.status]);
+  const { data: adminDocs } = useCollection(adminsQuery);
+  const adminProfile = adminDocs?.[0];
 
   const statusConfig = {
     Pending: { 
@@ -82,7 +92,11 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
       icon: Clock, 
       className: 'bg-yellow-100 text-yellow-800 border-yellow-200' 
     },
-    ManagerApproved: { label: 'Pending Admin', icon: Clock, className: 'bg-blue-100 text-blue-800 border-blue-200' },
+    ManagerApproved: { 
+      label: adminProfile ? `Pending with ${adminProfile.username}` : 'Pending Admin', 
+      icon: Clock, 
+      className: 'bg-blue-100 text-blue-800 border-blue-200' 
+    },
     Approved: { label: 'Approved', icon: CircleCheck, className: 'bg-green-100 text-green-800 border-green-200' },
     Rejected: { label: 'Rejected', icon: CircleX, className: 'bg-red-100 text-red-800 border-red-200' },
   };
