@@ -630,7 +630,7 @@ export default function PtwListPage() {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-bold text-primary">
-                                  {entry.action} — {entry.userName} ({entry.userRole || 'Unknown Designation'})
+                                  {entry.action} — {entry.userName}
                                 </span>
                                 {entry.submissionIndex && (
                                   <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-primary/30 rounded-sm">Subm {entry.submissionIndex}</Badge>
