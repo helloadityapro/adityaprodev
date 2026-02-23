@@ -619,24 +619,54 @@ export default function PtwListPage() {
                       const dateA = a.timestamp?.toDate?.().getTime() || 0;
                       const dateB = b.timestamp?.toDate?.().getTime() || 0;
                       return dateB - dateA;
-                    }).map((entry, idx) => (
-                      <div key={idx} className="relative pb-6">
-                        <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-primary">{entry.action}</span>
-                              {entry.submissionIndex && (
-                                <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-primary/30 rounded-sm">Subm {entry.submissionIndex}</Badge>
-                              )}
+                    }).map((entry, idx) => {
+                      const entryFiles = detailsPermit.attachments?.filter(a => a.submissionIndex === entry.submissionIndex) || [];
+                      return (
+                        <div key={idx} className="relative pb-8">
+                          <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-primary">{entry.action}</span>
+                                {entry.submissionIndex && (
+                                  <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-primary/30 rounded-sm">Subm {entry.submissionIndex}</Badge>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(entry.timestamp)}</span>
                             </div>
-                            <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(entry.timestamp)}</span>
+                            <p className="text-sm italic leading-relaxed text-foreground/80">"{entry.remarks}"</p>
+                            <p className="text-[10px] font-semibold text-muted-foreground">— {entry.userName}</p>
+
+                            {entryFiles.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-2 no-print">
+                                {entryFiles.map((file, fIdx) => (
+                                  <div key={fIdx} className="group relative">
+                                    {file.contentType.startsWith('image/') ? (
+                                      <div 
+                                        className="h-10 w-10 rounded-sm border overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                                        onClick={() => setViewerImages({ images: [file], initialIndex: 0 })}
+                                      >
+                                        <img src={file.url} alt={file.name} className="h-full w-full object-cover" />
+                                      </div>
+                                    ) : (
+                                      <a 
+                                        href={file.url} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="h-10 w-10 rounded-sm border bg-muted/40 flex items-center justify-center hover:bg-muted transition-colors"
+                                        title={file.name}
+                                      >
+                                        {file.contentType.startsWith('video/') ? <Film className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-muted-foreground" />}
+                                      </a>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <p className="text-sm italic leading-relaxed text-foreground/80">"{entry.remarks}"</p>
-                          <p className="text-[10px] font-semibold text-muted-foreground">— {entry.userName}</p>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
