@@ -633,7 +633,7 @@ export default function PtwListPage() {
                                   {entry.action} — {entry.userName}
                                 </span>
                                 {entry.submissionIndex && (
-                                  <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-primary/30 rounded-sm">Subm {entry.submissionIndex}</Badge>
+                                  <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-primary/30 rounded-sm">Submission {entry.submissionIndex}</Badge>
                                 )}
                               </div>
                               <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(entry.timestamp)}</span>
