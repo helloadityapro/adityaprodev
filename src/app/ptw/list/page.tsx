@@ -200,9 +200,9 @@ export default function PtwListPage() {
       timestamp: new Date(),
       userId: user.uid,
       userName: userProfile.username || user.email || 'System',
-      userRole: userRole,
+      userRole: userProfile.role || userRole,
       remarks: remarks,
-      action: targetStatus === 'Rejected' ? `Rejected by ${userRole}` : (targetStatus === 'ManagerApproved' ? 'Approved by Manager' : 'Final Approval by Admin'),
+      action: targetStatus === 'Rejected' ? `Rejected by ${userProfile.role || userRole}` : (targetStatus === 'ManagerApproved' ? 'Approved by Manager' : 'Final Approval by Admin'),
       submissionIndex: currentSubmission
     };
 
@@ -240,7 +240,7 @@ export default function PtwListPage() {
         addDocumentNonBlocking(collection(firestore, 'notifications'), {
           userId: adminDoc.id,
           title: "Permit Status Update",
-          description: `Permit ${permit.serialNumber} ("${permit.siteName}") status changed to ${targetStatus} by ${userRole}.`,
+          description: `Permit ${permit.serialNumber} ("${permit.siteName}") status changed to ${targetStatus} by ${userProfile.role || userRole}.`,
           link: `/ptw/list?view=${permit.id}`,
           read: false,
           createdAt: serverTimestamp(),
