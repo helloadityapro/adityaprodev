@@ -211,14 +211,15 @@ export default function RaisePtwPage() {
         const endOfDay = new Date(); endOfDay.setHours(23,59,59,999);
 
         try {
-          // Global daily sequence (not per-user) to ensure unique numbering organization-wide
+          // Global daily sequence
           const qToday = query(
             collection(firestore, "permits_to_work"), 
             where("requestDate", ">=", Timestamp.fromDate(startOfDay)), 
             where("requestDate", "<=", Timestamp.fromDate(endOfDay))
           );
           const snapshotToday = await getDocs(qToday);
-          serialNumber = `AGEPL/PtW/${dateStr}/${String(snapshotToday.size + 1).padStart(2, '0')}`;
+          // Format: AGEPL/PtW/YYYY/MM/DD/Count
+          serialNumber = `AGEPL/PtW/${dateStr}/${snapshotToday.size + 1}`;
         } catch (e) {
           serialNumber = `AGEPL/PtW/${dateStr}/${Date.now().toString().slice(-4)}`;
         }
@@ -250,7 +251,7 @@ export default function RaisePtwPage() {
 
       const newAttachments = await Promise.all(processedFiles.map(file => uploadFile(file, `uploads/${user.uid}/${timestamp}-${file.name}`)));
       
-      // Determine new status based on who is submitting
+      // If a Manager or Admin is raising it, skip Level 1 approval
       const isEngineerRole = userProfile.role === 'Site Engineer';
       const targetStatus = isEngineerRole ? "Pending" : "ManagerApproved";
 
