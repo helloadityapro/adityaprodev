@@ -1,5 +1,4 @@
-
-'use client';
+"use client";
 
 import * as React from "react"
 import { useSearchParams } from "next/navigation"
@@ -26,6 +25,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -80,11 +80,7 @@ export default function RaisePtwPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-    const isAdmin = userProfile.role === 'Admin' ||
-      user?.email === 'abhijeet.agepl@gmail.com' ||
-      user?.email === 'abhijeetsb22@gmail.com' ||
-      user?.email === 'khalil@adityagreenenergy.com' ||
-      user?.email === 'prafulrana143@gmail.com';
+    const isAdmin = isSuperAdmin(user?.email) || userProfile.role === 'Admin';
 
     if (isAdmin) {
       return Array.from(new Map(allSites.map(site => [site.name, site])).values());
@@ -213,7 +209,13 @@ export default function RaisePtwPage() {
         const endOfDay = new Date(); endOfDay.setHours(23,59,59,999);
 
         try {
-          const qToday = query(collection(firestore, "permits_to_work"), where("requestDate", ">=", Timestamp.fromDate(startOfDay)), where("requestDate", "<=", Timestamp.fromDate(endOfDay)));
+          // Count only current user's permits today to ensure listing permission matches security rules
+          const qToday = query(
+            collection(firestore, "permits_to_work"), 
+            where("requestDate", ">=", Timestamp.fromDate(startOfDay)), 
+            where("requestDate", "<=", Timestamp.fromDate(endOfDay)),
+            where("siteEngineerId", "==", user.uid)
+          );
           const snapshotToday = await getDocs(qToday);
           serialNumber = `AGEPL/PtW/${dateStr}/${String(snapshotToday.size + 1).padStart(2, '0')}`;
         } catch (e) {
@@ -426,11 +428,23 @@ export default function RaisePtwPage() {
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={siteSearchQuery} onChange={(e) => setSiteSearchQuery(e.target.value)} />
+                          <Input 
+                            placeholder="Search sites..." 
+                            className="h-9 w-full border-none focus-visible:ring-0 px-0" 
+                            value={siteSearchQuery} 
+                            onChange={(e) => setSiteSearchQuery(e.target.value)} 
+                            onKeyDown={(e) => e.stopPropagation()}
+                          />
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredAccessibleSites.length > 0 ? filteredAccessibleSites.map((site) => (
-                            <Button key={site.id} variant="ghost" className="w-full justify-start font-normal text-left" onClick={() => { field.onChange(site.name); setSelectedSite(site); setIsSitePopoverOpen(false); }}>
+                            <Button 
+                              key={site.id} 
+                              type="button"
+                              variant="ghost" 
+                              className="w-full justify-start font-normal text-left" 
+                              onClick={() => { field.onChange(site.name); setSelectedSite(site); setIsSitePopoverOpen(false); }}
+                            >
                               <Check className={cn("mr-2 h-4 w-4 shrink-0", site.name === field.value ? "opacity-100" : "opacity-0")} />
                               <span className="truncate">{site.name}</span>
                             </Button>
@@ -459,11 +473,23 @@ export default function RaisePtwPage() {
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input placeholder="Search types..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={ptwTypeSearchQuery} onChange={(e) => setPtwTypeSearchQuery(e.target.value)} />
+                          <Input 
+                            placeholder="Search types..." 
+                            className="h-9 w-full border-none focus-visible:ring-0 px-0" 
+                            value={ptwTypeSearchQuery} 
+                            onChange={(e) => setPtwTypeSearchQuery(e.target.value)} 
+                            onKeyDown={(e) => e.stopPropagation()}
+                          />
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredPtwTypesList.map((type) => (
-                            <Button key={type.id} variant="ghost" className="w-full justify-start font-normal text-left" onClick={() => { field.onChange(type.name); setIsPtwTypePopoverOpen(false); }}>
+                            <Button 
+                              key={type.id} 
+                              type="button"
+                              variant="ghost" 
+                              className="w-full justify-start font-normal text-left" 
+                              onClick={() => { field.onChange(type.name); setIsPtwTypePopoverOpen(false); }}
+                            >
                               <Check className={cn("mr-2 h-4 w-4 shrink-0", type.name === field.value ? "opacity-100" : "opacity-0")} />
                               <span className="truncate">{type.name}</span>
                             </Button>

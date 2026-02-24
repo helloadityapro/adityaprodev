@@ -43,7 +43,7 @@ service cloud.firestore {
     }
 
     match /projects/{projectId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /sites/{siteId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /sites/{siteId} { allow read: if isSignedIn(); allow write: if isAdmin() || isSiteManager(); }
     match /ptw_types/{ptwTypeId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /notifications/{notifId} { allow read, write: if isSignedIn(); }
   }

@@ -1,9 +1,8 @@
-
-'use client';
+"use client";
 
 import * as React from "react";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, doc, query, where } from "firebase/firestore";
+import { collection, doc, query, where, or } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { History, Clock, User, MapPin, FileText, ArrowRight, Eye } from "lucide-react";
@@ -20,6 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 type TimelineEntry = {
   status: string;
@@ -51,34 +51,30 @@ export default function PtwActivitiesPage() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  const { data: userProfile } = useDoc(useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]));
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
   
-  const isAdmin = userProfile?.role === "Admin" || 
-                  user?.email === 'abhijeet.agepl@gmail.com' || 
-                  user?.email === 'abhijeetsb22@gmail.com' ||
-                  user?.email === 'khalil@adityagreenenergy.com' ||
-                  user?.email === 'prafulrana143@gmail.com';
-  
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
   const userRole = isAdmin ? "Admin" : (userProfile?.role || "Site Engineer");
 
-  const permitsQuery = useMemoFirebase(() => collection(firestore, 'permits_to_work'), [firestore]);
+  const permitsQuery = useMemoFirebase(() => {
+    if (!userRole || !user || isProfileLoading) return null;
+    const colRef = collection(firestore, 'permits_to_work');
+    if (userRole === 'Admin') return colRef;
+    if (userRole === 'Site Manager') {
+      return query(colRef, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)));
+    }
+    return query(colRef, where('siteEngineerId', '==', user.uid));
+  }, [firestore, userRole, user, isProfileLoading]);
+
   const { data: allPermits, isLoading } = useCollection<Permit>(permitsQuery);
 
   const activities = React.useMemo(() => {
-    if (!allPermits || !userRole || !user) return [];
-
-    // Filter permits based on role
-    const visiblePermits = allPermits.filter(p => {
-      if (userRole === 'Admin') return true;
-      if (userRole === 'Site Manager') {
-        return p.siteManagerId === user.uid || p.siteEngineerId === user.uid;
-      }
-      return p.siteEngineerId === user.uid;
-    });
+    if (!allPermits) return [];
 
     // Flatten timeline entries
     const flattened: any[] = [];
-    visiblePermits.forEach(permit => {
+    allPermits.forEach(permit => {
       if (permit.timeline) {
         permit.timeline.forEach(entry => {
           flattened.push({
@@ -98,9 +94,9 @@ export default function PtwActivitiesPage() {
       const dateB = b.timestamp?.toDate?.()?.getTime() || (typeof b.timestamp === 'string' ? new Date(b.timestamp).getTime() : 0);
       return dateB - dateA;
     });
-  }, [allPermits, userRole, user]);
+  }, [allPermits]);
 
-  if (isLoading) {
+  if (isLoading || isProfileLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-9 w-64" />

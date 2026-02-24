@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -10,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs } from "firebase/firestore";
+import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs, or } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +25,7 @@ import {
   CarouselNext, 
   CarouselPrevious 
 } from "@/components/ui/carousel";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 type Attachment = { 
   url: string; 
@@ -158,35 +158,28 @@ export default function PtwListPage() {
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
   const [viewerImages, setViewerImages] = React.useState<{ images: Attachment[], initialIndex: number } | null>(null);
 
-  const { data: userProfile } = useDoc(useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]));
-  const isAdmin = userProfile?.role === "Admin" || user?.email === 'abhijeet.agepl@gmail.com' || user?.email === 'abhijeetsb22@gmail.com' || user?.email === 'khalil@adityagreenenergy.com' || user?.email === 'prafulrana143@gmail.com';
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
   const userRole = isAdmin ? "Admin" : (userProfile?.role || "Site Engineer");
 
   const permitsQuery = useMemoFirebase(() => {
-    if (!userRole || !user) return null;
-    return collection(firestore, 'permits_to_work');
-  }, [firestore, userRole, user]);
-
-  const { data: allPermits, isLoading } = useCollection<Permit>(permitsQuery);
-  const { data: ptwTypes } = useCollection<PtwType>(useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]));
-
-  const permits = React.useMemo(() => {
-    if (!allPermits || !userRole || !user) return [];
-    
-    // Filter hidden permits for the current user
-    const hiddenIds = userProfile?.hiddenPermitIds || [];
-    const visiblePermits = allPermits.filter(p => !hiddenIds.includes(p.id));
-
-    if (userRole === 'Admin') return visiblePermits;
+    if (!userRole || !user || isProfileLoading) return null;
+    const colRef = collection(firestore, 'permits_to_work');
+    if (userRole === 'Admin') return colRef;
     if (userRole === 'Site Manager') {
-      return visiblePermits.filter(p => p.siteManagerId === user.uid || p.siteEngineerId === user.uid);
+      return query(colRef, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)));
     }
-    return visiblePermits.filter(p => p.siteEngineerId === user.uid);
-  }, [allPermits, userRole, user, userProfile]);
+    return query(colRef, where('siteEngineerId', '==', user.uid));
+  }, [firestore, userRole, user, isProfileLoading]);
+
+  const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
+  const { data: ptwTypes } = useCollection<PtwType>(useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]));
 
   React.useEffect(() => {
     const viewId = searchParams.get('view');
-    if (viewId && permits.length > 0) {
+    if (viewId && permits && permits.length > 0) {
       const permit = permits.find(p => p.id === viewId);
       if (permit) {
         setDetailsPermit(permit);
@@ -279,13 +272,17 @@ export default function PtwListPage() {
 
   const filteredPermits = React.useMemo(() => {
     if (!permits) return [];
+    
+    const hiddenIds = userProfile?.hiddenPermitIds || [];
+    
     return permits.filter(p => {
+      if (hiddenIds.includes(p.id)) return false;
       const matchStatus = statusFilter === 'all' ? true : p.status === statusFilter;
       return matchStatus;
     }).sort((a, b) => {
       const { key, direction } = sortConfig;
-      let valA = a[key] || '';
-      let valB = b[key] || '';
+      let valA = (a[key] as any) || '';
+      let valB = (b[key] as any) || '';
       if (key === 'requestDate') {
         valA = a.requestDate?.toDate?.()?.getTime() || 0;
         valB = b.requestDate?.toDate?.()?.getTime() || 0;
@@ -294,7 +291,7 @@ export default function PtwListPage() {
       if (valA > valB) return direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [permits, statusFilter, sortConfig]);
+  }, [permits, statusFilter, sortConfig, userProfile]);
 
   const stats = React.useMemo(() => {
     if (!permits) return { total: 0, pending: 0, approved: 0, rejected: 0 };
@@ -322,7 +319,7 @@ export default function PtwListPage() {
     }, {} as Record<number, Attachment[]>);
   }, [detailsPermit]);
 
-  if (isLoading || !userRole) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
+  if (isLoading || isProfileLoading || !userRole) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   return (
     <div className="flex flex-col gap-6">
