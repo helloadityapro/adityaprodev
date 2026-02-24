@@ -1,21 +1,59 @@
+
 "use client";
 
 import * as React from "react";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, or } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ClipboardList, Search } from "lucide-react";
+import { ClipboardList, Search, Pencil, Trash2, Loader2 } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+
+type Requirement = {
+  id: string;
+  siteName: string;
+  description: string;
+  status: string;
+  userId: string;
+  userName: string;
+  siteManagerId: string | null;
+  createdAt: any;
+};
 
 export default function RequirementListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [editingReq, setEditingReq] = React.useState<Requirement | null>(null);
+  const [deletingReq, setDeletingReq] = React.useState<Requirement | null>(null);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc(userProfileRef);
@@ -27,7 +65,6 @@ export default function RequirementListPage() {
     if (!user || !userProfile) return null;
     const colRef = collection(firestore, 'requirements');
     
-    // We remove the server-side orderBy to avoid the need for composite indexes in prototyping
     if (isAdmin) return colRef;
     
     if (isManager) {
@@ -40,25 +77,41 @@ export default function RequirementListPage() {
     return query(colRef, where('userId', '==', user.uid));
   }, [firestore, user, userProfile, isAdmin, isManager]);
 
-  const { data: requirements, isLoading: reqsLoading } = useCollection(requirementsQuery);
+  const { data: requirements, isLoading: reqsLoading } = useCollection<Requirement>(requirementsQuery);
 
   const sortedAndFilteredReqs = React.useMemo(() => {
     if (!requirements) return [];
     
-    // Search Filter
     let result = requirements.filter(req => 
       req.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (req.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.description.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Client-side Sorting (Desc by createdAt)
     return result.sort((a, b) => {
         const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
         const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
     });
   }, [requirements, searchTerm]);
+
+  const handleDelete = () => {
+    if (!deletingReq) return;
+    deleteDocumentNonBlocking(doc(firestore, 'requirements', deletingReq.id));
+    toast({ title: "Deleted", description: "Requirement request has been removed." });
+    setDeletingReq(null);
+  };
+
+  const handleEditSave = () => {
+    if (!editingReq || !editingReq.description.trim()) return;
+    setIsSaving(true);
+    updateDocumentNonBlocking(doc(firestore, 'requirements', editingReq.id), {
+        description: editingReq.description
+    });
+    toast({ title: "Updated", description: "Requirement details updated." });
+    setIsSaving(false);
+    setEditingReq(null);
+  };
 
   return (
     <div className="space-y-8">
@@ -101,6 +154,7 @@ export default function RequirementListPage() {
                   <TableHead>User</TableHead>
                   <TableHead>Requirement</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -119,6 +173,20 @@ export default function RequirementListPage() {
                             {req.status || 'Pending'}
                         </Badge>
                     </TableCell>
+                    <TableCell className="text-right px-6">
+                        <div className="flex justify-end items-center gap-1">
+                            {req.userId === user?.uid && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setEditingReq(req)}>
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                            )}
+                            {(req.userId === user?.uid || req.siteManagerId === user?.uid || isAdmin) && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingReq(req)}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            )}
+                        </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -130,6 +198,51 @@ export default function RequirementListPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingReq} onOpenChange={(o) => !o && setEditingReq(null)}>
+        <DialogContent className="rounded-sm max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Edit Requirement Request</DialogTitle>
+                <DialogDescription>Modify your material or resource request for {editingReq?.siteName}.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label>Requirement Details</Label>
+                    <Textarea 
+                        rows={8} 
+                        value={editingReq?.description || ""} 
+                        onChange={(e) => setEditingReq(prev => prev ? { ...prev, description: e.target.value } : null)} 
+                    />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingReq(null)} disabled={isSaving}>Cancel</Button>
+                <Button onClick={handleEditSave} disabled={isSaving || !editingReq?.description.trim()}>
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Update Request
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deletingReq} onOpenChange={(o) => !o && setDeletingReq(null)}>
+        <AlertDialogContent className="rounded-sm">
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This will permanently delete your requirement request for <strong>{deletingReq?.siteName}</strong>.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Delete Permanently
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

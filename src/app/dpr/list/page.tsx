@@ -1,20 +1,58 @@
+
 "use client";
 
 import * as React from "react";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, or } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { FileText, Search } from "lucide-react";
+import { FileText, Search, Pencil, Trash2, Loader2 } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+
+type DPR = {
+  id: string;
+  siteName: string;
+  reportDate: string;
+  description: string;
+  userId: string;
+  userName: string;
+  siteManagerId: string | null;
+  createdAt: any;
+};
 
 export default function DPRListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [editingDpr, setEditingDpr] = React.useState<DPR | null>(null);
+  const [deletingDpr, setDeletingDpr] = React.useState<DPR | null>(null);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc(userProfileRef);
@@ -26,7 +64,6 @@ export default function DPRListPage() {
     if (!user || !userProfile) return null;
     const colRef = collection(firestore, 'dprs');
     
-    // We remove the server-side orderBy to avoid the need for composite indexes in prototyping
     if (isAdmin) return colRef;
     
     if (isManager) {
@@ -39,25 +76,42 @@ export default function DPRListPage() {
     return query(colRef, where('userId', '==', user.uid));
   }, [firestore, user, userProfile, isAdmin, isManager]);
 
-  const { data: dprs, isLoading: dprsLoading } = useCollection(dprsQuery);
+  const { data: dprs, isLoading: dprsLoading } = useCollection<DPR>(dprsQuery);
 
   const sortedAndFilteredDprs = React.useMemo(() => {
     if (!dprs) return [];
     
-    // Search Filter
     let result = dprs.filter(dpr => 
       dpr.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (dpr.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       dpr.description.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Client-side Sorting (Desc by reportDate/createdAt)
     return result.sort((a, b) => {
-        const dateA = new Date(a.reportDate || a.createdAt?.toDate?.() || 0).getTime();
-        const dateB = new Date(b.reportDate || b.createdAt?.toDate?.() || 0).getTime();
+        const dateA = new Date(a.reportDate || (a.createdAt?.toDate?.() || 0)).getTime();
+        const dateB = new Date(b.reportDate || (b.createdAt?.toDate?.() || 0)).getTime();
         return dateB - dateA;
     });
   }, [dprs, searchTerm]);
+
+  const handleDelete = () => {
+    if (!deletingDpr) return;
+    deleteDocumentNonBlocking(doc(firestore, 'dprs', deletingDpr.id));
+    toast({ title: "Deleted", description: "Report has been removed." });
+    setDeletingDpr(null);
+  };
+
+  const handleEditSave = () => {
+    if (!editingDpr || !editingDpr.description.trim()) return;
+    setIsSaving(true);
+    updateDocumentNonBlocking(doc(firestore, 'dprs', editingDpr.id), {
+        description: editingDpr.description,
+        reportDate: editingDpr.reportDate
+    });
+    toast({ title: "Updated", description: "Report has been updated successfully." });
+    setIsSaving(false);
+    setEditingDpr(null);
+  };
 
   return (
     <div className="space-y-8">
@@ -99,6 +153,7 @@ export default function DPRListPage() {
                   <TableHead>Site</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Update</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -110,6 +165,20 @@ export default function DPRListPage() {
                     <TableCell className="font-semibold">{dpr.siteName}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{dpr.userName || '—'}</TableCell>
                     <TableCell className="text-sm italic text-muted-foreground max-w-md">"{dpr.description}"</TableCell>
+                    <TableCell className="text-right px-6">
+                        <div className="flex justify-end items-center gap-1">
+                            {dpr.userId === user?.uid && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setEditingDpr(dpr)}>
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                            )}
+                            {(dpr.userId === user?.uid || dpr.siteManagerId === user?.uid || isAdmin) && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingDpr(dpr)}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            )}
+                        </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -121,6 +190,55 @@ export default function DPRListPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingDpr} onOpenChange={(o) => !o && setEditingDpr(null)}>
+        <DialogContent className="rounded-sm max-w-lg">
+            <DialogHeader>
+                <DialogTitle>Edit Daily Progress Report</DialogTitle>
+                <DialogDescription>Update the details for your site report at {editingDpr?.siteName}.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label>Report Date</Label>
+                    <Input type="date" value={editingDpr?.reportDate || ""} onChange={(e) => setEditingDpr(prev => prev ? { ...prev, reportDate: e.target.value } : null)} />
+                </div>
+                <div className="space-y-2">
+                    <Label>Today's Update</Label>
+                    <Textarea 
+                        rows={6} 
+                        value={editingDpr?.description || ""} 
+                        onChange={(e) => setEditingDpr(prev => prev ? { ...prev, description: e.target.value } : null)} 
+                    />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingDpr(null)} disabled={isSaving}>Cancel</Button>
+                <Button onClick={handleEditSave} disabled={isSaving || !editingDpr?.description.trim()}>
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Changes
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deletingDpr} onOpenChange={(o) => !o && setDeletingDpr(null)}>
+        <AlertDialogContent className="rounded-sm">
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the progress report for <strong>{deletingDpr?.siteName}</strong> on {deletingDpr?.reportDate}.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Delete Permanently
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
