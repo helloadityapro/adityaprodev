@@ -3,7 +3,7 @@
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, or } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, or, and } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import { MainNav } from "@/components/main-nav";
 import {
@@ -120,10 +120,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     
     if (userRole === 'Site Manager') {
       // Must filter to match security rules: Manager sees their own + mapped team data
+      // FIXED: Use and() to wrap multiple top-level filters
       return query(
         colRef, 
-        where('status', '==', 'Pending'),
-        or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid))
+        and(
+          where('status', '==', 'Pending'),
+          or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid))
+        )
       );
     }
     
