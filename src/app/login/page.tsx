@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import AppLogo from "@/components/app-logo"
 import { useAuth, useUser } from "@/firebase"
 import { signInWithEmailAndPassword } from "firebase/auth"
 import { useToast } from "@/hooks/use-toast"
@@ -47,7 +46,6 @@ export default function LoginPage() {
   const onSubmit = async (values: z.infer<typeof loginSchema>) => {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      // The useEffect above will handle the redirect once the auth state updates
     } catch (error: any) {
       let description = "An unexpected error occurred during login.";
       if (error.code === 'auth/invalid-credential') {
@@ -68,13 +66,10 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="mx-auto w-full max-w-sm animate-in fade-in zoom-in-95 duration-300">
-        <CardHeader className="text-center">
-          <div className="mb-4 flex justify-center">
-            <AppLogo />
-          </div>
-          <CardTitle className="text-2xl font-headline">Login</CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account
+        <CardHeader className="text-center pb-8 pt-10">
+          <CardTitle className="text-3xl font-bold tracking-tight text-primary">Aditya Pro</CardTitle>
+          <CardDescription className="mt-2">
+            Login to your account
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -102,9 +97,9 @@ export default function LoginPage() {
                         <FormLabel>Password</FormLabel>
                         <Link
                           href="/forgot-password"
-                          className="ml-auto inline-block text-sm underline"
+                          className="ml-auto inline-block text-sm underline text-muted-foreground"
                         >
-                          Forgot your password?
+                          Forgot password?
                         </Link>
                       </div>
                     <FormControl>
@@ -130,14 +125,14 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              <Button type="submit" className="w-full h-11" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? 'Logging in...' : 'Login'}
               </Button>
             </form>
           </Form>
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-6 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
-            <Link href="/register" className="underline font-medium">
+            <Link href="/register" className="underline font-medium text-primary">
               Sign up
             </Link>
           </div>

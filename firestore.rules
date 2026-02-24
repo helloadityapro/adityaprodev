@@ -1,116 +1,69 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --------------------------------
-    // Helper Functions
-    // --------------------------------
 
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
     function isAdmin() {
-      // Super Admin whitelist
       let superAdminEmails = [
         'abhijeet.agepl@gmail.com',
         'abhijeetsb22@gmail.com',
         'khalil@adityagreenenergy.com',
         'prafulrana143@gmail.com'
       ];
-      
-      let isSuperAdminEmail = isSignedIn() && request.auth.token.email in superAdminEmails;
-      
-      if (isSuperAdminEmail) {
-        return true;
-      }
-
-      // Fallback to Firestore role check
-      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return isSignedIn() && exists(userPath) && get(userPath).data.role == 'Admin';
+      return isSignedIn() && (request.auth.token.email in superAdminEmails || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin');
     }
 
     function isSiteManager() {
-        let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-        return isSignedIn() && exists(userPath) && get(userPath).data.role == 'Site Manager';
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Site Manager';
     }
-
-    function isSiteEngineer() {
-        let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-        return isSignedIn() && exists(userPath) && get(userPath).data.role == 'Site Engineer';
-    }
-
-    function canCreateOwnUser(userId) {
-      return isOwner(userId) && request.resource.data.id == userId;
-    }
-
-    function canUpdateOwnUser() {
-      let resourceData = resource.data;
-      let isChangingProtectedFields = request.resource.data.id != resourceData.id
-                                      || request.resource.data.role != resourceData.role
-                                      || request.resource.data.registrationRequest != resourceData.registrationRequest;
-      return !isChangingProtectedFields;
-    }
-
-    // --------------------------------
-    // Collection Rules
-    // --------------------------------
 
     match /users/{userId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn(); 
-      allow create: if canCreateOwnUser(userId) || isAdmin();
-      allow update: if (isOwner(userId) && canUpdateOwnUser()) 
-                    || isAdmin()
-                    || (isSiteManager() && resource.data.siteManagerId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedProjectIds']));
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
     }
 
-    match /projects/{projectId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    match /sites/{siteId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-    
-    match /ptw_types/{ptwTypeId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
     match /permits_to_work/{permitId} {
-      // RBAC: Engineers see theirs, Managers see theirs + their team's, Admins see all
       allow read: if isSignedIn() && (
         isAdmin() || 
         resource.data.siteEngineerId == request.auth.uid || 
         resource.data.siteManagerId == request.auth.uid
       );
-
-      allow create: if (isSiteEngineer() || isSiteManager() || isAdmin()) &&
-                       request.resource.data.siteEngineerId == request.auth.uid &&
-                       request.resource.data.status == 'Pending';
-
-      allow update: if isSignedIn() && resource != null && (
-        isAdmin() ||
-        (isSiteManager() && request.auth.uid == resource.data.siteManagerId) ||
-        (isSiteEngineer() && request.auth.uid == resource.data.siteEngineerId && resource.data.status == 'Rejected')
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.siteEngineerId == request.auth.uid || 
+        resource.data.siteManagerId == request.auth.uid
       );
-      
       allow delete: if isAdmin();
     }
 
-    match /notifications/{notificationId} {
-      allow get: if isSignedIn() && 'userId' in resource.data && resource.data.userId == request.auth.uid;
-      allow list: if isSignedIn() && query.limit <= 100; 
-      allow update: if isSignedIn() && 'userId' in resource.data && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn();
+    match /dprs/{dprId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.userId == request.auth.uid || 
+        resource.data.siteManagerId == request.auth.uid
+      );
+      allow write: if isSignedIn();
     }
+
+    match /requirements/{requirementId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.userId == request.auth.uid || 
+        resource.data.siteManagerId == request.auth.uid
+      );
+      allow write: if isSignedIn();
+    }
+
+    match /projects/{projectId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /sites/{siteId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /ptw_types/{ptwTypeId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /notifications/{notifId} { allow read, write: if isSignedIn(); }
   }
 }

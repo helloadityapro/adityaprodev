@@ -7,407 +7,83 @@
       "type": "object",
       "description": "Represents a user in the PermitFlow application.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user."
-        },
-        "username": {
-          "type": "string",
-          "description": "The username of the user."
-        },
-        "email": {
-          "type": "string",
-          "description": "The email address of the user.",
-          "format": "email"
-        },
-        "mobile": {
-          "type": "string",
-          "description": "The mobile phone number of the user."
-        },
-        "role": {
-          "type": "string",
-          "description": "The role of the user (Admin, Site Manager, Site Engineer)."
-        },
-        "registrationRequest": {
-          "type": "boolean",
-          "description": "Indicates whether the user's registration request is pending approval."
-        },
-        "siteManagerId": {
-          "type": "string",
-          "description": "Reference to the Site Manager this Site Engineer is assigned to. (Only for Site Engineer role)"
-        },
-        "assignedProjectIds": {
-          "type": "array",
-          "description": "References to Projects assigned to the user. (Relationship: User N:N Project)",
-          "items": {
-            "type": "string"
-          }
-        },
-        "hiddenPermitIds": {
-          "type": "array",
-          "description": "IDs of permits hidden by the user (Delete for me).",
-          "items": {
-            "type": "string"
-          }
-        }
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "mobile": { "type": "string" },
+        "role": { "type": "string" },
+        "registrationRequest": { "type": "boolean" },
+        "siteManagerId": { "type": "string" },
+        "assignedProjectIds": { "type": "array", "items": { "type": "string" } },
+        "hiddenPermitIds": { "type": "array", "items": { "type": "string" } }
       },
-      "required": [
-        "id",
-        "username",
-        "email",
-        "mobile",
-        "role"
-      ]
+      "required": ["id", "username", "email", "mobile", "role"]
     },
-    "Project": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Project",
+    "DPR": {
+      "title": "Daily Progress Report",
       "type": "object",
-      "description": "Represents a project in the PermitFlow application.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the project."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the project."
-        },
-        "description": {
-          "type": "string",
-          "description": "A description of the project."
-        }
+        "id": { "type": "string" },
+        "siteName": { "type": "string" },
+        "reportDate": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "userId": { "type": "string" },
+        "siteManagerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["siteName", "reportDate", "description", "userId"]
     },
-    "Site": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Site",
+    "Requirement": {
+      "title": "Site Requirement",
       "type": "object",
-      "description": "Represents a site managed by admins, used in dropdowns.",
       "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the site (Project name)."
-        },
-        "projectCompany": {
-          "type": "string",
-          "description": "The company associated with the project."
-        },
-        "acCapacity": {
-          "type": "string",
-          "description": "The AC capacity of the site."
-        },
-        "dcCapacity": {
-          "type": "string",
-          "description": "The DC capacity of the site."
-        }
+        "id": { "type": "string" },
+        "siteName": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Fulfilled"] },
+        "userId": { "type": "string" },
+        "siteManagerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "name"
-      ]
-    },
-    "PtwType": {
-      "title": "Ptw Type",
-      "type": "object",
-      "description": "Represents a type of Permit to Work, used in dropdowns.",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the PTW type."
-        },
-        "allowedApproverIds": {
-          "type": "array",
-          "description": "IDs of users (Managers/Admins) authorized to approve this type.",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "name"
-      ]
+      "required": ["siteName", "description", "userId"]
     },
     "PermitToWork": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "PermitToWork",
       "type": "object",
-      "description": "Represents a Permit to Work request.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the permit to work request."
-        },
-        "serialNumber": {
-          "type": "string",
-          "description": "Auto-generated human-readable serial number for the permit."
-        },
-        "siteName": {
-          "type": "string",
-          "description": "The name of the site."
-        },
-        "ptwType": {
-          "type": "string",
-          "description": "The type of permit."
-        },
-        "descriptionOfWork": {
-          "type": "string",
-          "description": "A description of the work to be performed."
-        },
-        "attachments": {
-          "type": "array",
-          "description": "An array of media files attached to the permit with submission history tracking.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "url": {
-                "type": "string",
-                "description": "URL of the media file.",
-                "format": "uri"
-              },
-              "contentType": {
-                "type": "string",
-                "description": "Content type of the media file."
-              },
-              "name": {
-                "type": "string",
-                "description": "The name of the media file."
-              },
-              "submissionIndex": {
-                "type": "number",
-                "description": "The submission sequence number of this file (1, 2, 3...)."
-              },
-              "timestamp": {
-                "type": "string",
-                "format": "date-time",
-                "description": "When this file was uploaded."
-              }
-            },
-            "required": [
-              "url",
-              "contentType",
-              "name",
-              "submissionIndex"
-            ]
-          }
-        },
-        "commentsAndRemarks": {
-          "type": "string",
-          "description": "Comments and remarks related to the permit."
-        },
-        "status": {
-          "type": "string",
-          "description": "The status of the permit (e.g., Pending, ManagerApproved, Approved, Rejected)."
-        },
-        "requestDate": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Timestamp when the permit was first requested."
-        },
-        "statusChangeDate": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Timestamp of the last status change."
-        },
-        "siteEngineerId": {
-          "type": "string",
-          "description": "Reference to User (Site Engineer) who raised the request."
-        },
-        "siteManagerId": {
-          "type": "string",
-          "description": "Reference to User (Site Manager) who is/was responsible for first-level review."
-        },
-        "adminId": {
-          "type": "string",
-          "description": "Reference to User (Admin) who gave/is giving final approval."
-        },
-        "latitude": {
-          "type": "number",
-          "description": "The latitude of the user when submitting the request."
-        },
-        "longitude": {
-          "type": "number",
-          "description": "The longitude of the user when submitting the request."
-        },
-        "timeline": {
-          "type": "array",
-          "description": "A log of all actions taken on this permit.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "status": { "type": "string" },
-              "timestamp": { "type": "string", "format": "date-time" },
-              "userId": { "type": "string" },
-              "userName": { "type": "string" },
-              "remarks": { "type": "string" },
-              "action": { "type": "string" },
-              "submissionIndex": { "type": "number" }
-            }
-          }
-        }
+        "id": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "siteName": { "type": "string" },
+        "ptwType": { "type": "string" },
+        "descriptionOfWork": { "type": "string" },
+        "status": { "type": "string" },
+        "siteEngineerId": { "type": "string" },
+        "siteManagerId": { "type": "string" },
+        "requestDate": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "siteName",
-        "ptwType",
-        "descriptionOfWork",
-        "status",
-        "siteEngineerId",
-        "requestDate"
-      ]
-    },
-    "Notification": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Notification",
-      "type": "object",
-      "description": "Represents a user notification.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the notification."
-        },
-        "userId": {
-          "type": "string",
-          "description": "The ID of the user this notification is for."
-        },
-        "title": {
-          "type": "string",
-          "description": "The title of the notification."
-        },
-        "description": {
-          "type": "string",
-          "description": "The body of the notification."
-        },
-        "link": {
-          "type": "string",
-          "description": "A URL to navigate to when the notification is clicked."
-        },
-        "read": {
-          "type": "boolean",
-          "description": "Whether the user has read the notification."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Timestamp when the notification was created."
-        }
-      },
-      "required": [
-        "id",
-        "userId",
-        "title",
-        "description",
-        "read",
-        "createdAt"
-      ]
+      "required": ["siteName", "ptwType", "descriptionOfWork", "status", "siteEngineerId", "requestDate"]
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password", "anonymous"]
   },
   "firestore": {
     "structure": [
       {
         "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profiles.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user."
-            }
-          ]
-        }
+        "definition": { "entityName": "User" }
       },
       {
-        "path": "/projects/{projectId}",
-        "definition": {
-          "entityName": "Project",
-          "schema": {
-            "$ref": "#/backend/entities/Project"
-          },
-          "description": "Stores project information.",
-          "params": [
-            {
-              "name": "projectId",
-              "description": "The unique identifier for the project."
-            }
-          ]
-        }
+        "path": "/dprs/{dprId}",
+        "definition": { "entityName": "DPR" }
       },
       {
-        "path": "/sites/{siteId}",
-        "definition": {
-          "entityName": "Site",
-          "schema": {
-            "$ref": "#/backend/entities/Site"
-          },
-          "description": "Stores site information managed by the admin.",
-          "params": [
-            {
-              "name": "siteId",
-              "description": "The unique identifier for the site."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/ptw_types/{ptwTypeId}",
-        "definition": {
-          "entityName": "PtwType",
-          "schema": {
-            "$ref": "#/backend/entities/PtwType"
-          },
-          "description": "Stores the available types for Permits to Work.",
-          "params": [
-            {
-              "name": "ptwTypeId",
-              "description": "The unique identifier for the PTW type."
-            }
-          ]
-        }
+        "path": "/requirements/{requirementId}",
+        "definition": { "entityName": "Requirement" }
       },
       {
         "path": "/permits_to_work/{permitId}",
-        "definition": {
-          "entityName": "PermitToWork",
-          "schema": {
-            "$ref": "#/backend/entities/PermitToWork"
-          },
-          "description": "Stores Permit to Work requests.",
-          "params": [
-            {
-              "name": "permitId",
-              "description": "The unique identifier for the permit to work request."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/notifications/{notificationId}",
-        "definition": {
-          "entityName": "Notification",
-          "schema": {
-            "$ref": "#/backend/entities/Notification"
-          },
-          "description": "Stores user-specific notifications.",
-          "params": [
-            {
-              "name": "notificationId",
-              "description": "The unique identifier for the notification."
-            }
-          ]
-        }
+        "definition": { "entityName": "PermitToWork" }
       }
     ]
   }
