@@ -33,6 +33,21 @@
         "requestDate": { "type": "string", "format": "date-time" }
       },
       "required": ["siteName", "ptwType", "descriptionOfWork", "status", "siteEngineerId", "requestDate"]
+    },
+    "DPR": {
+      "title": "Daily Progress Report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "siteName": { "type": "string" },
+        "reportDate": { "type": "string", "format": "date" },
+        "description": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "siteManagerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteName", "reportDate", "description", "userId"]
     }
   },
   "auth": {
@@ -47,6 +62,10 @@
       {
         "path": "/permits_to_work/{permitId}",
         "definition": { "entityName": "PermitToWork" }
+      },
+      {
+        "path": "/dprs/{dprId}",
+        "definition": { "entityName": "DPR" }
       }
     ]
   }

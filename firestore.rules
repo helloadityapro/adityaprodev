@@ -46,6 +46,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /dprs/{dprId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.userId == request.auth.uid || 
+        resource.data.siteManagerId == request.auth.uid
+      );
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
     match /projects/{projectId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /sites/{siteId} { allow read: if isSignedIn(); allow write: if isAdmin() || isSiteManager(); }
     match /ptw_types/{ptwTypeId} { allow read: if isSignedIn(); allow write: if isAdmin(); }

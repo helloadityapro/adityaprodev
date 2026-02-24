@@ -12,6 +12,7 @@ import {
   Workflow,
   MapPin,
   History,
+  FileText,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -70,6 +71,20 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <Link href="/ptw/activities">
                 <History className="h-4 w-4" />
                 <span className="font-medium">PtW Activities</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Reporting</SidebarGroupLabel>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Daily Progress Report" isActive={pathname === '/dpr'} className="rounded-sm">
+              <Link href="/dpr">
+                <FileText className="h-4 w-4" />
+                <span className="font-medium">DPR</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

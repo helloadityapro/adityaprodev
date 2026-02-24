@@ -1,5 +1,4 @@
-
-'use client';
+"use client";
 
 import * as React from "react";
 import { useForm } from "react-hook-form";
@@ -16,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Check, ChevronsUpDown, Loader2, FileText } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, FileText, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,8 +25,13 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 const dprSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
   reportDate: z.string().min(1, "Date is required"),
-  description: z.string().min(10, "Description must be at least 10 characters"),
+  description: z.string().min(10, "Daily update must be at least 10 characters"),
 });
+
+type Site = {
+  id: string;
+  name: string;
+};
 
 export default function DPRPage() {
   const firestore = useFirestore();
@@ -41,12 +45,11 @@ export default function DPRPage() {
   const isManager = userProfile?.role === 'Site Manager';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
-  const { data: allSites } = useCollection(sitesQuery);
+  const { data: allSites } = useCollection<Site>(sitesQuery);
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
     if (isAdmin) {
-        // Deduplicate sites by name for admin
         return Array.from(new Map(allSites.map(s => [s.name, s])).values());
     }
     const assignedIds = userProfile.assignedProjectIds || [];
@@ -59,7 +62,6 @@ export default function DPRPage() {
     const colRef = collection(firestore, 'dprs');
     if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'));
     
-    // Managers see their own + mapped engineers data
     if (isManager) {
         return query(
             colRef, 
@@ -68,7 +70,6 @@ export default function DPRPage() {
         );
     }
     
-    // Engineers only see their own data
     return query(colRef, where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
   }, [firestore, user, userProfile, isAdmin, isManager]);
 
@@ -87,7 +88,7 @@ export default function DPRPage() {
     if (!user) return;
     setIsSubmitting(true);
     try {
-      await addDocumentNonBlocking(collection(firestore, 'dprs'), {
+      addDocumentNonBlocking(collection(firestore, 'dprs'), {
         ...values,
         userId: user.uid,
         userName: userProfile?.username || user.email,
@@ -111,14 +112,14 @@ export default function DPRPage() {
         <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
           <FileText className="h-8 w-8" /> Daily Progress Report
         </h1>
-        <p className="text-muted-foreground">Submit and track daily activities across your assigned sites.</p>
+        <p className="text-muted-foreground">Log site progress and daily updates.</p>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">
-        <Card className="lg:col-span-1 shadow-md border-primary/10">
+        <Card className="lg:col-span-1 shadow-md border-primary/10 rounded-sm">
           <CardHeader>
-            <CardTitle>Submit New DPR</CardTitle>
-            <CardDescription>Fill in the work progress for the day.</CardDescription>
+            <CardTitle>Submit DPR</CardTitle>
+            <CardDescription>Enter details for today's site activity.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -129,7 +130,11 @@ export default function DPRPage() {
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}>
+                          <Button 
+                            variant="outline" 
+                            role="combobox" 
+                            className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}
+                          >
                             {field.value || "Select a site..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -170,32 +175,37 @@ export default function DPRPage() {
 
                 <FormField control={form.control} name="reportDate" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Report Date</FormLabel>
-                    <FormControl><Input type="date" {...field} className="rounded-sm" /></FormControl>
+                    <FormLabel>Select Date</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input type="date" {...field} className="rounded-sm pr-10" />
+                        <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
 
                 <FormField control={form.control} name="description" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Work Description</FormLabel>
-                    <FormControl><Textarea placeholder="Detail the tasks completed..." rows={6} {...field} className="rounded-sm" /></FormControl>
+                    <FormLabel>Today's Update</FormLabel>
+                    <FormControl><Textarea placeholder="What tasks were completed today?" rows={6} {...field} className="rounded-sm" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
 
-                <Button type="submit" className="w-full h-11 rounded-sm" disabled={isSubmitting}>
-                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : "Submit Report"}
+                <Button type="submit" className="w-full h-11 rounded-sm text-lg font-semibold" disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : "Submit DPR"}
                 </Button>
               </form>
             </Form>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2 shadow-md border-primary/10">
+        <Card className="lg:col-span-2 shadow-md border-primary/10 rounded-sm">
           <CardHeader>
-            <CardTitle>Recent Reports</CardTitle>
-            <CardDescription>History of DPRs submitted for your assigned areas.</CardDescription>
+            <CardTitle>Recent Updates</CardTitle>
+            <CardDescription>Track submitted progress reports.</CardDescription>
           </CardHeader>
           <CardContent>
             {dprsLoading ? (
@@ -205,26 +215,28 @@ export default function DPRPage() {
                 <Skeleton className="h-10 w-full" />
               </div>
             ) : dprs && dprs.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Site</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Description</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dprs.map((dpr) => (
-                    <TableRow key={dpr.id}>
-                      <TableCell className="font-medium whitespace-nowrap">{format(new Date(dpr.reportDate), 'dd MMM yyyy')}</TableCell>
-                      <TableCell className="font-semibold">{dpr.siteName}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{dpr.userName || '—'}</TableCell>
-                      <TableCell className="text-sm truncate max-w-[200px]">{dpr.description}</TableCell>
+              <div className="rounded-sm border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-32">Date</TableHead>
+                      <TableHead>Site</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Update</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {dprs.map((dpr) => (
+                      <TableRow key={dpr.id}>
+                        <TableCell className="font-medium whitespace-nowrap">{format(new Date(dpr.reportDate), 'dd MMM yyyy')}</TableCell>
+                        <TableCell className="font-semibold">{dpr.siteName}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{dpr.userName || '—'}</TableCell>
+                        <TableCell className="text-sm italic text-muted-foreground truncate max-w-[200px]">"{dpr.description}"</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             ) : (
               <div className="text-center py-12 text-muted-foreground italic bg-muted/20 rounded-lg border-2 border-dashed">
                 No reports found matching your criteria.
