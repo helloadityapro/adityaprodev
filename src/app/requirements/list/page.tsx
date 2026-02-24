@@ -3,12 +3,12 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ClipboardList, Search, Pencil, Trash2, Loader2, User } from "lucide-react";
+import { ClipboardList, Search, Pencil, Trash2, Loader2, User, Clock } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +42,7 @@ type Requirement = {
   description: string;
   status: "Pending" | "Ordered" | "Dispatched" | "In-transit" | "Delivered";
   statusUpdatedBy?: string;
+  statusUpdatedAt?: any;
   userId: string;
   userName: string;
   siteManagerId: string | null;
@@ -122,7 +123,8 @@ export default function RequirementListPage() {
     const reqRef = doc(firestore, 'requirements', reqId);
     updateDocumentNonBlocking(reqRef, {
         status: newStatus,
-        statusUpdatedBy: userProfile.username || user.email || "Unknown"
+        statusUpdatedBy: userProfile.username || user.email || "Unknown",
+        statusUpdatedAt: serverTimestamp()
     });
     toast({ title: "Status Updated", description: `Requirement status changed to ${newStatus}.` });
   };
@@ -198,9 +200,17 @@ export default function RequirementListPage() {
                                 </SelectContent>
                             </Select>
                             {req.statusUpdatedBy && (
-                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground italic whitespace-nowrap">
-                                    <User className="h-3 w-3" />
-                                    <span>by {req.statusUpdatedBy}</span>
+                                <div className="flex flex-col gap-0.5">
+                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground italic whitespace-nowrap">
+                                        <User className="h-3 w-3" />
+                                        <span>by {req.statusUpdatedBy}</span>
+                                    </div>
+                                    {req.statusUpdatedAt && (
+                                        <div className="flex items-center gap-1 text-[9px] text-muted-foreground/70 pl-4 whitespace-nowrap">
+                                            <Clock className="h-2.5 w-2.5" />
+                                            <span>{format(req.statusUpdatedAt.toDate(), 'dd MMM HH:mm')}</span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

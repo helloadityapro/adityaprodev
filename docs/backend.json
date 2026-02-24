@@ -59,6 +59,7 @@
         "description": { "type": "string" },
         "status": { "type": "string", "enum": ["Pending", "Ordered", "Dispatched", "In-transit", "Delivered"] },
         "statusUpdatedBy": { "type": "string" },
+        "statusUpdatedAt": { "type": "string", "format": "date-time" },
         "userId": { "type": "string" },
         "userName": { "type": "string" },
         "siteManagerId": { "type": "string" },
