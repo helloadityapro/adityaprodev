@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -107,6 +108,45 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
       <Icon className="h-3 w-3" /> {config.label}
     </Badge>
   );
+}
+
+/**
+ * WhatsApp Notification component for Managers/Admins to update Engineers
+ */
+function WhatsAppUpdateEngineer({ permit }: { permit: Permit }) {
+    const firestore = useFirestore();
+    const { data: engineerProfile } = useDoc(useMemoFirebase(() => doc(firestore, 'users', permit.siteEngineerId), [firestore, permit.siteEngineerId]));
+    
+    const triggerWhatsApp = () => {
+        if (!engineerProfile?.mobile) return;
+        const cleanMobile = engineerProfile.mobile.replace(/\D/g, '');
+        const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : (cleanMobile.startsWith('91') ? cleanMobile : `91${cleanMobile}`);
+        
+        // Get last remark from timeline
+        const lastEntry = [...(permit.timeline || [])].sort((a, b) => {
+            const dateA = a.timestamp?.toDate?.()?.getTime() || 0;
+            const dateB = b.timestamp?.toDate?.()?.getTime() || 0;
+            return dateB - dateA;
+        })[0];
+
+        const message = `Aditya Pro PtW Update:\nPermit: ${permit.serialNumber}\nSite: ${permit.siteName}\nStatus: ${permit.status}\nRemarks: ${lastEntry?.remarks || "No remarks"}\nLink: ${window.location.origin}/ptw/list?view=${permit.id}`;
+        const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+    };
+
+    if (!engineerProfile?.mobile) return null;
+
+    return (
+        <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-sm" 
+            title="Update Engineer via WhatsApp"
+            onClick={triggerWhatsApp}
+        >
+            <MessageCircle className="h-4 w-4" />
+        </Button>
+    );
 }
 
 function WhatsAppReminder({ userId, permit }: { userId: string | undefined, permit: Permit }) {
@@ -420,6 +460,10 @@ export default function PtwListPage() {
                           <WhatsAppReminder userId={permit.status === 'Pending' ? permit.siteManagerId : undefined} permit={permit} />
                         )}
 
+                        {(isAdmin || userProfile?.role === 'Site Manager') && (permit.status === 'Approved' || permit.status === 'Rejected' || permit.status === 'ManagerApproved') && (
+                          <WhatsAppUpdateEngineer permit={permit} />
+                        )}
+
                         {/* Manager Action Buttons (Shows if user is the mapped manager) */}
                         {isMappedManager && permit.status === 'Pending' && isAuthorized && (
                           <>
@@ -492,20 +536,23 @@ export default function PtwListPage() {
               <div className="flex gap-2">
                 {/* Inline Actions inside Details View */}
                 {detailsPermit && (
-                  <>
+                  <div className="flex items-center gap-2 mr-4">
+                    {(isAdmin || userProfile?.role === 'Site Manager') && (detailsPermit.status === 'Approved' || detailsPermit.status === 'Rejected' || detailsPermit.status === 'ManagerApproved') && (
+                      <WhatsAppUpdateEngineer permit={detailsPermit} />
+                    )}
                     {(detailsPermit.siteManagerId === user?.uid && detailsPermit.status === 'Pending') && (
-                      <div className="flex gap-2 mr-4">
+                      <div className="flex gap-2">
                         <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'ManagerApproved' }); }}>Approve</Button>
                         <Button size="sm" variant="destructive" className="h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>Reject</Button>
                       </div>
                     )}
                     {isAdmin && (detailsPermit.status === 'ManagerApproved' || (detailsPermit.status === 'Pending' && !detailsPermit.siteManagerId)) && (
-                      <div className="flex gap-2 mr-4">
+                      <div className="flex gap-2">
                         <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Approved' }); }}>Approve</Button>
                         <Button size="sm" variant="destructive" className="h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>Reject</Button>
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
                 <Button variant="outline" size="sm" className="h-8 text-xs font-bold rounded-sm" onClick={handlePrint}><Printer className="h-3.5 w-3.5 mr-1.5" /> Print</Button>
                 <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm"><CircleX className="h-4 w-4" /></Button></DialogClose>
