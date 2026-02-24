@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, Printer, FilterX } from "lucide-react";
+import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, Printer, FilterX, FileDown } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -137,7 +137,11 @@ export default function DPRListPage() {
 
   const handlePrint = () => {
     if (typeof window !== "undefined") {
+      const originalTitle = document.title;
+      const dateSuffix = startDate || endDate ? `_${startDate || 'Start'}_to_${endDate || 'End'}` : '';
+      document.title = `AdityaPro_DPR_Report${dateSuffix}`;
       window.print();
+      document.title = originalTitle;
     }
   };
 
@@ -153,8 +157,8 @@ export default function DPRListPage() {
         <div className="flex items-center gap-2">
           {(isAdmin || isManager) && (
             <Button variant="outline" className="rounded-sm font-bold" onClick={handlePrint}>
-              <Printer className="mr-2 h-4 w-4" />
-              Generate Report
+              <FileDown className="mr-2 h-4 w-4" />
+              Generate PDF Report
             </Button>
           )}
         </div>
