@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -47,6 +48,16 @@ service cloud.firestore {
     }
 
     match /dprs/{dprId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.userId == request.auth.uid || 
+        resource.data.siteManagerId == request.auth.uid
+      );
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    match /requirements/{reqId} {
       allow read: if isSignedIn() && (
         isAdmin() || 
         resource.data.userId == request.auth.uid || 

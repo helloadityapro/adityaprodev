@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -14,6 +15,8 @@ import {
   History,
   FileText,
   Table as TableIcon,
+  Package,
+  ClipboardList,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -79,7 +82,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
       </SidebarGroup>
 
       <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Reporting</SidebarGroupLabel>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">DPR Reporting</SidebarGroupLabel>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Submit DPR" isActive={pathname === '/dpr/submit'} className="rounded-sm">
@@ -94,6 +97,28 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <Link href="/dpr/list">
                 <TableIcon className="h-4 w-4" />
                 <span className="font-medium">DPR Data</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Site Requirements</SidebarGroupLabel>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Submit Requirement" isActive={pathname === '/requirements/submit'} className="rounded-sm">
+              <Link href="/requirements/submit">
+                <Package className="h-4 w-4" />
+                <span className="font-medium">Submit Requirement</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Requirement Data" isActive={pathname === '/requirements/list'} className="rounded-sm">
+              <Link href="/requirements/list">
+                <ClipboardList className="h-4 w-4" />
+                <span className="font-medium">Requirement Data</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

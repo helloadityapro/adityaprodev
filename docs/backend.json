@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -48,6 +49,21 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteName", "reportDate", "description", "userId"]
+    },
+    "Requirement": {
+      "title": "Site Requirement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "siteName": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "siteManagerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteName", "description", "userId", "status"]
     }
   },
   "auth": {
@@ -66,6 +82,10 @@
       {
         "path": "/dprs/{dprId}",
         "definition": { "entityName": "DPR" }
+      },
+      {
+        "path": "/requirements/{reqId}",
+        "definition": { "entityName": "Requirement" }
       }
     ]
   }
