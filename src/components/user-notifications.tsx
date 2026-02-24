@@ -43,6 +43,10 @@ export function UserNotifications() {
   const { user } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
+  
+  // Mounted check to prevent hydration mismatch with time-ago strings
+  const [isMounted, setIsMounted] = React.useState(false);
+  React.useEffect(() => setIsMounted(true), []);
 
   const notificationsQuery = useMemoFirebase(() => {
     if (!user) return null;
@@ -157,7 +161,7 @@ export function UserNotifications() {
                       {notification.description}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {notification.createdAt
+                      {isMounted && notification.createdAt
                         ? formatDistanceToNow(notification.createdAt.toDate(), {
                             addSuffix: true,
                           })
