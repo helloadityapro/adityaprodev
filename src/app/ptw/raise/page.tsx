@@ -260,6 +260,11 @@ export default function RaisePtwPage() {
         submissionIndex: currentSubmissionIndex
       };
 
+      // Correctly identify the siteManagerId:
+      // 1. Current user's mapped manager (for engineers)
+      // 2. If correcting, and no mapping, preserve old one (for managers correcting team permits)
+      const effectiveSiteManagerId = userProfile.siteManagerId || (isCorrectionMode ? permitToCorrect?.siteManagerId : null) || null;
+
       const permitData: any = {
         siteName: values.siteName,
         ptwType: values.ptwType,
@@ -269,17 +274,17 @@ export default function RaisePtwPage() {
         longitude: location.longitude,
         status: "Pending",
         statusChangeDate: serverTimestamp(),
-        siteManagerId: userProfile.siteManagerId || null, // Ensure siteManagerId is explicitly updated/preserved
+        siteManagerId: effectiveSiteManagerId,
       };
 
       let managerMobile = "";
-      if (userProfile.siteManagerId) {
-        const managerDoc = await getDoc(doc(firestore, 'users', userProfile.siteManagerId));
+      if (effectiveSiteManagerId) {
+        const managerDoc = await getDoc(doc(firestore, 'users', effectiveSiteManagerId));
         if (managerDoc.exists()) {
           managerMobile = managerDoc.data().mobile;
           
           addDocumentNonBlocking(collection(firestore, 'notifications'), {
-            userId: userProfile.siteManagerId,
+            userId: effectiveSiteManagerId,
             title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
             description: `${userProfile.username || user.email} ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit (${serialNumber}) for "${values.siteName}".`,
             link: `/ptw/list?view=${permitId}`,
@@ -485,7 +490,7 @@ export default function RaisePtwPage() {
                           {filteredPtwTypesList.map((type) => (
                             <Button 
                               key={type.id} 
-                              type="button"
+                              type="button" 
                               variant="ghost" 
                               className="w-full justify-start font-normal text-left" 
                               onClick={() => { field.onChange(type.name); setIsPtwTypePopoverOpen(false); }}

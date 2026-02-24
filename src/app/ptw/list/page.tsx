@@ -222,9 +222,9 @@ export default function PtwListPage() {
       timeline: arrayUnion({ ...timelineEntry, timestamp: new Date() })
     };
 
-    if (userRole === 'Site Manager') {
+    if (userProfile.role === 'Site Manager') {
       updateData.siteManagerId = user.uid;
-    } else if (userRole === 'Admin') {
+    } else if (isAdmin) {
       updateData.adminId = user.uid;
     }
 
@@ -390,7 +390,8 @@ export default function PtwListPage() {
             <TableBody>
               {filteredPermits.map(permit => {
                 const isAuthorized = isAuthorizedForType(permit.ptwType);
-                const isOwnOrTeamPermit = permit.siteEngineerId === user?.uid || (userRole === 'Site Manager' && permit.siteManagerId === user?.uid);
+                const isMappedManager = permit.siteManagerId === user?.uid;
+                const isOwnOrTeamPermit = permit.siteEngineerId === user?.uid || (userProfile?.role === 'Site Manager' && isMappedManager);
                 
                 return (
                   <TableRow key={permit.id}>
@@ -403,18 +404,20 @@ export default function PtwListPage() {
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="icon" className="rounded-sm" title="View Details" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
 
-                        {userRole === 'Site Engineer' && (permit.status === 'Pending' || permit.status === 'ManagerApproved') && (
+                        {userProfile?.role === 'Site Engineer' && (permit.status === 'Pending' || permit.status === 'ManagerApproved') && (
                           <WhatsAppReminder userId={permit.status === 'Pending' ? permit.siteManagerId : undefined} permit={permit} />
                         )}
 
-                        {userRole === 'Site Manager' && permit.status === 'Pending' && isAuthorized && permit.siteManagerId === user?.uid && (
+                        {/* Manager Action Buttons (Shows if user is the mapped manager, even if they are also Admin) */}
+                        {isMappedManager && permit.status === 'Pending' && isAuthorized && (
                           <>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'ManagerApproved' })}>Approve</Button>
                             <Button size="sm" variant="destructive" className="h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'Rejected' })}>Reject</Button>
                           </>
                         )}
 
-                        {userRole === 'Admin' && (permit.status === 'ManagerApproved' || (permit.status === 'Pending' && !permit.siteManagerId)) && isAuthorized && (
+                        {/* Admin Action Buttons (Shows only if status is ManagerApproved or no Manager mapped) */}
+                        {isAdmin && (permit.status === 'ManagerApproved' || (permit.status === 'Pending' && !permit.siteManagerId)) && isAuthorized && (
                           <>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'Approved' })}>Approve</Button>
                             <Button size="sm" variant="destructive" className="h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'Rejected' })}>Reject</Button>
@@ -475,6 +478,23 @@ export default function PtwListPage() {
                 <span className="text-xs font-mono text-primary font-semibold">{detailsPermit?.serialNumber}</span>
               </div>
               <div className="flex gap-2">
+                {/* Approval Actions inside Details View for convenience */}
+                {detailsPermit && (
+                  <>
+                    {(detailsPermit.siteManagerId === user?.uid && detailsPermit.status === 'Pending') && (
+                      <div className="flex gap-2 mr-4">
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'ManagerApproved' }); }}>Approve</Button>
+                        <Button size="sm" variant="destructive" className="h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>Reject</Button>
+                      </div>
+                    )}
+                    {isAdmin && (detailsPermit.status === 'ManagerApproved' || (detailsPermit.status === 'Pending' && !detailsPermit.siteManagerId)) && (
+                      <div className="flex gap-2 mr-4">
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Approved' }); }}>Approve</Button>
+                        <Button size="sm" variant="destructive" className="h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>Reject</Button>
+                      </div>
+                    )}
+                  </>
+                )}
                 <Button variant="outline" size="sm" className="h-8 text-xs font-bold rounded-sm" onClick={handlePrint}><Printer className="h-3.5 w-3.5 mr-1.5" /> Print</Button>
                 <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm"><CircleX className="h-4 w-4" /></Button></DialogClose>
               </div>
