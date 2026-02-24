@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -18,34 +17,6 @@
         "hiddenPermitIds": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["id", "username", "email", "mobile", "role"]
-    },
-    "DPR": {
-      "title": "Daily Progress Report",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "siteName": { "type": "string" },
-        "reportDate": { "type": "string", "format": "date-time" },
-        "description": { "type": "string" },
-        "userId": { "type": "string" },
-        "siteManagerId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["siteName", "reportDate", "description", "userId"]
-    },
-    "Requirement": {
-      "title": "Site Requirement",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "siteName": { "type": "string" },
-        "description": { "type": "string" },
-        "status": { "type": "string", "enum": ["Pending", "Fulfilled"] },
-        "userId": { "type": "string" },
-        "siteManagerId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["siteName", "description", "userId"]
     },
     "PermitToWork": {
       "title": "PermitToWork",
@@ -72,14 +43,6 @@
       {
         "path": "/users/{userId}",
         "definition": { "entityName": "User" }
-      },
-      {
-        "path": "/dprs/{dprId}",
-        "definition": { "entityName": "DPR" }
-      },
-      {
-        "path": "/requirements/{requirementId}",
-        "definition": { "entityName": "Requirement" }
       },
       {
         "path": "/permits_to_work/{permitId}",

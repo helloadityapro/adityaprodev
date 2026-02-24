@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -13,8 +12,6 @@ import {
   Workflow,
   MapPin,
   History,
-  FileText,
-  ClipboardList,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -38,28 +35,6 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <Link href="/dashboard">
                 <FolderKanban className="h-4 w-4" />
                 <span className="font-medium">Projects</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroup>
-
-      <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Reporting</SidebarGroupLabel>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="DPR" isActive={pathname === '/dpr'} className="rounded-sm">
-              <Link href="/dpr">
-                <FileText className="h-4 w-4" />
-                <span className="font-medium">DPR</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Requirements" isActive={pathname === '/requirements'} className="rounded-sm">
-              <Link href="/requirements">
-                <ClipboardList className="h-4 w-4" />
-                <span className="font-medium">Requirements</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
