@@ -19,15 +19,9 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { UserNotifications } from "@/components/user-notifications";
 import { Loader2, Sun, Moon } from "lucide-react";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
-
-const SUPER_ADMIN_EMAILS = [
-  'abhijeet.agepl@gmail.com',
-  'abhijeetsb22@gmail.com',
-  'khalil@adityagreenenergy.com',
-  'prafulrana143@gmail.com'
-];
 
 function FullPageLoader() {
   return (
@@ -80,12 +74,11 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  const isAdmin = userProfile?.role === "Admin" || (user?.email && SUPER_ADMIN_EMAILS.includes(user.email));
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
 
   React.useEffect(() => {
     if (user && !isProfileLoading) {
-      const isSuperAdmin = user.email && SUPER_ADMIN_EMAILS.includes(user.email);
-      if (!isSuperAdmin) return;
+      if (!isSuperAdmin(user.email)) return;
 
       const needsBootstrap = !userProfile || userProfile.role !== 'Admin' || userProfile.registrationRequest === true || (user.email === 'khalil@adityagreenenergy.com' && userProfile.username !== 'Khalil Choudhary');
       

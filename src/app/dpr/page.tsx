@@ -11,16 +11,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, orderBy } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, orderBy, or } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Check, ChevronsUpDown, Loader2, FileText, Calendar } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 const dprSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -36,7 +37,7 @@ export default function DPRPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc(userProfileRef);
 
-  const isAdmin = userProfile?.role === 'Admin' || ['abhijeet.agepl@gmail.com', 'abhijeetsb22@gmail.com', 'khalil@adityagreenenergy.com', 'prafulrana143@gmail.com'].includes(user?.email || '');
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
@@ -44,18 +45,32 @@ export default function DPRPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-    if (isAdmin) return allSites;
+    if (isAdmin) {
+        // Deduplicate sites by name for admin
+        return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+    }
     const assignedIds = userProfile.assignedProjectIds || [];
-    return allSites.filter(s => assignedIds.includes(s.id));
+    const filtered = allSites.filter(s => assignedIds.includes(s.id));
+    return Array.from(new Map(filtered.map(s => [s.name, s])).values());
   }, [allSites, userProfile, isAdmin]);
 
   const dprsQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || !userProfile) return null;
     const colRef = collection(firestore, 'dprs');
     if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'));
-    if (isManager) return query(colRef, where('siteManagerId', '==', user.uid), orderBy('createdAt', 'desc'));
+    
+    // Managers see their own + mapped engineers data
+    if (isManager) {
+        return query(
+            colRef, 
+            or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid)),
+            orderBy('createdAt', 'desc')
+        );
+    }
+    
+    // Engineers only see their own data
     return query(colRef, where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
-  }, [firestore, user, isAdmin, isManager]);
+  }, [firestore, user, userProfile, isAdmin, isManager]);
 
   const { data: dprs, isLoading: dprsLoading } = useCollection(dprsQuery);
 
@@ -133,7 +148,13 @@ export default function DPRPage() {
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredSites.length > 0 ? filteredSites.map((site) => (
-                            <Button key={site.id} type="button" variant="ghost" className="w-full justify-start font-normal text-left" onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}>
+                            <Button 
+                                key={site.id} 
+                                type="button" 
+                                variant="ghost" 
+                                className="w-full justify-start font-normal text-left" 
+                                onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}
+                            >
                               <Check className={cn("mr-2 h-4 w-4 shrink-0", site.name === field.value ? "opacity-100" : "opacity-0")} />
                               <span className="truncate">{site.name}</span>
                             </Button>
@@ -189,7 +210,7 @@ export default function DPRPage() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Site</TableHead>
-                    <TableHead>Engineer</TableHead>
+                    <TableHead>User</TableHead>
                     <TableHead>Description</TableHead>
                   </TableRow>
                 </TableHeader>

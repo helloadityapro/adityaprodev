@@ -8,6 +8,7 @@ import { collection, doc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, FileText, FolderKanban, UserPlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { isSuperAdmin } from '@/lib/auth-constants';
 
 function AdminDashboardSkeleton() {
     return (
@@ -67,11 +68,7 @@ export default function AdminDashboardPage() {
 
     const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-    const isAdmin = userProfile?.role === 'Admin' || 
-                    user?.email === 'abhijeet.agepl@gmail.com' || 
-                    user?.email === 'abhijeetsb22@gmail.com' ||
-                    user?.email === 'khalil@adityagreenenergy.com' ||
-                    user?.email === 'prafulrana143@gmail.com';
+    const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
     useEffect(() => {
         if (!isUserLoading && !isProfileLoading && !isAdmin) {

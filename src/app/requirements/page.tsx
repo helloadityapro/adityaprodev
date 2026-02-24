@@ -11,17 +11,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, orderBy } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, orderBy, or } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Check, ChevronsUpDown, Loader2, ClipboardList, Package } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 const requirementSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -36,7 +37,7 @@ export default function RequirementsPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc(userProfileRef);
 
-  const isAdmin = userProfile?.role === 'Admin' || ['abhijeet.agepl@gmail.com', 'abhijeetsb22@gmail.com', 'khalil@adityagreenenergy.com', 'prafulrana143@gmail.com'].includes(user?.email || '');
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
@@ -44,18 +45,29 @@ export default function RequirementsPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-    if (isAdmin) return allSites;
+    if (isAdmin) {
+        return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+    }
     const assignedIds = userProfile.assignedProjectIds || [];
-    return allSites.filter(s => assignedIds.includes(s.id));
+    const filtered = allSites.filter(s => assignedIds.includes(s.id));
+    return Array.from(new Map(filtered.map(s => [s.name, s])).values());
   }, [allSites, userProfile, isAdmin]);
 
   const reqsQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || !userProfile) return null;
     const colRef = collection(firestore, 'requirements');
     if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'));
-    if (isManager) return query(colRef, where('siteManagerId', '==', user.uid), orderBy('createdAt', 'desc'));
+    
+    if (isManager) {
+        return query(
+            colRef, 
+            or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid)),
+            orderBy('createdAt', 'desc')
+        );
+    }
+    
     return query(colRef, where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
-  }, [firestore, user, isAdmin, isManager]);
+  }, [firestore, user, userProfile, isAdmin, isManager]);
 
   const { data: reqs, isLoading: reqsLoading } = useCollection(reqsQuery);
 
@@ -134,7 +146,13 @@ export default function RequirementsPage() {
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredSites.length > 0 ? filteredSites.map((site) => (
-                            <Button key={site.id} type="button" variant="ghost" className="w-full justify-start font-normal text-left" onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}>
+                            <Button 
+                                key={site.id} 
+                                type="button" 
+                                variant="ghost" 
+                                className="w-full justify-start font-normal text-left" 
+                                onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}
+                            >
                               <Check className={cn("mr-2 h-4 w-4 shrink-0", site.name === field.value ? "opacity-100" : "opacity-0")} />
                               <span className="truncate">{site.name}</span>
                             </Button>
@@ -182,6 +200,7 @@ export default function RequirementsPage() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Site</TableHead>
+                    <TableHead>User</TableHead>
                     <TableHead>Requirement</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
@@ -191,6 +210,7 @@ export default function RequirementsPage() {
                     <TableRow key={req.id}>
                       <TableCell className="font-medium whitespace-nowrap">{req.createdAt ? format(req.createdAt.toDate(), 'dd MMM') : '—'}</TableCell>
                       <TableCell className="font-semibold">{req.siteName}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{req.userName || '—'}</TableCell>
                       <TableCell className="text-sm truncate max-w-[250px]">{req.description}</TableCell>
                       <TableCell>
                         <Badge variant={req.status === 'Fulfilled' ? 'default' : 'outline'} className="rounded-sm text-[10px] font-bold uppercase">
