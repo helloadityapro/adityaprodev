@@ -23,7 +23,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow update: if isSignedIn() && (
+        request.auth.uid == userId || 
+        isAdmin() || 
+        (isSiteManager() && get(/databases/$(database)/documents/users/$(userId)).data.siteManagerId == request.auth.uid)
+      );
       allow delete: if isAdmin();
     }
 

@@ -74,11 +74,9 @@ type PtwType = {
 function StatusBadge({ permit, className }: { permit: Permit, className?: string }) {
   const firestore = useFirestore();
   
-  // Fetch Manager Profile if status is Pending
   const managerRef = useMemoFirebase(() => (permit.status === 'Pending' && permit.siteManagerId) ? doc(firestore, 'users', permit.siteManagerId) : null, [firestore, permit.siteManagerId, permit.status]);
   const { data: managerProfile } = useDoc(managerRef);
 
-  // Fetch Admin Profile (Khalil) if status is ManagerApproved
   const adminsQuery = useMemoFirebase(() => {
     if (permit.status !== 'ManagerApproved') return null;
     return query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'), limit(1));
@@ -241,7 +239,6 @@ export default function PtwListPage() {
     const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
     getDocs(adminsQuery).then(snapshot => {
       snapshot.forEach(adminDoc => {
-        // Don't notify Khalil twice if he is the one performing the action
         if (adminDoc.id === user.uid) return;
         
         addDocumentNonBlocking(collection(firestore, 'notifications'), {
@@ -393,6 +390,8 @@ export default function PtwListPage() {
             <TableBody>
               {filteredPermits.map(permit => {
                 const isAuthorized = isAuthorizedForType(permit.ptwType);
+                const isOwnOrTeamPermit = permit.siteEngineerId === user?.uid || (userRole === 'Site Manager' && permit.siteManagerId === user?.uid);
+                
                 return (
                   <TableRow key={permit.id}>
                     <TableCell className="font-mono text-xs">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
@@ -422,7 +421,7 @@ export default function PtwListPage() {
                           </>
                         )}
 
-                        {userRole === 'Site Engineer' && permit.status === 'Rejected' && (
+                        {isOwnOrTeamPermit && permit.status === 'Rejected' && (
                           <Button size="sm" variant="outline" className="h-8 rounded-sm" onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}>
                             <FilePen className="h-3 w-3 mr-1.5" /> Resubmit
                           </Button>
