@@ -47,6 +47,8 @@ type Requirement = {
   userName: string;
   siteManagerId: string | null;
   createdAt: any;
+  editedBy?: string;
+  editedAt?: any;
 };
 
 const STATUS_OPTIONS = ["Pending", "Ordered", "Dispatched", "In-transit", "Delivered"] as const;
@@ -108,10 +110,12 @@ export default function RequirementListPage() {
   };
 
   const handleEditSave = () => {
-    if (!editingReq || !editingReq.description.trim()) return;
+    if (!editingReq || !editingReq.description.trim() || !userProfile) return;
     setIsSaving(true);
     updateDocumentNonBlocking(doc(firestore, 'requirements', editingReq.id), {
-        description: editingReq.description
+        description: editingReq.description,
+        editedBy: userProfile.username || user?.email || "Unknown",
+        editedAt: serverTimestamp()
     });
     toast({ title: "Updated", description: "Requirement details updated." });
     setIsSaving(false);
@@ -181,8 +185,20 @@ export default function RequirementListPage() {
                     </TableCell>
                     <TableCell className="font-semibold">{req.siteName}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{req.userName || '—'}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-sm truncate">
-                        {req.description}
+                    <TableCell className="max-w-sm">
+                        <div className="text-sm text-muted-foreground mb-1 truncate">{req.description}</div>
+                        {req.editedBy && (
+                            <div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-medium">
+                                <span className="bg-primary/10 px-1 rounded">Edited</span>
+                                <span>by {req.editedBy}</span>
+                                {req.editedAt && (
+                                    <span className="text-muted-foreground/60 flex items-center gap-1">
+                                        <Clock className="h-2.5 w-2.5" />
+                                        {format(req.editedAt.toDate(), 'dd MMM HH:mm')}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                     </TableCell>
                     <TableCell>
                         <div className="flex items-center gap-3">

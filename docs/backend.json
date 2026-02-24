@@ -46,7 +46,9 @@
         "userId": { "type": "string" },
         "userName": { "type": "string" },
         "siteManagerId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "editedBy": { "type": "string" },
+        "editedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteName", "reportDate", "description", "userId"]
     },
@@ -63,7 +65,9 @@
         "userId": { "type": "string" },
         "userName": { "type": "string" },
         "siteManagerId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "editedBy": { "type": "string" },
+        "editedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteName", "description", "userId", "status"]
     }

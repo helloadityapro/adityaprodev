@@ -3,12 +3,12 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { FileText, Search, Pencil, Trash2, Loader2 } from "lucide-react";
+import { FileText, Search, Pencil, Trash2, Loader2, Clock } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,8 @@ type DPR = {
   userName: string;
   siteManagerId: string | null;
   createdAt: any;
+  editedBy?: string;
+  editedAt?: any;
 };
 
 export default function DPRListPage() {
@@ -102,11 +104,13 @@ export default function DPRListPage() {
   };
 
   const handleEditSave = () => {
-    if (!editingDpr || !editingDpr.description.trim()) return;
+    if (!editingDpr || !editingDpr.description.trim() || !userProfile) return;
     setIsSaving(true);
     updateDocumentNonBlocking(doc(firestore, 'dprs', editingDpr.id), {
         description: editingDpr.description,
-        reportDate: editingDpr.reportDate
+        reportDate: editingDpr.reportDate,
+        editedBy: userProfile.username || user?.email || "Unknown",
+        editedAt: serverTimestamp()
     });
     toast({ title: "Updated", description: "Report has been updated successfully." });
     setIsSaving(false);
@@ -164,7 +168,21 @@ export default function DPRListPage() {
                     </TableCell>
                     <TableCell className="font-semibold">{dpr.siteName}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{dpr.userName || '—'}</TableCell>
-                    <TableCell className="text-sm italic text-muted-foreground max-w-md">"{dpr.description}"</TableCell>
+                    <TableCell className="max-w-md">
+                        <div className="text-sm italic text-muted-foreground mb-1">"{dpr.description}"</div>
+                        {dpr.editedBy && (
+                            <div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-medium">
+                                <span className="bg-primary/10 px-1 rounded">Edited</span>
+                                <span>by {dpr.editedBy}</span>
+                                {dpr.editedAt && (
+                                    <span className="text-muted-foreground/60 flex items-center gap-1">
+                                        <Clock className="h-2.5 w-2.5" />
+                                        {format(dpr.editedAt.toDate(), 'dd MMM HH:mm')}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                    </TableCell>
                     <TableCell className="text-right px-6">
                         <div className="flex justify-end items-center gap-1">
                             {dpr.userId === user?.uid && (
