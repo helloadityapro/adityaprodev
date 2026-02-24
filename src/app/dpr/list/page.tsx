@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { FileText, Search, Pencil, Trash2, Loader2, Clock } from "lucide-react";
+import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, Printer, FilterX } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,8 @@ export default function DPRListPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [startDate, setStartDate] = React.useState("");
+  const [endDate, setEndDate] = React.useState("");
   const [editingDpr, setEditingDpr] = React.useState<DPR | null>(null);
   const [deletingDpr, setDeletingDpr] = React.useState<DPR | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -83,18 +85,28 @@ export default function DPRListPage() {
   const sortedAndFilteredDprs = React.useMemo(() => {
     if (!dprs) return [];
     
-    let result = dprs.filter(dpr => 
-      dpr.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (dpr.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dpr.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    let result = dprs.filter(dpr => {
+      const matchesSearch = dpr.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (dpr.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        dpr.description.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      let matchesDate = true;
+      if (startDate) {
+        matchesDate = matchesDate && dpr.reportDate >= startDate;
+      }
+      if (endDate) {
+        matchesDate = matchesDate && dpr.reportDate <= endDate;
+      }
+      
+      return matchesSearch && matchesDate;
+    });
 
     return result.sort((a, b) => {
         const dateA = new Date(a.reportDate || (a.createdAt?.toDate?.() || 0)).getTime();
         const dateB = new Date(b.reportDate || (b.createdAt?.toDate?.() || 0)).getTime();
         return dateB - dateA;
     });
-  }, [dprs, searchTerm]);
+  }, [dprs, searchTerm, startDate, endDate]);
 
   const handleDelete = () => {
     if (!deletingDpr) return;
@@ -117,30 +129,99 @@ export default function DPRListPage() {
     setEditingDpr(null);
   };
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStartDate("");
+    setEndDate("");
+  };
+
+  const handlePrint = () => {
+    if (typeof window !== "undefined") {
+      window.print();
+    }
+  };
+
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
             <FileText className="h-8 w-8" /> DPR Data
           </h1>
           <p className="text-muted-foreground">Track and review submitted progress reports.</p>
         </div>
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search reports..." 
-            className="pl-9 rounded-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex items-center gap-2">
+          {(isAdmin || isManager) && (
+            <Button variant="outline" className="rounded-sm font-bold" onClick={handlePrint}>
+              <Printer className="mr-2 h-4 w-4" />
+              Generate Report
+            </Button>
+          )}
         </div>
       </div>
 
-      <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden">
-        <CardHeader>
-          <CardTitle>Updates</CardTitle>
-          <CardDescription>Comprehensive list of daily site activities.</CardDescription>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+        <div className="md:col-span-2 space-y-1.5">
+          <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search by site, user, or activity..." 
+              className="pl-9 rounded-sm h-10 border-primary/20"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">From Date</Label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input 
+              type="date" 
+              className="pl-9 rounded-sm h-10 border-primary/20" 
+              value={startDate} 
+              onChange={(e) => setStartDate(e.target.value)} 
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5 flex gap-2">
+          <div className="flex-1 space-y-1.5">
+            <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">To Date</Label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input 
+                type="date" 
+                className="pl-9 rounded-sm h-10 border-primary/20" 
+                value={endDate} 
+                onChange={(e) => setEndDate(e.target.value)} 
+              />
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="mt-auto h-10 w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
+            <FilterX className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden" id="printable-report-area">
+        <CardHeader className="border-b bg-muted/5">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Daily Progress Updates</CardTitle>
+              <CardDescription>
+                {startDate || endDate ? (
+                  <span className="text-primary font-semibold">
+                    Report for {startDate || 'Start'} to {endDate || 'Today'}
+                  </span>
+                ) : "Comprehensive list of daily site activities."}
+              </CardDescription>
+            </div>
+            <div className="hidden print:block text-right">
+              <p className="text-xs font-bold uppercase text-muted-foreground">Generated On</p>
+              <p className="text-sm font-mono">{format(new Date(), 'dd MMM yyyy HH:mm')}</p>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {dprsLoading ? (
@@ -152,22 +233,25 @@ export default function DPRListPage() {
           ) : sortedAndFilteredDprs && sortedAndFilteredDprs.length > 0 ? (
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="bg-muted/30">
                   <TableHead className="w-32">Date</TableHead>
                   <TableHead>Site</TableHead>
                   <TableHead>User</TableHead>
-                  <TableHead>Update</TableHead>
-                  <TableHead className="text-right px-6">Actions</TableHead>
+                  <TableHead className="min-w-[300px]">Update & Activity</TableHead>
+                  <TableHead className="text-right px-6 no-print">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sortedAndFilteredDprs.map((dpr) => (
-                  <TableRow key={dpr.id}>
+                  <TableRow key={dpr.id} className="hover:bg-muted/5">
                     <TableCell className="font-medium whitespace-nowrap">
                         {dpr.reportDate ? format(new Date(dpr.reportDate), 'dd MMM yyyy') : '—'}
                     </TableCell>
                     <TableCell className="font-semibold">{dpr.siteName}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{dpr.userName || '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      <div className="font-medium text-foreground">{dpr.userName || '—'}</div>
+                      <div className="text-[10px] uppercase tracking-tighter opacity-70">Engineer</div>
+                    </TableCell>
                     <TableCell className="max-w-md">
                         <div className="text-sm italic text-muted-foreground mb-1">"{dpr.description}"</div>
                         {dpr.editedBy && (
@@ -183,7 +267,7 @@ export default function DPRListPage() {
                             </div>
                         )}
                     </TableCell>
-                    <TableCell className="text-right px-6">
+                    <TableCell className="text-right px-6 no-print">
                         <div className="flex justify-end items-center gap-1">
                             {dpr.userId === user?.uid && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setEditingDpr(dpr)}>
@@ -203,7 +287,7 @@ export default function DPRListPage() {
             </Table>
           ) : (
             <div className="text-center py-24 text-muted-foreground italic bg-muted/5">
-              {searchTerm ? "No results found matching your search." : "No reports found matching your criteria."}
+              {searchTerm || startDate || endDate ? "No results found matching your filters." : "No reports found matching your criteria."}
             </div>
           )}
         </CardContent>
