@@ -1,10 +1,9 @@
-
 'use client';
 
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, or } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import { MainNav } from "@/components/main-nav";
 import {
@@ -112,14 +111,25 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
   
   const ptwQueryForBadge = useMemoFirebase(() => {
-    if (userRole === 'Admin' || userRole === 'Site Manager') {
+    if (!user || isProfileLoading) return null;
+    const colRef = collection(firestore, 'permits_to_work');
+    
+    if (userRole === 'Admin') {
+      return query(colRef, where('status', '==', 'Pending'));
+    }
+    
+    if (userRole === 'Site Manager') {
+      // Must filter to match security rules: Manager sees their own + mapped team data
       return query(
-        collection(firestore, 'permits_to_work'),
-        where('isNew', '==', true)
+        colRef, 
+        where('status', '==', 'Pending'),
+        or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid))
       );
     }
+    
     return null;
-  }, [firestore, userRole]);
+  }, [firestore, userRole, user, isProfileLoading]);
+  
   const { data: permitsForBadge } = useCollection(ptwQueryForBadge);
 
   const pendingPtwCount = React.useMemo(() => permitsForBadge?.length || 0, [permitsForBadge]);

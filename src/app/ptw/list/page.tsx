@@ -71,6 +71,8 @@ type PtwType = {
     allowedApproverIds?: string[];
 };
 
+type SortKey = 'serialNumber' | 'ptwType' | 'siteName' | 'requestDate' | 'status';
+
 function StatusBadge({ permit, className }: { permit: Permit, className?: string }) {
   const firestore = useFirestore();
   
@@ -107,12 +109,6 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
   );
 }
 
-const formatTimestamp = (ts: any) => {
-  if (!ts) return 'N/A';
-  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
-  return format(date, 'dd/MM/yyyy HH:mm');
-};
-
 function WhatsAppReminder({ userId, permit }: { userId: string | undefined, permit: Permit }) {
     const firestore = useFirestore();
     const { data: targetUser } = useDoc(useMemoFirebase(() => userId ? doc(firestore, 'users', userId) : null, [firestore, userId]));
@@ -141,7 +137,16 @@ function WhatsAppReminder({ userId, permit }: { userId: string | undefined, perm
     );
 }
 
-type SortKey = 'serialNumber' | 'ptwType' | 'siteName' | 'requestDate' | 'status';
+const SortIcon = ({ column, sortConfig }: { column: SortKey, sortConfig: { key: SortKey; direction: 'asc' | 'desc' } }) => {
+  if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
+  return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
+};
+
+const formatTimestamp = (ts: any) => {
+  if (!ts) return 'N/A';
+  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
+  return format(date, 'dd/MM/yyyy HH:mm');
+};
 
 export default function PtwListPage() {
   const firestore = useFirestore();
@@ -165,12 +170,12 @@ export default function PtwListPage() {
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole || !user || isProfileLoading) return null;
     const colRef = collection(firestore, 'permits_to_work');
-    if (userRole === 'Admin') return colRef;
+    if (isAdmin) return colRef;
     if (userRole === 'Site Manager') {
       return query(colRef, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)));
     }
     return query(colRef, where('siteEngineerId', '==', user.uid));
-  }, [firestore, userRole, user, isProfileLoading]);
+  }, [firestore, userRole, user, isProfileLoading, isAdmin]);
 
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
   const { data: ptwTypes } = useCollection<PtwType>(useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]));
@@ -260,11 +265,6 @@ export default function PtwListPage() {
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
-  };
-
-  const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
   const filteredPermits = React.useMemo(() => {
@@ -379,11 +379,11 @@ export default function PtwListPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead onClick={() => handleSort('serialNumber')} className="cursor-pointer">Serial No <SortIcon column="serialNumber" /></TableHead>
-                <TableHead onClick={() => handleSort('ptwType')} className="cursor-pointer">PTW Type <SortIcon column="ptwType" /></TableHead>
-                <TableHead onClick={() => handleSort('siteName')} className="cursor-pointer">Site <SortIcon column="siteName" /></TableHead>
-                <TableHead onClick={() => handleSort('status')} className="cursor-pointer">Status <SortIcon column="status" /></TableHead>
-                <TableHead onClick={() => handleSort('requestDate')} className="cursor-pointer">Date <SortIcon column="requestDate" /></TableHead>
+                <TableHead onClick={() => handleSort('serialNumber')} className="cursor-pointer">Serial No <SortIcon column="serialNumber" sortConfig={sortConfig} /></TableHead>
+                <TableHead onClick={() => handleSort('ptwType')} className="cursor-pointer">PTW Type <SortIcon column="ptwType" sortConfig={sortConfig} /></TableHead>
+                <TableHead onClick={() => handleSort('siteName')} className="cursor-pointer">Site <SortIcon column="siteName" sortConfig={sortConfig} /></TableHead>
+                <TableHead onClick={() => handleSort('status')} className="cursor-pointer">Status <SortIcon column="status" sortConfig={sortConfig} /></TableHead>
+                <TableHead onClick={() => handleSort('requestDate')} className="cursor-pointer">Date <SortIcon column="requestDate" sortConfig={sortConfig} /></TableHead>
                 <TableHead className="text-right px-6">Actions</TableHead>
               </TableRow>
             </TableHeader>

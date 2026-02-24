@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect } from 'react';
@@ -77,18 +76,24 @@ export default function AdminDashboardPage() {
     }, [isUserLoading, isProfileLoading, isAdmin, router]);
 
     const usersQuery = useMemoFirebase(() => {
-        if (!isAdmin) return null;
+        if (!isAdmin || isProfileLoading) return null;
         return collection(firestore, 'users');
-    }, [firestore, isAdmin]);
+    }, [firestore, isAdmin, isProfileLoading]);
     const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
 
-    const permitsQuery = useMemoFirebase(() => collection(firestore, 'permits_to_work'), [firestore]);
+    const permitsQuery = useMemoFirebase(() => {
+        if (!isAdmin || isProfileLoading) return null;
+        return collection(firestore, 'permits_to_work');
+    }, [firestore, isAdmin, isProfileLoading]);
     const { data: permits, isLoading: permitsLoading } = useCollection(permitsQuery);
 
-    const projectsQuery = useMemoFirebase(() => collection(firestore, 'projects'), [firestore]);
+    const projectsQuery = useMemoFirebase(() => {
+        if (!isAdmin || isProfileLoading) return null;
+        return collection(firestore, 'projects');
+    }, [firestore, isAdmin, isProfileLoading]);
     const { data: projects, isLoading: projectsLoading } = useCollection(projectsQuery);
 
-    if (isUserLoading || isProfileLoading || (isAdmin && usersLoading) || permitsLoading || projectsLoading) {
+    if (isUserLoading || isProfileLoading || (isAdmin && (usersLoading || permitsLoading || projectsLoading))) {
         return <AdminDashboardSkeleton />
     }
 
