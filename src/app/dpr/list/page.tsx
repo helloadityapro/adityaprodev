@@ -71,7 +71,7 @@ export default function DPRListPage() {
 
       <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden">
         <CardHeader>
-          <CardTitle>Historical Updates</CardTitle>
+          <CardTitle>Updates</CardTitle>
           <CardDescription>Comprehensive list of daily site activities.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
