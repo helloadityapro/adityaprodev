@@ -269,6 +269,7 @@ export default function RaisePtwPage() {
         longitude: location.longitude,
         status: "Pending",
         statusChangeDate: serverTimestamp(),
+        siteManagerId: userProfile.siteManagerId || null, // Ensure siteManagerId is explicitly updated/preserved
       };
 
       let managerMobile = "";
@@ -279,8 +280,8 @@ export default function RaisePtwPage() {
           
           addDocumentNonBlocking(collection(firestore, 'notifications'), {
             userId: userProfile.siteManagerId,
-            title: "New Permit Request",
-            description: `${userProfile.username || user.email} raised a permit (${serialNumber}) for "${values.siteName}".`,
+            title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
+            description: `${userProfile.username || user.email} ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit (${serialNumber}) for "${values.siteName}".`,
             link: `/ptw/list?view=${permitId}`,
             read: false,
             createdAt: serverTimestamp(),
@@ -313,7 +314,6 @@ export default function RaisePtwPage() {
         permitData.id = permitId;
         permitData.serialNumber = serialNumber;
         permitData.siteEngineerId = user.uid;
-        permitData.siteManagerId = userProfile.siteManagerId || null;
         permitData.requestDate = serverTimestamp();
         permitData.attachments = newAttachments;
         permitData.timeline = [timelineEntry];

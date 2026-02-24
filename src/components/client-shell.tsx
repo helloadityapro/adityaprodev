@@ -119,8 +119,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     }
     
     if (userRole === 'Site Manager') {
-      // Must filter to match security rules: Manager sees their own + mapped team data
-      // FIXED: Use and() to wrap multiple top-level filters
       return query(
         colRef, 
         and(
