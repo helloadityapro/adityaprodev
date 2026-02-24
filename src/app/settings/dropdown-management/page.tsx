@@ -13,8 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch, arrayUnion } from 'firebase/firestore';
-import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, ListTree, SlidersHorizontal, ClipboardList } from 'lucide-react';
+import { collection, doc, writeBatch, arrayUnion, getDocs } from 'firebase/firestore';
+import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, ListTree, SlidersHorizontal, ClipboardList, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -87,7 +87,7 @@ export default function AdminSettingsPage() {
 
   // Permit Management States
   const [selectedPermitIds, setSelectedPermitIds] = React.useState<string[]>([]);
-  const [deleteDialog, setDeleteDialog] = React.useState<{ open: boolean, targets: string[] }>({ open: false, targets: [] });
+  const [deleteDialog, setDeleteDialog] = React.useState<{ open: boolean, targets: string[], isAll: boolean }>({ open: false, targets: [], isAll: false });
   const [isDeleting, setIsDeleting] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -199,7 +199,7 @@ export default function AdminSettingsPage() {
       });
       toast({ title: "Hidden Successfully", description: "Selected requests hidden from your view." });
       setSelectedPermitIds([]);
-      setDeleteDialog({ open: false, targets: [] });
+      setDeleteDialog({ open: false, targets: [], isAll: false });
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not hide requests.' });
     } finally {
@@ -208,19 +208,31 @@ export default function AdminSettingsPage() {
   };
 
   const handleDeleteForEveryone = async () => {
-    if (!firestore || deleteDialog.targets.length === 0) return;
+    if (!firestore || (!deleteDialog.isAll && deleteDialog.targets.length === 0)) return;
     setIsDeleting(true);
     try {
-      const batch = writeBatch(firestore);
-      deleteDialog.targets.forEach(id => {
-        batch.delete(doc(firestore, 'permits_to_work', id));
-      });
-      await batch.commit();
-      toast({ title: "Permanently Deleted", description: "Selected requests deleted for everyone." });
+      let idsToDelete = deleteDialog.targets;
+      
+      if (deleteDialog.isAll) {
+        const snapshot = await getDocs(collection(firestore, 'permits_to_work'));
+        idsToDelete = snapshot.docs.map(doc => doc.id);
+      }
+
+      const batchSize = 500;
+      for (let i = 0; i < idsToDelete.length; i += batchSize) {
+        const batch = writeBatch(firestore);
+        const chunk = idsToDelete.slice(i, i + batchSize);
+        chunk.forEach(id => {
+          batch.delete(doc(firestore, 'permits_to_work', id));
+        });
+        await batch.commit();
+      }
+
+      toast({ title: "Permanently Deleted", description: deleteDialog.isAll ? "All records deleted." : "Selected requests deleted." });
       setSelectedPermitIds([]);
-      setDeleteDialog({ open: false, targets: [] });
+      setDeleteDialog({ open: false, targets: [], isAll: false });
     } catch (e) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete requests.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete records.' });
     } finally {
       setIsDeleting(false);
     }
@@ -359,9 +371,19 @@ export default function AdminSettingsPage() {
 
         <TabsContent value="permits" className="space-y-6 animate-in fade-in-50 duration-300">
           <Card className="rounded-sm">
-            <CardHeader>
-              <CardTitle>Delete Permit Records</CardTitle>
-              <CardDescription>Cleanup requests and manage administrative visibility across the entire platform.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Delete Permit Records</CardTitle>
+                <CardDescription>Cleanup requests and manage administrative visibility across the entire platform.</CardDescription>
+              </div>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => setDeleteDialog({ open: true, targets: [], isAll: true })}
+                className="rounded-sm bg-red-700 hover:bg-red-800"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" /> Delete All Records
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between gap-4 p-4 bg-muted/40 border rounded-sm">
@@ -372,7 +394,7 @@ export default function AdminSettingsPage() {
                 <Button 
                     variant="destructive" 
                     disabled={selectedPermitIds.length === 0} 
-                    onClick={() => setDeleteDialog({ open: true, targets: selectedPermitIds })}
+                    onClick={() => setDeleteDialog({ open: true, targets: selectedPermitIds, isAll: false })}
                     className="rounded-sm"
                 >
                     <Trash2 className="h-4 w-4 mr-2" /> Delete Selected
@@ -421,7 +443,7 @@ export default function AdminSettingsPage() {
                                   variant="ghost" 
                                   size="icon" 
                                   className="text-destructive hover:bg-destructive/10 rounded-sm h-8 w-8"
-                                  onClick={() => setDeleteDialog({ open: true, targets: [p.id] })}
+                                  onClick={() => setDeleteDialog({ open: true, targets: [p.id], isAll: false })}
                               >
                                   <Trash2 className="h-4 w-4" />
                               </Button>
@@ -489,27 +511,38 @@ export default function AdminSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={deleteDialog.open} onOpenChange={(o) => !o && setDeleteDialog({ open: false, targets: [] })}>
+      <AlertDialog open={deleteDialog.open} onOpenChange={(o) => !o && setDeleteDialog({ open: false, targets: [], isAll: false })}>
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {deleteDialog.targets.length > 1 ? 'Requests' : 'Request'}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {deleteDialog.isAll ? 'Factory Reset PtW Data' : `Delete ${deleteDialog.targets.length > 1 ? 'Requests' : 'Request'}`}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-                Choose how you want to handle the deletion of these records.
+                {deleteDialog.isAll 
+                  ? 'This will permanently remove EVERY Permit to Work from the database. The daily sequence count will reset to 1. Are you absolutely sure?'
+                  : 'Choose how you want to handle the deletion of these records.'
+                }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-col gap-3 py-4">
-            <div className="flex flex-col gap-1 p-3 border rounded-sm bg-accent/30">
-                <p className="text-sm font-bold">Delete for me</p>
-                <p className="text-xs text-muted-foreground">Only hides these requests from your administration dashboard. Engineers and Managers can still see them.</p>
-                <Button variant="outline" className="mt-2 w-full rounded-sm" onClick={handleDeleteForMe} disabled={isDeleting}>
-                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete for me"}
-                </Button>
-            </div>
+            {!deleteDialog.isAll && (
+              <div className="flex flex-col gap-1 p-3 border rounded-sm bg-accent/30">
+                  <p className="text-sm font-bold">Delete for me</p>
+                  <p className="text-xs text-muted-foreground">Only hides these requests from your administration dashboard. Engineers and Managers can still see them.</p>
+                  <Button variant="outline" className="mt-2 w-full rounded-sm" onClick={handleDeleteForMe} disabled={isDeleting}>
+                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete for me"}
+                  </Button>
+              </div>
+            )}
             <div className="flex flex-col gap-1 p-3 border border-destructive/20 rounded-sm bg-destructive/5">
                 <p className="text-sm font-bold text-destructive">Delete for everyone</p>
-                <p className="text-xs text-muted-foreground">Permanently removes these records from the database for all users. This action cannot be undone.</p>
+                <p className="text-xs text-muted-foreground">
+                  {deleteDialog.isAll 
+                    ? 'WIPE ALL DATA: This cannot be undone.' 
+                    : 'Permanently removes these records from the database for all users.'}
+                </p>
                 <Button variant="destructive" className="mt-2 w-full rounded-sm" onClick={handleDeleteForEveryone} disabled={isDeleting}>
-                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete for everyone"}
+                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : deleteDialog.isAll ? "Wipe All Data" : "Delete for everyone"}
                 </Button>
             </div>
           </div>
