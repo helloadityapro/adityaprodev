@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ClipboardList, Search, Pencil, Trash2, Loader2 } from "lucide-react";
+import { ClipboardList, Search, Pencil, Trash2, Loader2, User } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -34,17 +34,21 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Requirement = {
   id: string;
   siteName: string;
   description: string;
-  status: string;
+  status: "Pending" | "Ordered" | "Dispatched" | "In-transit" | "Delivered";
+  statusUpdatedBy?: string;
   userId: string;
   userName: string;
   siteManagerId: string | null;
   createdAt: any;
 };
+
+const STATUS_OPTIONS = ["Pending", "Ordered", "Dispatched", "In-transit", "Delivered"] as const;
 
 export default function RequirementListPage() {
   const firestore = useFirestore();
@@ -113,6 +117,16 @@ export default function RequirementListPage() {
     setEditingReq(null);
   };
 
+  const handleStatusChange = (reqId: string, newStatus: string) => {
+    if (!user || !userProfile) return;
+    const reqRef = doc(firestore, 'requirements', reqId);
+    updateDocumentNonBlocking(reqRef, {
+        status: newStatus,
+        statusUpdatedBy: userProfile.username || user.email || "Unknown"
+    });
+    toast({ title: "Status Updated", description: `Requirement status changed to ${newStatus}.` });
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -152,8 +166,8 @@ export default function RequirementListPage() {
                   <TableHead className="w-32">Date</TableHead>
                   <TableHead>Site</TableHead>
                   <TableHead>User</TableHead>
-                  <TableHead>Requirement</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="min-w-[200px]">Requirement</TableHead>
+                  <TableHead className="min-w-[250px]">Status & Log</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -165,13 +179,31 @@ export default function RequirementListPage() {
                     </TableCell>
                     <TableCell className="font-semibold">{req.siteName}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{req.userName || '—'}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-md truncate">
+                    <TableCell className="text-sm text-muted-foreground max-w-sm truncate">
                         {req.description}
                     </TableCell>
                     <TableCell>
-                        <Badge variant={req.status === 'Fulfilled' ? 'default' : 'secondary'} className="rounded-sm text-[10px] font-bold uppercase">
-                            {req.status || 'Pending'}
-                        </Badge>
+                        <div className="flex items-center gap-3">
+                            <Select 
+                                defaultValue={req.status || "Pending"} 
+                                onValueChange={(val) => handleStatusChange(req.id, val)}
+                            >
+                                <SelectTrigger className="w-[140px] h-8 text-[11px] font-bold rounded-sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {STATUS_OPTIONS.map(opt => (
+                                        <SelectItem key={opt} value={opt} className="text-[11px] font-medium">{opt}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {req.statusUpdatedBy && (
+                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground italic whitespace-nowrap">
+                                    <User className="h-3 w-3" />
+                                    <span>by {req.statusUpdatedBy}</span>
+                                </div>
+                            )}
+                        </div>
                     </TableCell>
                     <TableCell className="text-right px-6">
                         <div className="flex justify-end items-center gap-1">

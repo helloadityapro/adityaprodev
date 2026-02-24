@@ -68,6 +68,7 @@ export default function SubmitRequirementPage() {
       addDocumentNonBlocking(collection(firestore, 'requirements'), {
         ...values,
         status: "Pending",
+        statusUpdatedBy: userProfile?.username || user.email || "System",
         userId: user.uid,
         userName: userProfile?.username || user.email,
         siteManagerId: userProfile?.siteManagerId || null,
