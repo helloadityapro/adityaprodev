@@ -1,9 +1,8 @@
-
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, doc, query, where, orderBy, or } from "firebase/firestore";
+import { collection, doc, query, where, or } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,28 +26,38 @@ export default function RequirementListPage() {
   const requirementsQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
     const colRef = collection(firestore, 'requirements');
-    if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'));
+    
+    // We remove the server-side orderBy to avoid the need for composite indexes in prototyping
+    if (isAdmin) return colRef;
     
     if (isManager) {
         return query(
             colRef, 
-            or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid)),
-            orderBy('createdAt', 'desc')
+            or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid))
         );
     }
     
-    return query(colRef, where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
+    return query(colRef, where('userId', '==', user.uid));
   }, [firestore, user, userProfile, isAdmin, isManager]);
 
   const { data: requirements, isLoading: reqsLoading } = useCollection(requirementsQuery);
 
-  const filteredReqs = React.useMemo(() => {
+  const sortedAndFilteredReqs = React.useMemo(() => {
     if (!requirements) return [];
-    return requirements.filter(req => 
+    
+    // Search Filter
+    let result = requirements.filter(req => 
       req.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (req.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.description.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // Client-side Sorting (Desc by createdAt)
+    return result.sort((a, b) => {
+        const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+        const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+        return dateB - dateA;
+    });
   }, [requirements, searchTerm]);
 
   return (
@@ -83,7 +92,7 @@ export default function RequirementListPage() {
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
             </div>
-          ) : filteredReqs && filteredReqs.length > 0 ? (
+          ) : sortedAndFilteredReqs && sortedAndFilteredReqs.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -95,7 +104,7 @@ export default function RequirementListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredReqs.map((req) => (
+                {sortedAndFilteredReqs.map((req) => (
                   <TableRow key={req.id}>
                     <TableCell className="font-medium whitespace-nowrap">
                         {req.createdAt ? format(req.createdAt.toDate(), 'dd MMM yyyy') : '—'}

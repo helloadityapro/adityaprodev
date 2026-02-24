@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, doc, query, where, orderBy, or } from "firebase/firestore";
+import { collection, doc, query, where, or } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,28 +25,38 @@ export default function DPRListPage() {
   const dprsQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
     const colRef = collection(firestore, 'dprs');
-    if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'));
+    
+    // We remove the server-side orderBy to avoid the need for composite indexes in prototyping
+    if (isAdmin) return colRef;
     
     if (isManager) {
         return query(
             colRef, 
-            or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid)),
-            orderBy('createdAt', 'desc')
+            or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid))
         );
     }
     
-    return query(colRef, where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
+    return query(colRef, where('userId', '==', user.uid));
   }, [firestore, user, userProfile, isAdmin, isManager]);
 
   const { data: dprs, isLoading: dprsLoading } = useCollection(dprsQuery);
 
-  const filteredDprs = React.useMemo(() => {
+  const sortedAndFilteredDprs = React.useMemo(() => {
     if (!dprs) return [];
-    return dprs.filter(dpr => 
+    
+    // Search Filter
+    let result = dprs.filter(dpr => 
       dpr.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (dpr.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       dpr.description.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // Client-side Sorting (Desc by reportDate/createdAt)
+    return result.sort((a, b) => {
+        const dateA = new Date(a.reportDate || a.createdAt?.toDate?.() || 0).getTime();
+        const dateB = new Date(b.reportDate || b.createdAt?.toDate?.() || 0).getTime();
+        return dateB - dateA;
+    });
   }, [dprs, searchTerm]);
 
   return (
@@ -81,7 +91,7 @@ export default function DPRListPage() {
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
             </div>
-          ) : filteredDprs && filteredDprs.length > 0 ? (
+          ) : sortedAndFilteredDprs && sortedAndFilteredDprs.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -92,9 +102,11 @@ export default function DPRListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDprs.map((dpr) => (
+                {sortedAndFilteredDprs.map((dpr) => (
                   <TableRow key={dpr.id}>
-                    <TableCell className="font-medium whitespace-nowrap">{format(new Date(dpr.reportDate), 'dd MMM yyyy')}</TableCell>
+                    <TableCell className="font-medium whitespace-nowrap">
+                        {dpr.reportDate ? format(new Date(dpr.reportDate), 'dd MMM yyyy') : '—'}
+                    </TableCell>
                     <TableCell className="font-semibold">{dpr.siteName}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{dpr.userName || '—'}</TableCell>
                     <TableCell className="text-sm italic text-muted-foreground max-w-md">"{dpr.description}"</TableCell>
