@@ -78,17 +78,18 @@ export default function RaisePtwPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
+  const isAdmin = React.useMemo(() => isSuperAdmin(user?.email) || userProfile?.role === 'Admin', [user, userProfile]);
+  const isManager = React.useMemo(() => userProfile?.role === 'Site Manager', [userProfile]);
+
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-    const isAdmin = isSuperAdmin(user?.email) || userProfile.role === 'Admin';
-
     if (isAdmin) {
       return Array.from(new Map(allSites.map(site => [site.name, site])).values());
     }
     const assignedIds = userProfile.assignedProjectIds || [];
     const filtered = allSites.filter(s => assignedIds.includes(s.id));
     return Array.from(new Map(filtered.map(site => [site.name, site])).values());
-  }, [allSites, userProfile, user]);
+  }, [allSites, userProfile, isAdmin]);
 
   const [selectedSite, setSelectedSite] = React.useState<Site | null>(null);
   const [files, setFiles] = React.useState<File[]>([]);
@@ -159,12 +160,12 @@ export default function RaisePtwPage() {
 
   const triggerWhatsApp = (serial: string, site: string, permitId: string, mobile?: string) => {
     if (!mobile) {
-      toast({ variant: 'destructive', title: 'No Manager Mobile', description: 'Could not find manager mobile number for notification.' });
+      toast({ variant: 'destructive', title: 'No Mobile', description: 'No mobile number found for notification.' });
       return;
     }
     const cleanMobile = mobile.replace(/\D/g, '');
     const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
-    const message = `Hello, I've submitted a new PtW request.\nSerial: ${serial}\nSite: ${site}\nLink: ${window.location.origin}/ptw/list?view=${permitId}`;
+    const message = `Hello, I've resubmitted the PtW request.\nSerial: ${serial}\nSite: ${site}\nLink: ${window.location.origin}/ptw/list?view=${permitId}`;
     const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -209,7 +210,6 @@ export default function RaisePtwPage() {
         const endOfDay = new Date(); endOfDay.setHours(23,59,59,999);
 
         try {
-          // Count only current user's permits today to ensure listing permission matches security rules
           const qToday = query(
             collection(firestore, "permits_to_work"), 
             where("requestDate", ">=", Timestamp.fromDate(startOfDay)), 
@@ -249,20 +249,23 @@ export default function RaisePtwPage() {
 
       const newAttachments = await Promise.all(processedFiles.map(file => uploadFile(file, `uploads/${user.uid}/${timestamp}-${file.name}`)));
       
+      // Determine new status based on who is submitting
+      // If Site Engineer resubmits -> goes back to Manager review (Pending)
+      // If Site Manager or Admin resubmits -> advances to Admin level (ManagerApproved)
+      const isEngineerRole = userProfile.role === 'Site Engineer';
+      const targetStatus = isEngineerRole ? "Pending" : "ManagerApproved";
+
       const timelineEntry = {
-        status: "Pending",
+        status: targetStatus,
         timestamp: new Date(),
         userId: user.uid,
-        userName: userProfile.username || user.email || 'Engineer',
-        userRole: userProfile.role || 'Site Engineer',
-        remarks: values.commentsAndRemarks || (isCorrectionMode ? values.descriptionOfWork : "Permit raised."),
-        action: isCorrectionMode ? `Resubmitted` : "Created",
+        userName: userProfile.username || user.email || 'User',
+        userRole: userProfile.role,
+        remarks: values.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with corrections." : "Initial permit creation."),
+        action: isCorrectionMode ? "Resubmitted" : "Created",
         submissionIndex: currentSubmissionIndex
       };
 
-      // Correctly identify the siteManagerId:
-      // 1. Current user's mapped manager (for engineers)
-      // 2. If correcting, and no mapping, preserve old one (for managers correcting team permits)
       const effectiveSiteManagerId = userProfile.siteManagerId || (isCorrectionMode ? permitToCorrect?.siteManagerId : null) || null;
 
       const permitData: any = {
@@ -272,7 +275,7 @@ export default function RaisePtwPage() {
         commentsAndRemarks: values.commentsAndRemarks || "",
         latitude: location.latitude,
         longitude: location.longitude,
-        status: "Pending",
+        status: targetStatus,
         statusChangeDate: serverTimestamp(),
         siteManagerId: effectiveSiteManagerId,
       };
@@ -283,18 +286,20 @@ export default function RaisePtwPage() {
         if (managerDoc.exists()) {
           managerMobile = managerDoc.data().mobile;
           
-          addDocumentNonBlocking(collection(firestore, 'notifications'), {
-            userId: effectiveSiteManagerId,
-            title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
-            description: `${userProfile.username || user.email} ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit (${serialNumber}) for "${values.siteName}".`,
-            link: `/ptw/list?view=${permitId}`,
-            read: false,
-            createdAt: serverTimestamp(),
-          });
+          if (targetStatus === 'Pending') {
+            addDocumentNonBlocking(collection(firestore, 'notifications'), {
+                userId: effectiveSiteManagerId,
+                title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
+                description: `${userProfile.username} ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit (${serialNumber}) for "${values.siteName}". Please review.`,
+                link: `/ptw/list?view=${permitId}`,
+                read: false,
+                createdAt: serverTimestamp(),
+            });
+          }
         }
       }
 
-      // Notify Khalil for all Raise/Resubmission activities
+      // Notify Admins
       const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
       getDocs(adminsQuery).then(snapshot => {
         snapshot.forEach(adminDoc => {
@@ -303,7 +308,7 @@ export default function RaisePtwPage() {
           addDocumentNonBlocking(collection(firestore, 'notifications'), {
             userId: adminDoc.id,
             title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
-            description: `${userProfile.username || user.email} ${isCorrectionMode ? 'resubmitted' : 'raised'} permit ${serialNumber} for "${values.siteName}".`,
+            description: `Permit ${serialNumber} ("${values.siteName}") has been ${isCorrectionMode ? 'resubmitted' : 'raised'} and is now ${targetStatus}.`,
             link: `/ptw/list?view=${permitId}`,
             read: false,
             createdAt: serverTimestamp(),
@@ -333,7 +338,7 @@ export default function RaisePtwPage() {
       });
       setIsSubmitted(true);
       setIsProcessing(false);
-      toast({ title: "Submitted", description: `Permit ${serialNumber} raised successfully.` });
+      toast({ title: "Submission Success", description: `Permit ${serialNumber} is now ${targetStatus}.` });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Submission Failed", description: error.message });
       setIsProcessing(false);
@@ -374,7 +379,7 @@ export default function RaisePtwPage() {
             </Button>
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" className="h-11" onClick={() => router.push('/ptw/list')}>
-                View My Permits
+                View Dashboard
               </Button>
               <Button variant="secondary" className="h-11" onClick={() => {
                 setIsSubmitted(false);
@@ -405,14 +410,14 @@ export default function RaisePtwPage() {
       )}
 
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight">{isCorrectionMode ? "Correct PtW Request" : "Raise a Permit to Work"}</h1>
-        <p className="text-muted-foreground">Ensure all safety protocols are followed before submission.</p>
+        <h1 className="text-3xl font-bold tracking-tight">{isCorrectionMode ? "Resubmit PtW Request" : "Raise a Permit to Work"}</h1>
+        <p className="text-muted-foreground">Detailed site documentation is required for approval.</p>
       </div>
 
       <Card className="max-w-4xl">
         <CardHeader>
           <CardTitle>Permit Details</CardTitle>
-          <CardDescription>Fill in the work scope and site information accurately.</CardDescription>
+          <CardDescription>All fields are mandatory for safety compliance.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -454,7 +459,7 @@ export default function RaisePtwPage() {
                               <span className="truncate">{site.name}</span>
                             </Button>
                           )) : (
-                            <div className="p-4 text-center text-sm text-muted-foreground">No sites assigned to you.</div>
+                            <div className="p-4 text-center text-sm text-muted-foreground">No authorized sites found.</div>
                           )}
                         </ScrollArea>
                       </PopoverContent>
@@ -518,7 +523,7 @@ export default function RaisePtwPage() {
               <FormField control={form.control} name="descriptionOfWork" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Description of Work</FormLabel>
-                  <FormControl><Textarea placeholder="Provide a detailed scope of work..." rows={5} {...field} disabled={isProcessing || isSubmitted} /></FormControl>
+                  <FormControl><Textarea placeholder="Explain exactly what tasks will be performed..." rows={5} {...field} disabled={isProcessing || isSubmitted} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />

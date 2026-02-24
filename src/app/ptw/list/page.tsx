@@ -222,8 +222,8 @@ export default function PtwListPage() {
       timeline: arrayUnion({ ...timelineEntry, timestamp: new Date() })
     };
 
-    if (userProfile.role === 'Site Manager') {
-      updateData.siteManagerId = user.uid;
+    if (userProfile.role === 'Site Manager' && permit.status === 'Pending') {
+      updateData.siteManagerId = user.uid; // Ensure manager ID is locked in
     } else if (isAdmin) {
       updateData.adminId = user.uid;
     }
@@ -233,14 +233,26 @@ export default function PtwListPage() {
     // Notify Engineer
     addDocumentNonBlocking(collection(firestore, 'notifications'), {
       userId: permit.siteEngineerId,
-      title: "Permit Status Update",
-      description: `Your permit ${permit.serialNumber} for "${permit.siteName}" has been updated to ${targetStatus}.`,
+      title: targetStatus === 'Approved' ? "Permit Fully Approved" : (targetStatus === 'Rejected' ? "Permit Rejected" : "Permit Manager Approved"),
+      description: `Your permit ${permit.serialNumber} for "${permit.siteName}" is now ${targetStatus}. Remarks: ${remarks}`,
       link: `/ptw/list?view=${permit.id}`,
       read: false,
       createdAt: serverTimestamp(),
     });
 
-    // Notify Khalil
+    // Notify Manager if Admin acted
+    if (isAdmin && permit.siteManagerId && permit.siteManagerId !== user.uid) {
+        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+            userId: permit.siteManagerId,
+            title: "Admin Action on Permit",
+            description: `Admin ${targetStatus.toLowerCase()} permit ${permit.serialNumber} for "${permit.siteName}".`,
+            link: `/ptw/list?view=${permit.id}`,
+            read: false,
+            createdAt: serverTimestamp(),
+        });
+    }
+
+    // Always Notify Khalil for Status Updates
     const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
     getDocs(adminsQuery).then(snapshot => {
       snapshot.forEach(adminDoc => {
@@ -249,7 +261,7 @@ export default function PtwListPage() {
         addDocumentNonBlocking(collection(firestore, 'notifications'), {
           userId: adminDoc.id,
           title: "Permit Status Update",
-          description: `Permit ${permit.serialNumber} ("${permit.siteName}") status changed to ${targetStatus} by ${userProfile.role || userRole}.`,
+          description: `Permit ${permit.serialNumber} ("${permit.siteName}") changed to ${targetStatus} by ${userProfile.username}.`,
           link: `/ptw/list?view=${permit.id}`,
           read: false,
           createdAt: serverTimestamp(),
@@ -391,7 +403,7 @@ export default function PtwListPage() {
               {filteredPermits.map(permit => {
                 const isAuthorized = isAuthorizedForType(permit.ptwType);
                 const isMappedManager = permit.siteManagerId === user?.uid;
-                const isOwnOrTeamPermit = permit.siteEngineerId === user?.uid || (userProfile?.role === 'Site Manager' && isMappedManager);
+                const isOwnerOrManager = permit.siteEngineerId === user?.uid || (userProfile?.role === 'Site Manager' && isMappedManager);
                 
                 return (
                   <TableRow key={permit.id}>
@@ -408,7 +420,7 @@ export default function PtwListPage() {
                           <WhatsAppReminder userId={permit.status === 'Pending' ? permit.siteManagerId : undefined} permit={permit} />
                         )}
 
-                        {/* Manager Action Buttons (Shows if user is the mapped manager, even if they are also Admin) */}
+                        {/* Manager Action Buttons (Shows if user is the mapped manager) */}
                         {isMappedManager && permit.status === 'Pending' && isAuthorized && (
                           <>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'ManagerApproved' })}>Approve</Button>
@@ -424,7 +436,7 @@ export default function PtwListPage() {
                           </>
                         )}
 
-                        {isOwnOrTeamPermit && permit.status === 'Rejected' && (
+                        {isOwnerOrManager && permit.status === 'Rejected' && (
                           <Button size="sm" variant="outline" className="h-8 rounded-sm" onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}>
                             <FilePen className="h-3 w-3 mr-1.5" /> Resubmit
                           </Button>
@@ -478,7 +490,7 @@ export default function PtwListPage() {
                 <span className="text-xs font-mono text-primary font-semibold">{detailsPermit?.serialNumber}</span>
               </div>
               <div className="flex gap-2">
-                {/* Approval Actions inside Details View for convenience */}
+                {/* Inline Actions inside Details View */}
                 {detailsPermit && (
                   <>
                     {(detailsPermit.siteManagerId === user?.uid && detailsPermit.status === 'Pending') && (
