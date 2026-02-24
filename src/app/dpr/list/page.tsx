@@ -254,7 +254,6 @@ export default function DPRListPage() {
                     <TableCell className="font-semibold">{dpr.siteName}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       <div className="font-medium text-foreground">{dpr.userName || '—'}</div>
-                      <div className="text-[10px] uppercase tracking-tighter opacity-70">Engineer</div>
                     </TableCell>
                     <TableCell className="max-w-md">
                         <div className="text-sm italic text-muted-foreground mb-1">"{dpr.description}"</div>
