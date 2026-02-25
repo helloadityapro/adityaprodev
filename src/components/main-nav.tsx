@@ -17,6 +17,7 @@ import {
   Table as TableIcon,
   Package,
   ClipboardList,
+  ArrowLeftRight,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -119,6 +120,28 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <Link href="/requirements/list">
                 <ClipboardList className="h-4 w-4" />
                 <span className="font-medium">Requirement Data</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Material Movement</SidebarGroupLabel>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Record Movement" isActive={pathname === '/movements/record'} className="rounded-sm">
+              <Link href="/movements/record">
+                <ArrowLeftRight className="h-4 w-4" />
+                <span className="font-medium">Record Movement</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Movement Data" isActive={pathname === '/movements/list'} className="rounded-sm">
+              <Link href="/movements/list">
+                <TableIcon className="h-4 w-4" />
+                <span className="font-medium">Movement Data</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

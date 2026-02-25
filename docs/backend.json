@@ -75,6 +75,24 @@
         "editedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteName", "itemName", "quantity", "unit", "urgency", "expectedDate", "userId", "status"]
+    },
+    "MaterialMovement": {
+      "title": "Material Movement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "siteName": { "type": "string" },
+        "itemName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "movementType": { "type": "string", "enum": ["Inward", "Outward"] },
+        "movementDate": { "type": "string", "format": "date" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "siteManagerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteName", "itemName", "quantity", "unit", "movementType", "movementDate", "userId"]
     }
   },
   "auth": {
@@ -97,6 +115,10 @@
       {
         "path": "/requirements/{reqId}",
         "definition": { "entityName": "Requirement" }
+      },
+      {
+        "path": "/material_movements/{movementId}",
+        "definition": { "entityName": "MaterialMovement" }
       }
     ]
   }
