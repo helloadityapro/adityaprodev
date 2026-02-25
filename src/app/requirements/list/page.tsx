@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ClipboardList, Search, Pencil, Trash2, Loader2, User, Clock } from "lucide-react";
+import { ClipboardList, Search, Pencil, Trash2, Loader2, User, Clock, AlertTriangle } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -35,11 +35,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 type Requirement = {
   id: string;
   siteName: string;
-  description: string;
+  itemName: string;
+  quantity: number;
+  unit: string;
+  urgency: "High" | "Medium" | "Low";
+  expectedDate: string;
   status: "Pending" | "Ordered" | "Dispatched" | "In-transit" | "Delivered";
   statusUpdatedBy?: string;
   statusUpdatedAt?: any;
@@ -92,7 +97,7 @@ export default function RequirementListPage() {
     let result = requirements.filter(req => 
       req.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (req.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.description.toLowerCase().includes(searchTerm.toLowerCase())
+      (req.itemName || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return result.sort((a, b) => {
@@ -110,10 +115,14 @@ export default function RequirementListPage() {
   };
 
   const handleEditSave = () => {
-    if (!editingReq || !editingReq.description.trim() || !userProfile) return;
+    if (!editingReq || !editingReq.itemName.trim() || !userProfile) return;
     setIsSaving(true);
     updateDocumentNonBlocking(doc(firestore, 'requirements', editingReq.id), {
-        description: editingReq.description,
+        itemName: editingReq.itemName,
+        quantity: editingReq.quantity,
+        unit: editingReq.unit,
+        urgency: editingReq.urgency,
+        expectedDate: editingReq.expectedDate,
         editedBy: userProfile.username || user?.email || "Unknown",
         editedAt: serverTimestamp()
     });
@@ -133,6 +142,12 @@ export default function RequirementListPage() {
     toast({ title: "Status Updated", description: `Requirement status changed to ${newStatus}.` });
   };
 
+  const urgencyConfig = {
+    High: "bg-red-100 text-red-800 border-red-200",
+    Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
+    Low: "bg-blue-100 text-blue-800 border-blue-200",
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -145,7 +160,7 @@ export default function RequirementListPage() {
         <div className="relative w-full md:w-72">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search requirements..." 
+            placeholder="Search item, site or user..." 
             className="pl-9 rounded-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -169,44 +184,52 @@ export default function RequirementListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-32">Date</TableHead>
-                  <TableHead>Site</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead className="min-w-[200px]">Requirement</TableHead>
-                  <TableHead className="min-w-[250px]">Status & Log</TableHead>
+                  <TableHead className="w-32">Site & User</TableHead>
+                  <TableHead className="min-w-[200px]">Item Details</TableHead>
+                  <TableHead>Urgency</TableHead>
+                  <TableHead>Qty & Unit</TableHead>
+                  <TableHead>Expected By</TableHead>
+                  <TableHead className="min-w-[200px]">Status & Log</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sortedAndFilteredReqs.map((req) => (
                   <TableRow key={req.id}>
-                    <TableCell className="font-medium whitespace-nowrap">
-                        {req.createdAt ? format(req.createdAt.toDate(), 'dd MMM yyyy') : '—'}
+                    <TableCell>
+                        <div className="font-semibold">{req.siteName}</div>
+                        <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">{req.userName}</div>
                     </TableCell>
-                    <TableCell className="font-semibold">{req.siteName}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{req.userName || '—'}</TableCell>
-                    <TableCell className="max-w-sm">
-                        <div className="text-sm text-muted-foreground mb-1 truncate">{req.description}</div>
+                    <TableCell>
+                        <div className="text-sm font-medium whitespace-pre-wrap max-w-xs">{req.itemName}</div>
                         {req.editedBy && (
-                            <div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-medium">
-                                <span className="bg-primary/10 px-1 rounded">Edited</span>
-                                <span>by {req.editedBy}</span>
-                                {req.editedAt && (
-                                    <span className="text-muted-foreground/60 flex items-center gap-1">
-                                        <Clock className="h-2.5 w-2.5" />
-                                        {format(req.editedAt.toDate(), 'dd MMM HH:mm')}
-                                    </span>
-                                )}
+                            <div className="flex items-center gap-1.5 text-[9px] text-primary/70 font-bold uppercase mt-1">
+                                <span>Edited by {req.editedBy}</span>
                             </div>
                         )}
                     </TableCell>
                     <TableCell>
-                        <div className="flex items-center gap-3">
+                        <Badge variant="outline" className={cn("rounded-sm text-[10px] font-bold uppercase", urgencyConfig[req.urgency] || urgencyConfig.Medium)}>
+                            {req.urgency}
+                        </Badge>
+                    </TableCell>
+                    <TableCell>
+                        <div className="font-mono font-bold text-sm">{req.quantity}</div>
+                        <div className="text-[10px] text-muted-foreground uppercase">{req.unit}</div>
+                    </TableCell>
+                    <TableCell>
+                        <div className="flex items-center gap-1.5 text-xs font-semibold">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            {req.expectedDate ? format(new Date(req.expectedDate), 'dd MMM yy') : '—'}
+                        </div>
+                    </TableCell>
+                    <TableCell>
+                        <div className="flex items-center gap-2">
                             <Select 
                                 defaultValue={req.status || "Pending"} 
                                 onValueChange={(val) => handleStatusChange(req.id, val)}
                             >
-                                <SelectTrigger className="w-[140px] h-8 text-[11px] font-bold rounded-sm">
+                                <SelectTrigger className="w-[130px] h-8 text-[11px] font-bold rounded-sm">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -216,17 +239,9 @@ export default function RequirementListPage() {
                                 </SelectContent>
                             </Select>
                             {req.statusUpdatedBy && (
-                                <div className="flex flex-col gap-0.5">
-                                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground italic whitespace-nowrap">
-                                        <User className="h-3 w-3" />
-                                        <span>by {req.statusUpdatedBy}</span>
-                                    </div>
-                                    {req.statusUpdatedAt && (
-                                        <div className="flex items-center gap-1 text-[9px] text-muted-foreground/70 pl-4 whitespace-nowrap">
-                                            <Clock className="h-2.5 w-2.5" />
-                                            <span>{format(req.statusUpdatedAt.toDate(), 'dd MMM HH:mm')}</span>
-                                        </div>
-                                    )}
+                                <div className="hidden lg:flex flex-col text-[10px] text-muted-foreground italic leading-none">
+                                    <span>by {req.statusUpdatedBy}</span>
+                                    {req.statusUpdatedAt && <span>{format(req.statusUpdatedAt.toDate(), 'dd MMM HH:mm')}</span>}
                                 </div>
                             )}
                         </div>
@@ -266,17 +281,47 @@ export default function RequirementListPage() {
             </DialogHeader>
             <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                    <Label>Requirement Details</Label>
+                    <Label>Item Name</Label>
                     <Textarea 
-                        rows={8} 
-                        value={editingReq?.description || ""} 
-                        onChange={(e) => setEditingReq(prev => prev ? { ...prev, description: e.target.value } : null)} 
+                        rows={4} 
+                        value={editingReq?.itemName || ""} 
+                        onChange={(e) => setEditingReq(prev => prev ? { ...prev, itemName: e.target.value } : null)} 
                     />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Quantity</Label>
+                        <Input type="number" value={editingReq?.quantity || 0} onChange={(e) => setEditingReq(prev => prev ? { ...prev, quantity: Number(e.target.value) } : null)} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Unit</Label>
+                        <Select value={editingReq?.unit} onValueChange={(val) => setEditingReq(prev => prev ? { ...prev, unit: val } : null)}>
+                            <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {["Numbers", "Kilograms", "Liters", "Meters", "Sets"].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Urgency</Label>
+                        <Select value={editingReq?.urgency} onValueChange={(val: any) => setEditingReq(prev => prev ? { ...prev, urgency: val } : null)}>
+                            <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {["High", "Medium", "Low"].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Expected Date</Label>
+                        <Input type="date" value={editingReq?.expectedDate || ""} onChange={(e) => setEditingReq(prev => prev ? { ...prev, expectedDate: e.target.value } : null)} />
+                    </div>
                 </div>
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingReq(null)} disabled={isSaving}>Cancel</Button>
-                <Button onClick={handleEditSave} disabled={isSaving || !editingReq?.description.trim()}>
+                <Button onClick={handleEditSave} disabled={isSaving || !editingReq?.itemName.trim()}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Update Request
                 </Button>

@@ -59,7 +59,11 @@
       "properties": {
         "id": { "type": "string" },
         "siteName": { "type": "string" },
-        "description": { "type": "string" },
+        "itemName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string", "enum": ["Numbers", "Kilograms", "Liters", "Meters", "Sets"] },
+        "urgency": { "type": "string", "enum": ["High", "Medium", "Low"] },
+        "expectedDate": { "type": "string", "format": "date" },
         "status": { "type": "string", "enum": ["Pending", "Ordered", "Dispatched", "In-transit", "Delivered"] },
         "statusUpdatedBy": { "type": "string" },
         "statusUpdatedAt": { "type": "string", "format": "date-time" },
@@ -70,7 +74,7 @@
         "editedBy": { "type": "string" },
         "editedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["siteName", "description", "userId", "status"]
+      "required": ["siteName", "itemName", "quantity", "unit", "urgency", "expectedDate", "userId", "status"]
     }
   },
   "auth": {
