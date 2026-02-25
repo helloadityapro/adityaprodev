@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -12,11 +11,10 @@ import {
   DialogTitle,
   DialogClose,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import { MapPin, HardHat, User, Mail, Smartphone, ShieldCheck, SeparatorHorizontal } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { collection, query, where, doc } from 'firebase/firestore';
+import { MapPin, HardHat, User, Mail, Smartphone, ShieldCheck, FileCheck, UserCog } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
@@ -28,6 +26,7 @@ type UserProfile = {
   mobile: string;
   role: 'Admin' | 'Site Manager' | 'Site Engineer';
   assignedProjectIds?: string[];
+  siteManagerId?: string;
 };
 
 type Site = {
@@ -54,6 +53,20 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
     return query(collection(firestore, 'users'), where('siteManagerId', '==', user.id));
   }, [firestore, user]);
   const { data: mappedEngineers } = useCollection<UserProfile>(engineersQuery);
+
+  // If this user is a Site Engineer, fetch their mapped manager's info
+  const managerRef = useMemoFirebase(() => {
+    if (!user || user.role !== 'Site Engineer' || !user.siteManagerId) return null;
+    return doc(firestore, 'users', user.siteManagerId);
+  }, [firestore, user]);
+  const { data: mappedManager } = useDoc<UserProfile>(managerRef);
+
+  // Fetch count of PTWs raised by this user
+  const userPermitsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(firestore, 'permits_to_work'), where('siteEngineerId', '==', user.id));
+  }, [firestore, user]);
+  const { data: userPermits } = useCollection(userPermitsQuery);
 
   const assignedSites = React.useMemo(() => {
     if (!user?.assignedProjectIds || !allSites) return [];
@@ -86,6 +99,13 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                     </Badge>
                   </div>
                 </div>
+                <div className="flex flex-col items-end gap-1">
+                    <Label className="text-[9px] uppercase font-bold text-muted-foreground">PtWs Raised</Label>
+                    <Badge variant="outline" className="rounded-sm font-mono flex items-center gap-1.5 py-1">
+                        <FileCheck className="h-3 w-3 text-primary" />
+                        {userPermits?.length || 0}
+                    </Badge>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4">
@@ -105,6 +125,33 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
             </div>
 
             <Separator />
+
+            {/* Mapped Manager for Engineers */}
+            {user.role === 'Site Engineer' && (
+                <>
+                    <div className="space-y-4">
+                        <Label className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-2">
+                            <UserCog className="h-4 w-4" /> Reporting To
+                        </Label>
+                        {mappedManager ? (
+                            <div className="p-3 rounded-md border bg-card text-sm font-medium shadow-sm flex items-center gap-3">
+                                <div className="bg-primary/10 p-2 rounded-full">
+                                    <ShieldCheck className="h-4 w-4 text-primary" />
+                                </div>
+                                <div>
+                                    <p className="font-bold">{mappedManager.username}</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Site Manager</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-sm italic text-muted-foreground bg-muted/20 p-4 rounded-md border border-dashed text-center">
+                                No manager assigned to this engineer.
+                            </p>
+                        )}
+                    </div>
+                    <Separator />
+                </>
+            )}
 
             <div className="space-y-4">
               <Label className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-2">
