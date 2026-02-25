@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -33,6 +32,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { Separator } from "@/components/ui/separator";
 
 type DPR = {
   id: string;
@@ -255,10 +255,25 @@ export default function DPRListPage() {
                     <TableCell className="text-xs text-muted-foreground">
                       <div className="font-medium text-foreground">{dpr.userName || '—'}</div>
                     </TableCell>
-                    <TableCell className="max-w-md">
-                        <div className="text-sm italic text-muted-foreground mb-1">"{dpr.description}"</div>
+                    <TableCell className="max-w-md py-4">
+                        <div className="space-y-3 mb-3">
+                            {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx, arr) => (
+                                <React.Fragment key={pIdx}>
+                                    <p className="text-sm italic text-muted-foreground leading-relaxed">
+                                        "{para.trim()}"
+                                    </p>
+                                    {pIdx < arr.length - 1 && (
+                                        <div className="flex items-center gap-2 py-1">
+                                            <div className="h-px bg-primary/10 flex-1" />
+                                            <span className="text-[8px] text-primary/30 uppercase font-bold tracking-tighter">next part</span>
+                                            <div className="h-px bg-primary/10 flex-1" />
+                                        </div>
+                                    )}
+                                </React.Fragment>
+                            ))}
+                        </div>
                         {dpr.editedBy && (
-                            <div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-medium">
+                            <div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-medium border-t border-primary/5 pt-2">
                                 <span className="bg-primary/10 px-1 rounded">Edited</span>
                                 <span>by {dpr.editedBy}</span>
                                 {dpr.editedAt && (
