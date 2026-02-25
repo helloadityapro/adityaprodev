@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,7 @@ type MaterialMovement = {
   quantity: number;
   unit: string;
   movementType: "Inward" | "Outward";
+  sourceOrDestination: string;
   movementDate: string;
   userId: string;
   userName: string;
@@ -94,7 +95,8 @@ export default function MovementListPage() {
     let result = movements.filter(mov => {
       const matchesSearch = mov.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (mov.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (mov.itemName || '').toLowerCase().includes(searchTerm.toLowerCase());
+        (mov.itemName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (mov.sourceOrDestination || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       let matchesDate = true;
       if (startDate) {
@@ -138,6 +140,7 @@ export default function MovementListPage() {
         quantity: editingMov.quantity,
         unit: editingMov.unit,
         movementType: editingMov.movementType,
+        sourceOrDestination: editingMov.sourceOrDestination,
         movementDate: editingMov.movementDate,
         editedBy: userProfile.username || user?.email || "Unknown",
         editedAt: serverTimestamp()
@@ -212,7 +215,7 @@ export default function MovementListPage() {
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search item, site or user..." 
+              placeholder="Search item, site, from/to or user..." 
               className="pl-9 rounded-sm h-10 border-primary/20"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -281,7 +284,7 @@ export default function MovementListPage() {
               <TableHeader>
                 <TableRow className="bg-muted/30">
                   <TableHead className="w-32">Site & User</TableHead>
-                  <TableHead className="min-w-[200px]">Item Details</TableHead>
+                  <TableHead className="min-w-[200px]">Item & Origin/Destination</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Qty & Unit</TableHead>
                   <TableHead>Date</TableHead>
@@ -297,8 +300,16 @@ export default function MovementListPage() {
                     </TableCell>
                     <TableCell>
                         <div className="text-sm font-semibold whitespace-pre-wrap max-w-xs">{mov.itemName}</div>
+                        <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                {mov.movementType === 'Inward' ? 'From:' : 'To:'}
+                            </span>
+                            <span className="text-[11px] font-medium text-primary bg-primary/5 px-1.5 py-0.5 rounded-sm border border-primary/10">
+                                {mov.sourceOrDestination || '—'}
+                            </span>
+                        </div>
                         {mov.editedBy && (
-                            <div className="flex items-center gap-1.5 text-[8px] text-primary/70 font-bold uppercase mt-1">
+                            <div className="flex items-center gap-1.5 text-[8px] text-primary/70 font-bold uppercase mt-1.5">
                                 <Badge variant="outline" className="h-3 px-1 text-[7px] border-primary/20">Edited</Badge>
                                 <span>by {mov.editedBy}</span>
                             </div>
@@ -357,6 +368,10 @@ export default function MovementListPage() {
                     <Label>Item Name</Label>
                     <Input value={editingMov?.itemName || ""} onChange={(e) => setEditingMov(prev => prev ? { ...prev, itemName: e.target.value } : null)} />
                 </div>
+                <div className="space-y-2">
+                    <Label>{editingMov?.movementType === 'Inward' ? 'Inward From' : 'Outward To'}</Label>
+                    <Input value={editingMov?.sourceOrDestination || ""} onChange={(e) => setEditingMov(prev => prev ? { ...prev, sourceOrDestination: e.target.value } : null)} />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label>Movement Type</Label>
@@ -391,7 +406,7 @@ export default function MovementListPage() {
             </div>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingMov(null)} disabled={isSaving}>Cancel</Button>
-                <Button onClick={handleEditSave} disabled={isSaving || !editingMov?.itemName.trim()}>
+                <Button onClick={handleEditSave} disabled={isSaving || !editingMov?.itemName.trim() || !editingMov?.sourceOrDestination.trim()}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Update Record
                 </Button>

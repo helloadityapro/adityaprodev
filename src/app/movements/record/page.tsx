@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
@@ -31,6 +31,7 @@ const itemSchema = z.object({
 const movementSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
   movementType: z.enum(["Inward", "Outward"], { required_error: "Movement type is required" }),
+  sourceOrDestination: z.string().min(1, "Source/Destination name is required"),
   movementDate: z.string().min(1, "Date is required"),
   items: z.array(itemSchema).min(1, "Add at least one item"),
 });
@@ -72,6 +73,7 @@ export default function RecordMovementPage() {
     defaultValues: { 
       siteName: "", 
       movementType: "Inward",
+      sourceOrDestination: "",
       movementDate: format(new Date(), 'yyyy-MM-dd'),
       items: [{ itemName: "", quantity: 0, unit: "Numbers" }]
     },
@@ -82,6 +84,8 @@ export default function RecordMovementPage() {
     name: "items"
   });
 
+  const movementType = form.watch("movementType");
+
   const onSubmit = async (values: z.infer<typeof movementSchema>) => {
     if (!user) return;
     setIsSubmitting(true);
@@ -90,6 +94,7 @@ export default function RecordMovementPage() {
         return addDocumentNonBlocking(collection(firestore, 'material_movements'), {
           siteName: values.siteName,
           movementType: values.movementType,
+          sourceOrDestination: values.sourceOrDestination,
           movementDate: values.movementDate,
           ...item,
           userId: user.uid,
@@ -105,6 +110,7 @@ export default function RecordMovementPage() {
       form.reset({ 
         siteName: "", 
         movementType: values.movementType,
+        sourceOrDestination: "",
         movementDate: format(new Date(), 'yyyy-MM-dd'),
         items: [{ itemName: "", quantity: 0, unit: "Numbers" }] 
       });
@@ -134,7 +140,7 @@ export default function RecordMovementPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="siteName" render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Site Name</FormLabel>
@@ -187,7 +193,7 @@ export default function RecordMovementPage() {
                 <FormField control={form.control} name="movementType" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Movement Type</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="rounded-sm">
                           <SelectValue placeholder="Select type" />
@@ -198,6 +204,19 @@ export default function RecordMovementPage() {
                         <SelectItem value="Outward">Outward (Stock Going Out)</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="sourceOrDestination" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{movementType === 'Inward' ? 'Inward From' : 'Outward To'}</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input placeholder={movementType === 'Inward' ? "Vendor name or warehouse..." : "Receiver or destination site..."} {...field} className="rounded-sm pr-10" />
+                        <MapPin className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

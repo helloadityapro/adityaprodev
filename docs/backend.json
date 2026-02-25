@@ -86,13 +86,14 @@
         "quantity": { "type": "number" },
         "unit": { "type": "string" },
         "movementType": { "type": "string", "enum": ["Inward", "Outward"] },
+        "sourceOrDestination": { "type": "string" },
         "movementDate": { "type": "string", "format": "date" },
         "userId": { "type": "string" },
         "userName": { "type": "string" },
         "siteManagerId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["siteName", "itemName", "quantity", "unit", "movementType", "movementDate", "userId"]
+      "required": ["siteName", "itemName", "quantity", "unit", "movementType", "movementDate", "userId", "sourceOrDestination"]
     }
   },
   "auth": {
