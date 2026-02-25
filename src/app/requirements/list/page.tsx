@@ -197,7 +197,7 @@ export default function RequirementListPage() {
           <p className="text-muted-foreground">Monitor and track site material requests.</p>
         </div>
         <div className="flex items-center gap-2">
-          {(isAdmin || isManager) && (
+          {userProfile && (
             <Button variant="outline" className="rounded-sm font-bold border-primary text-primary hover:bg-primary/5" onClick={handlePrint}>
               <FileDown className="mr-2 h-4 w-4" />
               Generate Summary Report
