@@ -95,6 +95,27 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteName", "itemName", "quantity", "unit", "movementType", "movementDate", "userId", "sourceOrDestination"]
+    },
+    "Task": {
+      "title": "Task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "siteName": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "assignedToId": { "type": "string" },
+        "assignedToName": { "type": "string" },
+        "assignedById": { "type": "string" },
+        "assignedByName": { "type": "string" },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High"] },
+        "status": { "type": "string", "enum": ["To-do", "In Progress", "Completed", "Cancelled"] },
+        "dueDate": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "remarks": { "type": "string" }
+      },
+      "required": ["siteName", "title", "assignedToId", "priority", "status", "dueDate"]
     }
   },
   "auth": {
@@ -121,6 +142,10 @@
       {
         "path": "/material_movements/{movementId}",
         "definition": { "entityName": "MaterialMovement" }
+      },
+      {
+        "path": "/tasks/{taskId}",
+        "definition": { "entityName": "Task" }
       }
     ]
   }

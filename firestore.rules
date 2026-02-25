@@ -92,6 +92,22 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid || resource.data.siteManagerId == request.auth.uid));
     }
 
+    match /tasks/{taskId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.assignedToId == request.auth.uid || 
+        resource.data.assignedById == request.auth.uid ||
+        (isSiteManager() && get(/databases/$(database)/documents/users/$(resource.data.assignedToId)).data.siteManagerId == request.auth.uid)
+      );
+      allow create: if isSignedIn() && (isAdmin() || isSiteManager());
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.assignedToId == request.auth.uid || 
+        resource.data.assignedById == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
+
     match /projects/{projectId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /sites/{siteId} { allow read: if isSignedIn(); allow write: if isAdmin() || isSiteManager(); }
     match /ptw_types/{ptwTypeId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
