@@ -7,7 +7,6 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, serverTimestamp } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -219,9 +218,8 @@ export default function SubmitRequirementPage() {
                             <FormItem>
                                 <FormLabel>Item Name</FormLabel>
                                 <FormControl>
-                                    <Textarea 
-                                        placeholder="Detailed description of the material needed..." 
-                                        rows={2} 
+                                    <Input 
+                                        placeholder="Name of the material needed..." 
                                         {...field} 
                                         className="rounded-sm bg-background" 
                                     />

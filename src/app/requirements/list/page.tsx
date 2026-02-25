@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -282,8 +281,7 @@ export default function RequirementListPage() {
             <div className="space-y-4 py-4">
                 <div className="space-y-2">
                     <Label>Item Name</Label>
-                    <Textarea 
-                        rows={4} 
+                    <Input 
                         value={editingReq?.itemName || ""} 
                         onChange={(e) => setEditingReq(prev => prev ? { ...prev, itemName: e.target.value } : null)} 
                     />
