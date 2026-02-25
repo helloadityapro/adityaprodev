@@ -96,7 +96,6 @@ export default function TeamMappingPage() {
         const engineerRef = doc(firestore, 'users', selectedEngineerId);
         updateDocumentNonBlocking(engineerRef, { siteManagerId: selectedManagerId });
 
-        // Cascading logic: If engineer has sites, assign them to the manager too
         const engineer = engineers?.find(e => e.id === selectedEngineerId);
         if (engineer && engineer.assignedProjectIds?.length) {
             const managerRef = doc(firestore, 'users', selectedManagerId);
@@ -135,6 +134,8 @@ export default function TeamMappingPage() {
   const handleOpenSiteManagement = (u: User) => {
     setSiteManagementUser(u);
     setLocalAssignedSites(u.assignedProjectIds || []);
+    setSiteSearchQuery("");
+    setSelectedSiteToAdd(null);
   };
 
   const handleAddSiteToLocal = () => {
@@ -159,14 +160,12 @@ export default function TeamMappingPage() {
         const userRef = doc(firestore, 'users', siteManagementUser.id);
         updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
 
-        // CASCADING LOGIC: If this is an engineer, also assign these sites to their manager
         if (siteManagementUser.role === 'Site Engineer' && siteManagementUser.siteManagerId) {
             const managerRef = doc(firestore, 'users', siteManagementUser.siteManagerId);
             const managerSnap = await getDoc(managerRef);
             if (managerSnap.exists()) {
                 const managerData = managerSnap.data();
                 const currentSites = managerData.assignedProjectIds || [];
-                // Add newly assigned sites to manager's list (union)
                 const updatedSites = Array.from(new Set([...currentSites, ...localAssignedSites]));
                 updateDocumentNonBlocking(managerRef, { assignedProjectIds: updatedSites });
             }
@@ -174,7 +173,7 @@ export default function TeamMappingPage() {
 
         toast({
             title: 'Sites Updated',
-            description: `Access levels updated for ${siteManagementUser.username} and synchronized with manager if applicable.`,
+            description: `Access levels updated for ${siteManagementUser.username}.`,
         });
         setSiteManagementUser(null);
     } catch (e: any) {
@@ -311,6 +310,7 @@ export default function TeamMappingPage() {
                         value={managerSearchQuery}
                         onChange={(e) => setManagerSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.stopPropagation()}
+                        autoComplete="off"
                       />
                     </div>
                     <ScrollArea className="h-[250px]">
@@ -372,6 +372,7 @@ export default function TeamMappingPage() {
                         value={engineerSearchQuery}
                         onChange={(e) => setEngineerSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.stopPropagation()}
+                        autoComplete="off"
                       />
                     </div>
                     <ScrollArea className="h-[250px]">
@@ -439,6 +440,7 @@ export default function TeamMappingPage() {
                             value={tableManagerSearch}
                             onChange={(e) => setTableManagerSearch(e.target.value)}
                             className="h-8 pl-8 text-xs rounded-sm border-primary/10"
+                            autoComplete="off"
                           />
                         </div>
                       </div>
@@ -457,6 +459,7 @@ export default function TeamMappingPage() {
                           value={tableEngineerSearch}
                           onChange={(e) => setTableEngineerSearch(e.target.value)}
                           className="h-8 pl-8 text-xs rounded-sm border-primary/10"
+                          autoComplete="off"
                         />
                       </div>
                     </div>
@@ -543,7 +546,7 @@ export default function TeamMappingPage() {
                 <div className="flex items-end gap-3 p-4 bg-primary/5 border border-primary/10 rounded-sm">
                     <div className="flex-1 space-y-2">
                         <Label className="text-[10px] font-bold uppercase text-muted-foreground">Select Site to Add</Label>
-                        <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+                        <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen} modal={false}>
                             <PopoverTrigger asChild>
                                 <Button
                                     variant="outline"
@@ -559,7 +562,7 @@ export default function TeamMappingPage() {
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
                                 <div className="flex items-center border-b px-3">
                                     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                     <Input
@@ -567,7 +570,10 @@ export default function TeamMappingPage() {
                                         className="h-9 w-full border-none focus-visible:ring-0 px-0"
                                         value={siteSearchQuery}
                                         onChange={(e) => setSiteSearchQuery(e.target.value)}
-                                        onKeyDown={(e) => e.stopPropagation()}
+                                        onKeyDown={(e) => {
+                                            e.stopPropagation();
+                                        }}
+                                        autoComplete="off"
                                     />
                                 </div>
                                 <ScrollArea className="h-[200px]">
