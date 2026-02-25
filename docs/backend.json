@@ -131,6 +131,7 @@
         "fileSize": { "type": "number" },
         "uploadedById": { "type": "string" },
         "uploadedByName": { "type": "string" },
+        "siteManagerId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteId", "fileName", "fileUrl", "uploadedById"]

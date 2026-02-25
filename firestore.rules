@@ -118,9 +118,22 @@ service cloud.firestore {
     }
 
     match /site_documents/{docId} {
-      allow read: if isSignedIn() && hasAccessToSite(resource.data.siteId);
-      allow create: if isSignedIn() && hasAccessToSite(request.resource.data.siteId);
-      allow delete: if isAdmin() || (isSignedIn() && resource.data.uploadedById == request.auth.uid);
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        hasAccessToSite(resource.data.siteId) || 
+        resource.data.siteManagerId == request.auth.uid
+      );
+      allow create: if isSignedIn() && (
+        isAdmin() || 
+        hasAccessToSite(request.resource.data.siteId) || 
+        request.resource.data.siteManagerId == request.auth.uid
+      );
+      allow delete: if isAdmin() || (
+        isSignedIn() && (
+          resource.data.uploadedById == request.auth.uid || 
+          resource.data.siteManagerId == request.auth.uid
+        )
+      );
     }
 
     match /projects/{projectId} { allow read: if isSignedIn(); allow write: if isAdmin(); }

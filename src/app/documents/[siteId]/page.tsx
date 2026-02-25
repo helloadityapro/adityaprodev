@@ -37,6 +37,7 @@ type SiteDocument = {
   fileSize: number;
   uploadedById: string;
   uploadedByName: string;
+  siteManagerId: string | null;
   createdAt: any;
   storagePath: string;
 };
@@ -44,6 +45,13 @@ type SiteDocument = {
 type Site = {
   id: string;
   name: string;
+};
+
+type UserProfile = {
+  id: string;
+  username: string;
+  role: string;
+  siteManagerId?: string;
 };
 
 const getFileIcon = (type: string) => {
@@ -74,6 +82,9 @@ export default function SiteDocumentsPage() {
   const [uploadProgress, setUploadProgress] = React.useState(0);
   const [docToDelete, setDocToDelete] = React.useState<SiteDocument | null>(null);
 
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+
   const siteRef = useMemoFirebase(() => doc(firestore, 'sites', siteId), [firestore, siteId]);
   const { data: site, isLoading: siteLoading } = useDoc<Site>(siteRef);
 
@@ -85,7 +96,7 @@ export default function SiteDocumentsPage() {
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user || !site) return;
+    if (!file || !user || !site || !userProfile) return;
 
     setIsUploading(true);
     const storage = getStorage(firebaseApp);
@@ -108,6 +119,9 @@ export default function SiteDocumentsPage() {
       async () => {
         const url = await getDownloadURL(uploadTask.snapshot.ref);
         
+        // Tag the document with the manager's context for shared team folder access
+        const siteManagerId = userProfile.siteManagerId || (userProfile.role === 'Site Manager' ? user.uid : null);
+
         await addDocumentNonBlocking(collection(firestore, 'site_documents'), {
           siteId,
           siteName: site.name,
@@ -116,7 +130,8 @@ export default function SiteDocumentsPage() {
           fileType: file.type,
           fileSize: file.size,
           uploadedById: user.uid,
-          uploadedByName: user.displayName || user.email || 'User',
+          uploadedByName: userProfile.username || user.email || 'User',
+          siteManagerId: siteManagerId,
           createdAt: serverTimestamp(),
           storagePath: storagePath
         });
