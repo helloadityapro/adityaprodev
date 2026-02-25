@@ -77,9 +77,7 @@ export default function TeamMappingPage() {
   const [managerSearchQuery, setManagerSearchQuery] = React.useState("");
   const [isEngineerPopoverOpen, setIsEngineerPopoverOpen] = React.useState(false);
   const [engineerSearchQuery, setEngineerSearchQuery] = React.useState("");
-  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
-  const [selectedSiteToAdd, setSelectedSiteToAdd] = React.useState<string | null>(null);
 
   // Table filter states
   const [tableEngineerSearch, setTableEngineerSearch] = React.useState('');
@@ -135,21 +133,6 @@ export default function TeamMappingPage() {
     setSiteManagementUser(u);
     setLocalAssignedSites(u.assignedProjectIds || []);
     setSiteSearchQuery("");
-    setSelectedSiteToAdd(null);
-  };
-
-  const handleAddSiteToLocal = () => {
-    if (!selectedSiteToAdd) return;
-    if (localAssignedSites.includes(selectedSiteToAdd)) {
-        toast({ title: 'Already Assigned', description: 'This site is already in the list.', variant: 'destructive' });
-        return;
-    }
-    setLocalAssignedSites(prev => [...prev, selectedSiteToAdd]);
-    setSelectedSiteToAdd(null);
-  };
-
-  const handleRemoveSiteFromLocal = (siteId: string) => {
-    setLocalAssignedSites(prev => prev.filter(id => id !== siteId));
   };
 
   const handleSaveSites = async () => {
@@ -543,73 +526,46 @@ export default function TeamMappingPage() {
             </DialogHeader>
             
             <div className="space-y-6 py-4">
-                <div className="flex items-end gap-3 p-4 bg-primary/5 border border-primary/10 rounded-sm">
-                    <div className="flex-1 space-y-2">
-                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">Select Site to Add</Label>
-                        <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen} modal={false}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    className={cn(
-                                        "w-full justify-between font-normal h-10 rounded-sm bg-background",
-                                        !selectedSiteToAdd && "text-muted-foreground"
-                                    )}
-                                >
-                                    {selectedSiteToAdd
-                                        ? allSites?.find((s) => s.id === selectedSiteToAdd)?.name
-                                        : availableSitesToAssign.length > 0 ? "Search project sites..." : "All available sites assigned"}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
-                                <div className="flex items-center border-b px-3">
-                                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                    <Input
-                                        placeholder="Search sites..."
-                                        className="h-9 w-full border-none focus-visible:ring-0 px-0"
-                                        value={siteSearchQuery}
-                                        onChange={(e) => setSiteSearchQuery(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            e.stopPropagation();
-                                        }}
-                                        autoComplete="off"
-                                    />
-                                </div>
-                                <ScrollArea className="h-[200px]">
-                                    <div className="p-1">
-                                        {availableSitesToAssign.length > 0 ? (
-                                            availableSitesToAssign.map((site) => (
-                                                <Button
-                                                    key={site.id}
-                                                    variant="ghost"
-                                                    className="w-full justify-start font-normal h-9"
-                                                    onClick={() => {
-                                                        setSelectedSiteToAdd(site.id);
-                                                        setIsSitePopoverOpen(false);
-                                                        setSiteSearchQuery("");
-                                                    }}
-                                                >
-                                                    <Check
-                                                        className={cn(
-                                                            "mr-2 h-4 w-4",
-                                                            site.id === selectedSiteToAdd ? "opacity-100" : "opacity-0"
-                                                        )}
-                                                    />
-                                                    <span className="truncate">{site.name}</span>
-                                                </Button>
-                                            ))
-                                        ) : (
-                                            <p className="p-4 text-center text-sm text-muted-foreground italic">No more sites found.</p>
-                                        )}
-                                    </div>
-                                </ScrollArea>
-                            </PopoverContent>
-                        </Popover>
+                <div className="flex flex-col gap-3 p-4 bg-primary/5 border border-primary/10 rounded-sm">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Select Site to Add</Label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search project sites..."
+                            className="pl-9 h-10 rounded-sm bg-background border-primary/20"
+                            value={siteSearchQuery}
+                            onChange={(e) => setSiteSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            autoComplete="off"
+                        />
                     </div>
-                    <Button onClick={handleAddSiteToLocal} disabled={!selectedSiteToAdd} className="rounded-sm font-bold h-10">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add
-                    </Button>
+                    
+                    {siteSearchQuery && (
+                        <div className="border rounded-sm bg-background shadow-sm overflow-hidden">
+                            <ScrollArea className="h-[150px]">
+                                <div className="p-1">
+                                    {availableSitesToAssign.length > 0 ? (
+                                        availableSitesToAssign.map((site) => (
+                                            <Button
+                                                key={site.id}
+                                                variant="ghost"
+                                                className="w-full justify-start font-normal h-9 text-sm"
+                                                onClick={() => {
+                                                    setLocalAssignedSites(prev => [...prev, site.id]);
+                                                    setSiteSearchQuery("");
+                                                }}
+                                            >
+                                                <PlusCircle className="mr-2 h-4 w-4 text-primary" />
+                                                {site.name}
+                                            </Button>
+                                        ))
+                                    ) : (
+                                        <p className="p-4 text-center text-xs text-muted-foreground italic">No matching sites found.</p>
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-2">
