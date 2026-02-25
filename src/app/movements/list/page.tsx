@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin } from "lucide-react";
+import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin, Truck, Building2, ChevronsUpDown, Check } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type MaterialMovement = {
   id: string;
@@ -44,6 +47,7 @@ type MaterialMovement = {
   quantity: number;
   unit: string;
   movementType: "Inward" | "Outward";
+  sourceOrDestinationType: "Vendor" | "Site";
   sourceOrDestination: string;
   movementDate: string;
   userId: string;
@@ -52,6 +56,11 @@ type MaterialMovement = {
   createdAt: any;
   editedBy?: string;
   editedAt?: any;
+};
+
+type Site = {
+  id: string;
+  name: string;
 };
 
 export default function MovementListPage() {
@@ -65,11 +74,17 @@ export default function MovementListPage() {
   const [deletingMov, setDeletingMov] = React.useState<MaterialMovement | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
 
+  const [isEditSitePopoverOpen, setIsEditSitePopoverOpen] = React.useState(false);
+  const [editSiteSearchQuery, setEditSiteSearchQuery] = React.useState("");
+
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
+
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: allSites } = useCollection<Site>(sitesQuery);
 
   const movementsQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
@@ -140,6 +155,7 @@ export default function MovementListPage() {
         quantity: editingMov.quantity,
         unit: editingMov.unit,
         movementType: editingMov.movementType,
+        sourceOrDestinationType: editingMov.sourceOrDestinationType,
         sourceOrDestination: editingMov.sourceOrDestination,
         movementDate: editingMov.movementDate,
         editedBy: userProfile.username || user?.email || "Unknown",
@@ -158,6 +174,9 @@ export default function MovementListPage() {
       document.title = originalTitle;
     }
   };
+
+  const allSitesList = allSites ? Array.from(new Map(allSites.map(s => [s.name, s])).values()) : [];
+  const filteredAllSites = allSitesList.filter(s => s.name.toLowerCase().includes(editSiteSearchQuery.toLowerCase()));
 
   return (
     <div className="space-y-8">
@@ -302,9 +321,10 @@ export default function MovementListPage() {
                         <div className="text-sm font-semibold whitespace-pre-wrap max-w-xs">{mov.itemName}</div>
                         <div className="flex items-center gap-1.5 mt-1">
                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                {mov.movementType === 'Inward' ? 'From:' : 'To:'}
+                                {mov.movementType === 'Inward' ? 'From' : 'To'} ({mov.sourceOrDestinationType}):
                             </span>
-                            <span className="text-[11px] font-medium text-primary bg-primary/5 px-1.5 py-0.5 rounded-sm border border-primary/10">
+                            <span className="text-[11px] font-medium text-primary bg-primary/5 px-1.5 py-0.5 rounded-sm border border-primary/10 flex items-center gap-1">
+                                {mov.sourceOrDestinationType === 'Site' ? <Building2 className="h-3 w-3" /> : <Truck className="h-3 w-3" />}
                                 {mov.sourceOrDestination || '—'}
                             </span>
                         </div>
@@ -368,10 +388,62 @@ export default function MovementListPage() {
                     <Label>Item Name</Label>
                     <Input value={editingMov?.itemName || ""} onChange={(e) => setEditingMov(prev => prev ? { ...prev, itemName: e.target.value } : null)} />
                 </div>
-                <div className="space-y-2">
+                
+                <div className="space-y-3">
                     <Label>{editingMov?.movementType === 'Inward' ? 'Inward From' : 'Outward To'}</Label>
-                    <Input value={editingMov?.sourceOrDestination || ""} onChange={(e) => setEditingMov(prev => prev ? { ...prev, sourceOrDestination: e.target.value } : null)} />
+                    <RadioGroup
+                        value={editingMov?.sourceOrDestinationType}
+                        onValueChange={(val: any) => setEditingMov(prev => prev ? { ...prev, sourceOrDestinationType: val, sourceOrDestination: "" } : null)}
+                        className="flex gap-4 mb-2"
+                    >
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Vendor" id="edit-vendor" />
+                            <Label htmlFor="edit-vendor" className="font-normal cursor-pointer flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> Vendor</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Site" id="edit-site" />
+                            <Label htmlFor="edit-site" className="font-normal cursor-pointer flex items-center gap-1"><Building2 className="h-3.5 w-3.5" /> Project Site</Label>
+                        </div>
+                    </RadioGroup>
+                    
+                    {editingMov?.sourceOrDestinationType === 'Site' ? (
+                        <Popover open={isEditSitePopoverOpen} onOpenChange={setIsEditSitePopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" className="w-full justify-between font-normal rounded-sm">
+                                    {editingMov.sourceOrDestination || "Select site..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                <div className="flex items-center border-b px-3">
+                                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                    <Input 
+                                        placeholder="Search sites..." 
+                                        className="h-9 w-full border-none focus-visible:ring-0 px-0" 
+                                        value={editSiteSearchQuery} 
+                                        onChange={(e) => setEditSiteSearchQuery(e.target.value)}
+                                    />
+                                </div>
+                                <ScrollArea className="h-[200px]">
+                                    {filteredAllSites.map((site) => (
+                                        <Button 
+                                            key={site.id} 
+                                            variant="ghost" 
+                                            className="w-full justify-start font-normal text-left" 
+                                            onClick={() => { setEditingMov(prev => prev ? { ...prev, sourceOrDestination: site.name } : null); setIsEditSitePopoverOpen(false); }}
+                                        >
+                                            <Check className={cn("mr-2 h-4 w-4 shrink-0", site.name === editingMov.sourceOrDestination ? "opacity-100" : "opacity-0")} />
+                                            <span className="truncate">{site.name}</span>
+                                        </Button>
+                                    ))}
+                                </ScrollArea>
+                            </PopoverContent>
+                        </Popover>
+                    ) : (
+                        <Input value={editingMov?.sourceOrDestination || ""} onChange={(e) => setEditingMov(prev => prev ? { ...prev, sourceOrDestination: e.target.value } : null)} placeholder="Vendor name" />
+                    )}
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label>Movement Type</Label>

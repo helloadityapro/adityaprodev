@@ -15,12 +15,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, MapPin } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, MapPin, Building2, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
@@ -31,7 +32,8 @@ const itemSchema = z.object({
 const movementSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
   movementType: z.enum(["Inward", "Outward"], { required_error: "Movement type is required" }),
-  sourceOrDestination: z.string().min(1, "Source/Destination name is required"),
+  sourceOrDestinationType: z.enum(["Vendor", "Site"], { required_error: "Type is required" }),
+  sourceOrDestination: z.string().min(1, "Name is required"),
   movementDate: z.string().min(1, "Date is required"),
   items: z.array(itemSchema).min(1, "Add at least one item"),
 });
@@ -66,6 +68,8 @@ export default function RecordMovementPage() {
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
+  const [isTargetSitePopoverOpen, setIsTargetSitePopoverOpen] = React.useState(false);
+  const [targetSiteSearchQuery, setTargetSiteSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const form = useForm<z.infer<typeof movementSchema>>({
@@ -73,6 +77,7 @@ export default function RecordMovementPage() {
     defaultValues: { 
       siteName: "", 
       movementType: "Inward",
+      sourceOrDestinationType: "Vendor",
       sourceOrDestination: "",
       movementDate: format(new Date(), 'yyyy-MM-dd'),
       items: [{ itemName: "", quantity: 0, unit: "Numbers" }]
@@ -85,6 +90,7 @@ export default function RecordMovementPage() {
   });
 
   const movementType = form.watch("movementType");
+  const sourceOrDestinationType = form.watch("sourceOrDestinationType");
 
   const onSubmit = async (values: z.infer<typeof movementSchema>) => {
     if (!user) return;
@@ -94,6 +100,7 @@ export default function RecordMovementPage() {
         return addDocumentNonBlocking(collection(firestore, 'material_movements'), {
           siteName: values.siteName,
           movementType: values.movementType,
+          sourceOrDestinationType: values.sourceOrDestinationType,
           sourceOrDestination: values.sourceOrDestination,
           movementDate: values.movementDate,
           ...item,
@@ -110,6 +117,7 @@ export default function RecordMovementPage() {
       form.reset({ 
         siteName: "", 
         movementType: values.movementType,
+        sourceOrDestinationType: "Vendor",
         sourceOrDestination: "",
         movementDate: format(new Date(), 'yyyy-MM-dd'),
         items: [{ itemName: "", quantity: 0, unit: "Numbers" }] 
@@ -122,6 +130,8 @@ export default function RecordMovementPage() {
   };
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
+  const allSitesList = allSites ? Array.from(new Map(allSites.map(s => [s.name, s])).values()) : [];
+  const filteredAllSites = allSitesList.filter(s => s.name.toLowerCase().includes(targetSiteSearchQuery.toLowerCase()));
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
@@ -143,7 +153,7 @@ export default function RecordMovementPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="siteName" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Site Name</FormLabel>
+                    <FormLabel>Current Site</FormLabel>
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -152,7 +162,7 @@ export default function RecordMovementPage() {
                             role="combobox" 
                             className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}
                           >
-                            {field.value || "Select a site..."}
+                            {field.value || "Select site..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -190,6 +200,19 @@ export default function RecordMovementPage() {
                   </FormItem>
                 )} />
 
+                <FormField control={form.control} name="movementDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Movement Date</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input type="date" {...field} className="rounded-sm pr-10" />
+                        <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
                 <FormField control={form.control} name="movementType" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Movement Type</FormLabel>
@@ -208,31 +231,88 @@ export default function RecordMovementPage() {
                   </FormItem>
                 )} />
 
-                <FormField control={form.control} name="sourceOrDestination" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{movementType === 'Inward' ? 'Inward From' : 'Outward To'}</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input placeholder={movementType === 'Inward' ? "Vendor name or warehouse..." : "Receiver or destination site..."} {...field} className="rounded-sm pr-10" />
-                        <MapPin className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <div className="space-y-4">
+                  <FormField control={form.control} name="sourceOrDestinationType" render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>{movementType === 'Inward' ? 'Inward From' : 'Outward To'}</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            form.setValue("sourceOrDestination", "");
+                          }}
+                          defaultValue={field.value}
+                          className="flex gap-4"
+                        >
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl><RadioGroupItem value="Vendor" /></FormControl>
+                            <FormLabel className="font-normal cursor-pointer flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Vendor</FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl><RadioGroupItem value="Site" /></FormControl>
+                            <FormLabel className="font-normal cursor-pointer flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Project Site</FormLabel>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
 
-                <FormField control={form.control} name="movementDate" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Movement Date</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input type="date" {...field} className="rounded-sm pr-10" />
-                        <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                  <FormField control={form.control} name="sourceOrDestination" render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        {sourceOrDestinationType === 'Site' ? (
+                          <Popover open={isTargetSitePopoverOpen} onOpenChange={setIsTargetSitePopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                role="combobox" 
+                                className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}
+                              >
+                                {field.value || "Select target site..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                              <div className="flex items-center border-b px-3">
+                                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                <Input 
+                                  placeholder="Search sites..." 
+                                  className="h-9 w-full border-none focus-visible:ring-0 px-0" 
+                                  value={targetSiteSearchQuery} 
+                                  onChange={(e) => setTargetSiteSearchQuery(e.target.value)}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                              <ScrollArea className="h-[200px]">
+                                {filteredAllSites.length > 0 ? filteredAllSites.map((site) => (
+                                  <Button 
+                                      key={site.id} 
+                                      type="button" 
+                                      variant="ghost" 
+                                      className="w-full justify-start font-normal text-left" 
+                                      onClick={() => { field.onChange(site.name); setIsTargetSitePopoverOpen(false); }}
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4 shrink-0", site.name === field.value ? "opacity-100" : "opacity-0")} />
+                                    <span className="truncate">{site.name}</span>
+                                  </Button>
+                                )) : (
+                                  <div className="p-4 text-center text-sm text-muted-foreground">No sites found.</div>
+                                )}
+                              </ScrollArea>
+                            </PopoverContent>
+                          </Popover>
+                        ) : (
+                          <div className="relative">
+                            <Input placeholder="Enter vendor name..." {...field} className="rounded-sm pr-10" />
+                            <Truck className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          </div>
+                        )}
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
               </div>
 
               <Separator />
