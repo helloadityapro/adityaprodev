@@ -135,6 +135,10 @@ export default function TeamMappingPage() {
     setSiteSearchQuery("");
   };
 
+  const handleRemoveSiteFromLocal = (siteId: string) => {
+    setLocalAssignedSites(prev => prev.filter(id => id !== siteId));
+  };
+
   const handleSaveSites = async () => {
     if (!siteManagementUser) return;
     setIsSavingSites(true);
