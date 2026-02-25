@@ -5,7 +5,7 @@ import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from "@
 import { collection, doc, query, where, or } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { History, Clock, User, MapPin, FileText, ArrowRight, Eye } from "lucide-react";
+import { History, Clock, User, MapPin, FileText, ArrowRight, Eye, Search, Calendar, FilterX } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
 type TimelineEntry = {
@@ -51,6 +53,10 @@ export default function PtwActivitiesPage() {
   const firestore = useFirestore();
   const { user } = useUser();
 
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [startDate, setStartDate] = React.useState("");
+  const [endDate, setEndDate] = React.useState("");
+
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
   
@@ -69,7 +75,7 @@ export default function PtwActivitiesPage() {
 
   const { data: allPermits, isLoading } = useCollection<Permit>(permitsQuery);
 
-  const activities = React.useMemo(() => {
+  const filteredActivities = React.useMemo(() => {
     if (!allPermits) return [];
 
     // Flatten timeline entries
@@ -88,13 +94,42 @@ export default function PtwActivitiesPage() {
       }
     });
 
+    // Filtering logic
+    const filtered = flattened.filter(activity => {
+      const activityDate = activity.timestamp?.toDate?.() || new Date(activity.timestamp);
+      const activityDateStr = format(activityDate, 'yyyy-MM-dd');
+      
+      const matchesSearch = 
+        activity.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        activity.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        activity.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (activity.remarks || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        activity.action.toLowerCase().includes(searchTerm.toLowerCase());
+
+      let matchesDate = true;
+      if (startDate) {
+        matchesDate = matchesDate && activityDateStr >= startDate;
+      }
+      if (endDate) {
+        matchesDate = matchesDate && activityDateStr <= endDate;
+      }
+
+      return matchesSearch && matchesDate;
+    });
+
     // Sort by timestamp descending
-    return flattened.sort((a, b) => {
+    return filtered.sort((a, b) => {
       const dateA = a.timestamp?.toDate?.()?.getTime() || (typeof a.timestamp === 'string' ? new Date(a.timestamp).getTime() : 0);
       const dateB = b.timestamp?.toDate?.()?.getTime() || (typeof b.timestamp === 'string' ? new Date(b.timestamp).getTime() : 0);
       return dateB - dateA;
     });
-  }, [allPermits]);
+  }, [allPermits, searchTerm, startDate, endDate]);
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStartDate("");
+    setEndDate("");
+  };
 
   if (isLoading || isProfileLoading) {
     return (
@@ -112,9 +147,53 @@ export default function PtwActivitiesPage() {
         <p className="text-muted-foreground">Historical log of all permit-related actions and status changes.</p>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+        <div className="md:col-span-2 space-y-1.5">
+          <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search Activities</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search by Permit ID, Site, User or Action..." 
+              className="pl-9 rounded-sm h-10 border-primary/20"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">From Date</Label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input 
+              type="date" 
+              className="pl-9 rounded-sm h-10 border-primary/20" 
+              value={startDate} 
+              onChange={(e) => setStartDate(e.target.value)} 
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5 flex gap-2">
+          <div className="flex-1 space-y-1.5">
+            <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">To Date</Label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input 
+                type="date" 
+                className="pl-9 rounded-sm h-10 border-primary/20" 
+                value={endDate} 
+                onChange={(e) => setEndDate(e.target.value)} 
+              />
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="mt-auto h-10 w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
+            <FilterX className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
       <Card className="rounded-sm overflow-hidden">
         <CardContent className="p-0">
-          {activities.length > 0 ? (
+          {filteredActivities.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -128,7 +207,7 @@ export default function PtwActivitiesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activities.map((activity, index) => (
+                {filteredActivities.map((activity, index) => (
                   <TableRow key={`${activity.permitId}-${index}`} className="hover:bg-muted/50 transition-colors">
                     <TableCell className="text-xs font-medium whitespace-nowrap">
                       {formatTimestamp(activity.timestamp)}
@@ -174,7 +253,7 @@ export default function PtwActivitiesPage() {
               <History className="h-12 w-12 text-muted-foreground/30 mb-4" />
               <h3 className="text-lg font-semibold">No Activity Found</h3>
               <p className="text-muted-foreground max-w-sm mx-auto">
-                There are no recorded permit activities to display at this time.
+                {searchTerm || startDate || endDate ? "No activities match your filters." : "There are no recorded permit activities to display at this time."}
               </p>
             </div>
           )}
