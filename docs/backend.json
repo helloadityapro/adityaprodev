@@ -135,6 +135,17 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteId", "fileName", "fileUrl", "uploadedById"]
+    },
+    "OTPVerification": {
+      "title": "OTP Verification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "email": { "type": "string" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -169,6 +180,10 @@
       {
         "path": "/site_documents/{docId}",
         "definition": { "entityName": "SiteDocument" }
+      },
+      {
+        "path": "/otp_verifications/{otpId}",
+        "definition": { "entityName": "OTPVerification" }
       }
     ]
   }

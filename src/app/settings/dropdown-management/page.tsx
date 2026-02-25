@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -14,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, writeBatch, arrayUnion, getDocs, query, where, or } from 'firebase/firestore';
-import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserX } from 'lucide-react';
+import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserX, KeyRound, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -33,7 +34,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { format } from 'date-fns';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/alert';
+import { initiateCleanupOtp, verifyCleanupOtp } from '@/ai/flows/otp-flows';
 
 type PtwType = {
   id: string;
@@ -94,6 +96,9 @@ export default function AdminSettingsPage() {
   // Data Cleanup States
   const [purgeEmail, setPurgeEmail] = React.useState("");
   const [isPurging, setIsPurging] = React.useState(false);
+  const [isOtpDialogOpen, setIsOtpDialogOpen] = React.useState(false);
+  const [otpCode, setOtpCode] = React.useState("");
+  const [isVerifying, setIsVerifying] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -243,13 +248,45 @@ export default function AdminSettingsPage() {
     }
   };
 
-  // Data Purge Logic
-  const handleDataPurge = async () => {
+  // Data Purge Flow with OTP
+  const handleInitiatePurge = async () => {
     if (!purgeEmail.trim() || !firestore) return;
     setIsPurging(true);
     
+    const res = await initiateCleanupOtp();
+    if (res.success) {
+      toast({ title: 'Security OTP Sent', description: res.message });
+      setIsOtpDialogOpen(true);
+    } else {
+      toast({ variant: 'destructive', title: 'Action Blocked', description: res.message });
+    }
+    setIsPurging(false);
+  };
+
+  const handleVerifyAndExecutePurge = async () => {
+    if (!otpCode || otpCode.length !== 6) {
+      toast({ variant: 'destructive', title: 'Invalid Code', description: 'Please enter a valid 6-digit security code.' });
+      return;
+    }
+
+    setIsVerifying(true);
+    const verifyRes = await verifyCleanupOtp(otpCode);
+    
+    if (verifyRes.success) {
+      await executeDataPurge();
+      setIsOtpDialogOpen(false);
+      setOtpCode("");
+    } else {
+      toast({ variant: 'destructive', title: 'Verification Failed', description: verifyRes.message });
+    }
+    setIsVerifying(false);
+  };
+
+  const executeDataPurge = async () => {
+    if (!firestore) return;
+    setIsPurging(true);
+    
     try {
-      // 1. Find user by email
       const usersSnap = await getDocs(query(collection(firestore, 'users'), where('email', '==', purgeEmail.toLowerCase().trim())));
       if (usersSnap.empty) {
         toast({ variant: 'destructive', title: 'Not Found', description: 'No user found with this email.' });
@@ -275,13 +312,12 @@ export default function AdminSettingsPage() {
         }
       }
 
-      // Also delete the user document
       await deleteDocumentNonBlocking(doc(firestore, 'users', userId));
 
-      toast({ title: 'Purge Complete', description: `Deleted ${totalDeleted} records and the user account for ${purgeEmail}.` });
+      toast({ variant: 'success', title: 'Data Purge Complete', description: `Permanently deleted ${totalDeleted} records and associated user account.` });
       setPurgeEmail("");
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Purge Failed', description: e.message });
+      toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
     } finally {
       setIsPurging(false);
     }
@@ -528,13 +564,13 @@ export default function AdminSettingsPage() {
               </div>
             </CardHeader>
             <CardContent className="pt-6 space-y-6">
-              <Alert variant="destructive" className="bg-destructive/5">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Warning: Irreversible Action</AlertTitle>
-                <AlertDescription>
-                  This will permanently delete all content across the database linked to this user email. Use this for offboarding or error correction.
-                </AlertDescription>
-              </Alert>
+              <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-100 rounded-sm">
+                <ShieldAlert className="h-5 w-5 text-red-600 shrink-0" />
+                <div className="text-xs text-red-800 leading-relaxed">
+                  <p className="font-bold uppercase mb-0.5">Sensitive Operation</p>
+                  This will permanently delete all content linked to the user email. Verification is required from project leadership.
+                </div>
+              </div>
 
               <div className="space-y-4 max-w-md">
                 <div className="space-y-2">
@@ -549,17 +585,55 @@ export default function AdminSettingsPage() {
                 </div>
                 <Button 
                   variant="destructive" 
-                  className="w-full rounded-sm font-bold" 
+                  className="w-full rounded-sm font-bold h-11" 
                   disabled={!purgeEmail.includes('@') || isPurging}
-                  onClick={handleDataPurge}
+                  onClick={handleInitiatePurge}
                 >
-                  {isPurging ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Purging Records...</> : <><UserX className="mr-2 h-4 w-4" /> Purge All Data for User</>}
+                  {isPurging ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing...</> : <><KeyRound className="mr-2 h-4 w-4" /> Initiate Cleanup & Request OTP</>}
                 </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* OTP Verification Dialog */}
+      <Dialog open={isOtpDialogOpen} onOpenChange={(o) => !o && setIsOtpDialogOpen(false)}>
+        <DialogContent className="max-w-md rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <ShieldAlert className="h-5 w-5" /> Confirm Permanent Deletion
+            </DialogTitle>
+            <DialogDescription>
+              A 6-digit security code has been sent to <strong>khalil@adityagreenenergy.com</strong>. Enter it below to authorize data removal for <strong>{purgeEmail}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2 text-center">
+              <Label htmlFor="otp-input" className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Verification Code</Label>
+              <Input 
+                id="otp-input" 
+                placeholder="000000" 
+                maxLength={6} 
+                className="text-center text-3xl font-mono tracking-[0.5em] h-16 rounded-sm bg-muted/30 border-2 focus-visible:ring-red-500" 
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" className="rounded-sm" onClick={() => setIsOtpDialogOpen(false)}>Cancel</Button>
+            <Button 
+              variant="destructive" 
+              className="rounded-sm font-bold flex-1" 
+              disabled={otpCode.length !== 6 || isVerifying}
+              onClick={handleVerifyAndExecutePurge}
+            >
+              {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verify & Purge All Data"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!ptwTypeToManage} onOpenChange={() => setPtwTypeToManage(null)}>
         <DialogContent className="max-w-md rounded-sm">

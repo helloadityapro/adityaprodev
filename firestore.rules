@@ -136,6 +136,10 @@ service cloud.firestore {
       );
     }
 
+    match /otp_verifications/{otpId} {
+      allow read, write: if isSignedIn() && isAdmin();
+    }
+
     match /projects/{projectId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /sites/{siteId} { allow read: if isSignedIn(); allow write: if isAdmin() || isSiteManager(); }
     match /ptw_types/{ptwTypeId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
