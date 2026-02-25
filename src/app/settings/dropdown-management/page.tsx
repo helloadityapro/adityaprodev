@@ -13,8 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch, arrayUnion, getDocs, query, where } from 'firebase/firestore';
-import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, ListTree, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserX } from 'lucide-react';
+import { collection, doc, writeBatch, arrayUnion, getDocs, query, where, or } from 'firebase/firestore';
+import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -33,6 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { format } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type PtwType = {
   id: string;
@@ -537,7 +538,7 @@ export default function AdminSettingsPage() {
 
               <div className="space-y-4 max-w-md">
                 <div className="space-y-2">
-                  <Label htmlFor="purge-email">Target User Email</                  <Label htmlFor="purge-email">Target User Email</Label>
+                  <Label htmlFor="purge-email">Target User Email</Label>
                   <Input 
                     id="purge-email" 
                     placeholder="e.g. user@example.com" 
