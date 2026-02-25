@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Check, ChevronsUpDown, Loader2, FilePlus, Calendar } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, FilePlus, Calendar, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
@@ -22,7 +22,9 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 const dprSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
   reportDate: z.string().min(1, "Date is required"),
-  description: z.string().min(10, "Daily update must be at least 10 characters"),
+  updates: z.array(z.object({
+    value: z.string().min(1, "Paragraph cannot be empty")
+  })).min(1, "At least one paragraph is required"),
 });
 
 type Site = {
@@ -59,22 +61,37 @@ export default function SubmitDPRPage() {
 
   const form = useForm<z.infer<typeof dprSchema>>({
     resolver: zodResolver(dprSchema),
-    defaultValues: { siteName: "", reportDate: format(new Date(), 'yyyy-MM-dd'), description: "" },
+    defaultValues: { 
+      siteName: "", 
+      reportDate: format(new Date(), 'yyyy-MM-dd'), 
+      updates: [{ value: "" }] 
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "updates"
   });
 
   const onSubmit = async (values: z.infer<typeof dprSchema>) => {
     if (!user) return;
     setIsSubmitting(true);
     try {
+      // Combine paragraphs into a single description for storage
+      const combinedDescription = values.updates.map(u => u.value.trim()).join('\n\n');
+      
       addDocumentNonBlocking(collection(firestore, 'dprs'), {
-        ...values,
+        siteName: values.siteName,
+        reportDate: values.reportDate,
+        description: combinedDescription,
         userId: user.uid,
         userName: userProfile?.username || user.email,
         siteManagerId: userProfile?.siteManagerId || null,
         createdAt: serverTimestamp(),
       });
+      
       toast({ title: "Success", description: "DPR submitted successfully." });
-      form.reset({ siteName: "", reportDate: format(new Date(), 'yyyy-MM-dd'), description: "" });
+      form.reset({ siteName: "", reportDate: format(new Date(), 'yyyy-MM-dd'), updates: [{ value: "" }] });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
@@ -96,7 +113,7 @@ export default function SubmitDPRPage() {
       <Card className="shadow-md border-primary/10 rounded-sm">
         <CardHeader>
           <CardTitle>Daily Progress Report Form</CardTitle>
-          <CardDescription>All fields are mandatory for accurate tracking.</CardDescription>
+          <CardDescription>Break down your updates into paragraphs using the (+) button.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -163,13 +180,50 @@ export default function SubmitDPRPage() {
                 </FormItem>
               )} />
 
-              <FormField control={form.control} name="description" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Today's Update</FormLabel>
-                  <FormControl><Textarea placeholder="What tasks were completed today?" rows={8} {...field} className="rounded-sm" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <div className="space-y-4">
+                <FormLabel>Daily Updates (Paragraph Wise)</FormLabel>
+                {fields.map((field, index) => (
+                  <FormField
+                    key={field.id}
+                    control={form.control}
+                    name={`updates.${index}.value`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <Textarea 
+                              placeholder={`Activity details for part ${index + 1}...`} 
+                              rows={3} 
+                              {...field} 
+                              className="rounded-sm flex-1 min-h-[100px]" 
+                            />
+                          </FormControl>
+                          {fields.length > 1 && (
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-10 w-10 text-destructive hover:bg-destructive/10 shrink-0"
+                              onClick={() => remove(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-dashed rounded-sm h-12"
+                  onClick={() => append({ value: "" })}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Add New Paragraph
+                </Button>
+              </div>
 
               <div className="flex justify-end gap-4 pt-4 border-t">
                 <Button type="submit" className="min-w-[150px] h-11 rounded-sm text-lg font-semibold" disabled={isSubmitting}>
