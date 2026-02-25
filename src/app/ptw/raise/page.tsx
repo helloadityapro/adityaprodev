@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react"
@@ -207,19 +206,11 @@ export default function RaisePtwPage() {
       } else {
         const now = new Date();
         const dateStr = format(now, 'yyyy/MM/dd');
-        const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
-        const endOfDay = new Date(); endOfDay.setHours(23,59,59,999);
 
         try {
-          // Global daily sequence
-          const qToday = query(
-            collection(firestore, "permits_to_work"), 
-            where("requestDate", ">=", Timestamp.fromDate(startOfDay)), 
-            where("requestDate", "<=", Timestamp.fromDate(endOfDay))
-          );
-          const snapshotToday = await getDocs(qToday);
-          // Format: AGEPL/PtW/YYYY/MM/DD/Count
-          serialNumber = `AGEPL/PtW/${dateStr}/${snapshotToday.size + 1}`;
+          // Global sequential count logic: starting from 1 and incrementing every time
+          const snapshotTotal = await getDocs(collection(firestore, "permits_to_work"));
+          serialNumber = `AGEPL/PtW/${dateStr}/${snapshotTotal.size + 1}`;
         } catch (e) {
           serialNumber = `AGEPL/PtW/${dateStr}/${Date.now().toString().slice(-4)}`;
         }

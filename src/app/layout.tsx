@@ -1,10 +1,10 @@
-
 import React from "react";
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { ClientShell } from '@/components/client-shell';
+import type { Metadata } from "next";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -12,11 +12,15 @@ const inter = Inter({
   variable: '--font-inter',
 });
 
+export const metadata: Metadata = {
+  title: "Aditya Pro",
+  description: "Enterprise Asset Management and Permit to Work System",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable}`} suppressHydrationWarning>
       <head>
-        <title>Aditya Pro</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className="antialiased font-sans">
