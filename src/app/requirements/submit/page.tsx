@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -20,6 +19,7 @@ import { Search, Check, ChevronsUpDown, Loader2, PackagePlus, Calendar, Plus, Tr
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
