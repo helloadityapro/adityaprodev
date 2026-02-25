@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin, Truck, Building2, ChevronsUpDown, Check } from "lucide-react";
+import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin, Truck, Building2, ChevronsUpDown, Check, User } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -291,7 +291,7 @@ export default function MovementListPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           {loading ? (
             <div className="p-6 space-y-2">
               <Skeleton className="h-10 w-full" />
@@ -302,52 +302,64 @@ export default function MovementListPage() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30">
-                  <TableHead className="w-32">Site & User</TableHead>
-                  <TableHead className="min-w-[200px]">Item & Origin/Destination</TableHead>
+                  <TableHead className="w-28">Date</TableHead>
+                  <TableHead>Project Site</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Qty & Unit</TableHead>
-                  <TableHead>Date</TableHead>
+                  <TableHead className="min-w-[180px]">Source / Destination</TableHead>
+                  <TableHead className="min-w-[180px]">Item Details</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Recorded By</TableHead>
                   <TableHead className="text-right px-6 no-print">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredMovements.map((mov) => (
                   <TableRow key={mov.id} className="hover:bg-muted/5 transition-colors">
-                    <TableCell>
-                        <div className="font-bold text-sm">{mov.siteName}</div>
-                        <div className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">{mov.userName}</div>
-                    </TableCell>
-                    <TableCell>
-                        <div className="text-sm font-semibold whitespace-pre-wrap max-w-xs">{mov.itemName}</div>
-                        <div className="flex items-center gap-1.5 mt-1">
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                {mov.movementType === 'Inward' ? 'From' : 'To'} ({mov.sourceOrDestinationType}):
-                            </span>
-                            <span className="text-[11px] font-medium text-primary bg-primary/5 px-1.5 py-0.5 rounded-sm border border-primary/10 flex items-center gap-1">
-                                {mov.sourceOrDestinationType === 'Site' ? <Building2 className="h-3 w-3" /> : <Truck className="h-3 w-3" />}
-                                {mov.sourceOrDestination || '—'}
-                            </span>
+                    <TableCell className="whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {mov.movementDate ? format(new Date(mov.movementDate), 'dd MMM yy') : '—'}
                         </div>
-                        {mov.editedBy && (
-                            <div className="flex items-center gap-1.5 text-[8px] text-primary/70 font-bold uppercase mt-1.5">
-                                <Badge variant="outline" className="h-3 px-1 text-[7px] border-primary/20">Edited</Badge>
-                                <span>by {mov.editedBy}</span>
-                            </div>
-                        )}
                     </TableCell>
+                    <TableCell className="font-bold text-sm">{mov.siteName}</TableCell>
                     <TableCell>
                         <Badge variant="outline" className={cn("rounded-sm text-[10px] font-bold uppercase", mov.movementType === 'Inward' ? "bg-green-100 text-green-800 border-green-200" : "bg-blue-100 text-blue-800 border-blue-200")}>
                             {mov.movementType}
                         </Badge>
                     </TableCell>
                     <TableCell>
+                        <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                    {mov.movementType === 'Inward' ? 'From' : 'To'}:
+                                </span>
+                                <Badge variant="secondary" className="text-[9px] h-4 rounded-sm px-1.5 font-bold uppercase tracking-tighter">
+                                    {mov.sourceOrDestinationType || 'Vendor'}
+                                </Badge>
+                            </div>
+                            <span className="text-[11px] font-medium text-primary flex items-center gap-1">
+                                {mov.sourceOrDestinationType === 'Site' ? <Building2 className="h-3 w-3" /> : <Truck className="h-3 w-3" />}
+                                {mov.sourceOrDestination || '—'}
+                            </span>
+                        </div>
+                    </TableCell>
+                    <TableCell>
+                        <div className="text-sm font-semibold whitespace-pre-wrap max-w-xs">{mov.itemName}</div>
+                        {mov.editedBy && (
+                            <div className="flex items-center gap-1.5 text-[8px] text-primary/70 font-bold uppercase mt-1">
+                                <Badge variant="outline" className="h-3 px-1 text-[7px] border-primary/20">Edited</Badge>
+                                <span>by {mov.editedBy}</span>
+                            </div>
+                        )}
+                    </TableCell>
+                    <TableCell>
                         <div className="font-mono font-bold text-sm text-primary">{mov.quantity}</div>
                         <div className="text-[10px] text-muted-foreground uppercase font-medium">{mov.unit}</div>
                     </TableCell>
                     <TableCell>
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            {mov.movementDate ? format(new Date(mov.movementDate), 'dd MMM yy') : '—'}
+                        <div className="flex items-center gap-1.5">
+                            <User className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight truncate max-w-[100px]">{mov.userName}</span>
                         </div>
                     </TableCell>
                     <TableCell className="text-right px-6 no-print">
@@ -392,7 +404,7 @@ export default function MovementListPage() {
                 <div className="space-y-3">
                     <Label>{editingMov?.movementType === 'Inward' ? 'Inward From' : 'Outward To'}</Label>
                     <RadioGroup
-                        value={editingMov?.sourceOrDestinationType}
+                        value={editingMov?.sourceOrDestinationType || "Vendor"}
                         onValueChange={(val: any) => setEditingMov(prev => prev ? { ...prev, sourceOrDestinationType: val, sourceOrDestination: "" } : null)}
                         className="flex gap-4 mb-2"
                     >
