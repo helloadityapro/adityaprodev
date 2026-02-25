@@ -30,6 +30,7 @@
         "descriptionOfWork": { "type": "string" },
         "status": { "type": "string" },
         "siteEngineerId": { "type": "string" },
+        "siteEngineerName": { "type": "string" },
         "siteManagerId": { "type": "string" },
         "requestDate": { "type": "string", "format": "date-time" }
       },

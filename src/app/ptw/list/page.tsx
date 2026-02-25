@@ -55,6 +55,7 @@ type Permit = {
   descriptionOfWork: string;
   status: 'Pending' | 'ManagerApproved' | 'Approved' | 'Rejected';
   siteEngineerId: string;
+  siteEngineerName?: string;
   siteManagerId?: string;
   adminId?: string;
   requestDate: any;
@@ -72,7 +73,7 @@ type PtwType = {
     allowedApproverIds?: string[];
 };
 
-type SortKey = 'serialNumber' | 'ptwType' | 'siteName' | 'requestDate' | 'status';
+type SortKey = 'serialNumber' | 'ptwType' | 'siteName' | 'requestDate' | 'status' | 'siteEngineerName';
 
 function StatusBadge({ permit, className }: { permit: Permit, className?: string }) {
   const firestore = useFirestore();
@@ -330,12 +331,18 @@ export default function PtwListPage() {
       return matchStatus;
     }).sort((a, b) => {
       const { key, direction } = sortConfig;
-      let valA = (a[key] as any) || '';
-      let valB = (b[key] as any) || '';
+      let valA: any = (a[key] as any) || '';
+      let valB: any = (b[key] as any) || '';
+      
       if (key === 'requestDate') {
         valA = a.requestDate?.toDate?.()?.getTime() || 0;
         valB = b.requestDate?.toDate?.()?.getTime() || 0;
       }
+      if (key === 'siteEngineerName') {
+        valA = (a.siteEngineerName || a.timeline?.find(t => t.action === 'Created')?.userName || '').toLowerCase();
+        valB = (b.siteEngineerName || b.timeline?.find(t => t.action === 'Created')?.userName || '').toLowerCase();
+      }
+      
       if (valA < valB) return direction === 'asc' ? -1 : 1;
       if (valA > valB) return direction === 'asc' ? 1 : -1;
       return 0;
@@ -433,6 +440,7 @@ export default function PtwListPage() {
               <TableRow>
                 <TableHead onClick={() => handleSort('serialNumber')} className="cursor-pointer">Serial No <SortIcon column="serialNumber" sortConfig={sortConfig} /></TableHead>
                 <TableHead onClick={() => handleSort('ptwType')} className="cursor-pointer">PTW Type <SortIcon column="ptwType" sortConfig={sortConfig} /></TableHead>
+                <TableHead onClick={() => handleSort('siteEngineerName')} className="cursor-pointer">Requested By <SortIcon column="siteEngineerName" sortConfig={sortConfig} /></TableHead>
                 <TableHead onClick={() => handleSort('siteName')} className="cursor-pointer">Site <SortIcon column="siteName" sortConfig={sortConfig} /></TableHead>
                 <TableHead onClick={() => handleSort('status')} className="cursor-pointer">Status <SortIcon column="status" sortConfig={sortConfig} /></TableHead>
                 <TableHead onClick={() => handleSort('requestDate')} className="cursor-pointer">Date <SortIcon column="requestDate" sortConfig={sortConfig} /></TableHead>
@@ -445,10 +453,18 @@ export default function PtwListPage() {
                 const isMappedManager = permit.siteManagerId === user?.uid;
                 const isOwnerOrManager = permit.siteEngineerId === user?.uid || (userProfile?.role === 'Site Manager' && isMappedManager);
                 
+                const requestedBy = permit.siteEngineerName || permit.timeline?.find(t => t.action === 'Created')?.userName || '—';
+
                 return (
                   <TableRow key={permit.id}>
                     <TableCell className="font-mono text-xs">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
                     <TableCell className="font-medium">{permit.ptwType}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-sm font-medium">{requestedBy}</span>
+                      </div>
+                    </TableCell>
                     <TableCell>{permit.siteName}</TableCell>
                     <TableCell><StatusBadge permit={permit} /></TableCell>
                     <TableCell>{formatTimestamp(permit.requestDate)}</TableCell>

@@ -324,6 +324,7 @@ export default function RaisePtwPage() {
         permitData.id = permitId;
         permitData.serialNumber = serialNumber;
         permitData.siteEngineerId = user.uid;
+        permitData.siteEngineerName = userProfile.username || user.email || 'User';
         permitData.requestDate = serverTimestamp();
         permitData.attachments = newAttachments;
         permitData.timeline = [timelineEntry];
