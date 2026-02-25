@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, query, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FolderIcon, Search, ArrowRight } from 'lucide-react';
@@ -18,18 +18,33 @@ type Site = {
   projectCompany: string;
 };
 
+type UserProfile = {
+  id: string;
+  username: string;
+  role: string;
+  assignedProjectIds?: string[];
+};
+
 export default function DocumentsExplorerPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = React.useState('');
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
+
+  // For managers, we also need to fetch their engineers to see their assigned sites
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers, isLoading: teamLoading } = useCollection<UserProfile>(teamQuery);
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || (!userProfile && !isAdmin)) return [];
@@ -37,10 +52,18 @@ export default function DocumentsExplorerPage() {
     // Admins see all folders
     if (isAdmin) return allSites;
 
-    // Others see folders for assigned sites
-    const assignedIds = userProfile?.assignedProjectIds || [];
-    return allSites.filter(site => assignedIds.includes(site.id));
-  }, [allSites, userProfile, isAdmin]);
+    // Build a set of all unique project IDs this user should see
+    const assignedIds = new Set<string>(userProfile?.assignedProjectIds || []);
+    
+    // If manager, add all project IDs assigned to their engineers
+    if (isManager && teamMembers) {
+      teamMembers.forEach(member => {
+        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
+      });
+    }
+
+    return allSites.filter(site => assignedIds.has(site.id));
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
 
   const filteredSites = React.useMemo(() => {
     return accessibleSites.filter(site => 
@@ -49,7 +72,7 @@ export default function DocumentsExplorerPage() {
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [accessibleSites, searchTerm]);
 
-  if (isProfileLoading || sitesLoading) {
+  if (isProfileLoading || sitesLoading || (isManager && teamLoading)) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-9 w-64" />
