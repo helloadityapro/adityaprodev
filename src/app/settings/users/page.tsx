@@ -45,6 +45,8 @@ type User = {
   mobile?: string;
   role?: UserRole;
   registrationRequest?: boolean;
+  assignedProjectIds?: string[];
+  siteManagerId?: string;
   avatarUrl?: string;
   createdAt?: any;
 };
