@@ -1,9 +1,9 @@
+
 /**
  * Centralized list of Super Admin emails for the Aditya Pro application.
  * These users bypass standard role checks and have full system access.
  */
 export const SUPER_ADMIN_EMAILS = [
-  'abhijeet.agepl@gmail.com',
   'abhijeetsb22@gmail.com',
   'khalil@adityagreenenergy.com',
   'prafulrana143@gmail.com'

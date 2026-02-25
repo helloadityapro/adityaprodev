@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -24,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { format } from 'date-fns';
+import { isSuperAdmin } from '@/lib/auth-constants';
 
 type Permit = {
   id: string;
@@ -34,6 +34,13 @@ type Permit = {
   requestDate: any;
 };
 
+type UserProfile = {
+    id: string;
+    username: string;
+    role: string;
+    hiddenPermitIds?: string[];
+};
+
 export default function PermitManagementPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -41,13 +48,9 @@ export default function PermitManagementPage() {
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  const isAdmin = userProfile?.role === 'Admin' || 
-                  user?.email === 'abhijeet.agepl@gmail.com' || 
-                  user?.email === 'abhijeetsb22@gmail.com' ||
-                  user?.email === 'khalil@adityagreenenergy.com' ||
-                  user?.email === 'prafulrana143@gmail.com';
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   React.useEffect(() => {
     if (!isProfileLoading && !isAdmin) {

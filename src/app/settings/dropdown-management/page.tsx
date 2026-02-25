@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -34,7 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { format } from 'date-fns';
-import { Alert, AlertDescription, AlertTitle } from '@/alert';
+import { isSuperAdmin } from '@/lib/auth-constants';
 import { initiateCleanupOtp, verifyCleanupOtp } from '@/ai/flows/otp-flows';
 
 type PtwType = {
@@ -103,11 +102,7 @@ export default function AdminSettingsPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  const isAdmin = userProfile?.role === 'Admin' || 
-                  user?.email === 'abhijeet.agepl@gmail.com' || 
-                  user?.email === 'abhijeetsb22@gmail.com' ||
-                  user?.email === 'khalil@adityagreenenergy.com' ||
-                  user?.email === 'prafulrana143@gmail.com';
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   React.useEffect(() => {
     if (!isUserLoading && !isProfileLoading && !isAdmin) {

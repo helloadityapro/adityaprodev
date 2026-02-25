@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -15,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 type User = {
   id: string;
@@ -42,11 +44,7 @@ export default function SiteAssignmentPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  const isAdmin = userProfile?.role === 'Admin' || 
-                  user?.email === 'abhijeet.agepl@gmail.com' || 
-                  user?.email === 'abhijeetsb22@gmail.com' ||
-                  user?.email === 'khalil@adityagreenenergy.com' ||
-                  user?.email === 'prafulrana143@gmail.com';
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   
   const isManager = userProfile?.role === 'Site Manager';
 

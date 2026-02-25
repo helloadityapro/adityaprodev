@@ -13,7 +13,6 @@ service cloud.firestore {
 
     function isAdmin() {
       let superAdminEmails = [
-        'abhijeet.agepl@gmail.com',
         'abhijeetsb22@gmail.com',
         'khalil@adityagreenenergy.com',
         'prafulrana143@gmail.com'

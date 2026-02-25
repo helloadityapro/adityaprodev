@@ -315,7 +315,7 @@ export default function RequirementListPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Daily Site Requirements Summary</CardTitle>
-              <CardDescription>Approval workflow and status tracking for site material needs.</CardDescription>
+              <CardDescription>Approval workflow and status tracking for site material requests.</CardDescription>
             </div>
             <div className="hidden print:block text-right">
               <p className="text-[10px] font-bold uppercase text-muted-foreground">Report Generated On</p>
@@ -464,7 +464,7 @@ export default function RequirementListPage() {
       </Dialog>
 
       {/* Timeline / History Dialog */}
-      <Dialog open={!!historyReq} onOpenChange={() => setHistoryReq(null)}>
+      <Dialog open={!!historyReq} onOpenChange={(o) => !o && setHistoryReq(null)}>
         <DialogContent className="rounded-sm max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" /> Requirement Lifecycle</DialogTitle>

@@ -35,6 +35,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 type UserRole = 'Admin' | 'Site Manager' | 'Site Engineer';
 
@@ -80,14 +81,7 @@ export default function UsersPage() {
     }, [firestore, currentUser]);
     const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-    const SUPER_ADMIN_EMAILS = [
-      'abhijeet.agepl@gmail.com',
-      'abhijeetsb22@gmail.com',
-      'khalil@adityagreenenergy.com',
-      'prafulrana143@gmail.com'
-    ];
-
-    const isAdmin = userProfile?.role === 'Admin' || (currentUser?.email && SUPER_ADMIN_EMAILS.includes(currentUser.email));
+    const isAdmin = isSuperAdmin(currentUser?.email) || userProfile?.role === 'Admin';
 
     React.useEffect(() => {
         if (!isUserLoading && !isProfileLoading && !isAdmin) {

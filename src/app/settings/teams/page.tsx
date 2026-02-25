@@ -15,6 +15,7 @@ import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, Chevr
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 type User = {
   id: string;
@@ -35,11 +36,7 @@ export default function TeamMappingPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  const isAdmin = userProfile?.role === 'Admin' || 
-                  user?.email === 'abhijeet.agepl@gmail.com' || 
-                  user?.email === 'abhijeetsb22@gmail.com' ||
-                  user?.email === 'khalil@adityagreenenergy.com' ||
-                  user?.email === 'prafulrana143@gmail.com';
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   React.useEffect(() => {
     if (!isProfileLoading && !isAdmin) {
