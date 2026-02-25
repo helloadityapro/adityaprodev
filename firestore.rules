@@ -7,6 +7,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isAdmin() {
       let superAdminEmails = [
         'abhijeet.agepl@gmail.com',
@@ -14,11 +18,16 @@ service cloud.firestore {
         'khalil@adityagreenenergy.com',
         'prafulrana143@gmail.com'
       ];
-      return isSignedIn() && (request.auth.token.email in superAdminEmails || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin');
+      return isSignedIn() && (request.auth.token.email in superAdminEmails || getUserData().role == 'Admin');
     }
 
     function isSiteManager() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Site Manager';
+      return isSignedIn() && getUserData().role == 'Site Manager';
+    }
+
+    function hasAccessToSite(siteId) {
+      let user = getUserData();
+      return isAdmin() || (user.assignedProjectIds != null && siteId in user.assignedProjectIds);
     }
 
     match /users/{userId} {
@@ -106,6 +115,12 @@ service cloud.firestore {
         resource.data.assignedById == request.auth.uid
       );
       allow delete: if isAdmin();
+    }
+
+    match /site_documents/{docId} {
+      allow read: if isSignedIn() && hasAccessToSite(resource.data.siteId);
+      allow create: if isSignedIn() && hasAccessToSite(request.resource.data.siteId);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.uploadedById == request.auth.uid);
     }
 
     match /projects/{projectId} { allow read: if isSignedIn(); allow write: if isAdmin(); }

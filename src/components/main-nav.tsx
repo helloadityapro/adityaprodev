@@ -20,6 +20,7 @@ import {
   ArrowLeftRight,
   ListTodo,
   CheckSquare,
+  FolderOpen,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -43,6 +44,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <Link href="/dashboard">
                 <FolderKanban className="h-4 w-4" />
                 <span className="font-medium">Projects</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Documents" isActive={pathname.startsWith('/documents')} className="rounded-sm">
+              <Link href="/documents">
+                <FolderOpen className="h-4 w-4" />
+                <span className="font-medium">Documents</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

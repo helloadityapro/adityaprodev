@@ -116,6 +116,24 @@
         "remarks": { "type": "string" }
       },
       "required": ["siteName", "title", "assignedToId", "priority", "status", "dueDate"]
+    },
+    "SiteDocument": {
+      "title": "Site Document",
+      "type": "object",
+      "description": "Represents a file uploaded to a site's document folder.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileType": { "type": "string" },
+        "fileSize": { "type": "number" },
+        "uploadedById": { "type": "string" },
+        "uploadedByName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "fileName", "fileUrl", "uploadedById"]
     }
   },
   "auth": {
@@ -146,6 +164,10 @@
       {
         "path": "/tasks/{taskId}",
         "definition": { "entityName": "Task" }
+      },
+      {
+        "path": "/site_documents/{docId}",
+        "definition": { "entityName": "SiteDocument" }
       }
     ]
   }
