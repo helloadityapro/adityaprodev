@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -16,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, MessageCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
@@ -41,6 +40,7 @@ type UserProfile = {
   username: string;
   email: string;
   role: string;
+  mobile?: string;
   siteManagerId?: string;
 };
 
@@ -74,6 +74,8 @@ export default function CreateTaskPage() {
   const [isUserPopoverOpen, setIsUserPopoverOpen] = React.useState(false);
   const [userSearchQuery, setUserSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSubmitted, setIsSubmitted] = React.useState(false);
+  const [submittedTask, setSubmittedTask] = React.useState<{ title: string, siteName: string, assigneeName: string, assigneeMobile?: string } | null>(null);
 
   const form = useForm<z.infer<typeof taskSchema>>({
     resolver: zodResolver(taskSchema),
@@ -86,6 +88,18 @@ export default function CreateTaskPage() {
       dueDate: format(new Date(), 'yyyy-MM-dd'),
     },
   });
+
+  const triggerWhatsApp = (title: string, site: string, mobile?: string) => {
+    if (!mobile) {
+      toast({ variant: 'destructive', title: 'No Mobile', description: 'Assigned user does not have a mobile number linked for WhatsApp notifications.' });
+      return;
+    }
+    const cleanMobile = mobile.replace(/\D/g, '');
+    const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
+    const message = `Hello, a new task has been assigned to you.\n\nTask: ${title}\nSite: ${site}\n\nPlease check your Aditya Pro dashboard for details.\nLink: ${window.location.origin}/tasks/list`;
+    const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
 
   const onSubmit = async (values: z.infer<typeof taskSchema>) => {
     if (!user || !userProfile) return;
@@ -105,7 +119,7 @@ export default function CreateTaskPage() {
 
       addDocumentNonBlocking(collection(firestore, 'tasks'), taskData);
 
-      // Notify Assignee
+      // Notify Assignee via platform notifications
       addDocumentNonBlocking(collection(firestore, 'notifications'), {
         userId: values.assignedToId,
         title: "New Task Assigned",
@@ -115,11 +129,17 @@ export default function CreateTaskPage() {
         createdAt: serverTimestamp(),
       });
       
-      toast({ title: "Task Created", description: "The task has been successfully assigned." });
-      router.push('/tasks/list');
+      setSubmittedTask({
+        title: values.title,
+        siteName: values.siteName,
+        assigneeName: assignedUser?.username || "Personnel",
+        assigneeMobile: assignedUser?.mobile
+      });
+      setIsSubmitted(true);
+      setIsSubmitting(false);
+      toast({ title: "Task Assigned", description: "The task has been successfully created." });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -129,6 +149,47 @@ export default function CreateTaskPage() {
 
   if (!isAdmin && !isManager) {
     return <div className="p-8 text-center">Only Admins and Managers can assign tasks.</div>;
+  }
+
+  if (isSubmitted && submittedTask) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-primary/10 p-4 rounded-full">
+                <CheckCircle2 className="h-12 w-12 text-primary" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold">Task Assigned</CardTitle>
+            <CardDescription className="text-base">
+              The task <strong className="text-primary">"{submittedTask.title}"</strong> has been successfully delegated to {submittedTask.assigneeName}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm" 
+              onClick={() => triggerWhatsApp(submittedTask.title, submittedTask.siteName, submittedTask.assigneeMobile)}
+            >
+              <MessageCircle className="mr-2 h-5 w-5" />
+              Notify via WhatsApp
+            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="h-11 rounded-sm" onClick={() => router.push('/tasks/list')}>
+                View Task List
+              </Button>
+              <Button variant="secondary" className="h-11 rounded-sm" onClick={() => {
+                setIsSubmitted(false);
+                setSubmittedTask(null);
+                form.reset();
+              }}>
+                Assign Another
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
