@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, getDoc } from 'firebase/firestore';
+import { collection, doc, query, where, getDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -86,29 +86,41 @@ export default function TeamMappingPage() {
   // Sort state
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
 
+  /**
+   * Recalculates and updates a Manager's assignedProjectIds based on all reporting engineers
+   */
+  const syncManagerSites = async (managerId: string) => {
+    const batch = writeBatch(firestore);
+    
+    // Fetch all engineers reporting to this manager
+    const q = query(collection(firestore, 'users'), where('siteManagerId', '==', managerId));
+    const snap = await getDocs(q);
+    
+    const allEngineerSites = new Set<string>();
+    snap.docs.forEach(d => {
+        const data = d.data();
+        (data.assignedProjectIds || []).forEach((id: string) => allEngineerSites.add(id));
+    });
+
+    const managerRef = doc(firestore, 'users', managerId);
+    batch.update(managerRef, { assignedProjectIds: Array.from(allEngineerSites) });
+    await batch.commit();
+  };
+
   const handleAssign = async () => {
     if (!selectedManagerId || !selectedEngineerId) return;
     setIsMapping(true);
 
     try {
         const engineerRef = doc(firestore, 'users', selectedEngineerId);
-        updateDocumentNonBlocking(engineerRef, { siteManagerId: selectedManagerId });
+        await updateDocumentNonBlocking(engineerRef, { siteManagerId: selectedManagerId });
 
-        const engineer = engineers?.find(e => e.id === selectedEngineerId);
-        if (engineer && engineer.assignedProjectIds?.length) {
-            const managerRef = doc(firestore, 'users', selectedManagerId);
-            const managerSnap = await getDoc(managerRef);
-            if (managerSnap.exists()) {
-                const managerData = managerSnap.data();
-                const currentSites = managerData.assignedProjectIds || [];
-                const updatedSites = Array.from(new Set([...currentSites, ...engineer.assignedProjectIds]));
-                updateDocumentNonBlocking(managerRef, { assignedProjectIds: updatedSites });
-            }
-        }
+        // Trigger sync
+        await syncManagerSites(selectedManagerId);
 
         toast({
             title: 'Engineer Assigned',
-            description: 'The site engineer has been successfully mapped to the manager and sites synchronized.',
+            description: 'The site engineer has been successfully mapped and sites synchronized.',
         });
         
         setSelectedEngineerId(null);
@@ -119,14 +131,26 @@ export default function TeamMappingPage() {
     }
   };
 
-  const handleRemoveMapping = (engineerId: string) => {
-    const engineerRef = doc(firestore, 'users', engineerId);
-    updateDocumentNonBlocking(engineerRef, { siteManagerId: null });
+  const handleRemoveMapping = async (engineerId: string) => {
+    const engineer = engineers?.find(e => e.id === engineerId);
+    const oldManagerId = engineer?.siteManagerId;
 
-    toast({
-      title: 'Mapping Removed',
-      description: 'The engineer mapping has been cleared.',
-    });
+    if (!oldManagerId) return;
+
+    try {
+        const engineerRef = doc(firestore, 'users', engineerId);
+        await updateDocumentNonBlocking(engineerRef, { siteManagerId: null });
+
+        // Recalculate old manager's sites
+        await syncManagerSites(oldManagerId);
+
+        toast({
+            title: 'Mapping Removed',
+            description: 'The engineer mapping has been cleared and manager access updated.',
+        });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Error', description: e.message });
+    }
   };
 
   const handleOpenSiteManagement = (u: User) => {
@@ -145,17 +169,11 @@ export default function TeamMappingPage() {
 
     try {
         const userRef = doc(firestore, 'users', siteManagementUser.id);
-        updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
+        await updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
 
+        // If it's an engineer, sync to manager
         if (siteManagementUser.role === 'Site Engineer' && siteManagementUser.siteManagerId) {
-            const managerRef = doc(firestore, 'users', siteManagementUser.siteManagerId);
-            const managerSnap = await getDoc(managerRef);
-            if (managerSnap.exists()) {
-                const managerData = managerSnap.data();
-                const currentSites = managerData.assignedProjectIds || [];
-                const updatedSites = Array.from(new Set([...currentSites, ...localAssignedSites]));
-                updateDocumentNonBlocking(managerRef, { assignedProjectIds: updatedSites });
-            }
+            await syncManagerSites(siteManagementUser.siteManagerId);
         }
 
         toast({
