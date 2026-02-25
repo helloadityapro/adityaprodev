@@ -310,6 +310,7 @@ export default function TeamMappingPage() {
                         className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm"
                         value={managerSearchQuery}
                         onChange={(e) => setManagerSearchQuery(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
                       />
                     </div>
                     <ScrollArea className="h-[250px]">
@@ -370,6 +371,7 @@ export default function TeamMappingPage() {
                         className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm"
                         value={engineerSearchQuery}
                         onChange={(e) => setEngineerSearchQuery(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
                       />
                     </div>
                     <ScrollArea className="h-[250px]">
@@ -565,6 +567,7 @@ export default function TeamMappingPage() {
                                         className="h-9 w-full border-none focus-visible:ring-0 px-0"
                                         value={siteSearchQuery}
                                         onChange={(e) => setSiteSearchQuery(e.target.value)}
+                                        onKeyDown={(e) => e.stopPropagation()}
                                     />
                                 </div>
                                 <ScrollArea className="h-[200px]">
