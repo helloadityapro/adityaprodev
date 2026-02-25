@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ClipboardList, Search, Pencil, Trash2, Loader2, User, Clock, AlertTriangle } from "lucide-react";
+import { ClipboardList, Search, Pencil, Trash2, Loader2, User, Clock, AlertTriangle, Calendar, FilterX } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,8 @@ export default function RequirementListPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [startDate, setStartDate] = React.useState("");
+  const [endDate, setEndDate] = React.useState("");
   const [editingReq, setEditingReq] = React.useState<Requirement | null>(null);
   const [deletingReq, setDeletingReq] = React.useState<Requirement | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -93,18 +95,28 @@ export default function RequirementListPage() {
   const sortedAndFilteredReqs = React.useMemo(() => {
     if (!requirements) return [];
     
-    let result = requirements.filter(req => 
-      req.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (req.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (req.itemName || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    let result = requirements.filter(req => {
+      const matchesSearch = req.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (req.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (req.itemName || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      let matchesDate = true;
+      if (startDate) {
+        matchesDate = matchesDate && req.expectedDate >= startDate;
+      }
+      if (endDate) {
+        matchesDate = matchesDate && req.expectedDate <= endDate;
+      }
+      
+      return matchesSearch && matchesDate;
+    });
 
     return result.sort((a, b) => {
         const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
         const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
     });
-  }, [requirements, searchTerm]);
+  }, [requirements, searchTerm, startDate, endDate]);
 
   const handleDelete = () => {
     if (!deletingReq) return;
@@ -141,6 +153,12 @@ export default function RequirementListPage() {
     toast({ title: "Status Updated", description: `Requirement status changed to ${newStatus}.` });
   };
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStartDate("");
+    setEndDate("");
+  };
+
   const urgencyConfig = {
     High: "bg-red-100 text-red-800 border-red-200",
     Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -156,21 +174,62 @@ export default function RequirementListPage() {
           </h1>
           <p className="text-muted-foreground">Monitor and track site material requests.</p>
         </div>
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search item, site or user..." 
-            className="pl-9 rounded-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+        <div className="md:col-span-2 space-y-1.5">
+          <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search item, site or user..." 
+              className="pl-9 rounded-sm h-10 border-primary/20"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">From Expected Date</Label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input 
+              type="date" 
+              className="pl-9 rounded-sm h-10 border-primary/20" 
+              value={startDate} 
+              onChange={(e) => setStartDate(e.target.value)} 
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5 flex gap-2">
+          <div className="flex-1 space-y-1.5">
+            <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">To Expected Date</Label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input 
+                type="date" 
+                className="pl-9 rounded-sm h-10 border-primary/20" 
+                value={endDate} 
+                onChange={(e) => setEndDate(e.target.value)} 
+              />
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="mt-auto h-10 w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
+            <FilterX className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
       <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden">
         <CardHeader>
           <CardTitle>Pending & Past Requests</CardTitle>
-          <CardDescription>Status tracking for all submitted site requirements.</CardDescription>
+          <CardDescription>
+            {startDate || endDate ? (
+              <span className="text-primary font-semibold">
+                Expected between {startDate || 'Start'} and {endDate || 'End'}
+              </span>
+            ) : "Status tracking for all submitted site requirements."}
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {reqsLoading ? (
@@ -265,7 +324,7 @@ export default function RequirementListPage() {
             </Table>
           ) : (
             <div className="text-center py-24 text-muted-foreground italic bg-muted/5">
-              {searchTerm ? "No results found matching your search." : "No requirements found matching your criteria."}
+              {searchTerm || startDate || endDate ? "No results found matching your filters." : "No requirements found matching your criteria."}
             </div>
           )}
         </CardContent>
