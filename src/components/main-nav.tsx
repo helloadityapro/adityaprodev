@@ -38,14 +38,16 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Main</SidebarGroupLabel>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Projects" isActive={pathname === '/dashboard'} className="rounded-sm">
-              <Link href="/dashboard">
-                <FolderKanban className="h-4 w-4" />
-                <span className="font-medium">Projects</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {userRole === 'Admin' && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Projects" isActive={pathname === '/dashboard'} className="rounded-sm">
+                <Link href="/dashboard">
+                  <FolderKanban className="h-4 w-4" />
+                  <span className="font-medium">Projects</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Documents" isActive={pathname.startsWith('/documents')} className="rounded-sm">
               <Link href="/documents">
@@ -82,7 +84,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
       </SidebarGroup>
 
       <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px) font-bold uppercase tracking-wider text-muted-foreground/60">Permit to Work</SidebarGroupLabel>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Permit to Work</SidebarGroupLabel>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Raise PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm">

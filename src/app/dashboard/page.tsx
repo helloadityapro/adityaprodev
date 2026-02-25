@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Table,
   TableBody,
@@ -12,6 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { isSuperAdmin } from '@/lib/auth-constants';
 
 // Define the type for our site data
 type SiteData = {
@@ -90,12 +94,29 @@ function DashboardSkeleton() {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+  
   const [sites, setSites] = useState<SiteData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isDataLoading, setIsDataLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+
   useEffect(() => {
+    if (!isUserLoading && !isProfileLoading && user && !isAdmin) {
+      router.replace('/ptw/list');
+    }
+  }, [user, isUserLoading, isProfileLoading, isAdmin, router]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
     const fetchData = async () => {
       try {
         const response = await fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vT8JE2-QFEjU_CVprrrBPivhxoygAtkC8S6JFPTK8-R28EL9XuTTv7aJ3Onejmsp55_RQEvF8g7Ku1p/pub?gid=1131066411&single=true&output=csv');
@@ -108,12 +129,12 @@ export default function DashboardPage() {
       } catch (err: any) {
         setError(err.message || 'An error occurred while fetching data.');
       } finally {
-        setIsLoading(false);
+        setIsDataLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [isAdmin]);
 
   const filteredSites = useMemo(() => {
     return sites.filter(site => 
@@ -122,8 +143,9 @@ export default function DashboardPage() {
     );
   }, [sites, searchTerm]);
 
-  if (isLoading) return <DashboardSkeleton />;
-  if (error) return <p>Error: {error}</p>;
+  if (isUserLoading || isProfileLoading || (isAdmin && isDataLoading)) return <DashboardSkeleton />;
+  if (!isAdmin) return null;
+  if (error) return <p className="p-8 text-destructive">Error: {error}</p>;
 
   return (
     <>
