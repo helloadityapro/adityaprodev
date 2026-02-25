@@ -11,11 +11,13 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check } from 'lucide-react';
+import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check, MapPin, PlusCircle, Loader2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 
 type User = {
   id: string;
@@ -23,9 +25,18 @@ type User = {
   email: string;
   role: 'Admin' | 'Site Manager' | 'Site Engineer';
   siteManagerId?: string;
+  assignedProjectIds?: string[];
 };
 
-type SortKey = 'engineer' | 'manager';
+type Site = {
+  id: string;
+  name: string;
+  projectCompany: string;
+  acCapacity: string;
+  dcCapacity: string;
+};
+
+type SortKey = 'engineer' | 'manager' | 'sites';
 
 export default function TeamMappingPage() {
   const firestore = useFirestore();
@@ -37,12 +48,13 @@ export default function TeamMappingPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   React.useEffect(() => {
-    if (!isProfileLoading && !isAdmin) {
+    if (!isProfileLoading && !isAdmin && !isManager) {
       router.replace('/ptw/raise');
     }
-  }, [isProfileLoading, isAdmin, router]);
+  }, [isProfileLoading, isAdmin, isManager, router]);
 
   const managersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), where('role', '==', 'Site Manager')), [firestore]);
   const { data: managers, isLoading: managersLoading } = useCollection<User>(managersQuery);
@@ -50,14 +62,23 @@ export default function TeamMappingPage() {
   const engineersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), where('role', '==', 'Site Engineer')), [firestore]);
   const { data: engineers, isLoading: engineersLoading } = useCollection<User>(engineersQuery);
 
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
+
   const [selectedManagerId, setSelectedManagerId] = React.useState<string | null>(null);
   const [selectedEngineerId, setSelectedEngineerId] = React.useState<string | null>(null);
+  const [siteManagementUser, setSiteManagementUser] = React.useState<User | null>(null);
+  const [localAssignedSites, setLocalAssignedSites] = React.useState<string[]>([]);
+  const [isSavingSites, setIsSavingSites] = React.useState(false);
 
   // Popover & Search states
   const [isManagerPopoverOpen, setIsManagerPopoverOpen] = React.useState(false);
   const [managerSearchQuery, setManagerSearchQuery] = React.useState("");
   const [isEngineerPopoverOpen, setIsEngineerPopoverOpen] = React.useState(false);
   const [engineerSearchQuery, setEngineerSearchQuery] = React.useState("");
+  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
+  const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
+  const [selectedSiteToAdd, setSelectedSiteToAdd] = React.useState<string | null>(null);
 
   // Table filter states
   const [tableEngineerSearch, setTableEngineerSearch] = React.useState('');
@@ -88,6 +109,40 @@ export default function TeamMappingPage() {
       title: 'Mapping Removed',
       description: 'The engineer mapping has been cleared.',
     });
+  };
+
+  const handleOpenSiteManagement = (u: User) => {
+    setSiteManagementUser(u);
+    setLocalAssignedSites(u.assignedProjectIds || []);
+  };
+
+  const handleAddSiteToLocal = () => {
+    if (!selectedSiteToAdd) return;
+    if (localAssignedSites.includes(selectedSiteToAdd)) {
+        toast({ title: 'Already Assigned', description: 'This site is already in the list.', variant: 'destructive' });
+        return;
+    }
+    setLocalAssignedSites(prev => [...prev, selectedSiteToAdd]);
+    setSelectedSiteToAdd(null);
+  };
+
+  const handleRemoveSiteFromLocal = (siteId: string) => {
+    setLocalAssignedSites(prev => prev.filter(id => id !== siteId));
+  };
+
+  const handleSaveSites = () => {
+    if (!siteManagementUser) return;
+    setIsSavingSites(true);
+
+    const userRef = doc(firestore, 'users', siteManagementUser.id);
+    updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
+
+    toast({
+      title: 'Sites Updated',
+      description: `Access levels updated for ${siteManagementUser.username}.`,
+    });
+    setIsSavingSites(false);
+    setSiteManagementUser(null);
   };
 
   const handleSort = (key: SortKey) => {
@@ -126,33 +181,47 @@ export default function TeamMappingPage() {
     if (!engineers || !managers) return [];
     
     return engineers
-      .filter(e => e.siteManagerId)
+      .filter(e => {
+        // Admins see all, Managers see only their team
+        if (isAdmin) return e.siteManagerId;
+        return e.siteManagerId === user?.uid;
+      })
       .filter(e => {
         const manager = managers.find(m => m.id === e.siteManagerId);
         const matchesEngineer = (e.username || '').toLowerCase().includes(tableEngineerSearch.toLowerCase());
-        const matchesManager = manager?.username.toLowerCase().includes(tableManagerSearch.toLowerCase()) ?? false;
+        const matchesManager = isAdmin ? (manager?.username.toLowerCase().includes(tableManagerSearch.toLowerCase()) ?? false) : true;
         return matchesEngineer && matchesManager;
       })
       .sort((a, b) => {
         const { key, direction } = sortConfig;
-        let valA = '';
-        let valB = '';
+        let valA: any = '';
+        let valB: any = '';
 
         if (key === 'engineer') {
             valA = (a.username || '').toLowerCase();
             valB = (b.username || '').toLowerCase();
-        } else {
+        } else if (key === 'manager') {
             valA = (managers.find(m => m.id === a.siteManagerId)?.username || '').toLowerCase();
             valB = (managers.find(m => m.id === b.siteManagerId)?.username || '').toLowerCase();
+        } else {
+            valA = (a.assignedProjectIds?.length || 0);
+            valB = (b.assignedProjectIds?.length || 0);
         }
 
         if (valA < valB) return direction === 'asc' ? -1 : 1;
         if (valA > valB) return direction === 'asc' ? 1 : -1;
         return 0;
       });
-  }, [engineers, managers, tableEngineerSearch, tableManagerSearch, sortConfig]);
+  }, [engineers, managers, tableEngineerSearch, tableManagerSearch, sortConfig, isAdmin, user]);
 
-  if (isProfileLoading || managersLoading || engineersLoading) {
+  const availableSitesToAssign = React.useMemo(() => {
+    const list = allSites?.filter(site => !localAssignedSites.includes(site.id)) || [];
+    return list.filter(site => 
+      site.name.toLowerCase().includes(siteSearchQuery.toLowerCase())
+    );
+  }, [allSites, localAssignedSites, siteSearchQuery]);
+
+  if (isProfileLoading || managersLoading || engineersLoading || sitesLoading) {
     return (
       <div className="space-y-6 animate-pulse">
         <Skeleton className="h-9 w-64" />
@@ -162,193 +231,205 @@ export default function TeamMappingPage() {
     );
   }
 
-  if (!isAdmin) return null;
-
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Teams</h1>
-      <p className="text-muted-foreground">Assign Site Engineers to Site Managers for PTW approvals.</p>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-3xl font-bold tracking-tight">Teams & Site Access</h1>
+        <p className="text-muted-foreground">Manage reporting structures and site authorizations for your engineers.</p>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Assign Site Engineer to Site Manager</CardTitle>
-          <CardDescription>Select a manager and then an engineer to assign and make a team.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div className="space-y-2">
-              <Label>Site Manager</Label>
-              <Popover open={isManagerPopoverOpen} onOpenChange={setIsManagerPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className={cn(
-                      "w-full justify-between font-normal",
-                      !selectedManagerId && "text-muted-foreground"
-                    )}
-                  >
-                    {selectedManagerId
-                      ? managers?.find((m) => m.id === selectedManagerId)?.username
-                      : "Select a Manager..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <div className="flex items-center border-b px-3">
-                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                    <Input
-                      placeholder="Search managers..."
-                      className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm"
-                      value={managerSearchQuery}
-                      onChange={(e) => setManagerSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  <ScrollArea className="h-[250px]">
-                    <div className="p-1">
-                      {filteredManagers.length > 0 ? (
-                        filteredManagers.map((m) => (
-                          <Button
-                            key={m.id}
-                            variant="ghost"
-                            className="w-full justify-start font-normal"
-                            onClick={() => {
-                              setSelectedManagerId(m.id);
-                              setIsManagerPopoverOpen(false);
-                              setManagerSearchQuery("");
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                m.id === selectedManagerId ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {m.username}
-                          </Button>
-                        ))
-                      ) : (
-                        <p className="p-4 text-center text-sm text-muted-foreground">No manager found.</p>
+      {isAdmin && (
+        <Card className="rounded-sm border-primary/10 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-primary">Map Site Engineer to Manager</CardTitle>
+            <CardDescription>Assign an engineer to a supervisor to define the Level 1 approval flow.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase">Supervisor (Site Manager)</Label>
+                <Popover open={isManagerPopoverOpen} onOpenChange={setIsManagerPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn(
+                        "w-full justify-between font-normal rounded-sm",
+                        !selectedManagerId && "text-muted-foreground"
                       )}
+                    >
+                      {selectedManagerId
+                        ? managers?.find((m) => m.id === selectedManagerId)?.username
+                        : "Select Supervisor..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <div className="flex items-center border-b px-3">
+                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                      <Input
+                        placeholder="Search managers..."
+                        className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm"
+                        value={managerSearchQuery}
+                        onChange={(e) => setManagerSearchQuery(e.target.value)}
+                      />
                     </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Site Engineer</Label>
-              <Popover open={isEngineerPopoverOpen} onOpenChange={setIsEngineerPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className={cn(
-                      "w-full justify-between font-normal",
-                      !selectedEngineerId && "text-muted-foreground"
-                    )}
-                  >
-                    {selectedEngineerId
-                      ? engineers?.find((e) => e.id === selectedEngineerId)?.username
-                      : "Select an Engineer..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <div className="flex items-center border-b px-3">
-                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                    <Input
-                      placeholder="Search unmapped engineers..."
-                      className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm"
-                      value={engineerSearchQuery}
-                      onChange={(e) => setEngineerSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  <ScrollArea className="h-[250px]">
-                    <div className="p-1">
-                      {filteredUnmappedEngineers.length > 0 ? (
-                        filteredUnmappedEngineers.map((e) => (
-                          <Button
-                            key={e.id}
-                            variant="ghost"
-                            className="w-full justify-start font-normal"
-                            onClick={() => {
-                              setSelectedEngineerId(e.id);
-                              setIsEngineerPopoverOpen(false);
-                              setEngineerSearchQuery("");
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                e.id === selectedEngineerId ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {e.username}
-                          </Button>
-                        ))
-                      ) : (
-                        <p className="p-4 text-center text-sm text-muted-foreground">No unmapped engineers found.</p>
+                    <ScrollArea className="h-[250px]">
+                      <div className="p-1">
+                        {filteredManagers.length > 0 ? (
+                          filteredManagers.map((m) => (
+                            <Button
+                              key={m.id}
+                              variant="ghost"
+                              className="w-full justify-start font-normal"
+                              onClick={() => {
+                                setSelectedManagerId(m.id);
+                                setIsManagerPopoverOpen(false);
+                                setManagerSearchQuery("");
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  m.id === selectedManagerId ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {m.username}
+                            </Button>
+                          ))
+                        ) : (
+                          <p className="p-4 text-center text-sm text-muted-foreground">No managers found.</p>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase">Site Engineer</Label>
+                <Popover open={isEngineerPopoverOpen} onOpenChange={setIsEngineerPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn(
+                        "w-full justify-between font-normal rounded-sm",
+                        !selectedEngineerId && "text-muted-foreground"
                       )}
+                    >
+                      {selectedEngineerId
+                        ? engineers?.find((e) => e.id === selectedEngineerId)?.username
+                        : "Select Engineer..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <div className="flex items-center border-b px-3">
+                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                      <Input
+                        placeholder="Search unmapped engineers..."
+                        className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm"
+                        value={engineerSearchQuery}
+                        onChange={(e) => setEngineerSearchQuery(e.target.value)}
+                      />
                     </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
+                    <ScrollArea className="h-[250px]">
+                      <div className="p-1">
+                        {filteredUnmappedEngineers.length > 0 ? (
+                          filteredUnmappedEngineers.map((e) => (
+                            <Button
+                              key={e.id}
+                              variant="ghost"
+                              className="w-full justify-start font-normal"
+                              onClick={() => {
+                                setSelectedEngineerId(e.id);
+                                setIsEngineerPopoverOpen(false);
+                                setEngineerSearchQuery("");
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  e.id === selectedEngineerId ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {e.username}
+                            </Button>
+                          ))
+                        ) : (
+                          <p className="p-4 text-center text-sm text-muted-foreground">No unmapped engineers.</p>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <Button onClick={handleAssign} disabled={!selectedManagerId || !selectedEngineerId} className="rounded-sm font-bold">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Create Team Link
+              </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
 
-            <Button onClick={handleAssign} disabled={!selectedManagerId || !selectedEngineerId}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Assign Mapping
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Teams</CardTitle>
-          <CardDescription>A list of all engineers and their assigned managers.</CardDescription>
+      <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+        <CardHeader className="bg-muted/5 border-b">
+          <CardTitle className="text-lg">Organization Teams</CardTitle>
+          <CardDescription>View all reporting relationships and manage individual site access levels.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[200px]">
-                    <div className="flex flex-col gap-2 py-2">
-                      <div className="flex items-center cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('manager')}>
-                        <span>Assigned Manager</span>
-                        <SortIcon column="manager" />
+                <TableRow className="bg-muted/30">
+                  {isAdmin && (
+                    <TableHead className="min-w-[200px]">
+                      <div className="flex flex-col gap-2 py-2">
+                        <div className="flex items-center cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('manager')}>
+                          <span className="text-xs font-bold uppercase tracking-tight">Supervisor</span>
+                          <SortIcon column="manager" />
+                        </div>
+                        <div className="relative">
+                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Filter..."
+                            value={tableManagerSearch}
+                            onChange={(e) => setTableManagerSearch(e.target.value)}
+                            className="h-8 pl-8 text-xs rounded-sm border-primary/10"
+                          />
+                        </div>
                       </div>
-                      <div className="relative">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Filter managers..."
-                          value={tableManagerSearch}
-                          onChange={(e) => setTableManagerSearch(e.target.value)}
-                          className="h-8 pl-8 text-xs"
-                        />
-                      </div>
-                    </div>
-                  </TableHead>
+                    </TableHead>
+                  )}
                   <TableHead className="min-w-[200px]">
                     <div className="flex flex-col gap-2 py-2">
                       <div className="flex items-center cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('engineer')}>
-                        <span>Engineer Name</span>
+                        <span className="text-xs font-bold uppercase tracking-tight">Engineer Name</span>
                         <SortIcon column="engineer" />
                       </div>
                       <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                          placeholder="Filter engineers..."
+                          placeholder="Filter..."
                           value={tableEngineerSearch}
                           onChange={(e) => setTableEngineerSearch(e.target.value)}
-                          className="h-8 pl-8 text-xs"
+                          className="h-8 pl-8 text-xs rounded-sm border-primary/10"
                         />
                       </div>
                     </div>
                   </TableHead>
-                  <TableHead className="text-right align-bottom pb-4 px-4">Action</TableHead>
+                  <TableHead className="w-32 align-bottom pb-4 text-center" onClick={() => handleSort('sites')}>
+                    <div className="flex items-center justify-center cursor-pointer gap-1">
+                        <span className="text-xs font-bold uppercase tracking-tight">Sites</span>
+                        <SortIcon column="sites" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-right align-bottom pb-4 px-6">
+                    <span className="text-xs font-bold uppercase tracking-tight">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -356,24 +437,46 @@ export default function TeamMappingPage() {
                   filteredMappings.map(e => {
                     const manager = managers?.find(m => m.id === e.siteManagerId);
                     return (
-                      <TableRow key={e.id}>
-                        <TableCell className="font-medium px-4">{manager?.username || 'Unknown Manager'}</TableCell>
-                        <TableCell className="px-4">{e.username || 'Unknown Engineer'}</TableCell>
-                        <TableCell className="text-right px-4">
-                          <Button variant="ghost" size="icon" onClick={() => handleRemoveMapping(e.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                            <span className="sr-only">Remove</span>
-                          </Button>
+                      <TableRow key={e.id} className="hover:bg-muted/5 group">
+                        {isAdmin && <TableCell className="font-bold text-sm px-4">{manager?.username || 'System Admin'}</TableCell>}
+                        <TableCell className="px-4">
+                            <div className="flex flex-col">
+                                <span className="font-semibold">{e.username}</span>
+                                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">{e.email}</span>
+                            </div>
+                        </TableCell>
+                        <TableCell className="text-center px-4">
+                            <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">
+                                {e.assignedProjectIds?.length || 0}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-right px-6">
+                          <div className="flex justify-end gap-1">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 text-xs font-bold rounded-sm border-primary/20 hover:bg-primary hover:text-white transition-all"
+                                onClick={() => handleOpenSiteManagement(e)}
+                            >
+                                <MapPin className="h-3.5 w-3.5 mr-1.5" /> Manage Sites
+                            </Button>
+                            {isAdmin && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleRemoveMapping(e.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                    <span className="sr-only">Remove Mapping</span>
+                                </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-12 text-muted-foreground">
+                    <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-24 text-muted-foreground">
                       <div className="flex flex-col items-center justify-center">
                         <Users className="h-12 w-12 mb-4 opacity-20" />
-                        <p>No engineer mappings found matching your filters.</p>
+                        <p className="font-medium italic">No reporting engineers found matching your filters.</p>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -383,6 +486,136 @@ export default function TeamMappingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Site Management Dialog */}
+      <Dialog open={!!siteManagementUser} onOpenChange={(o) => !o && setSiteManagementUser(null)}>
+        <DialogContent className="max-w-2xl rounded-sm">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-primary" /> Manage Site Access
+                </DialogTitle>
+                <DialogDescription>
+                    Assign project sites to <strong>{siteManagementUser?.username}</strong>. They will only see folders and data for these authorized sites.
+                </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6 py-4">
+                <div className="flex items-end gap-3 p-4 bg-primary/5 border border-primary/10 rounded-sm">
+                    <div className="flex-1 space-y-2">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground">Select Site to Add</Label>
+                        <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className={cn(
+                                        "w-full justify-between font-normal h-10 rounded-sm bg-background",
+                                        !selectedSiteToAdd && "text-muted-foreground"
+                                    )}
+                                >
+                                    {selectedSiteToAdd
+                                        ? allSites?.find((s) => s.id === selectedSiteToAdd)?.name
+                                        : availableSitesToAssign.length > 0 ? "Search project sites..." : "All available sites assigned"}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                <div className="flex items-center border-b px-3">
+                                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                    <Input
+                                        placeholder="Search sites..."
+                                        className="h-9 w-full border-none focus-visible:ring-0 px-0"
+                                        value={siteSearchQuery}
+                                        onChange={(e) => setSiteSearchQuery(e.target.value)}
+                                    />
+                                </div>
+                                <ScrollArea className="h-[200px]">
+                                    <div className="p-1">
+                                        {availableSitesToAssign.length > 0 ? (
+                                            availableSitesToAssign.map((site) => (
+                                                <Button
+                                                    key={site.id}
+                                                    variant="ghost"
+                                                    className="w-full justify-start font-normal h-9"
+                                                    onClick={() => {
+                                                        setSelectedSiteToAdd(site.id);
+                                                        setIsSitePopoverOpen(false);
+                                                        setSiteSearchQuery("");
+                                                    }}
+                                                >
+                                                    <Check
+                                                        className={cn(
+                                                            "mr-2 h-4 w-4",
+                                                            site.id === selectedSiteToAdd ? "opacity-100" : "opacity-0"
+                                                        )}
+                                                    />
+                                                    <span className="truncate">{site.name}</span>
+                                                </Button>
+                                            ))
+                                        ) : (
+                                            <p className="p-4 text-center text-sm text-muted-foreground italic">No more sites found.</p>
+                                        )}
+                                    </div>
+                                </ScrollArea>
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                    <Button onClick={handleAddSiteToLocal} disabled={!selectedSiteToAdd} className="rounded-sm font-bold h-10">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add
+                    </Button>
+                </div>
+
+                <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider">Authorized Site Access</Label>
+                    <div className="rounded-sm border overflow-hidden">
+                        <ScrollArea className="h-[250px]">
+                            <Table>
+                                <TableHeader className="bg-muted/30">
+                                    <TableRow>
+                                        <TableHead className="text-[10px] uppercase font-bold">Site Name</TableHead>
+                                        <TableHead className="text-[10px] uppercase font-bold">Company</TableHead>
+                                        <TableHead className="w-16 text-right px-4"></TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {localAssignedSites.length > 0 ? (
+                                        localAssignedSites.map(siteId => {
+                                            const site = allSites?.find(s => s.id === siteId);
+                                            return (
+                                                <TableRow key={siteId} className="hover:bg-muted/5 group">
+                                                    <TableCell className="font-semibold text-sm">{site?.name || 'Unknown Site'}</TableCell>
+                                                    <TableCell className="text-xs text-muted-foreground">{site?.projectCompany || 'N/A'}</TableCell>
+                                                    <TableCell className="text-right px-4">
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive rounded-sm" onClick={() => handleRemoveSiteFromLocal(siteId)}>
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={3} className="h-32 text-center text-muted-foreground italic text-sm">
+                                                No sites assigned. User cannot raise permits yet.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    </div>
+                </div>
+            </div>
+
+            <DialogFooter className="gap-2 border-t pt-4">
+                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Cancel</Button></DialogClose>
+                <Button onClick={handleSaveSites} disabled={isSavingSites} className="rounded-sm font-bold min-w-[120px]">
+                    {isSavingSites ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Save Updates
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -83,7 +82,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
       </SidebarGroup>
 
       <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Permit to Work</SidebarGroupLabel>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px) font-bold uppercase tracking-wider text-muted-foreground/60">Permit to Work</SidebarGroupLabel>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Raise PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm">
@@ -183,22 +182,6 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
       
-      {(userRole === "Admin" || userRole === "Site Manager") && (
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Management</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Assign Sites" isActive={pathname === '/settings/site-assignment'} className="rounded-sm">
-                <Link href="/settings/site-assignment">
-                  <MapPin className="h-4 w-4" />
-                  <span className="font-medium">Assign Sites</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      )}
-
       {userRole === "Admin" && (
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Administration</SidebarGroupLabel>
