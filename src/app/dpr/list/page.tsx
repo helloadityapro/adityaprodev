@@ -265,7 +265,7 @@ export default function DPRListPage() {
                                     {pIdx < arr.length - 1 && (
                                         <div className="flex items-center gap-2 py-1">
                                             <div className="h-px bg-primary/10 flex-1" />
-                                            <span className="text-[8px] text-primary/30 uppercase font-bold tracking-tighter">next part</span>
+                                            <span className="text-[8px] text-primary/30 uppercase font-bold tracking-tighter">new line</span>
                                             <div className="h-px bg-primary/10 flex-1" />
                                         </div>
                                     )}
