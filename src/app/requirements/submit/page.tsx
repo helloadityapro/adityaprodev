@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
@@ -69,7 +71,7 @@ export default function SubmitRequirementPage() {
     resolver: zodResolver(requirementSchema),
     defaultValues: { 
       siteName: "", 
-      items: [{ itemName: "", quantity: 0, unit: "Numbers", urgency: "Medium", expectedDate: "" }]
+      items: [{ itemName: "", quantity: 0, unit: "Numbers", urgency: "Medium", expectedDate: format(new Date(), 'yyyy-MM-dd') }]
     },
   });
 
@@ -79,29 +81,69 @@ export default function SubmitRequirementPage() {
   });
 
   const onSubmit = async (values: z.infer<typeof requirementSchema>) => {
-    if (!user) return;
+    if (!user || !userProfile) return;
     setIsSubmitting(true);
     try {
-      // Each item is submitted as a separate document for individual tracking
+      const isEngineer = userProfile.role === 'Site Engineer';
+      const targetStatus = isEngineer ? "Pending" : (userProfile.role === 'Site Manager' ? "ManagerApproved" : "Approved");
+
+      const timelineEntry = {
+        action: "Created",
+        status: targetStatus,
+        remarks: "Requirement submitted for approval.",
+        userName: userProfile.username || user.email,
+        userId: user.uid,
+        timestamp: new Date().toISOString()
+      };
+
       const promises = values.items.map(item => {
         return addDocumentNonBlocking(collection(firestore, 'requirements'), {
           siteName: values.siteName,
           ...item,
-          status: "Pending",
+          status: targetStatus,
           statusUpdatedBy: userProfile?.username || user.email || "System",
+          statusUpdatedAt: serverTimestamp(),
           userId: user.uid,
           userName: userProfile?.username || user.email,
           siteManagerId: userProfile?.siteManagerId || null,
           createdAt: serverTimestamp(),
+          timeline: [timelineEntry]
         });
       });
 
       await Promise.all(promises);
+
+      // Notify Manager if Engineer submitted
+      if (isEngineer && userProfile.siteManagerId) {
+        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+          userId: userProfile.siteManagerId,
+          title: "New Site Requirement",
+          description: `${userProfile.username} has submitted ${values.items.length} new site requirements for "${values.siteName}".`,
+          link: "/requirements/list",
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      // Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid) return;
+        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+          userId: adminDoc.id,
+          title: "Site Requirement Logged",
+          description: `New requirement (${values.items[0].itemName}...) raised for "${values.siteName}" by ${userProfile.username}.`,
+          link: "/requirements/list",
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      });
       
-      toast({ title: "Success", description: `${values.items.length} items submitted successfully.` });
+      toast({ title: "Success", description: `${values.items.length} items submitted and are now ${targetStatus}.` });
       form.reset({ 
         siteName: "", 
-        items: [{ itemName: "", quantity: 0, unit: "Numbers", urgency: "Medium", expectedDate: "" }] 
+        items: [{ itemName: "", quantity: 0, unit: "Numbers", urgency: "Medium", expectedDate: format(new Date(), 'yyyy-MM-dd') }] 
       });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
@@ -124,7 +166,7 @@ export default function SubmitRequirementPage() {
       <Card className="shadow-md border-primary/10 rounded-sm">
         <CardHeader>
           <CardTitle>Material Request Form</CardTitle>
-          <CardDescription>Select a site and list all required items below.</CardDescription>
+          <CardDescription>Select a site and list all required items below. Requests follow a PtW-style approval flow.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -189,7 +231,7 @@ export default function SubmitRequirementPage() {
                         type="button" 
                         variant="outline" 
                         size="sm" 
-                        onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers", urgency: "Medium", expectedDate: "" })}
+                        onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers", urgency: "Medium", expectedDate: format(new Date(), 'yyyy-MM-dd') })}
                         className="rounded-sm border-primary text-primary hover:bg-primary/5"
                     >
                         <Plus className="mr-2 h-4 w-4" /> Add Another Item

@@ -64,7 +64,7 @@
         "unit": { "type": "string", "enum": ["Numbers", "Kilograms", "Liters", "Meters", "Sets"] },
         "urgency": { "type": "string", "enum": ["High", "Medium", "Low"] },
         "expectedDate": { "type": "string", "format": "date" },
-        "status": { "type": "string", "enum": ["Pending", "Ordered", "Dispatched", "In-transit", "Delivered"] },
+        "status": { "type": "string", "enum": ["Pending", "ManagerApproved", "Approved", "Rejected", "Ordered", "Dispatched", "In-transit", "Delivered"] },
         "statusUpdatedBy": { "type": "string" },
         "statusUpdatedAt": { "type": "string", "format": "date-time" },
         "userId": { "type": "string" },
@@ -72,7 +72,8 @@
         "siteManagerId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
         "editedBy": { "type": "string" },
-        "editedAt": { "type": "string", "format": "date-time" }
+        "editedAt": { "type": "string", "format": "date-time" },
+        "timeline": { "type": "array" }
       },
       "required": ["siteName", "itemName", "quantity", "unit", "urgency", "expectedDate", "userId", "status"]
     },
