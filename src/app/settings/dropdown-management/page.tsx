@@ -13,8 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch, arrayUnion, getDocs } from 'firebase/firestore';
-import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, ListTree, SlidersHorizontal, ClipboardList, RefreshCw } from 'lucide-react';
+import { collection, doc, writeBatch, arrayUnion, getDocs, query, where } from 'firebase/firestore';
+import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, ListTree, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -89,6 +89,10 @@ export default function AdminSettingsPage() {
   const [selectedPermitIds, setSelectedPermitIds] = React.useState<string[]>([]);
   const [deleteDialog, setDeleteDialog] = React.useState<{ open: boolean, targets: string[], isAll: boolean }>({ open: false, targets: [], isAll: false });
   const [isDeleting, setIsDeleting] = React.useState(false);
+
+  // Data Cleanup States
+  const [purgeEmail, setPurgeEmail] = React.useState("");
+  const [isPurging, setIsPurging] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -238,6 +242,50 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // Data Purge Logic
+  const handleDataPurge = async () => {
+    if (!purgeEmail.trim() || !firestore) return;
+    setIsPurging(true);
+    
+    try {
+      // 1. Find user by email
+      const usersSnap = await getDocs(query(collection(firestore, 'users'), where('email', '==', purgeEmail.toLowerCase().trim())));
+      if (usersSnap.empty) {
+        toast({ variant: 'destructive', title: 'Not Found', description: 'No user found with this email.' });
+        setIsPurging(false);
+        return;
+      }
+
+      const userId = usersSnap.docs[0].id;
+      const collections = ['permits_to_work', 'tasks', 'requirements', 'dprs', 'material_movements', 'notifications'];
+      let totalDeleted = 0;
+
+      for (const colName of collections) {
+        const q = query(collection(firestore, colName), or(where('userId', '==', userId), where('siteEngineerId', '==', userId), where('assignedToId', '==', userId)));
+        const snap = await getDocs(q);
+        
+        if (!snap.empty) {
+          const batch = writeBatch(firestore);
+          snap.docs.forEach(doc => {
+            batch.delete(doc.ref);
+            totalDeleted++;
+          });
+          await batch.commit();
+        }
+      }
+
+      // Also delete the user document
+      await deleteDocumentNonBlocking(doc(firestore, 'users', userId));
+
+      toast({ title: 'Purge Complete', description: `Deleted ${totalDeleted} records and the user account for ${purgeEmail}.` });
+      setPurgeEmail("");
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Purge Failed', description: e.message });
+    } finally {
+      setIsPurging(false);
+    }
+  };
+
   if (isUserLoading || isProfileLoading || ptwTypesLoading || sitesLoading || permitsLoading) {
     return (
         <div className="space-y-6 animate-pulse">
@@ -257,9 +305,10 @@ export default function AdminSettingsPage() {
       </div>
 
       <Tabs defaultValue="configuration" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-8 rounded-sm max-w-md">
+        <TabsList className="grid w-full grid-cols-3 mb-8 rounded-sm max-w-xl">
           <TabsTrigger value="configuration" className="flex items-center gap-2 rounded-sm"><SlidersHorizontal className="h-4 w-4" /> Manage</TabsTrigger>
           <TabsTrigger value="permits" className="flex items-center gap-2 rounded-sm"><ClipboardList className="h-4 w-4" /> Delete Permits</TabsTrigger>
+          <TabsTrigger value="cleanup" className="flex items-center gap-2 rounded-sm"><Eraser className="h-4 w-4" /> Data Cleanup</TabsTrigger>
         </TabsList>
 
         <TabsContent value="configuration" className="space-y-6 animate-in fade-in-50 duration-300">
@@ -459,6 +508,52 @@ export default function AdminSettingsPage() {
                     )}
                   </TableBody>
                 </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="cleanup" className="space-y-6 animate-in fade-in-50 duration-300">
+          <Card className="rounded-sm border-destructive/20">
+            <CardHeader className="bg-destructive/5 border-b border-destructive/10">
+              <div className="flex items-center gap-3">
+                <div className="bg-destructive/10 p-2 rounded-sm">
+                  <Eraser className="h-6 w-6 text-destructive" />
+                </div>
+                <div>
+                  <CardTitle className="text-destructive">User Data Cleanup</CardTitle>
+                  <CardDescription>Purge all database records (Permits, Tasks, Requirements) assigned to a specific user email.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-6">
+              <Alert variant="destructive" className="bg-destructive/5">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Warning: Irreversible Action</AlertTitle>
+                <AlertDescription>
+                  This will permanently delete all content across the database linked to this user email. Use this for offboarding or error correction.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-4 max-w-md">
+                <div className="space-y-2">
+                  <Label htmlFor="purge-email">Target User Email</                  <Label htmlFor="purge-email">Target User Email</Label>
+                  <Input 
+                    id="purge-email" 
+                    placeholder="e.g. user@example.com" 
+                    value={purgeEmail}
+                    onChange={(e) => setPurgeEmail(e.target.value)}
+                    className="rounded-sm"
+                  />
+                </div>
+                <Button 
+                  variant="destructive" 
+                  className="w-full rounded-sm font-bold" 
+                  disabled={!purgeEmail.includes('@') || isPurging}
+                  onClick={handleDataPurge}
+                >
+                  {isPurging ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Purging Records...</> : <><UserX className="mr-2 h-4 w-4" /> Purge All Data for User</>}
+                </Button>
               </div>
             </CardContent>
           </Card>
