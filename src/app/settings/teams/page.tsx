@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where } from 'firebase/firestore';
+import { collection, doc, query, where, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -70,6 +70,7 @@ export default function TeamMappingPage() {
   const [siteManagementUser, setSiteManagementUser] = React.useState<User | null>(null);
   const [localAssignedSites, setLocalAssignedSites] = React.useState<string[]>([]);
   const [isSavingSites, setIsSavingSites] = React.useState(false);
+  const [isMapping, setIsMapping] = React.useState(false);
 
   // Popover & Search states
   const [isManagerPopoverOpen, setIsManagerPopoverOpen] = React.useState(false);
@@ -87,18 +88,38 @@ export default function TeamMappingPage() {
   // Sort state
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
 
-  const handleAssign = () => {
+  const handleAssign = async () => {
     if (!selectedManagerId || !selectedEngineerId) return;
+    setIsMapping(true);
 
-    const engineerRef = doc(firestore, 'users', selectedEngineerId);
-    updateDocumentNonBlocking(engineerRef, { siteManagerId: selectedManagerId });
+    try {
+        const engineerRef = doc(firestore, 'users', selectedEngineerId);
+        updateDocumentNonBlocking(engineerRef, { siteManagerId: selectedManagerId });
 
-    toast({
-      title: 'Engineer Assigned',
-      description: 'The site engineer has been successfully mapped to the manager.',
-    });
-    
-    setSelectedEngineerId(null);
+        // Cascading logic: If engineer has sites, assign them to the manager too
+        const engineer = engineers?.find(e => e.id === selectedEngineerId);
+        if (engineer && engineer.assignedProjectIds?.length) {
+            const managerRef = doc(firestore, 'users', selectedManagerId);
+            const managerSnap = await getDoc(managerRef);
+            if (managerSnap.exists()) {
+                const managerData = managerSnap.data();
+                const currentSites = managerData.assignedProjectIds || [];
+                const updatedSites = Array.from(new Set([...currentSites, ...engineer.assignedProjectIds]));
+                updateDocumentNonBlocking(managerRef, { assignedProjectIds: updatedSites });
+            }
+        }
+
+        toast({
+            title: 'Engineer Assigned',
+            description: 'The site engineer has been successfully mapped to the manager and sites synchronized.',
+        });
+        
+        setSelectedEngineerId(null);
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Mapping Error', description: e.message });
+    } finally {
+        setIsMapping(false);
+    }
   };
 
   const handleRemoveMapping = (engineerId: string) => {
@@ -130,19 +151,37 @@ export default function TeamMappingPage() {
     setLocalAssignedSites(prev => prev.filter(id => id !== siteId));
   };
 
-  const handleSaveSites = () => {
+  const handleSaveSites = async () => {
     if (!siteManagementUser) return;
     setIsSavingSites(true);
 
-    const userRef = doc(firestore, 'users', siteManagementUser.id);
-    updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
+    try {
+        const userRef = doc(firestore, 'users', siteManagementUser.id);
+        updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
 
-    toast({
-      title: 'Sites Updated',
-      description: `Access levels updated for ${siteManagementUser.username}.`,
-    });
-    setIsSavingSites(false);
-    setSiteManagementUser(null);
+        // CASCADING LOGIC: If this is an engineer, also assign these sites to their manager
+        if (siteManagementUser.role === 'Site Engineer' && siteManagementUser.siteManagerId) {
+            const managerRef = doc(firestore, 'users', siteManagementUser.siteManagerId);
+            const managerSnap = await getDoc(managerRef);
+            if (managerSnap.exists()) {
+                const managerData = managerSnap.data();
+                const currentSites = managerData.assignedProjectIds || [];
+                // Add newly assigned sites to manager's list (union)
+                const updatedSites = Array.from(new Set([...currentSites, ...localAssignedSites]));
+                updateDocumentNonBlocking(managerRef, { assignedProjectIds: updatedSites });
+            }
+        }
+
+        toast({
+            title: 'Sites Updated',
+            description: `Access levels updated for ${siteManagementUser.username} and synchronized with manager if applicable.`,
+        });
+        setSiteManagementUser(null);
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    } finally {
+        setIsSavingSites(false);
+    }
   };
 
   const handleSort = (key: SortKey) => {
@@ -182,7 +221,6 @@ export default function TeamMappingPage() {
     
     return engineers
       .filter(e => {
-        // Admins see all, Managers see only their team
         if (isAdmin) return e.siteManagerId;
         return e.siteManagerId === user?.uid;
       })
@@ -235,14 +273,14 @@ export default function TeamMappingPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight">Teams & Site Access</h1>
-        <p className="text-muted-foreground">Manage reporting structures and site authorizations for your engineers.</p>
+        <p className="text-muted-foreground">Manage reporting structures and site authorizations. Engineer sites sync to managers automatically.</p>
       </div>
 
       {isAdmin && (
         <Card className="rounded-sm border-primary/10 bg-primary/5">
           <CardHeader>
             <CardTitle className="text-sm font-bold uppercase tracking-wider text-primary">Map Site Engineer to Manager</CardTitle>
-            <CardDescription>Assign an engineer to a supervisor to define the Level 1 approval flow.</CardDescription>
+            <CardDescription>Assign an engineer to a supervisor. Sites assigned to the engineer will sync to the manager.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
@@ -366,8 +404,8 @@ export default function TeamMappingPage() {
                 </Popover>
               </div>
 
-              <Button onClick={handleAssign} disabled={!selectedManagerId || !selectedEngineerId} className="rounded-sm font-bold">
-                <UserPlus className="mr-2 h-4 w-4" />
+              <Button onClick={handleAssign} disabled={!selectedManagerId || !selectedEngineerId || isMapping} className="rounded-sm font-bold">
+                {isMapping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
                 Create Team Link
               </Button>
             </div>
@@ -495,7 +533,7 @@ export default function TeamMappingPage() {
                     <MapPin className="h-5 w-5 text-primary" /> Manage Site Access
                 </DialogTitle>
                 <DialogDescription>
-                    Assign project sites to <strong>{siteManagementUser?.username}</strong>. They will only see folders and data for these authorized sites.
+                    Assign sites to <strong>{siteManagementUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
                 </DialogDescription>
             </DialogHeader>
             
@@ -596,7 +634,7 @@ export default function TeamMappingPage() {
                                     ) : (
                                         <TableRow>
                                             <TableCell colSpan={3} className="h-32 text-center text-muted-foreground italic text-sm">
-                                                No sites assigned. User cannot raise permits yet.
+                                                No sites assigned.
                                             </TableCell>
                                         </TableRow>
                                     )}
