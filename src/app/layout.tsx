@@ -4,6 +4,7 @@ import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { ClientShell } from '@/components/client-shell';
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import type { Metadata } from "next";
 
 const inter = Inter({
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="antialiased font-sans">
         <FirebaseClientProvider>
+          <FirebaseErrorListener />
           <ClientShell>{children}</ClientShell>
         </FirebaseClientProvider>
         <Toaster />
