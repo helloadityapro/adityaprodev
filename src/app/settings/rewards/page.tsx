@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -9,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat, Settings2, RotateCcw, Plus, Minus } from "lucide-react";
+import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat, Settings2, RotateCcw, Plus, Minus, ShieldCheck, KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
@@ -22,7 +21,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogClose
 } from "@/components/ui/dialog";
+import { initiatePointsOtp, verifyPointsOtp } from "@/ai/flows/otp-flows";
 
 type UserProfile = {
   id: string;
@@ -50,7 +51,13 @@ export default function AdminRewardsSettingsPage() {
   // Manual Point Adjustment States
   const [selectedUserForPoints, setSelectedUserForPoints] = React.useState<UserProfile | null>(null);
   const [adjustmentValue, setAdjustmentValue] = React.useState<string>("");
-  const [isAdjusting, setIsAdjusting] = React.useState(false);
+  const [pendingActionType, setPendingActionType] = React.useState<'adjust' | 'clear' | null>(null);
+  
+  // 2FA States
+  const [isOtpDialogOpen, setIsOtpDialogOpen] = React.useState(false);
+  const [otpCode, setOtpCode] = React.useState("");
+  const [isVerifying, setIsVerifying] = React.useState(false);
+  const [isInitiatingOtp, setIsInitiatingOtp] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -95,32 +102,69 @@ export default function AdminRewardsSettingsPage() {
     toast({ title: 'Multiplier Updated', description: `Performance X-Factor set to ${multiplier}x.` });
   };
 
-  const handleManualPointAdjustment = (type: 'adjust' | 'clear') => {
+  const handleInitiateManualAdjustment = (type: 'adjust' | 'clear') => {
     if (!selectedUserForPoints) return;
-    setIsAdjusting(true);
-
-    const userRef = doc(firestore, 'users', selectedUserForPoints.id);
-
-    if (type === 'clear') {
-      updateDocumentNonBlocking(userRef, { totalPoints: 0 });
-      toast({ title: 'Points Cleared', description: `Balance reset to zero for ${selectedUserForPoints.username}.` });
-    } else {
+    
+    if (type === 'adjust') {
       const val = parseFloat(adjustmentValue);
       if (isNaN(val) || val === 0) {
         toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Enter a non-zero number to adjust.' });
-        setIsAdjusting(false);
         return;
       }
+    }
+
+    setPendingActionType(type);
+    start2FA();
+  };
+
+  const start2FA = async () => {
+    setIsInitiatingOtp(true);
+    const res = await initiatePointsOtp();
+    if (res.success) {
+      toast({ title: 'Security OTP Requested', description: res.message });
+      setIsOtpDialogOpen(true);
+    } else {
+      toast({ variant: 'destructive', title: 'Action Blocked', description: res.message });
+    }
+    setIsInitiatingOtp(false);
+  };
+
+  const handleVerifyAndExecute = async () => {
+    if (otpCode.length !== 6) return;
+    setIsVerifying(true);
+    
+    const verifyRes = await verifyPointsOtp(otpCode);
+    if (verifyRes.success) {
+      executeManualPointAdjustment();
+      setIsOtpDialogOpen(false);
+      setOtpCode("");
+    } else {
+      toast({ variant: 'destructive', title: 'Verification Failed', description: verifyRes.message });
+    }
+    setIsVerifying(false);
+  };
+
+  const executeManualPointAdjustment = () => {
+    if (!selectedUserForPoints || !pendingActionType) return;
+
+    const userRef = doc(firestore, 'users', selectedUserForPoints.id);
+
+    if (pendingActionType === 'clear') {
+      updateDocumentNonBlocking(userRef, { totalPoints: 0 });
+      toast({ variant: 'success', title: 'Points Cleared', description: `Balance reset to zero for ${selectedUserForPoints.username}.` });
+    } else {
+      const val = parseFloat(adjustmentValue);
       updateDocumentNonBlocking(userRef, { totalPoints: increment(val) });
       toast({ 
+        variant: 'success',
         title: val > 0 ? 'Points Added' : 'Points Deducted', 
         description: `${Math.abs(val)} points ${val > 0 ? 'added to' : 'deducted from'} ${selectedUserForPoints.username}'s account.` 
       });
     }
 
-    setIsAdjusting(false);
     setSelectedUserForPoints(null);
     setAdjustmentValue("");
+    setPendingActionType(null);
   };
 
   const filteredUsers = React.useMemo(() => {
@@ -144,7 +188,6 @@ export default function AdminRewardsSettingsPage() {
         <p className="text-muted-foreground">Configure the points economy and assign performance multipliers.</p>
       </div>
 
-      {/* Global Settings Section - Horizontal and Top */}
       <Card className="w-full rounded-sm border-primary/10 shadow-md">
         <CardHeader className="bg-primary/5 border-b py-4">
           <div className="flex items-center gap-2">
@@ -180,7 +223,6 @@ export default function AdminRewardsSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Personnel Table Section */}
       <Card className="w-full rounded-sm border-amber-500/10 shadow-md overflow-hidden">
         <CardHeader className="bg-amber-500/5 border-b flex flex-row items-center justify-between">
           <div className="space-y-1">
@@ -267,7 +309,7 @@ export default function AdminRewardsSettingsPage() {
               <Settings2 className="h-5 w-5 text-primary" /> Manual Point Adjustment
             </DialogTitle>
             <DialogDescription>
-              Modifying points for <strong>{selectedUserForPoints?.username}</strong>.
+              Modifying points for <strong>{selectedUserForPoints?.username}</strong>. Secure authorization is required.
             </DialogDescription>
           </DialogHeader>
           
@@ -292,10 +334,10 @@ export default function AdminRewardsSettingsPage() {
                 </div>
                 <Button 
                   className="rounded-sm font-bold px-6 h-11"
-                  onClick={() => handleManualPointAdjustment('adjust')}
-                  disabled={isAdjusting || !adjustmentValue}
+                  onClick={() => handleInitiateManualAdjustment('adjust')}
+                  disabled={isInitiatingOtp || !adjustmentValue}
                 >
-                  {parseFloat(adjustmentValue) < 0 ? <Minus className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                  {isInitiatingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : parseFloat(adjustmentValue) < 0 ? <Minus className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                   Apply
                 </Button>
               </div>
@@ -305,17 +347,55 @@ export default function AdminRewardsSettingsPage() {
             <div className="pt-4 border-t">
               <Button 
                 variant="destructive" 
-                className="w-full rounded-sm font-bold bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
-                onClick={() => handleManualPointAdjustment('clear')}
-                disabled={isAdjusting}
+                className="w-full rounded-sm font-bold bg-red-50 text-red-600 border-red-100 hover:bg-red-100 h-11"
+                onClick={() => handleInitiateManualAdjustment('clear')}
+                disabled={isInitiatingOtp}
               >
-                <RotateCcw className="h-4 w-4 mr-2" /> Clear All Points (Reset to 0)
+                {isInitiatingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+                Clear All Points (Reset to 0)
               </Button>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setSelectedUserForPoints(null)} className="rounded-sm">Cancel</Button>
+            <DialogClose asChild><Button variant="ghost" className="rounded-sm">Cancel</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* OTP Verification Dialog */}
+      <Dialog open={isOtpDialogOpen} onOpenChange={(o) => !o && setIsOtpDialogOpen(false)}>
+        <DialogContent className="max-w-md rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-primary">
+              <ShieldCheck className="h-5 w-5" /> Authorize Transaction
+            </DialogTitle>
+            <DialogDescription>
+              A 6-digit security code has been sent to <strong>khalil@adityagreenenergy.com</strong>. Enter it below to authorize this point modification.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2 text-center">
+              <Label htmlFor="otp-input" className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Security Code</Label>
+              <Input 
+                id="otp-input" 
+                placeholder="000000" 
+                maxLength={6} 
+                className="text-center text-3xl font-mono tracking-[0.5em] h-16 rounded-sm bg-muted/30 border-2 focus-visible:ring-primary" 
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" className="rounded-sm" onClick={() => setIsOtpDialogOpen(false)}>Cancel</Button>
+            <Button 
+              className="rounded-sm font-bold flex-1 h-11" 
+              disabled={otpCode.length !== 6 || isVerifying}
+              onClick={handleVerifyAndExecute}
+            >
+              {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><KeyRound className="mr-2 h-4 w-4" /> Confirm & Process</>}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
