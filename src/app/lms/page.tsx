@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { GraduationCap, Clock, BookOpen, Search, ArrowRight, Star } from 'lucide-react';
+import { GraduationCap, Clock, BookOpen, Search, ArrowRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -56,7 +56,7 @@ export default function LMSCatalogPage() {
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <div className="bg-primary/10 p-2 rounded-sm">
-              <Logos.GraduationCap className="h-8 w-8 text-primary" />
+              <GraduationCap className="h-8 w-8 text-primary" />
             </div>
             <h1 className="text-4xl font-black tracking-tight text-foreground">Learning Hub</h1>
           </div>
@@ -145,7 +145,3 @@ export default function LMSCatalogPage() {
     </div>
   );
 }
-
-const Logos = {
-  GraduationCap: GraduationCap
-};
