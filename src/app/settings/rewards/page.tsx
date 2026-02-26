@@ -144,18 +144,19 @@ export default function AdminRewardsSettingsPage() {
         <p className="text-muted-foreground">Configure the points economy and assign performance multipliers.</p>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-3">
-        <Card className="md:col-span-1 rounded-sm border-primary/10 shadow-md">
-          <CardHeader className="bg-primary/5 border-b">
-            <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                <CardTitle>Global Point Value</CardTitle>
-            </div>
-            <CardDescription>Define the monetary value of one reward point.</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="point-value" className="text-xs font-bold uppercase tracking-wider">Value in Rupees (₹)</Label>
+      {/* Global Settings Section - Horizontal and Top */}
+      <Card className="w-full rounded-sm border-primary/10 shadow-md">
+        <CardHeader className="bg-primary/5 border-b py-4">
+          <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              <CardTitle>Global Point Value</CardTitle>
+          </div>
+          <CardDescription>Define the monetary value of one reward point.</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            <div className="flex-1 space-y-2 w-full">
+              <Label htmlFor="point-value" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Value in Rupees (₹)</Label>
               <div className="flex gap-2">
                 <Input 
                   id="point-value" 
@@ -163,98 +164,100 @@ export default function AdminRewardsSettingsPage() {
                   step="0.1" 
                   value={pointValueInput} 
                   onChange={(e) => setPointValueInput(e.target.value)}
-                  className="rounded-sm font-mono font-bold text-lg"
+                  className="rounded-sm font-mono font-bold text-lg h-11"
                 />
-                <Button onClick={handleUpdatePointValue} disabled={isUpdatingGlobal} className="rounded-sm font-bold">
+                <Button onClick={handleUpdatePointValue} disabled={isUpdatingGlobal} className="rounded-sm font-bold h-11 px-8">
                   {isUpdatingGlobal ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                   Set Value
                 </Button>
               </div>
             </div>
-            <div className="p-4 bg-muted/30 border border-dashed rounded-sm text-[10px] leading-relaxed italic text-muted-foreground">
-                Changes to this value will immediately reflect in all users' Point Bank calculations across the platform.
+            <div className="flex-1 p-4 bg-muted/30 border border-dashed rounded-sm text-xs leading-relaxed italic text-muted-foreground">
+                <span className="font-bold text-primary mr-1">Note:</span>
+                Changes to this value will immediately reflect in all users' Point Bank calculations across the entire platform.
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card className="md:col-span-2 rounded-sm border-amber-500/10 shadow-md overflow-hidden">
-          <CardHeader className="bg-amber-500/5 border-b flex flex-row items-center justify-between">
-            <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                    <Star className="h-5 w-5 text-amber-500" />
-                    <CardTitle>Personnel X-Factors</CardTitle>
-                </div>
-                <CardDescription>Assign multipliers and manually adjust point balances.</CardDescription>
-            </div>
-            <div className="relative w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input 
-                    placeholder="Search users..." 
-                    className="h-9 pl-8 text-xs rounded-sm bg-background border-primary/10" 
-                    value={userSearch}
-                    onChange={(e) => setUserSearch(e.target.value)}
-                />
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead>User Profile</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead className="text-center">Current Points</TableHead>
-                  <TableHead className="text-center">X-Factor</TableHead>
-                  <TableHead className="text-right px-6">Actions</TableHead>
+      {/* Personnel Table Section */}
+      <Card className="w-full rounded-sm border-amber-500/10 shadow-md overflow-hidden">
+        <CardHeader className="bg-amber-500/5 border-b flex flex-row items-center justify-between">
+          <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-amber-500" />
+                  <CardTitle>Personnel X-Factors</CardTitle>
+              </div>
+              <CardDescription>Assign multipliers and manually adjust point balances.</CardDescription>
+          </div>
+          <div className="relative w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                  placeholder="Search users..." 
+                  className="h-9 pl-8 text-xs rounded-sm bg-background border-primary/10" 
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+              />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-muted/30">
+              <TableRow>
+                <TableHead>User Profile</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead className="text-center">Current Points</TableHead>
+                <TableHead className="text-center">X-Factor</TableHead>
+                <TableHead className="text-right px-6">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.map(u => (
+                <TableRow key={u.id} className="hover:bg-muted/5 group">
+                  <TableCell>
+                      <div className="flex flex-col">
+                          <span className="text-sm font-semibold">{u.username}</span>
+                          <span className="text-[10px] text-muted-foreground">{u.email}</span>
+                      </div>
+                  </TableCell>
+                  <TableCell>
+                      <Badge variant="secondary" className="text-[10px] rounded-sm uppercase font-bold py-0 h-5">
+                          {u.role === 'Site Engineer' ? <HardHat className="h-3 w-3 mr-1" /> : <UserCog className="h-3 w-3 mr-1" />}
+                          {u.role}
+                      </Badge>
+                  </TableCell>
+                  <TableCell className="text-center font-mono text-primary font-bold">
+                      {(u.totalPoints || 0).toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                      <div className="flex justify-center items-center gap-1">
+                          <Input 
+                              type="number" 
+                              step="0.1" 
+                              min="0.1"
+                              defaultValue={u.pointsMultiplier || 1.0}
+                              className="w-16 h-7 text-right font-bold text-amber-700 bg-amber-50 border-amber-200 rounded-sm text-xs"
+                              onBlur={(e) => handleUpdateUserMultiplier(u.id, parseFloat(e.target.value))}
+                          />
+                          <span className="text-[10px] font-bold text-amber-700">x</span>
+                      </div>
+                  </TableCell>
+                  <TableCell className="text-right px-6">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-7 text-[10px] font-bold rounded-sm border-primary/20 hover:bg-primary/5"
+                        onClick={() => setSelectedUserForPoints(u)}
+                      >
+                        <Settings2 className="h-3 w-3 mr-1" /> Adjust Points
+                      </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map(u => (
-                  <TableRow key={u.id} className="hover:bg-muted/5 group">
-                    <TableCell>
-                        <div className="flex flex-col">
-                            <span className="text-sm font-semibold">{u.username}</span>
-                            <span className="text-[10px] text-muted-foreground">{u.email}</span>
-                        </div>
-                    </TableCell>
-                    <TableCell>
-                        <Badge variant="secondary" className="text-[10px] rounded-sm uppercase font-bold py-0 h-5">
-                            {u.role === 'Site Engineer' ? <HardHat className="h-3 w-3 mr-1" /> : <UserCog className="h-3 w-3 mr-1" />}
-                            {u.role}
-                        </Badge>
-                    </TableCell>
-                    <TableCell className="text-center font-mono text-primary font-bold">
-                        {(u.totalPoints || 0).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                        <div className="flex justify-center items-center gap-1">
-                            <Input 
-                                type="number" 
-                                step="0.1" 
-                                min="0.1"
-                                defaultValue={u.pointsMultiplier || 1.0}
-                                className="w-16 h-7 text-right font-bold text-amber-700 bg-amber-50 border-amber-200 rounded-sm text-xs"
-                                onBlur={(e) => handleUpdateUserMultiplier(u.id, parseFloat(e.target.value))}
-                            />
-                            <span className="text-[10px] font-bold text-amber-700">x</span>
-                        </div>
-                    </TableCell>
-                    <TableCell className="text-right px-6">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-7 text-[10px] font-bold rounded-sm border-primary/20 hover:bg-primary/5"
-                          onClick={() => setSelectedUserForPoints(u)}
-                        >
-                          <Settings2 className="h-3 w-3 mr-1" /> Adjust Points
-                        </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Manual Adjustment Dialog */}
       <Dialog open={!!selectedUserForPoints} onOpenChange={(o) => !o && setSelectedUserForPoints(null)}>
