@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -41,7 +40,7 @@ type RewardSettings = {
 
 export default function AdminRewardsSettingsPage() {
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const router = useRouter();
 
