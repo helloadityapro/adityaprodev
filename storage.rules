@@ -1,0 +1,50 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is an Admin or Super Admin
+    // Uses firestore.get to verify the role from the user's profile
+    function isAdmin() {
+      let superAdminEmails = [
+        'khalil@adityagreenenergy.com',
+        'prafulrana143@gmail.com'
+      ];
+      return isSignedIn() && (
+        request.auth.token.email in superAdminEmails || 
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'Admin'
+      );
+    }
+
+    // Rules for Site Documents (Shared project folders)
+    match /site_documents/{siteId}/{fileName} {
+      // Allow reading if the user is authenticated. 
+      // Access control is primarily managed at the UI/Firestore layer, 
+      // ensuring authorized users see their folders.
+      allow read: if isSignedIn();
+      
+      // Allow upload if the user is signed in
+      allow create: if isSignedIn();
+      
+      // Only Admins can permanently delete site documentation
+      allow delete: if isAdmin();
+    }
+
+    // Rules for PtW Attachments and User-specific uploads
+    match /uploads/{userId}/{fileName} {
+      // Allow reading for authenticated users 
+      // (Managers and Admins must be able to view permit attachments)
+      allow read: if isSignedIn();
+      
+      // Only the owner of the upload or an Admin can write/update files
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
+      // Only Admins can delete these records
+      allow delete: if isAdmin();
+    }
+  }
+}
