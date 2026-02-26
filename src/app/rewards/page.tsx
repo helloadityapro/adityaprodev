@@ -184,6 +184,14 @@ export default function RewardsPage() {
                             <span className="font-medium">Movement Log (Manager)</span>
                             <Badge className="bg-slate-50 text-slate-600 border-slate-100">+0.05</Badge>
                         </div>
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="font-medium">DPR Submission (Engineer)</span>
+                            <Badge className="bg-slate-100 text-slate-800 border-slate-200">+0.10</Badge>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="font-medium">DPR Submission (Manager)</span>
+                            <Badge className="bg-slate-50 text-slate-600 border-slate-100">+0.05</Badge>
+                        </div>
                     </div>
                     <Separator />
                     <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-sm border border-primary/10">

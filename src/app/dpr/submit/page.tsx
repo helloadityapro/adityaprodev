@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { collection, doc, serverTimestamp, increment } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -89,8 +89,23 @@ export default function SubmitDPRPage() {
         siteManagerId: userProfile?.siteManagerId || null,
         createdAt: serverTimestamp(),
       });
+
+      // Reward Points Logic for DPR
+      // Creator gets 0.1 per report, Manager gets 0.05 per report
+      const multiplier = userProfile?.pointsMultiplier || 1;
+      const engineerPoints = 0.1 * multiplier;
       
-      toast({ title: "Success", description: "DPR submitted successfully." });
+      updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
+        totalPoints: increment(engineerPoints)
+      });
+
+      if (userProfile?.siteManagerId) {
+        updateDocumentNonBlocking(doc(firestore, 'users', userProfile.siteManagerId), {
+            totalPoints: increment(0.05)
+        });
+      }
+      
+      toast({ title: "Success", description: "DPR submitted successfully. Points updated." });
       form.reset({ siteName: "", reportDate: format(new Date(), 'yyyy-MM-dd'), updates: [{ value: "" }] });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
