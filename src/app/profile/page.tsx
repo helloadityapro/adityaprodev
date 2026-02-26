@@ -202,88 +202,76 @@ export default function ProfilePage() {
         </Card>
       </div>
 
-      {/* Main Grid for reporting and authorized sites */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1 space-y-8">
-          {userProfile.role === 'Site Engineer' && (
-            <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden">
-              <CardHeader className="bg-primary/5 py-3 border-b">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
-                  <UserCog className="h-4 w-4" /> Reporting Structure
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6">
-                {managerProfile ? (
-                  <div className="flex items-center gap-4 p-4 rounded-md border bg-card shadow-sm hover:border-primary/30 transition-all cursor-default">
-                    <Avatar className="h-12 w-12 border">
-                      <AvatarFallback className="text-sm font-bold bg-muted">{managerProfile.username?.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold">{managerProfile.username}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Assigned Site Manager</span>
-                      <span className="text-[10px] text-primary font-mono mt-1">{managerProfile.email}</span>
-                    </div>
+      {/* Main Content Sections: Stacked vertically */}
+      <div className="space-y-8">
+        {/* Hierarchy Section */}
+        {userProfile.role === 'Site Engineer' && (
+          <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden w-full">
+            <CardHeader className="bg-primary/5 py-3 border-b">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
+                <UserCog className="h-4 w-4" /> Reporting Structure
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {managerProfile ? (
+                <div className="flex items-center gap-4 p-4 rounded-md border bg-card shadow-sm hover:border-primary/30 transition-all cursor-default max-w-md">
+                  <Avatar className="h-12 w-12 border">
+                    <AvatarFallback className="text-sm font-bold bg-muted">{managerProfile.username?.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold">{managerProfile.username}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Assigned Site Manager</span>
+                    <span className="text-[10px] text-primary font-mono mt-1">{managerProfile.email}</span>
                   </div>
-                ) : (
-                  <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center">
-                    <p className="text-sm text-muted-foreground italic">No manager mapped. Please contact Admin.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {userProfile.role === 'Site Manager' && (
-            <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden">
-              <CardHeader className="bg-primary/5 py-3 border-b">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
-                  <Users className="h-4 w-4" /> My Team
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {teamMembers && teamMembers.length > 0 ? (
-                  <Table>
-                    <TableBody>
-                      {teamMembers.map(member => (
-                        <TableRow key={member.id} className="hover:bg-muted/5 transition-colors">
-                          <TableCell className="py-4">
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-10 w-10 border shadow-sm">
-                                <AvatarFallback className="text-xs font-bold bg-muted">{member.username?.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-sm font-bold truncate">{member.username}</span>
-                                <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">{member.role}</span>
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center m-6">
-                    <p className="text-sm text-muted-foreground italic">No engineers currently report to you.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-          
-          <Card className="rounded-sm border-amber-500/10 bg-amber-500/5 shadow-sm p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Award className="h-5 w-5 text-amber-500" />
-              <h3 className="font-bold text-sm uppercase tracking-widest text-amber-700">Rewards Insight</h3>
-            </div>
-            <p className="text-xs leading-relaxed text-muted-foreground/80 font-medium">
-              Your professional ranking is determined by the volume and quality of documentation submitted. 
-              <strong className="text-amber-700 ml-1">Daily Progress Reports</strong>, <strong className="text-amber-700">Material Logs</strong>, 
-              and <strong className="text-amber-700">Permit Accuracy</strong> directly impact your total points balance.
-            </p>
+                </div>
+              ) : (
+                <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center">
+                  <p className="text-sm text-muted-foreground italic">No manager mapped. Please contact Admin.</p>
+                </div>
+              )}
+            </CardContent>
           </Card>
-        </div>
+        )}
 
-        <Card className="lg:col-span-2 rounded-sm border-primary/10 overflow-hidden shadow-md">
+        {userProfile.role === 'Site Manager' && (
+          <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden w-full">
+            <CardHeader className="bg-primary/5 py-3 border-b">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
+                <Users className="h-4 w-4" /> My Team
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {teamMembers && teamMembers.length > 0 ? (
+                <Table>
+                  <TableBody>
+                    {teamMembers.map(member => (
+                      <TableRow key={member.id} className="hover:bg-muted/5 transition-colors">
+                        <TableCell className="py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10 border shadow-sm">
+                              <AvatarFallback className="text-xs font-bold bg-muted">{member.username?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-sm font-bold truncate">{member.username}</span>
+                              <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">{member.role}</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center m-6">
+                  <p className="text-sm text-muted-foreground italic">No engineers currently report to you.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* My Sites Section */}
+        <Card className="rounded-sm border-primary/10 overflow-hidden shadow-md w-full">
           <CardHeader className="bg-primary/5 py-3 border-b">
             <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
               <MapPin className="h-4 w-4" /> My Sites
@@ -295,7 +283,7 @@ export default function ProfilePage() {
                 <TableBody>
                   {assignedSites.map(site => (
                     <TableRow key={site.id} className="hover:bg-muted/5 transition-colors group">
-                      <TableCell className="py-4">
+                      <TableCell className="py-4 px-6">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10 border shadow-sm">
                             <AvatarFallback className="text-xs font-bold bg-muted group-hover:bg-primary/10 group-hover:text-primary transition-colors">
@@ -320,6 +308,19 @@ export default function ProfilePage() {
               </div>
             )}
           </CardContent>
+        </Card>
+
+        {/* Rewards Insight Section */}
+        <Card className="rounded-sm border-amber-500/10 bg-amber-500/5 shadow-sm p-6 w-full">
+          <div className="flex items-center gap-2 mb-4">
+            <Award className="h-5 w-5 text-amber-500" />
+            <h3 className="font-bold text-sm uppercase tracking-widest text-amber-700">Rewards Insight</h3>
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground/80 font-medium max-w-3xl">
+            Your professional ranking is determined by the volume and quality of documentation submitted. 
+            <strong className="text-amber-700 ml-1">Daily Progress Reports</strong>, <strong className="text-amber-700">Material Logs</strong>, 
+            and <strong className="text-amber-700">Permit Accuracy</strong> directly impact your total points balance.
+          </p>
         </Card>
       </div>
     </div>
