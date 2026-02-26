@@ -287,15 +287,17 @@ export default function ProfilePage() {
           </CardHeader>
           <CardContent className="pt-6">
             {assignedSites.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
                 {assignedSites.map(site => (
-                  <div key={site.id} className="flex items-center gap-4 p-4 rounded-md border bg-card hover:bg-primary/5 hover:border-primary/20 transition-all group shadow-sm">
-                    <div className="p-3 bg-muted rounded-sm group-hover:bg-primary/10 transition-colors">
-                      <HardHat className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-                    </div>
+                  <div key={site.id} className="flex items-center gap-3 p-3 rounded-md border bg-card hover:border-primary/30 transition-all cursor-default group shadow-sm">
+                    <Avatar className="h-10 w-10 border shadow-sm">
+                      <AvatarFallback className="text-xs font-bold bg-muted group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                        <HardHat className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
                     <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-bold truncate">{site.name}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold mt-0.5">Project Location</span>
+                      <span className="text-sm font-bold truncate group-hover:text-primary transition-colors">{site.name}</span>
+                      <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">Project Location</span>
                     </div>
                   </div>
                 ))}
