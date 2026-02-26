@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Trophy, Star, Award, Coins, MapPin, ShieldCheck, UserCog, TrendingUp, HardHat, Smartphone, Zap, Users } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 
 type UserProfile = {
   id: string;
@@ -239,23 +240,29 @@ export default function ProfilePage() {
                   <Users className="h-4 w-4" /> Managed Team
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6">
+              <CardContent className="p-0">
                 {teamMembers && teamMembers.length > 0 ? (
-                  <div className="space-y-3">
-                    {teamMembers.map(member => (
-                      <div key={member.id} className="flex items-center gap-3 p-3 rounded-md border bg-card hover:border-primary/30 transition-all cursor-default">
-                        <Avatar className="h-10 w-10 border shadow-sm">
-                          <AvatarFallback className="text-xs font-bold bg-muted">{member.username?.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-sm font-bold truncate">{member.username}</span>
-                          <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">{member.role}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <Table>
+                    <TableBody>
+                      {teamMembers.map(member => (
+                        <TableRow key={member.id} className="hover:bg-muted/5 transition-colors">
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10 border shadow-sm">
+                                <AvatarFallback className="text-xs font-bold bg-muted">{member.username?.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold truncate">{member.username}</span>
+                                <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">{member.role}</span>
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 ) : (
-                  <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center">
+                  <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center m-6">
                     <p className="text-sm text-muted-foreground italic">No engineers currently report to you.</p>
                   </div>
                 )}
@@ -277,7 +284,7 @@ export default function ProfilePage() {
         </div>
 
         <Card className="lg:col-span-2 rounded-sm border-primary/10 overflow-hidden shadow-md">
-          <CardHeader className="bg-muted/5 border-b flex flex-row items-center justify-between">
+          <CardHeader className="bg-muted/5 border-b">
             <div className="space-y-1">
               <CardTitle className="text-lg flex items-center gap-2 font-bold tracking-tight">
                 <MapPin className="h-5 w-5 text-primary" /> Authorized Site Access
@@ -285,25 +292,31 @@ export default function ProfilePage() {
               <CardDescription>Official project authorizations and management rights.</CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="pt-6">
+          <CardContent className="p-0">
             {assignedSites.length > 0 ? (
-              <div className="space-y-3">
-                {assignedSites.map(site => (
-                  <div key={site.id} className="flex items-center gap-3 p-3 rounded-md border bg-card hover:border-primary/30 transition-all cursor-default group shadow-sm">
-                    <Avatar className="h-10 w-10 border shadow-sm">
-                      <AvatarFallback className="text-xs font-bold bg-muted group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                        <HardHat className="h-4 w-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-bold truncate group-hover:text-primary transition-colors">{site.name}</span>
-                      <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">Project Location</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <Table>
+                <TableBody>
+                  {assignedSites.map(site => (
+                    <TableRow key={site.id} className="hover:bg-muted/5 transition-colors group">
+                      <TableCell className="py-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 border shadow-sm">
+                            <AvatarFallback className="text-xs font-bold bg-muted group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                              <HardHat className="h-4 w-4" />
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold truncate group-hover:text-primary transition-colors">{site.name}</span>
+                            <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">Project Location</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             ) : (
-              <div className="flex flex-col items-center justify-center py-20 text-center bg-muted/10 rounded-sm border border-dashed">
+              <div className="flex flex-col items-center justify-center py-20 text-center bg-muted/10 rounded-sm border border-dashed m-6">
                 <MapPin className="h-10 w-10 text-muted-foreground/30 mb-3" />
                 <p className="text-sm text-muted-foreground font-medium">No sites currently assigned to your account.</p>
                 <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold tracking-tighter">Contact Administration for site mapping</p>
