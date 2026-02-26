@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -100,7 +99,7 @@ export default function RewardsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-black text-primary">
-              #{leaders?.findIndex(l => l.id === user?.uid) !== -1 ? (leaders?.findIndex(l => l.id === user?.uid) || 0) + 1 : '—'}
+              #{leaders && user ? (leaders.findIndex(l => l.id === user.uid) !== -1 ? leaders.findIndex(l => l.id === user.uid) + 1 : '—') : '—'}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1 font-bold uppercase tracking-wider">Platform Percentile</p>
           </CardContent>
@@ -170,19 +169,19 @@ export default function RewardsPage() {
                     <div className="space-y-2">
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">PtW (No Correction)</span>
-                            <Badge className="bg-green-100 text-green-800 border-green-200">+1.00</span>
+                            <Badge className="bg-green-100 text-green-800 border-green-200">+1.00</Badge>
                         </div>
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">PtW (With Correction)</span>
-                            <Badge className="bg-blue-100 text-blue-800 border-blue-200">+0.50</span>
+                            <Badge className="bg-blue-100 text-blue-800 border-blue-200">+0.50</Badge>
                         </div>
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">Movement Log (Engineer)</span>
-                            <Badge className="bg-slate-100 text-slate-800 border-slate-200">+0.10</span>
+                            <Badge className="bg-slate-100 text-slate-800 border-slate-200">+0.10</Badge>
                         </div>
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">Movement Log (Manager)</span>
-                            <Badge className="bg-slate-50 text-slate-600 border-slate-100">+0.05</span>
+                            <Badge className="bg-slate-50 text-slate-600 border-slate-100">+0.05</Badge>
                         </div>
                     </div>
                     <Separator />
