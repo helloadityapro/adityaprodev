@@ -237,7 +237,7 @@ export default function ProfilePage() {
             <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden">
               <CardHeader className="bg-primary/5 py-3 border-b">
                 <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
-                  <Users className="h-4 w-4" /> Managed Team
+                  <Users className="h-4 w-4" /> My Team
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
