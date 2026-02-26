@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -625,7 +626,7 @@ export default function AdminSettingsPage() {
             </DialogTitle>
             <DialogDescription>
               A 6-digit security code has been sent to <strong>khalil@adityagreenenergy.com</strong>. Enter it below to authorize data removal for <strong>{purgeEmail}</strong>.
-              <p className="mt-2 text-xs font-semibold text-primary">Note: Check server console logs for the code during this prototype phase.</p>
+              <span className="block mt-2 text-xs font-semibold text-primary">Note: Check server console logs for the code during this prototype phase.</span>
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">

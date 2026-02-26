@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -371,8 +372,8 @@ export default function AdminRewardsSettingsPage() {
               <ShieldCheck className="h-5 w-5" /> Authorize Transaction
             </DialogTitle>
             <DialogDescription>
-              <p>A 6-digit security code has been sent to <strong>khalil@adityagreenenergy.com</strong>. Enter it below to authorize this point modification.</p>
-              <p className="mt-2 text-xs font-semibold text-primary">Note: Check server console logs for the code during this prototype phase.</p>
+              A 6-digit security code has been sent to <strong>khalil@adityagreenenergy.com</strong>. Enter it below to authorize this point modification.
+              <span className="block mt-2 text-xs font-semibold text-primary">Note: Check server console logs for the code during this prototype phase.</span>
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
