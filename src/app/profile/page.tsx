@@ -286,7 +286,7 @@ export default function ProfilePage() {
         <Card className="lg:col-span-2 rounded-sm border-primary/10 overflow-hidden shadow-md">
           <CardHeader className="bg-primary/5 py-3 border-b">
             <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
-              <MapPin className="h-4 w-4" /> Authorized Site Access
+              <MapPin className="h-4 w-4" /> My Sites
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
