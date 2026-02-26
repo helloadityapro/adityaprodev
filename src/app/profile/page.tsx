@@ -284,13 +284,10 @@ export default function ProfilePage() {
         </div>
 
         <Card className="lg:col-span-2 rounded-sm border-primary/10 overflow-hidden shadow-md">
-          <CardHeader className="bg-muted/5 border-b">
-            <div className="space-y-1">
-              <CardTitle className="text-lg flex items-center gap-2 font-bold tracking-tight">
-                <MapPin className="h-5 w-5 text-primary" /> Authorized Site Access
-              </CardTitle>
-              <CardDescription>Official project authorizations and management rights.</CardDescription>
-            </div>
+          <CardHeader className="bg-primary/5 py-3 border-b">
+            <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
+              <MapPin className="h-4 w-4" /> Authorized Site Access
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {assignedSites.length > 0 ? (
