@@ -1,9 +1,8 @@
-
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp, increment, getDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -150,7 +149,7 @@ export default function TaskListPage() {
     };
   }, [tasks, user]);
 
-  const handleUpdateStatus = (remarks: string, nextStatus: Task['status']) => {
+  const handleUpdateStatus = async (remarks: string, nextStatus: Task['status']) => {
     if (!actionTask) return;
     setIsUpdating(true);
     
@@ -160,6 +159,30 @@ export default function TaskListPage() {
         remarks: remarks || actionTask.remarks || "",
         updatedAt: serverTimestamp()
     });
+
+    // Reward Points Logic for Assignee on Completion
+    if (nextStatus === 'Completed') {
+        const assigneeDoc = await getDoc(doc(firestore, 'users', actionTask.assignedToId));
+        if (assigneeDoc.exists()) {
+            const assigneeData = assigneeDoc.data();
+            const multiplier = assigneeData.pointsMultiplier || 1;
+            const pointsToAdd = 0.1 * multiplier;
+            
+            updateDocumentNonBlocking(doc(firestore, 'users', actionTask.assignedToId), {
+                totalPoints: increment(pointsToAdd)
+            });
+            
+            // Notify Assignee about points
+            addDocumentNonBlocking(collection(firestore, 'notifications'), {
+                userId: actionTask.assignedToId,
+                title: "Points Earned!",
+                description: `You earned ${pointsToAdd.toFixed(2)} points for completing task: "${actionTask.title}".`,
+                link: `/rewards`,
+                read: false,
+                createdAt: serverTimestamp(),
+            });
+        }
+    }
 
     // Notify Assigner
     if (actionTask.assignedById !== user?.uid) {
@@ -173,7 +196,7 @@ export default function TaskListPage() {
         });
     }
 
-    toast({ title: "Task Updated", description: `Status changed to ${nextStatus}.` });
+    toast({ title: "Task Updated", description: `Status changed to ${nextStatus}. Points updated if completed.` });
     setIsUpdating(false);
     setActionTask(null);
   };
@@ -246,11 +269,11 @@ export default function TaskListPage() {
             </TabsList>
           </Tabs>
 
-          <div className="flex flex-1 items-center gap-2 max-w-xl">
-            <div className="relative flex-1">
+          <div className="flex items-center gap-2">
+            <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Search by title, site, or assignee..." 
+                placeholder="Search tasks..." 
                 className="pl-9 rounded-sm h-10 border-primary/20"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

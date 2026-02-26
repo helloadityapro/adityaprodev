@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, query, where } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { collection, doc, serverTimestamp, query, where, increment } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -42,6 +42,7 @@ type UserProfile = {
   role: string;
   mobile?: string;
   siteManagerId?: string;
+  pointsMultiplier?: number;
 };
 
 export default function CreateTaskPage() {
@@ -119,6 +120,12 @@ export default function CreateTaskPage() {
 
       addDocumentNonBlocking(collection(firestore, 'tasks'), taskData);
 
+      // Reward Points Logic for Assigner
+      const multiplier = userProfile.pointsMultiplier || 1;
+      updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
+        totalPoints: increment(0.1 * multiplier)
+      });
+
       // Notify Assignee via platform notifications
       addDocumentNonBlocking(collection(firestore, 'notifications'), {
         userId: values.assignedToId,
@@ -137,7 +144,7 @@ export default function CreateTaskPage() {
       });
       setIsSubmitted(true);
       setIsSubmitting(false);
-      toast({ title: "Task Assigned", description: "The task has been successfully created." });
+      toast({ title: "Task Assigned", description: "The task has been successfully created. Points updated." });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
       setIsSubmitting(false);

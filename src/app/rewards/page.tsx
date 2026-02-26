@@ -18,6 +18,7 @@ type UserProfile = {
   email: string;
   role: string;
   totalPoints?: number;
+  pointsMultiplier?: number;
 };
 
 type RewardSettings = {
@@ -176,6 +177,7 @@ export default function RewardsPage() {
                             <span className="font-medium">PtW (With Correction)</span>
                             <Badge className="bg-blue-100 text-blue-800 border-blue-200">+0.50</Badge>
                         </div>
+                        <Separator className="my-1 opacity-50" />
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">Movement Log (Engineer)</span>
                             <Badge className="bg-slate-100 text-slate-800 border-slate-200">+0.10</Badge>
@@ -184,6 +186,7 @@ export default function RewardsPage() {
                             <span className="font-medium">Movement Log (Manager)</span>
                             <Badge className="bg-slate-50 text-slate-600 border-slate-100">+0.05</Badge>
                         </div>
+                        <Separator className="my-1 opacity-50" />
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">DPR Submission (Engineer)</span>
                             <Badge className="bg-slate-100 text-slate-800 border-slate-200">+0.10</Badge>
@@ -191,6 +194,15 @@ export default function RewardsPage() {
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">DPR Submission (Manager)</span>
                             <Badge className="bg-slate-50 text-slate-600 border-slate-100">+0.05</Badge>
+                        </div>
+                        <Separator className="my-1 opacity-50" />
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="font-medium">Task Assignment (Assigner)</span>
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-200">+0.10</Badge>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="font-medium">Task Completion (Assignee)</span>
+                            <Badge className="bg-green-100 text-green-800 border-green-200">+0.10</Badge>
                         </div>
                     </div>
                     <Separator />
