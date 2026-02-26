@@ -209,7 +209,7 @@ export default function ProfilePage() {
           <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden w-full">
             <CardHeader className="bg-primary/5 py-3 border-b">
               <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
-                <UserCog className="h-4 w-4" /> Reporting Structure
+                <UserCog className="h-4 w-4" /> Reporting Manager
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
