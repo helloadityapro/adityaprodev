@@ -15,6 +15,7 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -204,7 +205,7 @@ export default function AdminRewardsSettingsPage() {
     ).sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
   }, [allUsers, userSearch]);
 
-  if (isProfileLoading || isUsersLoading || isRequestsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
+  if (isProfileLoading || isUsersLoading || isRequestsLoading || isUserLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   if (!isAdmin) return null;
 
