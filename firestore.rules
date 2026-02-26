@@ -137,7 +137,9 @@ service cloud.firestore {
     }
 
     match /lms_progress/{progressId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      // Allow read if the progress document belongs to the user (identified by ID prefix) or they are an admin
+      allow read: if isSignedIn() && (isAdmin() || progressId.split('_')[0] == request.auth.uid);
+      // Allow write if the user is the owner of the progress data
       allow write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
 
