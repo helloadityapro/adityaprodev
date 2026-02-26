@@ -48,8 +48,14 @@ const initiateCleanupOtpFlow = ai.defineFlow({
       expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       createdAt: serverTimestamp()
     });
-    console.log(`[SECURITY] Cleanup OTP: ${code}`);
-    return { success: true, message: `Code sent to ${email}.` };
+    
+    // IMPORTANT: In production, integrate with an email provider here.
+    // For prototyping, the code is logged to the server console.
+    console.log('--------------------------------------------------');
+    console.log(`[SECURITY] DATA CLEANUP OTP for ${email}: ${code}`);
+    console.log('--------------------------------------------------');
+    
+    return { success: true, message: `Security code dispatched to ${email}. Check server logs if not received.` };
   } catch (e: any) {
     return { success: false, message: e.message };
   }
@@ -95,8 +101,14 @@ const initiatePointsOtpFlow = ai.defineFlow({
       expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       createdAt: serverTimestamp()
     });
-    console.log(`[SECURITY] Points Adjustment OTP: ${code}`);
-    return { success: true, message: `Security code sent to ${email}.` };
+    
+    // IMPORTANT: In production, integrate with an email provider here.
+    // For prototyping, the code is logged to the server console.
+    console.log('--------------------------------------------------');
+    console.log(`[SECURITY] POINTS ADJUSTMENT OTP for ${email}: ${code}`);
+    console.log('--------------------------------------------------');
+    
+    return { success: true, message: `Security code dispatched to ${email}. Check server logs if not received.` };
   } catch (e: any) {
     return { success: false, message: e.message };
   }
@@ -123,7 +135,7 @@ const verifyPointsOtpFlow = ai.defineFlow({
 async function verifyGenericOtp(docId: string, inputCode: string) {
   try {
     const snap = await getDoc(doc(db, 'otp_verifications', docId));
-    if (!snap.exists()) return { success: false, message: "No active code found." };
+    if (!snap.exists()) return { success: false, message: "No active session found. Please request a new code." };
     
     const data = snap.data();
     const now = new Date();
@@ -131,7 +143,7 @@ async function verifyGenericOtp(docId: string, inputCode: string) {
 
     if (data.code === inputCode) {
       if (now < expiresAt) return { success: true, message: "Verified." };
-      return { success: false, message: "Code has expired." };
+      return { success: false, message: "Security code has expired. Please request a new one." };
     }
     return { success: false, message: "Incorrect security code." };
   } catch (e: any) {
