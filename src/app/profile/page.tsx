@@ -1,13 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, collection, query, orderBy } from 'firebase/firestore';
+import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, query, orderBy, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Trophy, Star, Award, Coins, MapPin, ShieldCheck, UserCog, TrendingUp, HardHat, Smartphone, Zap } from 'lucide-react';
+import { Trophy, Star, Award, Coins, MapPin, ShieldCheck, UserCog, TrendingUp, HardHat, Smartphone, Zap, Users } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -69,14 +69,21 @@ export default function ProfilePage() {
   );
   const { data: allUsers, isLoading: isRankLoading } = useCollection<UserProfile>(leadersQuery);
 
-  // 4. Fetch manager info if applicable
+  // 4. Fetch manager info if applicable (for engineers)
   const managerRef = useMemoFirebase(() => {
     if (!userProfile?.siteManagerId) return null;
     return doc(firestore, 'users', userProfile.siteManagerId);
   }, [firestore, userProfile?.siteManagerId]);
   const { data: managerProfile } = useDoc<UserProfile>(managerRef);
 
-  // 5. Fetch all sites to map assigned IDs
+  // 5. Fetch team members (for managers)
+  const teamQuery = useMemoFirebase(() => {
+    if (!userProfile || userProfile.role !== 'Site Manager' || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, userProfile?.role]);
+  const { data: teamMembers, isLoading: isTeamLoading } = useCollection<UserProfile>(teamQuery);
+
+  // 6. Fetch all sites to map assigned IDs
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
@@ -95,7 +102,7 @@ export default function ProfilePage() {
   const userPoints = userProfile?.totalPoints || 0;
   const monetaryValue = userPoints * pointValue;
 
-  if (isAuthLoading || isProfileLoading || isRankLoading) {
+  if (isAuthLoading || isProfileLoading || isRankLoading || (userProfile?.role === 'Site Manager' && isTeamLoading)) {
     return <ProfilePageSkeleton />;
   }
 
@@ -152,7 +159,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Account Performance Section (Refined Personal Stats) */}
+      {/* Account Performance Section (Refined Personal Stats Bar) */}
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-1">
             <Zap className="h-4 w-4 text-primary fill-primary" />
@@ -208,7 +215,7 @@ export default function ProfilePage() {
                 {managerProfile ? (
                   <div className="flex items-center gap-4 p-4 rounded-md border bg-card shadow-sm hover:border-primary/30 transition-all cursor-default">
                     <Avatar className="h-12 w-12 border">
-                      <AvatarFallback className="text-sm font-bold bg-muted">{managerProfile.username.charAt(0)}</AvatarFallback>
+                      <AvatarFallback className="text-sm font-bold bg-muted">{managerProfile.username?.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
                       <span className="text-sm font-bold">{managerProfile.username}</span>
@@ -219,6 +226,37 @@ export default function ProfilePage() {
                 ) : (
                   <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center">
                     <p className="text-sm text-muted-foreground italic">No manager mapped. Please contact Admin.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {userProfile.role === 'Site Manager' && (
+            <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden">
+              <CardHeader className="bg-primary/5 py-3 border-b">
+                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
+                  <Users className="h-4 w-4" /> Managed Team
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {teamMembers && teamMembers.length > 0 ? (
+                  <div className="space-y-3">
+                    {teamMembers.map(member => (
+                      <div key={member.id} className="flex items-center gap-3 p-3 rounded-md border bg-card hover:border-primary/30 transition-all cursor-default">
+                        <Avatar className="h-10 w-10 border shadow-sm">
+                          <AvatarFallback className="text-xs font-bold bg-muted">{member.username?.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-sm font-bold truncate">{member.username}</span>
+                          <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">{member.role}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center">
+                    <p className="text-sm text-muted-foreground italic">No engineers currently report to you.</p>
                   </div>
                 )}
               </CardContent>
