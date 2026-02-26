@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -9,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment, getDoc } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -32,6 +33,11 @@ type Site = {
   name: string;
 };
 
+type RewardSettings = {
+  dprEngineer?: number;
+  dprManager?: number;
+};
+
 export default function SubmitDPRPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -44,6 +50,9 @@ export default function SubmitDPRPage() {
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
+
+  const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
+  const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
@@ -91,9 +100,11 @@ export default function SubmitDPRPage() {
       });
 
       // Reward Points Logic for DPR
-      // Creator gets 0.1 per report, Manager gets 0.05 per report
+      const rateEngineer = rewardSettings?.dprEngineer ?? 0.1;
+      const rateManager = rewardSettings?.dprManager ?? 0.05;
+
       const multiplier = userProfile?.pointsMultiplier || 1;
-      const engineerPoints = 0.1 * multiplier;
+      const engineerPoints = rateEngineer * multiplier;
       
       updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
         totalPoints: increment(engineerPoints)
@@ -101,7 +112,7 @@ export default function SubmitDPRPage() {
 
       if (userProfile?.siteManagerId) {
         updateDocumentNonBlocking(doc(firestore, 'users', userProfile.siteManagerId), {
-            totalPoints: increment(0.05)
+            totalPoints: increment(rateManager)
         });
       }
       

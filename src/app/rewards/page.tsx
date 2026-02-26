@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -23,6 +24,14 @@ type UserProfile = {
 
 type RewardSettings = {
   pointValueInRs?: number;
+  ptwNoCorrection?: number;
+  ptwWithCorrection?: number;
+  movementEngineer?: number;
+  movementManager?: number;
+  dprEngineer?: number;
+  dprManager?: number;
+  taskAssignment?: number;
+  taskCompletion?: number;
 };
 
 export default function RewardsPage() {
@@ -33,7 +42,7 @@ export default function RewardsPage() {
   const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isUserLoading } = useDoc<UserProfile>(userRef);
 
-  // Fetch global reward settings (point value)
+  // Fetch global reward settings
   const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
   const { data: settings } = useDoc<RewardSettings>(settingsRef);
 
@@ -165,51 +174,51 @@ export default function RewardsPage() {
         <div className="space-y-6">
             <Card className="rounded-sm border-primary/10">
                 <CardHeader>
-                    <CardTitle className="text-sm font-bold uppercase text-primary">Points System</CardTitle>
+                    <CardTitle className="text-sm font-bold uppercase text-primary">Current Points System</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-2">
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">PtW (No Correction)</span>
-                            <Badge className="bg-green-100 text-green-800 border-green-200">+1.00</Badge>
+                            <Badge className="bg-green-100 text-green-800 border-green-200">+{settings?.ptwNoCorrection?.toFixed(2) || '1.00'}</Badge>
                         </div>
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">PtW (With Correction)</span>
-                            <Badge className="bg-blue-100 text-blue-800 border-blue-200">+0.50</Badge>
+                            <Badge className="bg-blue-100 text-blue-800 border-blue-200">+{settings?.ptwWithCorrection?.toFixed(2) || '0.50'}</Badge>
                         </div>
                         <Separator className="my-1 opacity-50" />
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">Movement Log (Engineer)</span>
-                            <Badge className="bg-slate-100 text-slate-800 border-slate-200">+0.10</Badge>
+                            <Badge className="bg-slate-100 text-slate-800 border-slate-200">+{settings?.movementEngineer?.toFixed(2) || '0.10'}</Badge>
                         </div>
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">Movement Log (Manager)</span>
-                            <Badge className="bg-slate-50 text-slate-600 border-slate-100">+0.05</Badge>
+                            <Badge className="bg-slate-50 text-slate-600 border-slate-100">+{settings?.movementManager?.toFixed(2) || '0.05'}</Badge>
                         </div>
                         <Separator className="my-1 opacity-50" />
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">DPR Submission (Engineer)</span>
-                            <Badge className="bg-slate-100 text-slate-800 border-slate-200">+0.10</Badge>
+                            <Badge className="bg-slate-100 text-slate-800 border-slate-200">+{settings?.dprEngineer?.toFixed(2) || '0.10'}</Badge>
                         </div>
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">DPR Submission (Manager)</span>
-                            <Badge className="bg-slate-50 text-slate-600 border-slate-100">+0.05</Badge>
+                            <Badge className="bg-slate-50 text-slate-600 border-slate-100">+{settings?.dprManager?.toFixed(2) || '0.05'}</Badge>
                         </div>
                         <Separator className="my-1 opacity-50" />
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">Task Assignment (Assigner)</span>
-                            <Badge className="bg-amber-100 text-amber-800 border-amber-200">+0.10</Badge>
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-200">+{settings?.taskAssignment?.toFixed(2) || '0.10'}</Badge>
                         </div>
                         <div className="flex justify-between items-center text-xs">
                             <span className="font-medium">Task Completion (Assignee)</span>
-                            <Badge className="bg-green-100 text-green-800 border-green-200">+0.10</Badge>
+                            <Badge className="bg-green-100 text-green-800 border-green-200">+{settings?.taskCompletion?.toFixed(2) || '0.10'}</Badge>
                         </div>
                     </div>
                     <Separator />
                     <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-sm border border-primary/10">
                         <TrendingUp className="h-4 w-4 text-primary" />
                         <div className="text-[10px] leading-relaxed italic text-muted-foreground">
-                            High accuracy and zero-rejection submissions maximize your reward potential.
+                            Rewards are dynamically adjusted by project administration based on site documentation goals.
                         </div>
                     </div>
                 </CardContent>

@@ -26,7 +26,15 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "pointValueInRs": { "type": "number", "default": 1 }
+        "pointValueInRs": { "type": "number", "default": 1 },
+        "ptwNoCorrection": { "type": "number", "default": 1 },
+        "ptwWithCorrection": { "type": "number", "default": 0.5 },
+        "movementEngineer": { "type": "number", "default": 0.1 },
+        "movementManager": { "type": "number", "default": 0.05 },
+        "dprEngineer": { "type": "number", "default": 0.1 },
+        "dprManager": { "type": "number", "default": 0.05 },
+        "taskAssignment": { "type": "number", "default": 0.1 },
+        "taskCompletion": { "type": "number", "default": 0.1 }
       }
     },
     "PermitToWork": {
@@ -126,74 +134,6 @@
         "remarks": { "type": "string" }
       },
       "required": ["siteName", "title", "assignedToId", "priority", "status", "dueDate"]
-    },
-    "SiteDocument": {
-      "title": "Site Document",
-      "type": "object",
-      "description": "Represents a file uploaded to a site's document folder.",
-      "properties": {
-        "id": { "type": "string" },
-        "siteId": { "type": "string" },
-        "siteName": { "type": "string" },
-        "fileName": { "type": "string" },
-        "fileUrl": { "type": "string" },
-        "fileType": { "type": "string" },
-        "fileSize": { "type": "number" },
-        "uploadedById": { "type": "string" },
-        "uploadedByName": { "type": "string" },
-        "siteManagerId": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["siteId", "fileName", "fileUrl", "uploadedById"]
-    },
-    "LMSCourse": {
-      "title": "LMS Course",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "description": { "type": "string" },
-        "category": { "type": "string" },
-        "thumbnailUrl": { "type": "string" },
-        "duration": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "createdBy": { "type": "string" }
-      }
-    },
-    "LMSModule": {
-      "title": "LMS Module",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "courseId": { "type": "string" },
-        "title": { "type": "string" },
-        "content": { "type": "string" },
-        "order": { "type": "number" },
-        "videoUrl": { "type": "string" }
-      }
-    },
-    "LMSQuiz": {
-      "title": "LMS Quiz",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "courseId": { "type": "string" },
-        "moduleId": { "type": "string" },
-        "questions": { "type": "array" }
-      }
-    },
-    "LMSProgress": {
-      "title": "LMS Progress",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "courseId": { "type": "string" },
-        "completedModuleIds": { "type": "array" },
-        "quizResults": { "type": "object" },
-        "status": { "type": "string", "enum": ["started", "completed"] },
-        "lastAccessed": { "type": "string", "format": "date-time" }
-      }
     }
   },
   "auth": {
@@ -228,26 +168,6 @@
       {
         "path": "/tasks/{taskId}",
         "definition": { "entityName": "Task" }
-      },
-      {
-        "path": "/site_documents/{docId}",
-        "definition": { "entityName": "SiteDocument" }
-      },
-      {
-        "path": "/lms_courses/{courseId}",
-        "definition": { "entityName": "LMSCourse" }
-      },
-      {
-        "path": "/lms_modules/{moduleId}",
-        "definition": { "entityName": "LMSModule" }
-      },
-      {
-        "path": "/lms_quizzes/{quizId}",
-        "definition": { "entityName": "LMSQuiz" }
-      },
-      {
-        "path": "/lms_progress/{progressId}",
-        "definition": { "entityName": "LMSProgress" }
       }
     ]
   }

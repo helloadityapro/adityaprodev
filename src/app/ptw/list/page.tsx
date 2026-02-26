@@ -73,6 +73,11 @@ type PtwType = {
     allowedApproverIds?: string[];
 };
 
+type RewardSettings = {
+  ptwNoCorrection?: number;
+  ptwWithCorrection?: number;
+};
+
 type SortKey = 'serialNumber' | 'ptwType' | 'siteName' | 'requestDate' | 'status' | 'siteEngineerName';
 
 function StatusBadge({ permit, className }: { permit: Permit, className?: string }) {
@@ -217,6 +222,9 @@ export default function PtwListPage() {
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
   const { data: ptwTypes } = useCollection<PtwType>(useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]));
 
+  const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
+  const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
+
   React.useEffect(() => {
     const viewId = searchParams.get('view');
     if (viewId && permits && permits.length > 0) {
@@ -276,7 +284,12 @@ export default function PtwListPage() {
             
             // Check for any rejections in lifecycle
             const hasRejection = (permit.timeline || []).some(t => t.status === 'Rejected');
-            const basePoints = hasRejection ? 0.5 : 1.0;
+            
+            // Fetch configured rates or fallback to defaults
+            const baseNoCorrection = rewardSettings?.ptwNoCorrection ?? 1.0;
+            const baseWithCorrection = rewardSettings?.ptwWithCorrection ?? 0.5;
+            
+            const basePoints = hasRejection ? baseWithCorrection : baseNoCorrection;
             const pointsToAdd = basePoints * multiplier;
 
             updateDocumentNonBlocking(doc(firestore, 'users', permit.siteEngineerId), {

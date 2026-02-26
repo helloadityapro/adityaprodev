@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, query, where, increment } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, increment, getDoc } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -46,6 +46,10 @@ type UserProfile = {
   pointsMultiplier?: number;
 };
 
+type RewardSettings = {
+  taskAssignment?: number;
+};
+
 export default function CreateTaskPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -71,6 +75,9 @@ export default function CreateTaskPage() {
     return colRef;
   }, [firestore, isAdmin, isManager, user]);
   const { data: teamUsers } = useCollection<UserProfile>(usersQuery);
+
+  const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
+  const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
@@ -123,9 +130,10 @@ export default function CreateTaskPage() {
       addDocumentNonBlocking(collection(firestore, 'tasks'), taskData);
 
       // Reward Points Logic for Assigner
+      const rate = rewardSettings?.taskAssignment ?? 0.1;
       const multiplier = userProfile.pointsMultiplier || 1;
       updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
-        totalPoints: increment(0.1 * multiplier)
+        totalPoints: increment(rate * multiplier)
       });
 
       // Notify Assignee via platform notifications

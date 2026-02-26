@@ -57,6 +57,10 @@ type Task = {
   remarks?: string;
 };
 
+type RewardSettings = {
+  taskCompletion?: number;
+};
+
 const STATUS_OPTIONS = ["To-do", "In Progress", "Completed", "Cancelled"] as const;
 
 function PriorityBadge({ priority }: { priority: string }) {
@@ -116,6 +120,9 @@ export default function TaskListPage() {
 
   const { data: tasks, isLoading } = useCollection<Task>(tasksQuery);
 
+  const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
+  const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
+
   const filteredTasks = React.useMemo(() => {
     if (!tasks) return [];
     
@@ -167,7 +174,9 @@ export default function TaskListPage() {
         if (assigneeDoc.exists()) {
             const assigneeData = assigneeDoc.data();
             const multiplier = assigneeData.pointsMultiplier || 1;
-            const pointsToAdd = 0.1 * multiplier;
+            
+            const rate = rewardSettings?.taskCompletion ?? 0.1;
+            const pointsToAdd = rate * multiplier;
             
             updateDocumentNonBlocking(doc(firestore, 'users', actionTask.assignedToId), {
                 totalPoints: increment(pointsToAdd)
@@ -183,13 +192,6 @@ export default function TaskListPage() {
                 createdAt: serverTimestamp(),
             });
         }
-    } else if (nextStatus !== 'Completed' && actionTask.status === 'Completed') {
-        // Reverse points if task was completed but then moved back to other status
-        const assigneeDoc = await getDoc(doc(firestore, 'users', actionTask.assignedToId));
-        const multiplier = assigneeDoc.exists() ? assigneeDoc.data()?.pointsMultiplier || 1 : 1;
-        updateDocumentNonBlocking(doc(firestore, 'users', actionTask.assignedToId), {
-            totalPoints: increment(-(0.1 * multiplier))
-        });
     }
 
     // Notify Assigner
@@ -213,26 +215,10 @@ export default function TaskListPage() {
     if (!deletingTask || !firestore) return;
 
     try {
-        // 1. Reverse Assignment Points
-        const assignerDoc = await getDoc(doc(firestore, 'users', deletingTask.assignedById));
-        const assignerMultiplier = assignerDoc.exists() ? assignerDoc.data()?.pointsMultiplier || 1 : 1;
-        updateDocumentNonBlocking(doc(firestore, 'users', deletingTask.assignedById), {
-            totalPoints: increment(-(0.1 * assignerMultiplier))
-        });
-
-        // 2. Reverse Completion Points if task was finished
-        if (deletingTask.status === 'Completed') {
-            const assigneeDoc = await getDoc(doc(firestore, 'users', deletingTask.assignedToId));
-            const assigneeMultiplier = assigneeDoc.exists() ? assigneeDoc.data()?.pointsMultiplier || 1 : 1;
-            updateDocumentNonBlocking(doc(firestore, 'users', deletingTask.assignedToId), {
-                totalPoints: increment(-(0.1 * assigneeMultiplier))
-            });
-        }
-
         deleteDocumentNonBlocking(doc(firestore, 'tasks', deletingTask.id));
-        toast({ title: "Deleted", description: "Task and associated points removed." });
+        toast({ title: "Deleted", description: "Task record removed. Note: Assignment points are not automatically reversed." });
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to reverse points during deletion.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to complete deletion.' });
     } finally {
         setDeletingTask(null);
     }
@@ -459,7 +445,7 @@ export default function TaskListPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>Remove Task?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    This will permanently delete task <strong>{deletingTask?.title}</strong> and reverse any reward points. This action cannot be undone.
+                    This will permanently delete task <strong>{deletingTask?.title}</strong>. This action cannot be undone.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
