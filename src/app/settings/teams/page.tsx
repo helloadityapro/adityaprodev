@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, getDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, doc, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -87,7 +87,8 @@ export default function TeamMappingPage() {
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
 
   /**
-   * Recalculates and updates a Manager's assignedProjectIds based on all reporting engineers
+   * Recalculates and updates a Manager's assignedProjectIds based on all reporting engineers.
+   * This ensures Managers "inherit" all site access from their reporting team members.
    */
   const syncManagerSites = async (managerId: string) => {
     const batch = writeBatch(firestore);
@@ -115,12 +116,12 @@ export default function TeamMappingPage() {
         const engineerRef = doc(firestore, 'users', selectedEngineerId);
         await updateDocumentNonBlocking(engineerRef, { siteManagerId: selectedManagerId });
 
-        // Trigger sync
+        // Trigger inherited site sync
         await syncManagerSites(selectedManagerId);
 
         toast({
             title: 'Engineer Assigned',
-            description: 'The site engineer has been successfully mapped and sites synchronized.',
+            description: 'Reporting structure updated and site access synchronized.',
         });
         
         setSelectedEngineerId(null);
@@ -141,7 +142,7 @@ export default function TeamMappingPage() {
         const engineerRef = doc(firestore, 'users', engineerId);
         await updateDocumentNonBlocking(engineerRef, { siteManagerId: null });
 
-        // Recalculate old manager's sites
+        // Recalculate old manager's inherited sites
         await syncManagerSites(oldManagerId);
 
         toast({
@@ -171,7 +172,7 @@ export default function TeamMappingPage() {
         const userRef = doc(firestore, 'users', siteManagementUser.id);
         await updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
 
-        // If it's an engineer, sync to manager
+        // If it's an engineer, sync updated access to their manager
         if (siteManagementUser.role === 'Site Engineer' && siteManagementUser.siteManagerId) {
             await syncManagerSites(siteManagementUser.siteManagerId);
         }

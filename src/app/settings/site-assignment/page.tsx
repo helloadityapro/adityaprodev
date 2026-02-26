@@ -1,9 +1,8 @@
-
 'use client';
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where } from 'firebase/firestore';
+import { collection, doc, query, where, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -117,12 +116,40 @@ export default function SiteAssignmentPage() {
     setLocalAssignedSites(prev => prev.filter(id => id !== siteId));
   };
 
-  const handleSave = () => {
-    if (!selectedUserId) return;
+  /**
+   * Recalculates and updates a Manager's assignedProjectIds based on all reporting engineers.
+   * Ensures the manager "inherits" all sites assigned to their team.
+   */
+  const syncManagerSites = async (managerId: string, updatedEngineerId: string, updatedEngineerSites: string[]) => {
+    try {
+      const q = query(collection(firestore, 'users'), where('siteManagerId', '==', managerId));
+      const snap = await getDocs(q);
+      
+      const allTeamSites = new Set<string>();
+      snap.docs.forEach(d => {
+          const data = d.data();
+          const sites = data.id === updatedEngineerId ? updatedEngineerSites : (data.assignedProjectIds || []);
+          sites.forEach((id: string) => allTeamSites.add(id));
+      });
+
+      const managerRef = doc(firestore, 'users', managerId);
+      updateDocumentNonBlocking(managerRef, { assignedProjectIds: Array.from(allTeamSites) });
+    } catch (e) {
+      console.error("Manager inheritance sync failed", e);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!selectedUserId || !selectedUser) return;
     setIsSaving(true);
 
     const userRef = doc(firestore, 'users', selectedUserId);
     updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
+
+    // If an engineer's sites are updated, sync them to their manager
+    if (selectedUser.role === 'Site Engineer' && selectedUser.siteManagerId) {
+      await syncManagerSites(selectedUser.siteManagerId, selectedUserId, localAssignedSites);
+    }
 
     toast({
       title: 'Sites Assigned',
@@ -148,7 +175,7 @@ export default function SiteAssignmentPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight">Assign Sites</h1>
-        <p className="text-muted-foreground">Manage which sites are accessible to specific users.</p>
+        <p className="text-muted-foreground">Manage which sites are accessible to specific users. Engineer assignments automatically sync to Managers.</p>
       </div>
 
       <Card>

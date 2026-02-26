@@ -95,9 +95,20 @@ export default function ProfilePage() {
   }, [allUsers, user]);
 
   const assignedSites = React.useMemo(() => {
-    if (!userProfile?.assignedProjectIds || !allSites) return [];
-    return allSites.filter(s => userProfile.assignedProjectIds?.includes(s.id));
-  }, [userProfile, allSites]);
+    if (!allSites || !userProfile) return [];
+    
+    // Start with directly assigned sites
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    
+    // For Managers, explicitly aggregate from team members in real-time
+    if (userProfile.role === 'Site Manager' && teamMembers) {
+      teamMembers.forEach(member => {
+        (member.assignedProjectIds || []).forEach(id => siteIds.add(id));
+      });
+    }
+
+    return allSites.filter(s => siteIds.has(s.id));
+  }, [userProfile, allSites, teamMembers]);
 
   const pointValue = settings?.pointValueInRs || 1;
   const userPoints = userProfile?.totalPoints || 0;
