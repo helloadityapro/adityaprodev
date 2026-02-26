@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -314,7 +313,7 @@ export default function AdminRewardsSettingsPage() {
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b pb-1">Documentation</h3>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b pb-1">DPR</h3>
                 <div className="space-y-2">
                   <Label className="text-[10px] uppercase font-bold">DPR (Engineer)</Label>
                   <Input type="number" step="0.01" value={rates.dprEngineer} onChange={e => setRates({...rates, dprEngineer: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
