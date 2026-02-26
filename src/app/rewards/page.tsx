@@ -10,6 +10,7 @@ import { Trophy, Coins, Award, TrendingUp, Medal, Star, User } from "lucide-reac
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 
 type UserProfile = {
   id: string;
