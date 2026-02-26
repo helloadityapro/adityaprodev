@@ -13,7 +13,6 @@ service cloud.firestore {
 
     function isAdmin() {
       let superAdminEmails = [
-        'abhijeetsb22@gmail.com',
         'khalil@adityagreenenergy.com',
         'prafulrana143@gmail.com'
       ];
@@ -38,6 +37,11 @@ service cloud.firestore {
         (isSiteManager() && get(/databases/$(database)/documents/users/$(userId)).data.siteManagerId == request.auth.uid)
       );
       allow delete: if isAdmin();
+    }
+
+    match /system_settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /permits_to_work/{permitId} {

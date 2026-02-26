@@ -8,8 +8,8 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { collection, doc, serverTimestamp, increment } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -93,7 +93,7 @@ export default function RecordMovementPage() {
   const sourceOrDestinationType = form.watch("sourceOrDestinationType");
 
   const onSubmit = async (values: z.infer<typeof movementSchema>) => {
-    if (!user) return;
+    if (!user || !userProfile) return;
     setIsSubmitting(true);
     try {
       const promises = values.items.map(item => {
@@ -112,8 +112,23 @@ export default function RecordMovementPage() {
       });
 
       await Promise.all(promises);
+
+      // Reward Points Logic for Movement
+      // Creator gets 0.1 per item, Manager gets 0.05 per item
+      const multiplier = userProfile.pointsMultiplier || 1;
+      const engineerPoints = 0.1 * values.items.length * multiplier;
       
-      toast({ title: "Success", description: `${values.items.length} movement logs recorded.` });
+      updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
+        totalPoints: increment(engineerPoints)
+      });
+
+      if (userProfile.siteManagerId) {
+        updateDocumentNonBlocking(doc(firestore, 'users', userProfile.siteManagerId), {
+            totalPoints: increment(0.05 * values.items.length) // Fixed reward for manager
+        });
+      }
+      
+      toast({ title: "Success", description: `${values.items.length} movement logs recorded. Points updated.` });
       form.reset({ 
         siteName: "", 
         movementType: values.movementType,

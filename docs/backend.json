@@ -15,9 +15,19 @@
         "registrationRequest": { "type": "boolean" },
         "siteManagerId": { "type": "string" },
         "assignedProjectIds": { "type": "array", "items": { "type": "string" } },
-        "hiddenPermitIds": { "type": "array", "items": { "type": "string" } }
+        "hiddenPermitIds": { "type": "array", "items": { "type": "string" } },
+        "totalPoints": { "type": "number", "default": 0 },
+        "pointsMultiplier": { "type": "number", "default": 1 }
       },
       "required": ["id", "username", "email", "mobile", "role"]
+    },
+    "SystemSettings": {
+      "title": "System Settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pointValueInRs": { "type": "number", "default": 1 }
+      }
     },
     "PermitToWork": {
       "title": "PermitToWork",
@@ -156,6 +166,10 @@
       {
         "path": "/users/{userId}",
         "definition": { "entityName": "User" }
+      },
+      {
+        "path": "/system_settings/{settingId}",
+        "definition": { "entityName": "SystemSettings" }
       },
       {
         "path": "/permits_to_work/{permitId}",

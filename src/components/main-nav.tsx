@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -20,6 +21,8 @@ import {
   ListTodo,
   CheckSquare,
   FolderOpen,
+  Trophy,
+  Coins,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -53,6 +56,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <Link href="/documents">
                 <FolderOpen className="h-4 w-4" />
                 <span className="font-medium">Documents</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Rewards & Points" isActive={pathname === '/rewards'} className="rounded-sm">
+              <Link href="/rewards">
+                <Trophy className="h-4 w-4 text-amber-500" />
+                <span className="font-medium">Points Bank</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -193,6 +204,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <Link href="/admin/dashboard">
                   <LayoutDashboard className="h-4 w-4" />
                   <span className="font-medium">Dashboard</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Rewards Setup" isActive={pathname === '/settings/rewards'} className="rounded-sm">
+                <Link href="/settings/rewards">
+                  <Coins className="h-4 w-4 text-amber-600" />
+                  <span className="font-medium">Rewards Setup</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs, or } from "firebase/firestore";
+import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs, or, increment, getDoc } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -111,9 +111,6 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
   );
 }
 
-/**
- * WhatsApp Notification component for Managers/Admins to update Engineers
- */
 function WhatsAppUpdateEngineer({ permit }: { permit: Permit }) {
     const firestore = useFirestore();
     const { data: engineerProfile } = useDoc(useMemoFirebase(() => doc(firestore, 'users', permit.siteEngineerId), [firestore, permit.siteEngineerId]));
@@ -123,7 +120,6 @@ function WhatsAppUpdateEngineer({ permit }: { permit: Permit }) {
         const cleanMobile = engineerProfile.mobile.replace(/\D/g, '');
         const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : (cleanMobile.startsWith('91') ? cleanMobile : `91${cleanMobile}`);
         
-        // Get last remark from timeline
         const lastEntry = [...(permit.timeline || [])].sort((a, b) => {
             const dateA = a.timestamp?.toDate?.()?.getTime() || 0;
             const dateB = b.timestamp?.toDate?.()?.getTime() || 0;
@@ -241,7 +237,7 @@ export default function PtwListPage() {
     return typeDoc.allowedApproverIds.includes(user.uid);
   };
 
-  const handleAction = (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
+  const handleAction = async (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
     if (!user || !userProfile) return;
     const permitRef = doc(firestore, "permits_to_work", permit.id);
     const currentSubmission = Math.max(1, ...(permit.attachments?.map(a => a.submissionIndex || 0) || []));
@@ -264,12 +260,40 @@ export default function PtwListPage() {
     };
 
     if (userProfile.role === 'Site Manager' && permit.status === 'Pending') {
-      updateData.siteManagerId = user.uid; // Ensure manager ID is locked in
+      updateData.siteManagerId = user.uid;
     } else if (isAdmin) {
       updateData.adminId = user.uid;
     }
 
     updateDocumentNonBlocking(permitRef, updateData);
+
+    // Rewards Point Logic
+    if (targetStatus === 'Approved') {
+        const engineerDoc = await getDoc(doc(firestore, 'users', permit.siteEngineerId));
+        if (engineerDoc.exists()) {
+            const engineerData = engineerDoc.data();
+            const multiplier = engineerData.pointsMultiplier || 1;
+            
+            // Check for any rejections in lifecycle
+            const hasRejection = (permit.timeline || []).some(t => t.status === 'Rejected');
+            const basePoints = hasRejection ? 0.5 : 1.0;
+            const pointsToAdd = basePoints * multiplier;
+
+            updateDocumentNonBlocking(doc(firestore, 'users', permit.siteEngineerId), {
+                totalPoints: increment(pointsToAdd)
+            });
+
+            // Notification for points
+            addDocumentNonBlocking(collection(firestore, 'notifications'), {
+                userId: permit.siteEngineerId,
+                title: "Points Earned!",
+                description: `You earned ${pointsToAdd.toFixed(2)} points for permit ${permit.serialNumber}.`,
+                link: `/rewards`,
+                read: false,
+                createdAt: serverTimestamp(),
+            });
+        }
+    }
 
     // Notify Engineer
     addDocumentNonBlocking(collection(firestore, 'notifications'), {
@@ -281,7 +305,6 @@ export default function PtwListPage() {
       createdAt: serverTimestamp(),
     });
 
-    // Notify Manager if Admin acted
     if (isAdmin && permit.siteManagerId && permit.siteManagerId !== user.uid) {
         addDocumentNonBlocking(collection(firestore, 'notifications'), {
             userId: permit.siteManagerId,
@@ -293,7 +316,6 @@ export default function PtwListPage() {
         });
     }
 
-    // Always Notify Khalil for Status Updates
     const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
     getDocs(adminsQuery).then(snapshot => {
       snapshot.forEach(adminDoc => {
@@ -480,7 +502,6 @@ export default function PtwListPage() {
                           <WhatsAppUpdateEngineer permit={permit} />
                         )}
 
-                        {/* Manager Action Buttons (Shows if user is the mapped manager) */}
                         {isMappedManager && permit.status === 'Pending' && isAuthorized && (
                           <>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'ManagerApproved' })}>Approve</Button>
@@ -488,7 +509,6 @@ export default function PtwListPage() {
                           </>
                         )}
 
-                        {/* Admin Action Buttons (Shows only if status is ManagerApproved or no Manager mapped) */}
                         {isAdmin && (permit.status === 'ManagerApproved' || (permit.status === 'Pending' && !permit.siteManagerId)) && isAuthorized && (
                           <>
                             <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'Approved' })}>Approve</Button>
@@ -550,7 +570,6 @@ export default function PtwListPage() {
                 <span className="text-xs font-mono text-primary font-semibold">{detailsPermit?.serialNumber}</span>
               </div>
               <div className="flex gap-2">
-                {/* Inline Actions inside Details View */}
                 {detailsPermit && (
                   <div className="flex items-center gap-2 mr-4">
                     {(isAdmin || userProfile?.role === 'Site Manager') && (detailsPermit.status === 'Approved' || detailsPermit.status === 'Rejected' || detailsPermit.status === 'ManagerApproved') && (
