@@ -3,12 +3,12 @@
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { doc, collection, query, where, orderBy, serverTimestamp, arrayUnion, increment } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { doc, collection, query, where, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, GraduationCap, ArrowLeft, Radio, AlertCircle, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, GraduationCap, ArrowLeft, Radio, AlertCircle, Lock, Loader2 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +39,19 @@ type ProgressData = {
   quizResults?: Record<string, number>;
 };
 
+/**
+ * Extracts the YouTube Video ID and returns a proper embed URL.
+ * Prevents "Connection Refused" errors caused by using standard watch URLs in iframes.
+ */
+function getYouTubeEmbedUrl(url?: string) {
+  if (!url) return '';
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  const videoId = (match && match[2].length === 11) ? match[2] : null;
+  
+  return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0` : url;
+}
+
 export default function ModuleLearningPage() {
   const { courseId, moduleId } = useParams() as { courseId: string, moduleId: string };
   const firestore = useFirestore();
@@ -60,7 +73,6 @@ export default function ModuleLearningPage() {
   const { data: quizzes, error: quizError } = useCollection<Quiz>(quizRef);
   const quiz = quizzes?.[0];
 
-  // Use simple query to avoid composite index requirements
   const allModulesQuery = useMemoFirebase(() => query(
     collection(firestore, 'lms_modules'), 
     where('courseId', '==', courseId)
@@ -95,35 +107,49 @@ export default function ModuleLearningPage() {
 
     if (finalScore >= 80) {
       toast({ title: 'Assessment Passed!', description: `You scored ${finalScore}%. Module marked as complete.` });
-      markModuleComplete();
+      markModuleComplete(finalScore);
     } else {
       toast({ variant: 'destructive', title: 'Assessment Failed', description: `You scored ${finalScore}%. A minimum of 80% is required.` });
     }
   };
 
-  const markModuleComplete = async () => {
+  const markModuleComplete = async (finalScore: number = 100) => {
     if (!user || !moduleId || !progress) return;
     
     if (!progress.completedModuleIds.includes(moduleId)) {
       updateDocumentNonBlocking(doc(firestore, 'lms_progress', `${user.uid}_${courseId}`), {
         completedModuleIds: arrayUnion(moduleId),
-        [`quizResults.${moduleId}`]: score,
+        [`quizResults.${moduleId}`]: finalScore,
         lastAccessed: serverTimestamp()
       });
     }
   };
 
   const handleFinishCourse = () => {
-    markModuleComplete();
+    if (!quiz) markModuleComplete();
     router.push(`/lms/courses/${courseId}`);
   };
 
   if (moduleLoading || allModulesLoading) {
-    return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
+    return (
+      <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-8">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="aspect-video w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
   }
 
   if (moduleError || allModulesError || quizError) {
-    return <div className="p-12 text-center text-destructive font-bold">Error loading module: {(moduleError || allModulesError || quizError)?.message}</div>;
+    return (
+      <div className="p-12 text-center flex flex-col items-center gap-4">
+        <AlertCircle className="h-12 w-12 text-destructive opacity-50" />
+        <h2 className="text-xl font-bold text-destructive">Error Loading Module</h2>
+        <p className="text-muted-foreground">{(moduleError || allModulesError || quizError)?.message}</p>
+        <Button variant="outline" onClick={() => window.location.reload()}>Retry Connection</Button>
+      </div>
+    );
   }
 
   if (!moduleData) return <div className="p-12 text-center">Module not found.</div>;
@@ -131,21 +157,20 @@ export default function ModuleLearningPage() {
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-8 pb-32">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <Button variant="ghost" size="sm" asChild className="w-fit text-muted-foreground">
+        <Button variant="ghost" size="sm" asChild className="w-fit text-muted-foreground hover:text-primary">
           <Link href={`/lms/courses/${courseId}`}><ArrowLeft className="mr-2 h-4 w-4" /> Course Overview</Link>
         </Button>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Module {currentIndex + 1} of {sortedModules.length}</span>
           <div className="flex gap-1">
             {sortedModules.map((m, i) => (
-              <div key={m.id} className={cn("h-1 w-6 rounded-full", i <= currentIndex ? "bg-primary" : "bg-muted")} />
+              <div key={m.id} className={cn("h-1 w-6 rounded-full transition-colors", i <= currentIndex ? "bg-primary" : "bg-muted")} />
             ))}
           </div>
         </div>
       </div>
 
       <div className="space-y-10">
-        {/* Content Section */}
         <div className="space-y-6">
           <div className="space-y-2">
             <h1 className="text-4xl font-black tracking-tight text-foreground">{moduleData.title}</h1>
@@ -155,9 +180,11 @@ export default function ModuleLearningPage() {
           {moduleData.videoUrl && (
             <div className="aspect-video bg-black rounded-sm overflow-hidden shadow-xl ring-1 ring-primary/10">
               <iframe 
-                src={moduleData.videoUrl.replace('watch?v=', 'embed/')} 
-                className="w-full h-full"
+                src={getYouTubeEmbedUrl(moduleData.videoUrl)} 
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
+                title={moduleData.title}
               />
             </div>
           )}
@@ -167,7 +194,6 @@ export default function ModuleLearningPage() {
           </div>
         </div>
 
-        {/* Quiz Section */}
         {quiz && (
           <div className="space-y-6 pt-8 border-t border-primary/10">
             <div className="flex items-center gap-3">
@@ -249,7 +275,6 @@ export default function ModuleLearningPage() {
         )}
       </div>
 
-      {/* Navigation Footer */}
       <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur border-t p-4 z-20 md:left-[16rem]">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
           <Button variant="ghost" disabled={!prevModule} asChild={!!prevModule} className="rounded-sm font-bold">
@@ -257,7 +282,7 @@ export default function ModuleLearningPage() {
           </Button>
 
           <div className="hidden md:block flex-1 text-center">
-            <span className="text-[10px] font-black uppercase tracking-widest text-primary px-4">
+            <span className="text-[10px] font-black uppercase tracking-widest text-primary px-4 truncate max-w-[300px] inline-block">
               {moduleData.title}
             </span>
           </div>
@@ -267,7 +292,7 @@ export default function ModuleLearningPage() {
               className="rounded-sm font-black shadow-md"
               disabled={!!quiz && (!isQuizSubmitted || score < 80)}
               asChild={!quiz || (isQuizSubmitted && score >= 80)}
-              onClick={!quiz ? markModuleComplete : undefined}
+              onClick={!quiz ? () => markModuleComplete() : undefined}
             >
               {!quiz || (isQuizSubmitted && score >= 80) ? (
                 <Link href={`/lms/courses/${courseId}/learn/${nextModule.id}`}>Next Module <ChevronRight className="ml-2 h-4 w-4" /></Link>
