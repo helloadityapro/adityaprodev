@@ -23,11 +23,6 @@ service cloud.firestore {
       return isSignedIn() && getUserData().role == 'Site Manager';
     }
 
-    function hasAccessToSite(siteId) {
-      let user = getUserData();
-      return isAdmin() || (user.assignedProjectIds != null && siteId in user.assignedProjectIds);
-    }
-
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
@@ -121,29 +116,29 @@ service cloud.firestore {
     }
 
     match /site_documents/{docId} {
-      allow read: if isSignedIn() && (
-        isAdmin() || 
-        hasAccessToSite(resource.data.siteId) || 
-        resource.data.siteManagerId == request.auth.uid
-      );
-      allow create: if isSignedIn() && (
-        isAdmin() || 
-        hasAccessToSite(request.resource.data.siteId) || 
-        request.resource.data.siteManagerId == request.auth.uid
-      );
-      allow delete: if isAdmin() || (
-        isSignedIn() && (
-          resource.data.uploadedById == request.auth.uid || 
-          resource.data.siteManagerId == request.auth.uid
-        )
-      );
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.uploadedById == request.auth.uid);
     }
 
-    match /point_adjustment_requests/{requestId} {
-      allow read: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && (request.auth.token.email == 'khalil@adityagreenenergy.com');
-      allow delete: if isAdmin() && (request.auth.token.email == 'khalil@adityagreenenergy.com');
+    match /lms_courses/{courseId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /lms_modules/{moduleId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /lms_quizzes/{quizId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /lms_progress/{progressId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
 
     match /otp_verifications/{otpId} {
@@ -154,5 +149,6 @@ service cloud.firestore {
     match /sites/{siteId} { allow read: if isSignedIn(); allow write: if isAdmin() || isSiteManager(); }
     match /ptw_types/{ptwTypeId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /notifications/{notifId} { allow read, write: if isSignedIn(); }
+    match /point_adjustment_requests/{requestId} { allow read, write: if isAdmin(); }
   }
 }

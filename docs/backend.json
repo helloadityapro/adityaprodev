@@ -146,21 +146,53 @@
       },
       "required": ["siteId", "fileName", "fileUrl", "uploadedById"]
     },
-    "PointAdjustmentRequest": {
-      "title": "Point Adjustment Request",
+    "LMSCourse": {
+      "title": "LMS Course",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "duration": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      }
+    },
+    "LMSModule": {
+      "title": "LMS Module",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "order": { "type": "number" },
+        "videoUrl": { "type": "string" }
+      }
+    },
+    "LMSQuiz": {
+      "title": "LMS Quiz",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "moduleId": { "type": "string" },
+        "questions": { "type": "array" }
+      }
+    },
+    "LMSProgress": {
+      "title": "LMS Progress",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "userId": { "type": "string" },
-        "userName": { "type": "string" },
-        "amount": { "type": "number" },
-        "type": { "type": "string", "enum": ["adjust", "clear"] },
-        "requestedById": { "type": "string" },
-        "requestedByName": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "processedAt": { "type": "string", "format": "date-time" },
-        "processedById": { "type": "string" }
+        "courseId": { "type": "string" },
+        "completedModuleIds": { "type": "array" },
+        "quizResults": { "type": "object" },
+        "status": { "type": "string", "enum": ["started", "completed"] },
+        "lastAccessed": { "type": "string", "format": "date-time" }
       }
     }
   },
@@ -202,8 +234,20 @@
         "definition": { "entityName": "SiteDocument" }
       },
       {
-        "path": "/point_adjustment_requests/{requestId}",
-        "definition": { "entityName": "PointAdjustmentRequest" }
+        "path": "/lms_courses/{courseId}",
+        "definition": { "entityName": "LMSCourse" }
+      },
+      {
+        "path": "/lms_modules/{moduleId}",
+        "definition": { "entityName": "LMSModule" }
+      },
+      {
+        "path": "/lms_quizzes/{quizId}",
+        "definition": { "entityName": "LMSQuiz" }
+      },
+      {
+        "path": "/lms_progress/{progressId}",
+        "definition": { "entityName": "LMSProgress" }
       }
     ]
   }

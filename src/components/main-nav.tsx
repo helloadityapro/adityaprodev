@@ -22,7 +22,8 @@ import {
   CheckSquare,
   FolderOpen,
   Trophy,
-  Coins,
+  GraduationCap,
+  BookOpen,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -56,6 +57,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <Link href="/documents">
                 <FolderOpen className="h-4 w-4" />
                 <span className="font-medium">Documents</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Learning Hub" isActive={pathname.startsWith('/lms')} className="rounded-sm">
+              <Link href="/lms">
+                <GraduationCap className="h-4 w-4" />
+                <span className="font-medium">Learning Hub</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -197,6 +206,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Administration</SidebarGroupLabel>
           <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="LMS Admin" isActive={pathname.startsWith('/lms/admin')} className="rounded-sm">
+                <Link href="/lms/admin">
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  <span className="font-medium text-primary font-bold">LMS Admin</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/admin/dashboard'} className="rounded-sm">
                 <Link href="/admin/dashboard">
