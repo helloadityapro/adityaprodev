@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Trophy, Star, Award, Coins, MapPin, ShieldCheck, UserCog, TrendingUp, HardHat } from 'lucide-react';
+import { Trophy, Star, Award, Coins, MapPin, ShieldCheck, UserCog, TrendingUp, HardHat, Smartphone } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -36,31 +36,13 @@ type Site = {
 function ProfilePageSkeleton() {
     return (
         <div className="space-y-8 animate-pulse">
-            <div className="flex flex-col gap-2">
-                <Skeleton className="h-10 w-48" />
-                <Skeleton className="h-4 w-64" />
+            <Skeleton className="h-32 w-full rounded-sm" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
             </div>
-            <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-                <Card className="lg:col-span-1">
-                    <CardHeader className="items-center text-center">
-                        <Skeleton className="h-24 w-24 rounded-full mb-4" />
-                        <Skeleton className="h-8 w-48" />
-                        <Skeleton className="h-4 w-56" />
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <Skeleton className="h-12 w-full" />
-                        <Skeleton className="h-12 w-full" />
-                    </CardContent>
-                </Card>
-                <div className="lg:col-span-2 space-y-8">
-                    <div className="grid grid-cols-3 gap-4">
-                        <Skeleton className="h-32 w-full" />
-                        <Skeleton className="h-32 w-full" />
-                        <Skeleton className="h-32 w-full" />
-                    </div>
-                    <Skeleton className="h-64 w-full" />
-                </div>
-            </div>
+            <Skeleton className="h-64 w-full" />
         </div>
     );
 }
@@ -123,171 +105,168 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-1">
-         <h1 className="text-3xl font-bold tracking-tight text-primary">My Profile</h1>
-         <p className="text-muted-foreground">Comprehensive overview of your professional standing and site authorizations.</p>
-      </div>
+      {/* Top Hero Section: Horizontal Profile Card */}
+      <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden bg-gradient-to-r from-primary/5 to-transparent">
+        <CardContent className="p-6 md:p-8">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10">
+            <Avatar className="h-24 w-24 md:h-32 md:w-32 border-4 border-background ring-4 ring-primary/5 shadow-xl">
+              {user?.photoURL && <AvatarImage src={user.photoURL} alt={userProfile.username} data-ai-hint="person face" />}
+              <AvatarFallback className="text-4xl font-black bg-primary text-primary-foreground">
+                {userProfile.username?.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            
+            <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left space-y-4">
+              <div className="space-y-1">
+                <h1 className="text-3xl md:text-4xl font-black tracking-tight text-foreground">{userProfile.username}</h1>
+                <p className="text-muted-foreground font-medium text-lg">{userProfile.email}</p>
+              </div>
+              
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                <Badge variant="secondary" className="rounded-sm font-bold uppercase text-xs h-7 px-3">
+                  {userProfile.role}
+                </Badge>
+                <Badge variant={userProfile.registrationRequest ? 'destructive' : 'outline'} className="rounded-sm font-bold uppercase text-xs h-7 px-3">
+                  {userProfile.registrationRequest ? 'Awaiting Approval' : 'Verified Personnel'}
+                </Badge>
+              </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        {/* Left Column: Core Info */}
-        <div className="space-y-8">
-            <Card className="rounded-sm border-primary/10 shadow-md">
-                <CardHeader className="items-center text-center pb-2">
-                    <Avatar className="h-24 w-24 mb-4 border-2 border-primary/20 ring-4 ring-primary/5">
-                        {user?.photoURL && <AvatarImage src={user.photoURL} alt={userProfile.username} data-ai-hint="person face" />}
-                        <AvatarFallback className="text-3xl font-black bg-primary text-primary-foreground">
-                            {userProfile.username?.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                    </Avatar>
-                    <CardTitle className="text-2xl font-black tracking-tight">{userProfile.username}</CardTitle>
-                    <CardDescription className="font-medium">{userProfile.email}</CardDescription>
-                    <div className="flex items-center gap-2 mt-3">
-                        <Badge variant="secondary" className="rounded-sm font-bold uppercase text-[10px] h-5 px-2">
-                            {userProfile.role}
-                        </Badge>
-                        <Badge variant={userProfile.registrationRequest ? 'destructive' : 'outline'} className="rounded-sm font-bold uppercase text-[10px] h-5 px-2">
-                            {userProfile.registrationRequest ? 'Awaiting Approval' : 'Verified'}
-                        </Badge>
-                    </div>
-                </CardHeader>
-                <CardContent className="pt-4 space-y-4">
-                    <Separator className="bg-primary/5" />
-                    <div className="grid gap-4 text-sm">
-                        <div className="flex justify-between items-center p-3 rounded-md bg-muted/30">
-                            <span className="font-bold text-[10px] uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                                <ShieldCheck className="h-3.5 w-3.5" /> Mobile
-                            </span>
-                            <span className="font-mono font-bold">{userProfile.mobile || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 rounded-md bg-muted/30">
-                            <span className="font-bold text-[10px] uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                                <Star className="h-3.5 w-3.5 text-amber-500" /> Multiplier
-                            </span>
-                            <span className="font-black text-amber-700">{userProfile.pointsMultiplier || 1.0}x</span>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md pt-2">
+                <div className="flex items-center gap-3 p-3 rounded-md bg-background/50 border border-primary/5 shadow-sm">
+                  <Smartphone className="h-4 w-4 text-primary" />
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Verified Mobile</span>
+                    <span className="font-mono font-bold text-sm">{userProfile.mobile || 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-md bg-amber-500/5 border border-amber-500/10 shadow-sm">
+                  <Star className="h-4 w-4 text-amber-500" />
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-bold text-amber-700 uppercase tracking-widest">Multiplier</span>
+                    <span className="font-black text-amber-700 text-sm">{userProfile.pointsMultiplier || 1.0}x</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-            {userProfile.role === 'Site Engineer' && (
-                <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden">
-                    <CardHeader className="bg-primary/5 py-3 border-b">
-                        <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                            <UserCog className="h-4 w-4 text-primary" /> Reporting Structure
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                        {managerProfile ? (
-                            <div className="flex items-center gap-4">
-                                <Avatar className="h-10 w-10 border">
-                                    <AvatarFallback className="text-xs font-bold">{managerProfile.username.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-bold">{managerProfile.username}</span>
-                                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Assigned Site Manager</span>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="p-4 bg-muted/20 border border-dashed rounded-sm text-center">
-                                <p className="text-xs text-muted-foreground italic">No manager mapped. Please contact Admin.</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
+      {/* Main Grid for Stats and reporting */}
+      <div className="grid grid-cols-1 gap-8">
+        {/* Row 1: Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-amber-500/5 border-amber-500/20 rounded-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase text-amber-700 tracking-widest">Total Points</span>
+                <Trophy className="h-4 w-4 text-amber-500" />
+              </div>
+              <div className="text-3xl font-black text-amber-700">{userPoints.toFixed(2)}</div>
+              <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">Accumulated Balance</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-green-500/5 border-green-500/20 rounded-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase text-green-700 tracking-widest">Rewards Value</span>
+                <Coins className="h-4 w-4 text-green-600" />
+              </div>
+              <div className="text-3xl font-black text-green-700">₹{monetaryValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+              <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">1 Point = ₹{pointValue}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-primary/5 border-primary/20 rounded-sm">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase text-primary tracking-widest">Global Rank</span>
+                <Award className="h-4 w-4 text-primary" />
+              </div>
+              <div className="text-3xl font-black text-primary">#{globalRank || '—'}</div>
+              <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">Platform Percentile</p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Right Column: Stats & Sites */}
-        <div className="lg:col-span-2 space-y-8">
-            {/* Quick Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-amber-500/5 border-amber-500/20 rounded-sm">
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-black uppercase text-amber-700 tracking-widest">Total Points</span>
-                            <Trophy className="h-4 w-4 text-amber-500" />
-                        </div>
-                        <div className="text-3xl font-black text-amber-700">{userPoints.toFixed(2)}</div>
-                        <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">Accumulated Balance</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-green-500/5 border-green-500/20 rounded-sm">
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-black uppercase text-green-700 tracking-widest">Rewards Value</span>
-                            <Coins className="h-4 w-4 text-green-600" />
-                        </div>
-                        <div className="text-3xl font-black text-green-700">₹{monetaryValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-                        <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">1 Point = ₹{pointValue}</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-primary/5 border-primary/20 rounded-sm">
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-black uppercase text-primary tracking-widest">Global Rank</span>
-                            <Award className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="text-3xl font-black text-primary">#{globalRank || '—'}</div>
-                        <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">Platform Percentile</p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Performance Summary Card */}
-            <Card className="rounded-sm border-primary/10 overflow-hidden shadow-md">
-                <CardHeader className="bg-muted/5 border-b flex flex-row items-center justify-between">
-                    <div className="space-y-1">
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <TrendingUp className="h-5 w-5 text-primary" /> Performance & Sites
-                        </CardTitle>
-                        <CardDescription>Official authorizations and professional rank summary.</CardDescription>
-                    </div>
+        {/* Row 2: reporting & authorized sites */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1 space-y-8">
+            {userProfile.role === 'Site Engineer' && (
+              <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-full">
+                <CardHeader className="bg-primary/5 py-3 border-b">
+                  <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                    <UserCog className="h-4 w-4 text-primary" /> Reporting Structure
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-6 space-y-8">
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-primary" />
-                            <h3 className="font-bold text-sm uppercase tracking-widest">Authorized Site Access</h3>
-                        </div>
-                        {assignedSites.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {assignedSites.map(site => (
-                                    <div key={site.id} className="flex items-center gap-3 p-3 rounded-md border bg-card hover:bg-primary/5 hover:border-primary/20 transition-colors group">
-                                        <div className="p-2 bg-muted rounded-sm group-hover:bg-primary/10 transition-colors">
-                                            <HardHat className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                                        </div>
-                                        <span className="text-sm font-bold truncate">{site.name}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-12 text-center bg-muted/10 rounded-sm border border-dashed">
-                                <MapPin className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                                <p className="text-sm text-muted-foreground font-medium">No sites currently assigned to your account.</p>
-                                <p className="text-[10px] text-muted-foreground mt-1 uppercase">Contact Administration for site mapping</p>
-                            </div>
-                        )}
+                <CardContent className="pt-6">
+                  {managerProfile ? (
+                    <div className="flex items-center gap-4 p-4 rounded-md border bg-card">
+                      <Avatar className="h-12 w-12 border">
+                        <AvatarFallback className="text-sm font-bold bg-muted">{managerProfile.username.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold">{managerProfile.username}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Assigned Site Manager</span>
+                        <span className="text-[10px] text-primary font-mono mt-1">{managerProfile.email}</span>
+                      </div>
                     </div>
-
-                    <Separator className="opacity-50" />
-
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                            <Award className="h-4 w-4 text-amber-500" />
-                            <h3 className="font-bold text-sm uppercase tracking-widest">Rewards Insight</h3>
-                        </div>
-                        <div className="p-4 rounded-sm bg-amber-500/5 border border-amber-500/10">
-                            <p className="text-xs leading-relaxed text-muted-foreground">
-                                Your professional ranking is determined by the volume and quality of documentation submitted. 
-                                <strong className="text-amber-700 ml-1">Daily Progress Reports</strong>, <strong className="text-amber-700">Material Logs</strong>, 
-                                and <strong className="text-amber-700">Permit Accuracy</strong> directly impact your points balance.
-                            </p>
-                        </div>
+                  ) : (
+                    <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center">
+                      <p className="text-sm text-muted-foreground italic">No manager mapped. Please contact Admin.</p>
                     </div>
+                  )}
                 </CardContent>
+              </Card>
+            )}
+            
+            <Card className="rounded-sm border-amber-500/10 bg-amber-500/5 shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Award className="h-5 w-5 text-amber-500" />
+                <h3 className="font-bold text-sm uppercase tracking-widest text-amber-700">Rewards Insight</h3>
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Your professional ranking is determined by the volume and quality of documentation submitted. 
+                <strong className="text-amber-700 ml-1">Daily Progress Reports</strong>, <strong className="text-amber-700">Material Logs</strong>, 
+                and <strong className="text-amber-700">Permit Accuracy</strong> directly impact your points balance.
+              </p>
             </Card>
+          </div>
+
+          <Card className="lg:col-span-2 rounded-sm border-primary/10 overflow-hidden shadow-md">
+            <CardHeader className="bg-muted/5 border-b flex flex-row items-center justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-primary" /> Authorized Site Access
+                </CardTitle>
+                <CardDescription>Official authorizations and site management rights.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {assignedSites.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {assignedSites.map(site => (
+                    <div key={site.id} className="flex items-center gap-4 p-4 rounded-md border bg-card hover:bg-primary/5 hover:border-primary/20 transition-all group shadow-sm">
+                      <div className="p-3 bg-muted rounded-sm group-hover:bg-primary/10 transition-colors">
+                        <HardHat className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold truncate">{site.name}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold mt-0.5">Project Location</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 text-center bg-muted/10 rounded-sm border border-dashed">
+                  <MapPin className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                  <p className="text-sm text-muted-foreground font-medium">No sites currently assigned to your account.</p>
+                  <p className="text-[10px] text-muted-foreground mt-1 uppercase font-bold tracking-tighter">Contact Administration for site mapping</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
