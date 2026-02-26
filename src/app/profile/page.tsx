@@ -212,20 +212,28 @@ export default function ProfilePage() {
                 <UserCog className="h-4 w-4" /> Reporting Structure
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
+            <CardContent className="p-0">
               {managerProfile ? (
-                <div className="flex items-center gap-4 p-4 rounded-md border bg-card shadow-sm hover:border-primary/30 transition-all cursor-default max-w-md">
-                  <Avatar className="h-12 w-12 border">
-                    <AvatarFallback className="text-sm font-bold bg-muted">{managerProfile.username?.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold">{managerProfile.username}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">Assigned Site Manager</span>
-                    <span className="text-[10px] text-primary font-mono mt-1">{managerProfile.email}</span>
-                  </div>
-                </div>
+                <Table>
+                  <TableBody>
+                    <TableRow className="hover:bg-muted/5 transition-colors">
+                      <TableCell className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10 border shadow-sm">
+                            <AvatarFallback className="text-xs font-bold bg-muted">{managerProfile.username?.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold truncate">{managerProfile.username}</span>
+                            <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">Assigned Site Manager</span>
+                            <span className="text-[10px] text-primary font-mono mt-0.5">{managerProfile.email}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
               ) : (
-                <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center">
+                <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center m-6">
                   <p className="text-sm text-muted-foreground italic">No manager mapped. Please contact Admin.</p>
                 </div>
               )}
