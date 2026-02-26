@@ -139,9 +139,14 @@ service cloud.firestore {
       );
     }
 
+    match /point_adjustment_requests/{requestId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && (request.auth.token.email == 'khalil@adityagreenenergy.com');
+      allow delete: if isAdmin() && (request.auth.token.email == 'khalil@adityagreenenergy.com');
+    }
+
     match /otp_verifications/{otpId} {
-      // OTP verification flows run on the server using the Client SDK which lacks user auth context.
-      // We allow public write/read for this ephemeral collection to support the 2FA process.
       allow read, write: if true;
     }
 

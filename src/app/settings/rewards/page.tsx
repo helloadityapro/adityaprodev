@@ -1,14 +1,15 @@
+
 "use client";
 
 import * as React from "react";
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase";
-import { collection, doc, increment } from "firebase/firestore";
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
+import { collection, doc, increment, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat, Settings2, RotateCcw, Plus, Minus, ShieldCheck, KeyRound } from "lucide-react";
+import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat, Settings2, RotateCcw, Plus, Minus, ShieldCheck, History, CheckCircle2, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
@@ -23,7 +24,7 @@ import {
   DialogTitle,
   DialogClose
 } from "@/components/ui/dialog";
-import { initiatePointsOtp, verifyPointsOtp } from "@/ai/flows/otp-flows";
+import { cn } from "@/lib/utils";
 
 type UserProfile = {
   id: string;
@@ -36,6 +37,18 @@ type UserProfile = {
 
 type RewardSettings = {
   pointValueInRs?: number;
+};
+
+type PointRequest = {
+  id: string;
+  userId: string;
+  userName: string;
+  amount: number;
+  type: 'adjust' | 'clear';
+  requestedById: string;
+  requestedByName: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: any;
 };
 
 export default function AdminRewardsSettingsPage() {
@@ -51,18 +64,13 @@ export default function AdminRewardsSettingsPage() {
   // Manual Point Adjustment States
   const [selectedUserForPoints, setSelectedUserForPoints] = React.useState<UserProfile | null>(null);
   const [adjustmentValue, setAdjustmentValue] = React.useState<string>("");
-  const [pendingActionType, setPendingActionType] = React.useState<'adjust' | 'clear' | null>(null);
-  
-  // 2FA States
-  const [isOtpDialogOpen, setIsOtpDialogOpen] = React.useState(false);
-  const [otpCode, setOtpCode] = React.useState("");
-  const [isVerifying, setIsVerifying] = React.useState(false);
-  const [isInitiatingOtp, setIsInitiatingOtp] = React.useState(false);
+  const [isSubmittingRequest, setIsSubmittingRequest] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isSuperAdminUser = user?.email === 'khalil@adityagreenenergy.com';
 
   React.useEffect(() => {
     if (!isUserLoading && !isProfileLoading && !isAdmin) {
@@ -75,6 +83,9 @@ export default function AdminRewardsSettingsPage() {
 
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: isUsersLoading } = useCollection<UserProfile>(usersQuery);
+
+  const requestsQuery = useMemoFirebase(() => collection(firestore, 'point_adjustment_requests'), [firestore]);
+  const { data: allRequests, isLoading: isRequestsLoading } = useCollection<PointRequest>(requestsQuery);
 
   React.useEffect(() => {
     if (settings?.pointValueInRs !== undefined) {
@@ -102,70 +113,88 @@ export default function AdminRewardsSettingsPage() {
     toast({ title: 'Multiplier Updated', description: `Performance X-Factor set to ${multiplier}x.` });
   };
 
-  const handleInitiateManualAdjustment = (type: 'adjust' | 'clear') => {
-    if (!selectedUserForPoints) return;
+  const handleInitiateRequest = async (type: 'adjust' | 'clear') => {
+    if (!selectedUserForPoints || !user || !userProfile) return;
     
+    let amount = 0;
     if (type === 'adjust') {
-      const val = parseFloat(adjustmentValue);
-      if (isNaN(val) || val === 0) {
+      amount = parseFloat(adjustmentValue);
+      if (isNaN(amount) || amount === 0) {
         toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Enter a non-zero number to adjust.' });
         return;
       }
     }
 
-    setPendingActionType(type);
-    start2FA();
-  };
-
-  const start2FA = async () => {
-    setIsInitiatingOtp(true);
-    const res = await initiatePointsOtp();
-    if (res.success) {
-      toast({ title: 'Security OTP Requested', description: res.message });
-      setIsOtpDialogOpen(true);
-    } else {
-      toast({ variant: 'destructive', title: 'Action Blocked', description: res.message });
-    }
-    setIsInitiatingOtp(false);
-  };
-
-  const handleVerifyAndExecute = async () => {
-    if (otpCode.length !== 6) return;
-    setIsVerifying(true);
-    
-    const verifyRes = await verifyPointsOtp(otpCode);
-    if (verifyRes.success) {
-      executeManualPointAdjustment();
-      setIsOtpDialogOpen(false);
-      setOtpCode("");
-    } else {
-      toast({ variant: 'destructive', title: 'Verification Failed', description: verifyRes.message });
-    }
-    setIsVerifying(false);
-  };
-
-  const executeManualPointAdjustment = () => {
-    if (!selectedUserForPoints || !pendingActionType) return;
-
-    const userRef = doc(firestore, 'users', selectedUserForPoints.id);
-
-    if (pendingActionType === 'clear') {
-      updateDocumentNonBlocking(userRef, { totalPoints: 0 });
-      toast({ variant: 'success', title: 'Points Cleared', description: `Balance reset to zero for ${selectedUserForPoints.username}.` });
-    } else {
-      const val = parseFloat(adjustmentValue);
-      updateDocumentNonBlocking(userRef, { totalPoints: increment(val) });
-      toast({ 
-        variant: 'success',
-        title: val > 0 ? 'Points Added' : 'Points Deducted', 
-        description: `${Math.abs(val)} points ${val > 0 ? 'added to' : 'deducted from'} ${selectedUserForPoints.username}'s account.` 
+    setIsSubmittingRequest(true);
+    try {
+      await addDocumentNonBlocking(collection(firestore, 'point_adjustment_requests'), {
+        userId: selectedUserForPoints.id,
+        userName: selectedUserForPoints.username,
+        amount: amount,
+        type: type,
+        requestedById: user.uid,
+        requestedByName: userProfile.username || user.email || 'Admin',
+        status: 'pending',
+        createdAt: serverTimestamp()
       });
-    }
 
-    setSelectedUserForPoints(null);
-    setAdjustmentValue("");
-    setPendingActionType(null);
+      toast({ 
+        title: 'Request Logged', 
+        description: `Adjustment for ${selectedUserForPoints.username} submitted for Super Admin approval.` 
+      });
+      setSelectedUserForPoints(null);
+      setAdjustmentValue("");
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Request Failed', description: e.message });
+    } finally {
+      setIsSubmittingRequest(false);
+    }
   };
+
+  const handleProcessRequest = async (req: PointRequest, action: 'approved' | 'rejected') => {
+    if (!isSuperAdminUser || !user) return;
+
+    try {
+      const reqRef = doc(firestore, 'point_adjustment_requests', req.id);
+      
+      if (action === 'approved') {
+        const userRef = doc(firestore, 'users', req.userId);
+        if (req.type === 'clear') {
+          updateDocumentNonBlocking(userRef, { totalPoints: 0 });
+        } else {
+          updateDocumentNonBlocking(userRef, { totalPoints: increment(req.amount) });
+        }
+
+        // Notify Target User
+        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+          userId: req.userId,
+          title: "Account Balance Adjusted",
+          description: req.type === 'clear' ? "Your points balance has been reset to zero by administration." : `Your points balance was manually adjusted by ${Math.abs(req.amount).toFixed(2)} points.`,
+          link: "/rewards",
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      updateDocumentNonBlocking(reqRef, {
+        status: action,
+        processedAt: serverTimestamp(),
+        processedById: user.uid
+      });
+
+      toast({ title: `Request ${action}`, description: `The point adjustment has been ${action}.` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    }
+  };
+
+  const pendingRequests = React.useMemo(() => {
+    return allRequests?.filter(r => r.status === 'pending').sort((a, b) => {
+      const da = a.createdAt?.toDate?.()?.getTime() || 0;
+      const db = b.createdAt?.toDate?.()?.getTime() || 0;
+      return db - da;
+    }) || [];
+  }, [allRequests]);
 
   const filteredUsers = React.useMemo(() => {
     if (!allUsers) return [];
@@ -175,7 +204,7 @@ export default function AdminRewardsSettingsPage() {
     ).sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
   }, [allUsers, userSearch]);
 
-  if (isProfileLoading || isUsersLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
+  if (isProfileLoading || isUsersLoading || isRequestsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   if (!isAdmin) return null;
 
@@ -185,7 +214,7 @@ export default function AdminRewardsSettingsPage() {
         <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
           <Coins className="h-8 w-8 text-amber-600" /> Rewards Administration
         </h1>
-        <p className="text-muted-foreground">Configure the points economy and assign performance multipliers.</p>
+        <p className="text-muted-foreground">Configure the points economy and process manual performance adjustments.</p>
       </div>
 
       <Card className="w-full rounded-sm border-primary/10 shadow-md">
@@ -223,6 +252,73 @@ export default function AdminRewardsSettingsPage() {
         </CardContent>
       </Card>
 
+      {pendingRequests.length > 0 && (
+        <Card className="w-full rounded-sm border-red-500/20 shadow-md overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+          <CardHeader className="bg-red-500/5 border-b flex flex-row items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-red-600" />
+                <CardTitle className="text-red-700">Pending Approvals</CardTitle>
+              </div>
+              <CardDescription>Actions requiring Super Admin (khalil@adityagreenenergy.com) authorization.</CardDescription>
+            </div>
+            <Badge variant="destructive" className="rounded-sm h-6 px-3">{pendingRequests.length} Pending</Badge>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead>Target Personnel</TableHead>
+                  <TableHead>Action Details</TableHead>
+                  <TableHead>Requested By</TableHead>
+                  <TableHead className="text-right px-6">Review</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingRequests.map(req => (
+                  <TableRow key={req.id}>
+                    <TableCell>
+                      <span className="font-bold text-sm">{req.userName}</span>
+                    </TableCell>
+                    <TableCell>
+                      {req.type === 'clear' ? (
+                        <Badge variant="outline" className="text-[10px] uppercase font-bold border-red-200 text-red-700 bg-red-50">Clear Balance</Badge>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={cn("text-[10px] font-bold uppercase", req.amount > 0 ? "border-green-200 text-green-700 bg-green-50" : "border-amber-200 text-amber-700 bg-amber-50")}>
+                            {req.amount > 0 ? `+${req.amount}` : req.amount} Points
+                          </Badge>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-medium">{req.requestedByName}</span>
+                        <span className="text-[9px] text-muted-foreground uppercase">{req.createdAt ? format(req.createdAt.toDate(), 'dd MMM HH:mm') : 'N/A'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right px-6">
+                      {isSuperAdminUser ? (
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" className="h-8 text-green-600 border-green-200 hover:bg-green-50" onClick={() => handleProcessRequest(req, 'approved')}>
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleProcessRequest(req, 'rejected')}>
+                            <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground italic">Waiting for Super Admin</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="w-full rounded-sm border-amber-500/10 shadow-md overflow-hidden">
         <CardHeader className="bg-amber-500/5 border-b flex flex-row items-center justify-between">
           <div className="space-y-1">
@@ -230,7 +326,7 @@ export default function AdminRewardsSettingsPage() {
                   <Star className="h-5 w-5 text-amber-500" />
                   <CardTitle>Personnel X-Factors</CardTitle>
               </div>
-              <CardDescription>Assign multipliers and manually adjust point balances.</CardDescription>
+              <CardDescription>Assign multipliers and initiate point adjustment requests.</CardDescription>
           </div>
           <div className="relative w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -309,7 +405,7 @@ export default function AdminRewardsSettingsPage() {
               <Settings2 className="h-5 w-5 text-primary" /> Manual Point Adjustment
             </DialogTitle>
             <DialogDescription>
-              Modifying points for <strong>{selectedUserForPoints?.username}</strong>. Secure authorization is required.
+              Modifying points for <strong>{selectedUserForPoints?.username}</strong>. All requests require Super Admin approval.
             </DialogDescription>
           </DialogHeader>
           
@@ -334,11 +430,11 @@ export default function AdminRewardsSettingsPage() {
                 </div>
                 <Button 
                   className="rounded-sm font-bold px-6 h-11"
-                  onClick={() => handleInitiateManualAdjustment('adjust')}
-                  disabled={isInitiatingOtp || !adjustmentValue}
+                  onClick={() => handleInitiateRequest('adjust')}
+                  disabled={isSubmittingRequest || !adjustmentValue}
                 >
-                  {isInitiatingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : parseFloat(adjustmentValue) < 0 ? <Minus className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                  Apply
+                  {isSubmittingRequest ? <Loader2 className="h-4 w-4 animate-spin" /> : parseFloat(adjustmentValue) < 0 ? <Minus className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                  Submit
                 </Button>
               </div>
               <p className="text-[10px] text-muted-foreground italic">Use negative numbers to deduct points.</p>
@@ -348,57 +444,17 @@ export default function AdminRewardsSettingsPage() {
               <Button 
                 variant="outline" 
                 className="w-full rounded-sm font-bold border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all h-11"
-                onClick={() => handleInitiateManualAdjustment('clear')}
-                disabled={isInitiatingOtp}
+                onClick={() => handleInitiateRequest('clear')}
+                disabled={isSubmittingRequest}
               >
-                {isInitiatingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
-                Clear All Points (Reset to 0)
+                {isSubmittingRequest ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+                Clear All Points (Request Reset)
               </Button>
             </div>
           </div>
 
           <DialogFooter>
             <DialogClose asChild><Button variant="ghost" className="rounded-sm">Cancel</Button></DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* OTP Verification Dialog */}
-      <Dialog open={isOtpDialogOpen} onOpenChange={(o) => !o && setIsOtpDialogOpen(false)}>
-        <DialogContent className="max-w-md rounded-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-primary">
-              <ShieldCheck className="h-5 w-5" /> Authorize Transaction
-            </DialogTitle>
-            <DialogDescription asChild>
-              <div className="text-sm text-muted-foreground">
-                <span>A 6-digit security code has been sent to <strong>khalil@adityagreenenergy.com</strong>. Enter it below to authorize this point modification.</span>
-                <span className="block mt-2 text-xs font-semibold text-primary">Note: Check server console logs for the code during this prototype phase.</span>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-6 space-y-4">
-            <div className="space-y-2 text-center">
-              <Label htmlFor="otp-input" className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Security Code</Label>
-              <Input 
-                id="otp-input" 
-                placeholder="000000" 
-                maxLength={6} 
-                className="text-center text-3xl font-mono tracking-[0.5em] h-16 rounded-sm bg-muted/30 border-2 focus-visible:ring-primary" 
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" className="rounded-sm" onClick={() => setIsOtpDialogOpen(false)}>Cancel</Button>
-            <Button 
-              className="rounded-sm font-bold flex-1 h-11" 
-              disabled={otpCode.length !== 6 || isVerifying}
-              onClick={handleVerifyAndExecute}
-            >
-              {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><KeyRound className="mr-2 h-4 w-4" /> Confirm & Process</>}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

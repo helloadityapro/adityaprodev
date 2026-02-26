@@ -146,15 +146,21 @@
       },
       "required": ["siteId", "fileName", "fileUrl", "uploadedById"]
     },
-    "OTPVerification": {
-      "title": "OTP Verification",
+    "PointAdjustmentRequest": {
+      "title": "Point Adjustment Request",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "code": { "type": "string" },
-        "email": { "type": "string" },
-        "expiresAt": { "type": "string", "format": "date-time" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["adjust", "clear"] },
+        "requestedById": { "type": "string" },
+        "requestedByName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "processedAt": { "type": "string", "format": "date-time" },
+        "processedById": { "type": "string" }
       }
     }
   },
@@ -196,8 +202,8 @@
         "definition": { "entityName": "SiteDocument" }
       },
       {
-        "path": "/otp_verifications/{otpId}",
-        "definition": { "entityName": "OTPVerification" }
+        "path": "/point_adjustment_requests/{requestId}",
+        "definition": { "entityName": "PointAdjustmentRequest" }
       }
     ]
   }
