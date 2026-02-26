@@ -3,18 +3,26 @@
 
 import * as React from "react";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where } from "firebase/firestore";
+import { collection, doc, increment } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat } from "lucide-react";
+import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat, Settings2, RotateCcw, Plus, Minus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type UserProfile = {
   id: string;
@@ -38,6 +46,11 @@ export default function AdminRewardsSettingsPage() {
   const [pointValueInput, setPointValueInput] = React.useState<string>("1");
   const [userSearch, setUserSearch] = React.useState("");
   const [isUpdatingGlobal, setIsUpdatingGlobal] = React.useState(false);
+  
+  // Manual Point Adjustment States
+  const [selectedUserForPoints, setSelectedUserForPoints] = React.useState<UserProfile | null>(null);
+  const [adjustmentValue, setAdjustmentValue] = React.useState<string>("");
+  const [isAdjusting, setIsAdjusting] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -80,6 +93,34 @@ export default function AdminRewardsSettingsPage() {
       pointsMultiplier: multiplier
     });
     toast({ title: 'Multiplier Updated', description: `Performance X-Factor set to ${multiplier}x.` });
+  };
+
+  const handleManualPointAdjustment = (type: 'adjust' | 'clear') => {
+    if (!selectedUserForPoints) return;
+    setIsAdjusting(true);
+
+    const userRef = doc(firestore, 'users', selectedUserForPoints.id);
+
+    if (type === 'clear') {
+      updateDocumentNonBlocking(userRef, { totalPoints: 0 });
+      toast({ title: 'Points Cleared', description: `Balance reset to zero for ${selectedUserForPoints.username}.` });
+    } else {
+      const val = parseFloat(adjustmentValue);
+      if (isNaN(val) || val === 0) {
+        toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Enter a non-zero number to adjust.' });
+        setIsAdjusting(false);
+        return;
+      }
+      updateDocumentNonBlocking(userRef, { totalPoints: increment(val) });
+      toast({ 
+        title: val > 0 ? 'Points Added' : 'Points Deducted', 
+        description: `${Math.abs(val)} points ${val > 0 ? 'added to' : 'deducted from'} ${selectedUserForPoints.username}'s account.` 
+      });
+    }
+
+    setIsAdjusting(false);
+    setSelectedUserForPoints(null);
+    setAdjustmentValue("");
   };
 
   const filteredUsers = React.useMemo(() => {
@@ -143,7 +184,7 @@ export default function AdminRewardsSettingsPage() {
                     <Star className="h-5 w-5 text-amber-500" />
                     <CardTitle>Personnel X-Factors</CardTitle>
                 </div>
-                <CardDescription>Assign multipliers to top-tier site engineers and managers.</CardDescription>
+                <CardDescription>Assign multipliers and manually adjust point balances.</CardDescription>
             </div>
             <div className="relative w-64">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -162,7 +203,8 @@ export default function AdminRewardsSettingsPage() {
                   <TableHead>User Profile</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead className="text-center">Current Points</TableHead>
-                  <TableHead className="text-right px-6">X-Factor Multiplier</TableHead>
+                  <TableHead className="text-center">X-Factor</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -183,18 +225,28 @@ export default function AdminRewardsSettingsPage() {
                     <TableCell className="text-center font-mono text-primary font-bold">
                         {(u.totalPoints || 0).toFixed(2)}
                     </TableCell>
-                    <TableCell className="text-right px-6">
-                        <div className="flex justify-end items-center gap-2">
+                    <TableCell className="text-center">
+                        <div className="flex justify-center items-center gap-1">
                             <Input 
                                 type="number" 
                                 step="0.1" 
                                 min="0.1"
                                 defaultValue={u.pointsMultiplier || 1.0}
-                                className="w-20 h-8 text-right font-bold text-amber-700 bg-amber-50 border-amber-200 rounded-sm"
+                                className="w-16 h-7 text-right font-bold text-amber-700 bg-amber-50 border-amber-200 rounded-sm text-xs"
                                 onBlur={(e) => handleUpdateUserMultiplier(u.id, parseFloat(e.target.value))}
                             />
-                            <span className="text-xs font-bold text-amber-700">x</span>
+                            <span className="text-[10px] font-bold text-amber-700">x</span>
                         </div>
+                    </TableCell>
+                    <TableCell className="text-right px-6">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-7 text-[10px] font-bold rounded-sm border-primary/20 hover:bg-primary/5"
+                          onClick={() => setSelectedUserForPoints(u)}
+                        >
+                          <Settings2 className="h-3 w-3 mr-1" /> Adjust Points
+                        </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -203,6 +255,67 @@ export default function AdminRewardsSettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Manual Adjustment Dialog */}
+      <Dialog open={!!selectedUserForPoints} onOpenChange={(o) => !o && setSelectedUserForPoints(null)}>
+        <DialogContent className="max-w-md rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 text-primary" /> Manual Point Adjustment
+            </DialogTitle>
+            <DialogDescription>
+              Modifying points for <strong>{selectedUserForPoints?.username}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-6 space-y-6">
+            <div className="flex items-center justify-between p-4 bg-muted/30 rounded-sm border border-dashed">
+              <span className="text-xs font-bold uppercase text-muted-foreground">Current Balance</span>
+              <span className="text-xl font-black text-primary font-mono">{(selectedUserForPoints?.totalPoints || 0).toFixed(2)}</span>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-xs font-bold uppercase tracking-wider">Adjustment Amount</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input 
+                    type="number" 
+                    step="0.1"
+                    placeholder="Enter amount (e.g. 5 or -5)"
+                    value={adjustmentValue}
+                    onChange={(e) => setAdjustmentValue(e.target.value)}
+                    className="rounded-sm font-mono h-11"
+                  />
+                </div>
+                <Button 
+                  className="rounded-sm font-bold px-6 h-11"
+                  onClick={() => handleManualPointAdjustment('adjust')}
+                  disabled={isAdjusting || !adjustmentValue}
+                >
+                  {parseFloat(adjustmentValue) < 0 ? <Minus className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                  Apply
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground italic">Use negative numbers to deduct points.</p>
+            </div>
+
+            <div className="pt-4 border-t">
+              <Button 
+                variant="destructive" 
+                className="w-full rounded-sm font-bold bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
+                onClick={() => handleManualPointAdjustment('clear')}
+                disabled={isAdjusting}
+              >
+                <RotateCcw className="h-4 w-4 mr-2" /> Clear All Points (Reset to 0)
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setSelectedUserForPoints(null)} className="rounded-sm">Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
