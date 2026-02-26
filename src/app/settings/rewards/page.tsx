@@ -66,10 +66,10 @@ export default function AdminRewardsSettingsPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   React.useEffect(() => {
-    if (!isProfileLoading && !isAdmin) {
+    if (!isUserLoading && !isProfileLoading && !isAdmin) {
       router.replace('/ptw/raise');
     }
-  }, [isProfileLoading, isAdmin, router]);
+  }, [isUserLoading, isProfileLoading, isAdmin, router]);
 
   const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
   const { data: settings } = useDoc<RewardSettings>(settingsRef);
@@ -347,8 +347,8 @@ export default function AdminRewardsSettingsPage() {
 
             <div className="pt-4 border-t">
               <Button 
-                variant="destructive" 
-                className="w-full rounded-sm font-bold bg-red-50 text-red-600 border-red-100 hover:bg-red-100 h-11"
+                variant="outline" 
+                className="w-full rounded-sm font-bold border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all h-11"
                 onClick={() => handleInitiateManualAdjustment('clear')}
                 disabled={isInitiatingOtp}
               >
@@ -371,9 +371,11 @@ export default function AdminRewardsSettingsPage() {
             <DialogTitle className="flex items-center gap-2 text-primary">
               <ShieldCheck className="h-5 w-5" /> Authorize Transaction
             </DialogTitle>
-            <DialogDescription>
-              A 6-digit security code has been sent to <strong>khalil@adityagreenenergy.com</strong>. Enter it below to authorize this point modification.
-              <span className="block mt-2 text-xs font-semibold text-primary">Note: Check server console logs for the code during this prototype phase.</span>
+            <DialogDescription asChild>
+              <div className="text-sm text-muted-foreground">
+                <span>A 6-digit security code has been sent to <strong>khalil@adityagreenenergy.com</strong>. Enter it below to authorize this point modification.</span>
+                <span className="block mt-2 text-xs font-semibold text-primary">Note: Check server console logs for the code during this prototype phase.</span>
+              </div>
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
