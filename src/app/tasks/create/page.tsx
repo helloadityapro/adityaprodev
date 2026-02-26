@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -61,12 +62,13 @@ export default function CreateTaskPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
-  // Users query (Admins see all, Managers see their team)
+  // Users query: Admins see all, Managers see team, Engineers see all for collaboration
   const usersQuery = useMemoFirebase(() => {
     const colRef = collection(firestore, 'users');
     if (isAdmin) return colRef;
     if (isManager) return query(colRef, where('siteManagerId', '==', user?.uid));
-    return null;
+    // Engineers can assign tasks to any registered personnel
+    return colRef;
   }, [firestore, isAdmin, isManager, user]);
   const { data: teamUsers } = useCollection<UserProfile>(usersQuery);
 
@@ -153,10 +155,6 @@ export default function CreateTaskPage() {
 
   const filteredSites = allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())) || [];
   const filteredUsers = teamUsers?.filter(u => u.username.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.email.toLowerCase().includes(userSearchQuery.toLowerCase())) || [];
-
-  if (!isAdmin && !isManager) {
-    return <div className="p-8 text-center">Only Admins and Managers can assign tasks.</div>;
-  }
 
   if (isSubmitted && submittedTask) {
     return (

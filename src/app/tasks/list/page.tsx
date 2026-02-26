@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -219,11 +220,9 @@ export default function TaskListPage() {
           </h1>
           <p className="text-muted-foreground">Monitor and update site activity assignments.</p>
         </div>
-        {(isAdmin || isManager) && (
-          <Button onClick={() => window.location.href = '/tasks/create'} className="rounded-sm font-bold">
-            Assign New Task
-          </Button>
-        )}
+        <Button onClick={() => window.location.href = '/tasks/create'} className="rounded-sm font-bold">
+          Assign New Task
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

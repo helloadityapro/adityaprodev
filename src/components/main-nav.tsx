@@ -73,16 +73,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Task Management</SidebarGroupLabel>
         <SidebarMenu>
-          {(userRole === 'Admin' || userRole === 'Site Manager') && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Assign Task" isActive={pathname === '/tasks/create'} className="rounded-sm">
-                <Link href="/tasks/create">
-                  <CheckSquare className="h-4 w-4" />
-                  <span className="font-medium">Assign Task</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Assign Task" isActive={pathname === '/tasks/create'} className="rounded-sm">
+              <Link href="/tasks/create">
+                <CheckSquare className="h-4 w-4" />
+                <span className="font-medium">Assign Task</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Tasks List" isActive={pathname === '/tasks/list'} className="rounded-sm">
               <Link href="/tasks/list">
