@@ -56,12 +56,12 @@ export default function LMSCatalogPage() {
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <div className="bg-primary/10 p-2 rounded-sm">
-              <GraduationCap className="h-8 w-8 text-primary" />
+              <Logos.GraduationCap className="h-8 w-8 text-primary" />
             </div>
             <h1 className="text-4xl font-black tracking-tight text-foreground">Learning Hub</h1>
           </div>
           <p className="text-muted-foreground text-lg max-w-xl">
-            Professional development and safety compliance training for Aditya personnel.
+            Professional development and safety compliance training for Aditya Green Energy members.
           </p>
         </div>
 
@@ -145,3 +145,7 @@ export default function LMSCatalogPage() {
     </div>
   );
 }
+
+const Logos = {
+  GraduationCap: GraduationCap
+};
