@@ -3,12 +3,12 @@
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { doc, collection, query, where, orderBy, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, collection, query, where, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { GraduationCap, Clock, CheckCircle2, BookOpen, ArrowLeft, ChevronRight, Lock, Loader2 } from 'lucide-react';
+import { GraduationCap, Clock, CheckCircle2, BookOpen, ArrowLeft, ChevronRight, Lock, Loader2, AlertCircle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
@@ -45,14 +45,19 @@ export default function CourseDetailsPage() {
   const [isStarting, setIsStarting] = React.useState(false);
 
   const courseRef = useMemoFirebase(() => doc(firestore, 'lms_courses', courseId), [firestore, courseId]);
-  const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
+  const { data: course, isLoading: courseLoading, error: courseError } = useDoc<Course>(courseRef);
 
+  // Use simple query to avoid composite index requirements
   const modulesQuery = useMemoFirebase(() => query(
     collection(firestore, 'lms_modules'), 
-    where('courseId', '==', courseId),
-    orderBy('order', 'asc')
+    where('courseId', '==', courseId)
   ), [firestore, courseId]);
-  const { data: modules, isLoading: modulesLoading } = useCollection<Module>(modulesQuery);
+  const { data: modules, isLoading: modulesLoading, error: modulesError } = useCollection<Module>(modulesQuery);
+
+  const sortedModules = React.useMemo(() => {
+    if (!modules) return [];
+    return [...modules].sort((a, b) => (a.order || 0) - (b.order || 0));
+  }, [modules]);
 
   const progressRef = useMemoFirebase(() => user ? doc(firestore, 'lms_progress', `${user.uid}_${courseId}`) : null, [firestore, user, courseId]);
   const { data: progress } = useDoc<ProgressData>(progressRef);
@@ -60,7 +65,7 @@ export default function CourseDetailsPage() {
   const startCourse = async () => {
     if (!user || !course) return;
     
-    if (!modules || modules.length === 0) {
+    if (!sortedModules || sortedModules.length === 0) {
       toast({
         variant: "destructive",
         title: "Course Unavailable",
@@ -80,11 +85,11 @@ export default function CourseDetailsPage() {
           completedModuleIds: [],
           status: 'started',
           lastAccessed: serverTimestamp()
-        });
+        }, { merge: true });
       }
 
       // Navigate to first uncompleted module or the first one if all finished
-      const targetModule = modules.find(m => !progress?.completedModuleIds?.includes(m.id)) || modules[0];
+      const targetModule = sortedModules.find(m => !progress?.completedModuleIds?.includes(m.id)) || sortedModules[0];
       router.push(`/lms/courses/${courseId}/learn/${targetModule.id}`);
     } catch (error: any) {
       toast({
@@ -111,9 +116,20 @@ export default function CourseDetailsPage() {
     );
   }
 
+  if (courseError || modulesError) {
+    return (
+      <div className="p-12 text-center flex flex-col items-center gap-4">
+        <AlertCircle className="h-12 w-12 text-destructive opacity-50" />
+        <h2 className="text-xl font-bold">Error Loading Curriculum</h2>
+        <p className="text-muted-foreground">{(courseError || modulesError)?.message}</p>
+        <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
+      </div>
+    );
+  }
+
   if (!course) return <div className="p-12 text-center text-muted-foreground">Course not found.</div>;
 
-  const totalModules = modules?.length || 0;
+  const totalModules = sortedModules?.length || 0;
   const completedCount = progress?.completedModuleIds?.length || 0;
   const progressPercent = totalModules > 0 ? (completedCount / totalModules) * 100 : 0;
 
@@ -147,9 +163,9 @@ export default function CourseDetailsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              {modules && modules.length > 0 ? (
+              {sortedModules && sortedModules.length > 0 ? (
                 <div className="divide-y">
-                  {modules.map((m, idx) => {
+                  {sortedModules.map((m, idx) => {
                     const isCompleted = progress?.completedModuleIds?.includes(m.id);
                     return (
                       <Link 

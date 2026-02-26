@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -11,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BookOpen, Plus, Trash2, Edit3, Layers, Layout, GraduationCap, Video, FileText, CheckCircle2, ChevronRight, Search } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Edit3, Layers, Layout, GraduationCap, Video, FileText, CheckCircle2, ChevronRight, Search, AlertCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -69,13 +68,19 @@ export default function LMSAdminPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   const coursesQuery = useMemoFirebase(() => query(collection(firestore, 'lms_courses'), orderBy('createdAt', 'desc')), [firestore]);
-  const { data: courses, isLoading: coursesLoading } = useCollection<Course>(coursesQuery);
+  const { data: courses, isLoading: coursesLoading, error: coursesError } = useCollection<Course>(coursesQuery);
 
+  // Use simple query to avoid composite index requirements in prototype
   const modulesQuery = useMemoFirebase(() => {
     if (!selectedCourse) return null;
-    return query(collection(firestore, 'lms_modules'), where('courseId', '==', selectedCourse.id), orderBy('order', 'asc'));
+    return query(collection(firestore, 'lms_modules'), where('courseId', '==', selectedCourse.id));
   }, [firestore, selectedCourse]);
-  const { data: modules } = useCollection<Module>(modulesQuery);
+  const { data: modules, isLoading: modulesLoading, error: modulesError } = useCollection<Module>(modulesQuery);
+
+  const sortedModules = React.useMemo(() => {
+    if (!modules) return [];
+    return [...modules].sort((a, b) => (a.order || 0) - (b.order || 0));
+  }, [modules]);
 
   const handleCreateCourse = async () => {
     if (!user || !isAdmin) return;
@@ -141,6 +146,13 @@ export default function LMSAdminPage() {
         </Button>
       </div>
 
+      {(coursesError || modulesError) && (
+        <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-sm flex items-center gap-3 text-destructive text-sm font-medium">
+          <AlertCircle className="h-5 w-5" />
+          <p>Error loading data: {(coursesError || modulesError)?.message}</p>
+        </div>
+      )}
+
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Course List */}
         <Card className="lg:col-span-1 rounded-sm border-primary/10 shadow-md h-fit overflow-hidden">
@@ -201,12 +213,17 @@ export default function LMSAdminPage() {
             )}
           </CardHeader>
           <CardContent className="p-0">
-            {!selectedCourse ? (
+            {modulesLoading ? (
+              <div className="p-12 space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : !selectedCourse ? (
               <div className="p-32 flex flex-col items-center justify-center text-center gap-4">
                 <Layout className="h-12 w-12 text-muted-foreground/20" />
                 <p className="text-sm text-muted-foreground font-medium">Please select a course from the left to manage modules and assessments.</p>
               </div>
-            ) : modules && modules.length > 0 ? (
+            ) : sortedModules.length > 0 ? (
               <Table>
                 <TableHeader className="bg-muted/30">
                   <TableRow>
@@ -217,7 +234,7 @@ export default function LMSAdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {modules.map(module => (
+                  {sortedModules.map(module => (
                     <TableRow key={module.id} className="hover:bg-muted/5 group">
                       <TableCell className="text-center font-mono font-bold text-xs text-primary">{module.order}</TableCell>
                       <TableCell>

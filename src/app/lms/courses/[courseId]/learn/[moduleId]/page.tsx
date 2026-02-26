@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -52,28 +51,33 @@ export default function ModuleLearningPage() {
   const [score, setScore] = React.useState(0);
 
   const moduleRef = useMemoFirebase(() => doc(firestore, 'lms_modules', moduleId), [firestore, moduleId]);
-  const { data: moduleData, isLoading: moduleLoading } = useDoc<Module>(moduleRef);
+  const { data: moduleData, isLoading: moduleLoading, error: moduleError } = useDoc<Module>(moduleRef);
 
   const quizRef = useMemoFirebase(() => {
     if (!moduleId) return null;
     return query(collection(firestore, 'lms_quizzes'), where('moduleId', '==', moduleId));
   }, [firestore, moduleId]);
-  const { data: quizzes } = useCollection<Quiz>(quizRef);
+  const { data: quizzes, error: quizError } = useCollection<Quiz>(quizRef);
   const quiz = quizzes?.[0];
 
+  // Use simple query to avoid composite index requirements
   const allModulesQuery = useMemoFirebase(() => query(
     collection(firestore, 'lms_modules'), 
-    where('courseId', '==', courseId),
-    orderBy('order', 'asc')
+    where('courseId', '==', courseId)
   ), [firestore, courseId]);
-  const { data: allModules } = useCollection<Module>(allModulesQuery);
+  const { data: allModules, isLoading: allModulesLoading, error: allModulesError } = useCollection<Module>(allModulesQuery);
+
+  const sortedModules = React.useMemo(() => {
+    if (!allModules) return [];
+    return [...allModules].sort((a, b) => (a.order || 0) - (b.order || 0));
+  }, [allModules]);
 
   const progressRef = useMemoFirebase(() => user ? doc(firestore, 'lms_progress', `${user.uid}_${courseId}`) : null, [firestore, user, courseId]);
   const { data: progress } = useDoc<ProgressData>(progressRef);
 
-  const currentIndex = allModules?.findIndex(m => m.id === moduleId) ?? -1;
-  const nextModule = allModules?.[currentIndex + 1];
-  const prevModule = allModules?.[currentIndex - 1];
+  const currentIndex = sortedModules?.findIndex(m => m.id === moduleId) ?? -1;
+  const nextModule = sortedModules?.[currentIndex + 1];
+  const prevModule = sortedModules?.[currentIndex - 1];
 
   const handleQuizSubmit = () => {
     if (!quiz || !user) return;
@@ -114,8 +118,12 @@ export default function ModuleLearningPage() {
     router.push(`/lms/courses/${courseId}`);
   };
 
-  if (moduleLoading || !allModules) {
+  if (moduleLoading || allModulesLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
+  }
+
+  if (moduleError || allModulesError || quizError) {
+    return <div className="p-12 text-center text-destructive font-bold">Error loading module: {(moduleError || allModulesError || quizError)?.message}</div>;
   }
 
   if (!moduleData) return <div className="p-12 text-center">Module not found.</div>;
@@ -127,9 +135,9 @@ export default function ModuleLearningPage() {
           <Link href={`/lms/courses/${courseId}`}><ArrowLeft className="mr-2 h-4 w-4" /> Course Overview</Link>
         </Button>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Module {currentIndex + 1} of {allModules.length}</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Module {currentIndex + 1} of {sortedModules.length}</span>
           <div className="flex gap-1">
-            {allModules.map((m, i) => (
+            {sortedModules.map((m, i) => (
               <div key={m.id} className={cn("h-1 w-6 rounded-full", i <= currentIndex ? "bg-primary" : "bg-muted")} />
             ))}
           </div>
