@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -13,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch, arrayUnion, getDocs, query, where, or } from 'firebase/firestore';
+import { collection, doc, writeBatch, arrayUnion, getDocs, query, where, or, getDoc, increment } from 'firebase/firestore';
 import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserX, KeyRound, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -64,6 +65,8 @@ type Permit = {
   siteName: string;
   ptwType: string;
   status: string;
+  siteEngineerId: string;
+  timeline?: any[];
   requestDate: any;
 };
 
@@ -203,7 +206,7 @@ export default function AdminSettingsPage() {
         hiddenPermitIds: arrayUnion(...deleteDialog.targets)
       });
       toast({ title: "Hidden Successfully", description: "Selected requests hidden from your view." });
-      setSelectedPermitIds([]);
+      setSelectedIds([]);
       setDeleteDialog({ open: false, targets: [], isAll: false });
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not hide requests.' });
@@ -221,6 +224,28 @@ export default function AdminSettingsPage() {
       if (deleteDialog.isAll) {
         const snapshot = await getDocs(collection(firestore, 'permits_to_work'));
         idsToDelete = snapshot.docs.map(doc => doc.id);
+      }
+
+      // Points Reversal Logic
+      for (const id of idsToDelete) {
+          const pRef = doc(firestore, 'permits_to_work', id);
+          const pSnap = await getDoc(pRef);
+          if (pSnap.exists()) {
+              const pData = pSnap.data();
+              if (pData.status === 'Approved') {
+                  const hasRejection = (pData.timeline || []).some((t: any) => t.status === 'Rejected');
+                  const basePoints = hasRejection ? 0.5 : 1.0;
+                  
+                  const engRef = doc(firestore, 'users', pData.siteEngineerId);
+                  const engSnap = await getDoc(engRef);
+                  if (engSnap.exists()) {
+                      const m = engSnap.data()?.pointsMultiplier || 1;
+                      updateDocumentNonBlocking(engRef, {
+                          totalPoints: increment(-(basePoints * m))
+                      });
+                  }
+              }
+          }
       }
 
       const batchSize = 500;
@@ -455,7 +480,7 @@ export default function AdminSettingsPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Delete Permit Records</CardTitle>
-                <CardDescription>Cleanup requests and manage administrative visibility across the entire platform.</CardDescription>
+                <CardDescription>Cleanup requests and manage administrative visibility across the entire platform. Reward points are reversed on deletion.</CardDescription>
               </div>
               <Button 
                 variant="destructive" 
@@ -684,8 +709,8 @@ export default function AdminSettingsPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
                 {deleteDialog.isAll 
-                  ? 'This will permanently remove EVERY Permit to Work from the database. The daily sequence count will reset to 1. Are you absolutely sure?'
-                  : 'Choose how you want to handle the deletion of these records.'
+                  ? 'This will permanently remove EVERY Permit to Work from the database. The daily sequence count will reset to 1. Reward points will be reversed. Are you absolutely sure?'
+                  : 'Choose how you want to handle the deletion of these records. Points will be reversed if deleted for everyone.'
                 }
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -704,7 +729,7 @@ export default function AdminSettingsPage() {
                 <p className="text-xs text-muted-foreground">
                   {deleteDialog.isAll 
                     ? 'WIPE ALL DATA: This cannot be undone.' 
-                    : 'Permanently removes these records from the database for all users.'}
+                    : 'Permanently removes these records and reverses points from the database for all users.'}
                 </p>
                 <Button variant="destructive" className="mt-2 w-full rounded-sm" onClick={handleDeleteForEveryone} disabled={isDeleting}>
                     {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : deleteDialog.isAll ? "Wipe All Data" : "Delete for everyone"}

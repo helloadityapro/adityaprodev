@@ -1,8 +1,9 @@
+
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp, increment } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -108,11 +109,37 @@ export default function DPRListPage() {
     });
   }, [dprs, searchTerm, startDate, endDate]);
 
-  const handleDelete = () => {
-    if (!deletingDpr) return;
-    deleteDocumentNonBlocking(doc(firestore, 'dprs', deletingDpr.id));
-    toast({ title: "Deleted", description: "Report has been removed." });
-    setDeletingDpr(null);
+  const handleDelete = async () => {
+    if (!deletingDpr || !firestore) return;
+
+    try {
+        // Point Deduction Logic
+        const engineerId = deletingDpr.userId;
+        const managerId = deletingDpr.siteManagerId;
+
+        // Fetch current multiplier for accurate deduction
+        const engDoc = await getDoc(doc(firestore, 'users', engineerId));
+        const multiplier = engDoc.exists() ? engDoc.data()?.pointsMultiplier || 1 : 1;
+        
+        // Engineer loses 0.1 * multiplier
+        updateDocumentNonBlocking(doc(firestore, 'users', engineerId), {
+            totalPoints: increment(-(0.1 * multiplier))
+        });
+
+        // Manager loses 0.05
+        if (managerId) {
+            updateDocumentNonBlocking(doc(firestore, 'users', managerId), {
+                totalPoints: increment(-0.05)
+            });
+        }
+
+        deleteDocumentNonBlocking(doc(firestore, 'dprs', deletingDpr.id));
+        toast({ title: "Deleted", description: "Report and associated points have been removed." });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not complete deletion logic.' });
+    } finally {
+        setDeletingDpr(null);
+    }
   };
 
   const handleEditSave = () => {
@@ -344,7 +371,7 @@ export default function DPRListPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the progress report for <strong>{deletingDpr?.siteName}</strong> on {deletingDpr?.reportDate}.
+                    This action cannot be undone. This will permanently delete the progress report for <strong>{deletingDpr?.siteName}</strong> on {deletingDpr?.reportDate} and reverse any reward points earned.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

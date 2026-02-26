@@ -162,7 +162,7 @@ export default function TaskListPage() {
     });
 
     // Reward Points Logic for Assignee on Completion
-    if (nextStatus === 'Completed') {
+    if (nextStatus === 'Completed' && actionTask.status !== 'Completed') {
         const assigneeDoc = await getDoc(doc(firestore, 'users', actionTask.assignedToId));
         if (assigneeDoc.exists()) {
             const assigneeData = assigneeDoc.data();
@@ -183,6 +183,13 @@ export default function TaskListPage() {
                 createdAt: serverTimestamp(),
             });
         }
+    } else if (nextStatus !== 'Completed' && actionTask.status === 'Completed') {
+        // Reverse points if task was completed but then moved back to other status
+        const assigneeDoc = await getDoc(doc(firestore, 'users', actionTask.assignedToId));
+        const multiplier = assigneeDoc.exists() ? assigneeDoc.data()?.pointsMultiplier || 1 : 1;
+        updateDocumentNonBlocking(doc(firestore, 'users', actionTask.assignedToId), {
+            totalPoints: increment(-(0.1 * multiplier))
+        });
     }
 
     // Notify Assigner
@@ -197,16 +204,38 @@ export default function TaskListPage() {
         });
     }
 
-    toast({ title: "Task Updated", description: `Status changed to ${nextStatus}. Points updated if completed.` });
+    toast({ title: "Task Updated", description: `Status changed to ${nextStatus}. Points updated if applicable.` });
     setIsUpdating(false);
     setActionTask(null);
   };
 
-  const handleDelete = () => {
-    if (!deletingTask) return;
-    deleteDocumentNonBlocking(doc(firestore, 'tasks', deletingTask.id));
-    toast({ title: "Deleted", description: "Task has been removed." });
-    setDeletingTask(null);
+  const handleDelete = async () => {
+    if (!deletingTask || !firestore) return;
+
+    try {
+        // 1. Reverse Assignment Points
+        const assignerDoc = await getDoc(doc(firestore, 'users', deletingTask.assignedById));
+        const assignerMultiplier = assignerDoc.exists() ? assignerDoc.data()?.pointsMultiplier || 1 : 1;
+        updateDocumentNonBlocking(doc(firestore, 'users', deletingTask.assignedById), {
+            totalPoints: increment(-(0.1 * assignerMultiplier))
+        });
+
+        // 2. Reverse Completion Points if task was finished
+        if (deletingTask.status === 'Completed') {
+            const assigneeDoc = await getDoc(doc(firestore, 'users', deletingTask.assignedToId));
+            const assigneeMultiplier = assigneeDoc.exists() ? assigneeDoc.data()?.pointsMultiplier || 1 : 1;
+            updateDocumentNonBlocking(doc(firestore, 'users', deletingTask.assignedToId), {
+                totalPoints: increment(-(0.1 * assigneeMultiplier))
+            });
+        }
+
+        deleteDocumentNonBlocking(doc(firestore, 'tasks', deletingTask.id));
+        toast({ title: "Deleted", description: "Task and associated points removed." });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to reverse points during deletion.' });
+    } finally {
+        setDeletingTask(null);
+    }
   };
 
   if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
@@ -430,7 +459,7 @@ export default function TaskListPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>Remove Task?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    This will permanently delete task <strong>{deletingTask?.title}</strong>. This action cannot be undone.
+                    This will permanently delete task <strong>{deletingTask?.title}</strong> and reverse any reward points. This action cannot be undone.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

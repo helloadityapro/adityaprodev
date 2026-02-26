@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp, increment, getDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -140,11 +140,31 @@ export default function MovementListPage() {
     };
   }, [filteredMovements]);
 
-  const handleDelete = () => {
-    if (!deletingMov) return;
-    deleteDocumentNonBlocking(doc(firestore, 'material_movements', deletingMov.id));
-    toast({ title: "Deleted", description: "Movement record has been removed." });
-    setDeletingMov(null);
+  const handleDelete = async () => {
+    if (!deletingMov || !firestore) return;
+
+    try {
+        // Reverse Reward Points
+        const engDoc = await getDoc(doc(firestore, 'users', deletingMov.userId));
+        const multiplier = engDoc.exists() ? engDoc.data()?.pointsMultiplier || 1 : 1;
+        
+        updateDocumentNonBlocking(doc(firestore, 'users', deletingMov.userId), {
+            totalPoints: increment(-(0.1 * multiplier))
+        });
+
+        if (deletingMov.siteManagerId) {
+            updateDocumentNonBlocking(doc(firestore, 'users', deletingMov.siteManagerId), {
+                totalPoints: increment(-0.05)
+            });
+        }
+
+        deleteDocumentNonBlocking(doc(firestore, 'material_movements', deletingMov.id));
+        toast({ title: "Deleted", description: "Movement record and points removed." });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to reverse points during deletion.' });
+    } finally {
+        setDeletingMov(null);
+    }
   };
 
   const handleEditSave = () => {
@@ -504,7 +524,7 @@ export default function MovementListPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Record?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    This will permanently remove this material movement log.
+                    This will permanently remove this material movement log and reverse any reward points earned.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
