@@ -9,11 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, GraduationCap, ArrowLeft, Radio, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, GraduationCap, ArrowLeft, Radio, AlertCircle, Lock } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 type Module = {
   id: string;

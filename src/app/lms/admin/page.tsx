@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, where, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 type Course = {
   id: string;
