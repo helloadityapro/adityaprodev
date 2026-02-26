@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { GraduationCap, Clock, CheckCircle2, PlayCircle, BookOpen, ArrowLeft, ChevronRight, Lock } from 'lucide-react';
+import { GraduationCap, Clock, CheckCircle2, BookOpen, ArrowLeft, ChevronRight, Lock, Loader2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,9 @@ export default function CourseDetailsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
+
+  const [isStarting, setIsStarting] = React.useState(false);
 
   const courseRef = useMemoFirebase(() => doc(firestore, 'lms_courses', courseId), [firestore, courseId]);
   const { data: course, isLoading: courseLoading } = useDoc<Course>(courseRef);
@@ -56,19 +60,39 @@ export default function CourseDetailsPage() {
   const startCourse = async () => {
     if (!user || !course) return;
     
-    if (!progress) {
-      const pRef = doc(firestore, 'lms_progress', `${user.uid}_${courseId}`);
-      await setDoc(pRef, {
-        userId: user.uid,
-        courseId: courseId,
-        completedModuleIds: [],
-        status: 'started',
-        lastAccessed: serverTimestamp()
+    if (!modules || modules.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "Course Unavailable",
+        description: "This course does not have any modules yet. Please check back later."
       });
+      return;
     }
 
-    if (modules && modules.length > 0) {
-      router.push(`/lms/courses/${courseId}/learn/${modules[0].id}`);
+    setIsStarting(true);
+    try {
+      if (!progress) {
+        const pRef = doc(firestore, 'lms_progress', `${user.uid}_${courseId}`);
+        // Initiate the write operation non-blockingly as per optimization guidelines.
+        setDoc(pRef, {
+          userId: user.uid,
+          courseId: courseId,
+          completedModuleIds: [],
+          status: 'started',
+          lastAccessed: serverTimestamp()
+        });
+      }
+
+      // Navigate to first uncompleted module or the first one if all finished
+      const targetModule = modules.find(m => !progress?.completedModuleIds?.includes(m.id)) || modules[0];
+      router.push(`/lms/courses/${courseId}/learn/${targetModule.id}`);
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to start course."
+      });
+      setIsStarting(false);
     }
   };
 
@@ -204,8 +228,17 @@ export default function CourseDetailsPage() {
 
               <Separator />
 
-              <Button size="lg" className="w-full h-12 text-lg font-black rounded-sm shadow-md" onClick={startCourse}>
-                {progress ? 'Continue Learning' : 'Enroll Now'}
+              <Button 
+                size="lg" 
+                className="w-full h-12 text-lg font-black rounded-sm shadow-md" 
+                onClick={startCourse}
+                disabled={isStarting}
+              >
+                {isStarting ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting...</>
+                ) : (
+                  progress ? 'Continue Learning' : 'Enroll Now'
+                )}
               </Button>
               
               <p className="text-[10px] text-center text-muted-foreground uppercase font-bold tracking-tighter">
