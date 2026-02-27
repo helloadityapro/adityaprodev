@@ -50,11 +50,13 @@ export default function LoginPage() {
       let description = "An unexpected error occurred during login.";
       let title = "Login Failed";
 
-      // Consolidate credential errors to provide the specific message requested by the user
-      // This handles cases where purged users attempt to login or users provide incorrect details
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+      // Precise error mapping to prevent valid users from thinking their account is missing due to a password typo
+      if (error.code === 'auth/user-not-found') {
           title = "User doesn't exist";
           description = "User doesn't exist, please register to login";
+      } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+          title = "Incorrect credentials";
+          description = "The password or email provided is incorrect. Please try again or register if you don't have an account.";
       } else if (error.code === 'auth/network-request-failed') {
           description = "Network error. Please check your internet connection.";
       }

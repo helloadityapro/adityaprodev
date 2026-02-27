@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -178,17 +179,21 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       }
   }, [notifications, toast, displayedNotifIds]);
 
-  React.useEffect(() => {
-    if (!isUserLoading && !user && pathname !== '/login' && pathname !== '/register' && pathname !== '/forgot-password') {
-      router.replace('/login');
-    }
-  }, [user, isUserLoading, router, pathname]);
-
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
 
+  // CRITICAL: Order matters. Return Auth pages first to allow login/registration to render.
   if (isAuthPage) return <>{children}</>;
 
-  if (isUserLoading || isProfileLoading || !user) return <FullPageLoader />;
+  // Only check authenticated states after verifying we aren't on an Auth page
+  if (isUserLoading || !user) {
+    if (!isUserLoading && !user) {
+      router.replace('/login');
+    }
+    return <FullPageLoader />;
+  }
+
+  // Wait for profile to load before performing the "Missing Profile" security block
+  if (isProfileLoading) return <FullPageLoader />;
 
   // SECURITY CHECK: Handle missing Firestore profile for authenticated users
   if (!userProfile && !isSuperAdmin(user.email)) {
@@ -197,7 +202,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <ShieldAlert className="mb-4 h-12 w-12 text-destructive" />
         <h1 className="mb-2 text-2xl font-bold tracking-tight">User doesn't exist</h1>
         <p className="mb-6 max-w-sm text-muted-foreground">
-          Your professional profile could not be found. Please register to login or contact project administration.
+          User doesn't exist, please register to login
         </p>
         <div className="flex flex-col gap-2 w-full max-w-xs">
           <Button onClick={() => { auth.signOut().then(() => router.replace('/register')) }} className="w-full font-bold">
