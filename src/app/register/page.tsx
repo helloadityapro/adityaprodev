@@ -44,7 +44,7 @@ export default function RegisterPage() {
 
   // Redirect only if fully registered and authorized
   useEffect(() => {
-    if (user && userProfile && !isProfileLoading) {
+    if (user && userProfile && !isProfileLoading && !userProfile.registrationRequest) {
       router.replace('/dashboard')
     }
   }, [user, userProfile, isProfileLoading, router])
@@ -94,9 +94,9 @@ export default function RegisterPage() {
       let title = "Uh oh! Something went wrong.";
       let description = error.message || "Could not create account.";
 
-      if (error.code === 'auth/email-already-use') {
-        title = "Email Already Registered";
-        description = "This account exists. If you were recently deleted, please login with your old password to complete profile recovery.";
+      if (error.code === 'auth/email-already-in-use') {
+        title = "Account Already Exists";
+        description = "This email is already registered. Please login to your existing account to restore your profile.";
       }
 
       toast({
@@ -239,7 +239,7 @@ export default function RegisterPage() {
                 {form.formState.isSubmitting ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
                 ) : (
-                  user ? 'Complete Profile Recovery' : 'Create an account'
+                  user ? 'Restore Profile' : 'Create an account'
                 )}
               </Button>
             </form>

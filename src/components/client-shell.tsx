@@ -78,7 +78,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
 
-  // Redirection Logic (Moved to Effect to prevent render cycle errors)
+  // Redirection Logic handles in Effect to avoid bad setState during render
   React.useEffect(() => {
     if (!isUserLoading && !user && !isAuthPage) {
       router.replace('/login');
@@ -204,9 +204,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <div className="bg-destructive/10 p-6 rounded-full mb-6">
           <UserX className="h-16 w-16 text-destructive opacity-80" />
         </div>
-        <h1 className="mb-2 text-3xl font-black uppercase tracking-tight text-destructive">Account Data Missing</h1>
+        <h1 className="mb-2 text-3xl font-black uppercase tracking-tight text-destructive">User doesn't exist</h1>
         <p className="mb-8 max-w-md text-muted-foreground text-lg leading-relaxed">
-          Your professional profile could not be found in the system. This usually happens after a data cleanup or if your registration was never completed.
+          Please register to login. Your professional profile could not be found in the database.
         </p>
         <div className="flex flex-col gap-3 w-full max-w-xs">
           <Button onClick={() => router.push('/register')} className="w-full font-black h-12 text-lg shadow-md rounded-sm">

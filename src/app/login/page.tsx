@@ -46,23 +46,11 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
     } catch (error: any) {
-      let description = "An unexpected error occurred during login.";
-      let title = "Login Failed";
-
-      // Consolidated error mapping to account for Firebase's ambiguous 'invalid-credential' code
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
-          title = "Login Failed";
-          description = "Incorrect credentials or account not found. Please check your password or register if you are a new user.";
-      } else if (error.code === 'auth/network-request-failed') {
-          description = "Network error. Please check your internet connection.";
-      } else if (error.code === 'auth/user-disabled') {
-          description = "This account has been disabled. Please contact project administration.";
-      }
-      
+      // Standardized error message as requested for all auth failures
       toast({
         variant: "destructive",
-        title: title,
-        description: description,
+        title: "Login Failed",
+        description: "User doesn't exist, please register to login",
       });
     }
   }
