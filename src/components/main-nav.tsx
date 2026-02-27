@@ -24,6 +24,7 @@ import {
   GraduationCap,
   BarChart3,
   BookOpen,
+  Coins,
 } from "lucide-react"
 import {
   SidebarMenu,
