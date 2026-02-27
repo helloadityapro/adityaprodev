@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -74,6 +75,24 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
+
+  // Handle Automatic Invalidation for deleted users
+  React.useEffect(() => {
+    if (user && !isProfileLoading && !userProfile && !isSuperAdmin(user.email)) {
+      console.warn("Unauthorized Session Detected: Firestore profile missing. Invalidating authentication.");
+      
+      // We attempt to delete the Auth record entirely to fulfill "complete deletion"
+      // Note: delete() usually requires a recent login.
+      user.delete()
+        .then(() => {
+          toast({ title: "Account Deactivated", description: "Your professional account has been permanently removed by administration." });
+        })
+        .catch(() => {
+          // Fallback to sign out if deletion is restricted by re-auth requirements
+          auth.signOut();
+        });
+    }
+  }, [user, isProfileLoading, userProfile, auth, toast]);
 
   React.useEffect(() => {
     if (user && !isProfileLoading) {
@@ -190,7 +209,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   if (isUserLoading || !user) return <FullPageLoader />;
 
   // CRITICAL SECURITY CHECK: If profile is missing for a non-bootstrap user, block access.
-  // This handles the case where a user is deleted from Firestore but their Auth record still exists.
   if (!isProfileLoading && !userProfile && !isSuperAdmin(user.email)) {
     return (
       <div className="flex flex-col min-h-screen items-center justify-center text-center gap-6 p-4 max-w-lg mx-auto">
@@ -200,16 +218,16 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Access Denied</h1>
           <p className="text-muted-foreground leading-relaxed">
-            Your professional profile could not be found or has been deactivated by project administration. 
-            Access to Aditya Pro services is restricted to authorized personnel only.
+            Your professional profile has been permanently removed by project administration. 
+            Access to Aditya Pro services has been revoked.
           </p>
         </div>
         <div className="flex flex-col w-full gap-3">
           <Button variant="outline" className="h-12 font-bold rounded-sm" onClick={() => auth.signOut()}>
-            Sign Out
+            Exit Application
           </Button>
           <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
-            Contact Support: khalil@adityagreenenergy.com
+            Invalidated Account Detected
           </p>
         </div>
       </div>
