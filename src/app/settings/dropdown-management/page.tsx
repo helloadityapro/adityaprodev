@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, writeBatch, arrayUnion, getDocs, query, where, or, getDoc, increment } from 'firebase/firestore';
-import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserX, KeyRound, ShieldAlert } from 'lucide-react';
+import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserX, KeyRound, ShieldAlert, User, UserCog } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -66,6 +66,8 @@ type Permit = {
   ptwType: string;
   status: string;
   siteEngineerId: string;
+  siteEngineerName?: string;
+  siteManagerId?: string;
   timeline?: any[];
   requestDate: any;
 };
@@ -520,6 +522,8 @@ export default function AdminSettingsPage() {
                       <TableHead>Serial No</TableHead>
                       <TableHead>Site</TableHead>
                       <TableHead>Type</TableHead>
+                      <TableHead>Engineer</TableHead>
+                      <TableHead>Manager</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead className="text-right px-6">Action</TableHead>
@@ -538,6 +542,18 @@ export default function AdminSettingsPage() {
                           <TableCell className="font-mono text-xs">{p.serialNumber || p.id.slice(0,8)}</TableCell>
                           <TableCell className="font-medium">{p.siteName}</TableCell>
                           <TableCell>{p.ptwType}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs">{p.siteEngineerName || '—'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                                <UserCog className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs">{allUsers?.find(u => u.id === p.siteManagerId)?.username || '—'}</span>
+                            </div>
+                          </TableCell>
                           <TableCell>
                               <Badge variant="outline" className="rounded-sm text-[10px] font-bold uppercase">{p.status}</Badge>
                           </TableCell>
@@ -558,7 +574,7 @@ export default function AdminSettingsPage() {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-12 text-muted-foreground italic">
+                        <TableCell colSpan={9} className="text-center py-12 text-muted-foreground italic">
                           No permit requests found matching your current view.
                         </TableCell>
                       </TableRow>
