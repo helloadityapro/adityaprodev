@@ -1,4 +1,3 @@
-
 'use client'
 
 import Link from "next/link"
@@ -48,14 +47,18 @@ export default function LoginPage() {
       await signInWithEmailAndPassword(auth, values.email, values.password);
     } catch (error: any) {
       let description = "An unexpected error occurred during login.";
-      if (error.code === 'auth/invalid-credential') {
-          description = "Invalid email or password. Please try again.";
+      let title = "Login Failed";
+
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+          title = "User doesn't exist";
+          description = "Please register or signup if you don't have an account or were recently deleted.";
       } else if (error.code === 'auth/network-request-failed') {
           description = "Network error. Please check your internet connection.";
       }
+      
       toast({
         variant: "destructive",
-        title: "Login Failed",
+        title: title,
         description: description,
       });
     }

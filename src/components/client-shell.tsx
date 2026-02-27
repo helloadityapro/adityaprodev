@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from "react";
@@ -79,20 +78,31 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   // Handle Automatic Invalidation for deleted users
   React.useEffect(() => {
     if (user && !isProfileLoading && !userProfile && !isSuperAdmin(user.email)) {
-      console.warn("Unauthorized Session Detected: Firestore profile missing. Invalidating authentication.");
+      console.warn("Unauthorized Session Detected: Firestore profile missing. Redirecting to registration.");
       
-      // We attempt to delete the Auth record entirely to fulfill "complete deletion"
-      // Note: delete() usually requires a recent login.
+      // Attempt self-deletion of Auth record
       user.delete()
         .then(() => {
-          toast({ title: "Account Deactivated", description: "Your professional account has been permanently removed by administration." });
+          toast({ 
+            variant: "destructive",
+            title: "User doesn't exist", 
+            description: "Your account has been removed. Please register or signup again." 
+          });
+          router.replace('/register');
         })
         .catch(() => {
-          // Fallback to sign out if deletion is restricted by re-auth requirements
-          auth.signOut();
+          // Fallback to sign out if deletion is restricted
+          auth.signOut().then(() => {
+            toast({ 
+              variant: "destructive",
+              title: "User doesn't exist", 
+              description: "Please register or signup to create a new profile." 
+            });
+            router.replace('/register');
+          });
         });
     }
-  }, [user, isProfileLoading, userProfile, auth, toast]);
+  }, [user, isProfileLoading, userProfile, auth, toast, router]);
 
   React.useEffect(() => {
     if (user && !isProfileLoading) {
@@ -208,30 +218,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   if (isUserLoading || !user) return <FullPageLoader />;
 
-  // CRITICAL SECURITY CHECK: If profile is missing for a non-bootstrap user, block access.
+  // SECURITY CHECK: If profile is missing for a non-bootstrap user, block and redirect
   if (!isProfileLoading && !userProfile && !isSuperAdmin(user.email)) {
-    return (
-      <div className="flex flex-col min-h-screen items-center justify-center text-center gap-6 p-4 max-w-lg mx-auto">
-        <div className="bg-destructive/10 p-6 rounded-full">
-          <ShieldAlert className="h-16 w-16 text-destructive" />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Access Denied</h1>
-          <p className="text-muted-foreground leading-relaxed">
-            Your professional profile has been permanently removed by project administration. 
-            Access to Aditya Pro services has been revoked.
-          </p>
-        </div>
-        <div className="flex flex-col w-full gap-3">
-          <Button variant="outline" className="h-12 font-bold rounded-sm" onClick={() => auth.signOut()}>
-            Exit Application
-          </Button>
-          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
-            Invalidated Account Detected
-          </p>
-        </div>
-      </div>
-    );
+    return <FullPageLoader />; // The useEffect will handle the redirect/cleanup
   }
 
   if (userProfile?.registrationRequest && !isAdmin) {
