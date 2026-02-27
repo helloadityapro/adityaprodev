@@ -86,7 +86,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           toast({ 
             variant: "destructive",
             title: "User doesn't exist", 
-            description: "Your account has been removed. Please register or signup again." 
+            description: "Please register to login" 
           });
           router.replace('/register');
         })
@@ -96,7 +96,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             toast({ 
               variant: "destructive",
               title: "User doesn't exist", 
-              description: "Please register or signup to create a new profile." 
+              description: "Please register to login" 
             });
             router.replace('/register');
           });

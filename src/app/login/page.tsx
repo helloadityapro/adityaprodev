@@ -51,7 +51,7 @@ export default function LoginPage() {
 
       if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
           title = "User doesn't exist";
-          description = "Please register or signup if you don't have an account or were recently deleted.";
+          description = "Please register to login";
       } else if (error.code === 'auth/network-request-failed') {
           description = "Network error. Please check your internet connection.";
       }
