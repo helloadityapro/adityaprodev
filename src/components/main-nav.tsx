@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -24,6 +23,7 @@ import {
   Trophy,
   GraduationCap,
   BarChart3,
+  BookOpen,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -126,12 +126,12 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <List className="h-4 w-4" />
                 <span className="font-medium">List of PtW</span>
               </Link>
-            </SidebarMenuButton>
-            {(userRole === 'Admin' || userRole === 'Site Manager') && pendingPtwCount > 0 && (
+              {(userRole === 'Admin' || userRole === 'Site Manager') && pendingPtwCount > 0 && (
                 <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
                     {pendingPtwCount}
                 </SidebarMenuBadge>
-            )}
+              )}
+            </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Activities" isActive={pathname === '/ptw/activities'} className="rounded-sm">
