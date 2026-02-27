@@ -23,8 +23,7 @@ import {
   FolderOpen,
   Trophy,
   GraduationCap,
-  BookOpen,
-  Coins,
+  BarChart3,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -53,6 +52,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Reports" isActive={pathname === '/reports'} className="rounded-sm">
+              <Link href="/reports">
+                <BarChart3 className="h-4 w-4" />
+                <span className="font-medium">Reports</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Documents" isActive={pathname.startsWith('/documents')} className="rounded-sm">
               <Link href="/documents">
