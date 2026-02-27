@@ -45,7 +45,14 @@ export function useDoc<T = any>(
 
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(!!memoizedDocRef);
-  const [error, setError] = useState<FirestoreError | Error | null>(null);
+  const [prevRef, setPrevRef] = useState<DocumentReference<DocumentData> | null | undefined>(memoizedDocRef);
+
+  // Sync state if the reference changes during render to avoid race conditions
+  if (memoizedDocRef !== prevRef) {
+    setPrevRef(memoizedDocRef);
+    setIsLoading(!!memoizedDocRef);
+    setData(null);
+  }
 
   useEffect(() => {
     if (!memoizedDocRef) {
@@ -89,6 +96,8 @@ export function useDoc<T = any>(
 
     return () => unsubscribe();
   }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
+
+  const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   return { data, isLoading, error };
 }

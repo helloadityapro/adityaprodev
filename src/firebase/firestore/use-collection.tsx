@@ -60,6 +60,14 @@ export function useCollection<T = any>(
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(!!memoizedTargetRefOrQuery);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
+  const [prevQuery, setPrevQuery] = useState(memoizedTargetRefOrQuery);
+
+  // Sync state if the query changes during render to avoid race conditions
+  if (memoizedTargetRefOrQuery !== prevQuery) {
+    setPrevQuery(memoizedTargetRefOrQuery);
+    setIsLoading(!!memoizedTargetRefOrQuery);
+    setData(null);
+  }
 
   useEffect(() => {
     if (!memoizedTargetRefOrQuery) {

@@ -188,10 +188,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   if (isAuthPage) return <>{children}</>;
 
-  if (isUserLoading || !user) return <FullPageLoader />;
+  if (isUserLoading || isProfileLoading || !user) return <FullPageLoader />;
 
   // SECURITY CHECK: Handle missing Firestore profile for authenticated users
-  if (!isProfileLoading && !userProfile && !isSuperAdmin(user.email)) {
+  if (!userProfile && !isSuperAdmin(user.email)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
         <ShieldAlert className="mb-4 h-12 w-12 text-destructive" />
