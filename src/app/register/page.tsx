@@ -79,10 +79,19 @@ export default function RegisterPage() {
         description: "Your account has been created and is pending approval.",
       })
     } catch (error: any) {
+      let title = "Uh oh! Something went wrong.";
+      let description = error.message || "Could not create account.";
+
+      // Specific handling for purged users who haven't had their Auth account deleted
+      if (error.code === 'auth/email-already-in-use') {
+        title = "Email Already Registered";
+        description = "This email is already in use. If you were recently deleted, your login credentials may still exist. Please contact Admin to fully clear your account or try logging in with your existing password.";
+      }
+
       toast({
         variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description: error.message || "Could not create account.",
+        title: title,
+        description: description,
       })
     }
   }

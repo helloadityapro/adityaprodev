@@ -1,3 +1,4 @@
+
 'use client'
 
 import Link from "next/link"
@@ -49,12 +50,11 @@ export default function LoginPage() {
       let description = "An unexpected error occurred during login.";
       let title = "Login Failed";
 
-      if (error.code === 'auth/user-not-found') {
+      // Consolidate credential errors to provide the specific message requested by the user
+      // This handles cases where purged users attempt to login or users provide incorrect details
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
           title = "User doesn't exist";
-          description = "Please register to login";
-      } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-          title = "Invalid credentials";
-          description = "Please check your email and password.";
+          description = "User doesn't exist, please register to login";
       } else if (error.code === 'auth/network-request-failed') {
           description = "Network error. Please check your internet connection.";
       }
