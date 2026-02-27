@@ -25,7 +25,7 @@ export default function UserNav() {
   const firestore = useFirestore();
   const { user } = useUser();
 
-  // Fetch the user's professional profile to get the 'username'
+  // Fetch the user's professional profile to get the 'username' and 'role'
   const userProfileRef = useMemoFirebase(() => {
     if (!user) return null;
     return doc(firestore, 'users', user.uid);
@@ -51,9 +51,14 @@ export default function UserNav() {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{displayUsername}</p>
-            <p className="text-xs leading-none text-muted-foreground">
+          <div className="flex flex-col space-y-1.5">
+            <div className="flex flex-col">
+              <p className="text-sm font-bold leading-none">{displayUsername}</p>
+              <p className="text-[10px] font-black text-primary uppercase tracking-wider mt-1">
+                {userProfile?.role || 'Personnel'}
+              </p>
+            </div>
+            <p className="text-xs leading-none text-muted-foreground pt-0.5">
               {user.email}
             </p>
           </div>
