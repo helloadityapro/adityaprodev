@@ -302,7 +302,7 @@ export default function AdminSettingsPage() {
         createdAt: serverTimestamp()
       });
 
-      toast({ title: 'Purge Requested', description: `Request for ${email} submitted for Super Admin authorization.` });
+      toast({ title: 'Purge Requested', description: `Cleanup for ${email} submitted for Super Admin authorization.` });
       setPurgeEmail("");
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Request Failed', description: e.message });
@@ -320,7 +320,7 @@ export default function AdminSettingsPage() {
       return;
     }
 
-    // Approved: Execute actual purge
+    // Approved: Execute actual purge of entries ONLY
     setIsDeleting(true);
     try {
       const usersSnap = await getDocs(query(collection(firestore, 'users'), where('email', '==', req.targetEmail)));
@@ -331,10 +331,12 @@ export default function AdminSettingsPage() {
       }
 
       const userId = usersSnap.docs[0].id;
+      // List of collections where user entries are stored
       const collections = ['permits_to_work', 'tasks', 'requirements', 'dprs', 'material_movements', 'notifications'];
       let totalDeleted = 0;
 
       for (const colName of collections) {
+        // Query for entries CREATED BY or ASSIGNED TO the user
         const q = query(collection(firestore, colName), or(where('userId', '==', userId), where('siteEngineerId', '==', userId), where('assignedToId', '==', userId)));
         const snap = await getDocs(q);
         
@@ -348,10 +350,15 @@ export default function AdminSettingsPage() {
         }
       }
 
-      await deleteDocumentNonBlocking(doc(firestore, 'users', userId));
+      // DO NOT DELETE the user profile. Instead, reset points.
+      updateDocumentNonBlocking(doc(firestore, 'users', userId), { 
+        totalPoints: 0,
+        lastPurgeAt: serverTimestamp() 
+      });
+
       updateDocumentNonBlocking(doc(firestore, 'cleanup_requests', req.id), { status: 'approved' });
 
-      toast({ variant: 'success', title: 'Data Purge Complete', description: `Deleted ${totalDeleted} records and associated user profile. Session will be blocked.` });
+      toast({ variant: 'success', title: 'Entries Purged', description: `Deleted ${totalDeleted} activity records. User profile and account access preserved.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
     } finally {
@@ -618,22 +625,24 @@ export default function AdminSettingsPage() {
                   </div>
                   <div>
                     <CardTitle className="text-destructive">User Data Cleanup</CardTitle>
-                    <CardDescription>Request a permanent data purge for a user. This action requires Super Admin authorization.</CardDescription>
+                    <CardDescription>Purge all activity entries for a user while preserving their profile and account access.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-6 space-y-6">
-                <div className="flex flex-col gap-4 p-4 bg-red-50 border border-red-100 rounded-sm">
+                <div className="flex flex-col gap-4 p-4 bg-amber-50 border border-amber-100 rounded-sm">
                   <div className="flex items-start gap-3">
-                    <ShieldAlert className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-                    <div className="text-xs text-red-800 leading-relaxed space-y-2">
-                      <p className="font-bold uppercase">Approval Workflow Information</p>
-                      <p>Once requested, the Super Admin must formally authorize the data removal. This process will:</p>
+                    <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="text-xs text-amber-800 leading-relaxed space-y-2">
+                      <p className="font-bold uppercase">Cleanup Workflow Information</p>
+                      <p>This action will permanently delete the following data for the target user:</p>
                       <ul className="list-disc pl-4 space-y-1">
-                        <li>Permanently delete the Firestore <strong>User Profile</strong> and all associated <strong>Permits, Tasks, Reports</strong>.</li>
-                        <li><strong>Block Session:</strong> The user will immediately lose access to the platform services.</li>
-                        <li><strong>Auth Warning:</strong> Note that Firebase Auth accounts are not automatically deleted via the Client SDK. You must manually block or delete the login via the Firebase Console to prevent future sign-ins.</li>
+                        <li>All <strong>Permits to Work</strong> raised.</li>
+                        <li>All <strong>Daily Progress Reports (DPRs)</strong> and <strong>Material Logs</strong>.</li>
+                        <li>All <strong>Tasks</strong> and <strong>Requirements</strong>.</li>
+                        <li><strong>Reward Points:</strong> The user's points balance will be reset to zero.</li>
                       </ul>
+                      <p className="font-bold">NOTE: The user's profile, role, and platform access will NOT be affected.</p>
                     </div>
                   </div>
                 </div>
@@ -655,7 +664,7 @@ export default function AdminSettingsPage() {
                     disabled={!purgeEmail.includes('@') || isRequestingPurge}
                     onClick={handleRequestPurge}
                   >
-                    {isRequestingPurge ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : <><KeyRound className="mr-2 h-4 w-4" /> Request Data Purge</>}
+                    {isRequestingPurge ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : <><RefreshCw className="mr-2 h-4 w-4" /> Request Log Cleanup</>}
                   </Button>
                 </div>
               </CardContent>
