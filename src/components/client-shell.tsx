@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { UserNotifications } from "@/components/user-notifications";
-import { Loader2, Sun, Moon, ShieldAlert } from "lucide-react";
+import { Loader2, Sun, Moon, ShieldAlert, LogOut } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
@@ -75,35 +75,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
 
-  // Handle Automatic Invalidation for deleted users
-  React.useEffect(() => {
-    if (user && !isProfileLoading && !userProfile && !isSuperAdmin(user.email)) {
-      console.warn("Unauthorized Session Detected: Firestore profile missing. Redirecting to registration.");
-      
-      // Attempt self-deletion of Auth record
-      user.delete()
-        .then(() => {
-          toast({ 
-            variant: "destructive",
-            title: "User doesn't exist", 
-            description: "Please register to login" 
-          });
-          router.replace('/register');
-        })
-        .catch(() => {
-          // Fallback to sign out if deletion is restricted
-          auth.signOut().then(() => {
-            toast({ 
-              variant: "destructive",
-              title: "User doesn't exist", 
-              description: "Please register to login" 
-            });
-            router.replace('/register');
-          });
-        });
-    }
-  }, [user, isProfileLoading, userProfile, auth, toast, router]);
-
+  // Bootstrap logic for Super Admins
   React.useEffect(() => {
     if (user && !isProfileLoading) {
       if (!isSuperAdmin(user.email)) return;
@@ -218,9 +190,25 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   if (isUserLoading || !user) return <FullPageLoader />;
 
-  // SECURITY CHECK: If profile is missing for a non-bootstrap user, block and redirect
+  // SECURITY CHECK: Handle missing Firestore profile for authenticated users
   if (!isProfileLoading && !userProfile && !isSuperAdmin(user.email)) {
-    return <FullPageLoader />; // The useEffect will handle the redirect/cleanup
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
+        <ShieldAlert className="mb-4 h-12 w-12 text-destructive" />
+        <h1 className="mb-2 text-2xl font-bold tracking-tight">User doesn't exist</h1>
+        <p className="mb-6 max-w-sm text-muted-foreground">
+          Your professional profile could not be found. Please register to login or contact project administration.
+        </p>
+        <div className="flex flex-col gap-2 w-full max-w-xs">
+          <Button onClick={() => { auth.signOut().then(() => router.replace('/register')) }} className="w-full font-bold">
+            Register to login
+          </Button>
+          <Button variant="ghost" onClick={() => auth.signOut()} className="w-full flex items-center gap-2">
+            <LogOut className="h-4 w-4" /> Sign Out
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (userProfile?.registrationRequest && !isAdmin) {

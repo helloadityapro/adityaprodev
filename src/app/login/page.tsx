@@ -49,9 +49,12 @@ export default function LoginPage() {
       let description = "An unexpected error occurred during login.";
       let title = "Login Failed";
 
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+      if (error.code === 'auth/user-not-found') {
           title = "User doesn't exist";
           description = "Please register to login";
+      } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+          title = "Invalid credentials";
+          description = "Please check your email and password.";
       } else if (error.code === 'auth/network-request-failed') {
           description = "Network error. Please check your internet connection.";
       }
