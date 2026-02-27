@@ -1,4 +1,3 @@
-
 'use client'
 
 import Link from "next/link"
@@ -50,13 +49,13 @@ export default function LoginPage() {
       let description = "An unexpected error occurred during login.";
       let title = "Login Failed";
 
-      // Precise error mapping to prevent valid users from thinking their account is missing due to a password typo
-      if (error.code === 'auth/user-not-found') {
-          title = "User doesn't exist";
-          description = "User doesn't exist, please register to login";
-      } else if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-          title = "Incorrect credentials";
-          description = "The password or email provided is incorrect. Please try again or register if you don't have an account.";
+      // Consolidated error mapping to account for Firebase's ambiguous 'invalid-credential' code
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+          title = "Login Failed";
+          description = "Incorrect credentials or account not found. If you were recently deleted, please register again.";
+      } else if (error.code === 'auth/wrong-password') {
+          title = "Incorrect Password";
+          description = "The password you entered is incorrect. Please try again.";
       } else if (error.code === 'auth/network-request-failed') {
           description = "Network error. Please check your internet connection.";
       }

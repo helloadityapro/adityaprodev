@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from "react";
@@ -18,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { UserNotifications } from "@/components/user-notifications";
-import { Loader2, Sun, Moon, ShieldAlert, LogOut } from "lucide-react";
+import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
@@ -196,19 +195,20 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   if (isProfileLoading) return <FullPageLoader />;
 
+  // User is authenticated but profile is missing (Account was purged)
   if (!userProfile && !isSuperAdmin(user.email)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
-        <ShieldAlert className="mb-4 h-12 w-12 text-destructive" />
-        <h1 className="mb-2 text-2xl font-bold tracking-tight">User doesn't exist</h1>
+        <UserX className="mb-4 h-16 w-16 text-destructive opacity-50" />
+        <h1 className="mb-2 text-2xl font-bold tracking-tight text-destructive">User doesn't exist</h1>
         <p className="mb-6 max-w-sm text-muted-foreground">
-          User doesn't exist, please register to login
+          Your professional profile could not be found. If you were recently deleted, please register to gain access.
         </p>
         <div className="flex flex-col gap-2 w-full max-w-xs">
-          <Button onClick={() => { auth.signOut().then(() => router.replace('/register')) }} className="w-full font-bold">
-            Register to login
+          <Button onClick={() => router.push('/register')} className="w-full font-bold h-11">
+            Complete Registration
           </Button>
-          <Button variant="ghost" onClick={() => auth.signOut()} className="w-full flex items-center gap-2">
+          <Button variant="ghost" onClick={() => auth.signOut()} className="w-full flex items-center justify-center gap-2">
             <LogOut className="h-4 w-4" /> Sign Out
           </Button>
         </div>
@@ -219,9 +219,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   if (userProfile?.registrationRequest && !isAdmin) {
      return (
       <div className="flex flex-col min-h-screen items-center justify-center text-center gap-6 p-4">
-        <h1 className="text-2xl font-bold">Registration Pending</h1>
-        <p className="text-muted-foreground">Account awaiting approval.</p>
-        <Button variant="outline" onClick={() => auth.signOut()}>Sign Out</Button>
+        <h1 className="text-3xl font-black uppercase tracking-tight">Registration Pending</h1>
+        <p className="text-muted-foreground max-w-sm">Your professional account is currently awaiting administrative authorization.</p>
+        <Button variant="outline" onClick={() => auth.signOut()} className="rounded-sm font-bold">Sign Out</Button>
       </div>
     );
   }

@@ -1,9 +1,8 @@
-
 'use client'
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -12,11 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import AppLogo from "@/components/app-logo"
-import { useAuth, useFirestore, setDocumentNonBlocking, useUser } from "@/firebase"
+import { useAuth, useFirestore, setDocumentNonBlocking, useUser, useDoc, useMemoFirebase } from "@/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { createUserWithEmailAndPassword } from "firebase/auth"
 import { doc, serverTimestamp } from "firebase/firestore"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Loader2, CheckCircle2 } from "lucide-react"
 
 const registerSchema = z.object({
   username: z.string().min(1, { message: "Username is required." }),
@@ -36,13 +36,18 @@ export default function RegisterPage() {
   const firestore = useFirestore()
   const { toast } = useToast()
   const { user } = useUser()
+  const [isSuccess, setIsSuccess] = useState(false)
 
-  // Redirect if already logged in
+  // Fetch profile to check if redirection is safe
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+
+  // Redirect only if fully registered and authorized
   useEffect(() => {
-    if (user) {
+    if (user && userProfile && !isProfileLoading) {
       router.replace('/dashboard')
     }
-  }, [user, router])
+  }, [user, userProfile, isProfileLoading, router])
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -58,11 +63,16 @@ export default function RegisterPage() {
 
   const onSubmit = async (values: z.infer<typeof registerSchema>) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password)
-      const newUser = userCredential.user
+      let uid = user?.uid;
+
+      // If user isn't logged in, create the account
+      if (!uid) {
+        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password)
+        uid = userCredential.user.uid;
+      }
 
       const userDoc = {
-        id: newUser.uid,
+        id: uid,
         username: values.username,
         email: values.email,
         mobile: values.mobile,
@@ -72,20 +82,21 @@ export default function RegisterPage() {
         createdAt: serverTimestamp(),
       }
 
-      setDocumentNonBlocking(doc(firestore, "users", newUser.uid), userDoc, { merge: true })
+      // Initialize the professional profile
+      setDocumentNonBlocking(doc(firestore, "users", uid), userDoc, { merge: true })
 
+      setIsSuccess(true);
       toast({
         title: "Registration successful!",
-        description: "Your account has been created and is pending approval.",
+        description: "Your professional profile has been initialized and is pending approval.",
       })
     } catch (error: any) {
       let title = "Uh oh! Something went wrong.";
       let description = error.message || "Could not create account.";
 
-      // Specific handling for purged users who haven't had their Auth account deleted
-      if (error.code === 'auth/email-already-in-use') {
+      if (error.code === 'auth/email-already-use') {
         title = "Email Already Registered";
-        description = "This email is already in use. If you were recently deleted, your login credentials may still exist. Please contact Admin to fully clear your account or try logging in with your existing password.";
+        description = "This account exists. If you were recently deleted, please login with your old password to complete profile recovery.";
       }
 
       toast({
@@ -96,7 +107,32 @@ export default function RegisterPage() {
     }
   }
 
-  if (user) return null;
+  // If successfully submitted, show confirmation instead of form
+  if (isSuccess) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <Card className="mx-auto w-full max-w-md text-center py-10">
+          <CardHeader>
+            <div className="flex justify-center mb-4">
+              <CheckCircle2 className="h-16 w-16 text-green-500" />
+            </div>
+            <CardTitle className="text-2xl font-bold">Registration Pending</CardTitle>
+            <CardDescription className="text-lg">
+              Account created successfully.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Your request for access to Aditya Pro has been received. Project administration will review and approve your credentials shortly.
+            </p>
+            <Button variant="outline" onClick={() => auth.signOut()} className="w-full">
+              Sign Out
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -107,7 +143,7 @@ export default function RegisterPage() {
             </div>
           <CardTitle className="text-2xl font-headline">Create an account</CardTitle>
           <CardDescription>
-            Enter your information to create an account. Your account will need admin approval.
+            {user ? "Your profile was missing. Please complete registration to gain access." : "Enter your information to create an account. Admin approval is required."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -200,13 +236,17 @@ export default function RegisterPage() {
                 )}
               />
               <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Creating account...' : 'Create an account'}
+                {form.formState.isSubmitting ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
+                ) : (
+                  user ? 'Complete Profile Recovery' : 'Create an account'
+                )}
               </Button>
             </form>
           </Form>
           <div className="mt-4 text-center text-sm">
             Already have an account?{" "}
-            <Link href="/login" className="underline font-medium">
+            <Link href="/login" className="underline font-medium text-primary">
               Sign in
             </Link>
           </div>
