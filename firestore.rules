@@ -36,7 +36,8 @@ service cloud.firestore {
 
     match /system_settings/{settingId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      // Allow any signed in user to update counters for serial number generation
+      allow write: if isAdmin() || (settingId == 'counters' && isSignedIn());
     }
 
     match /permits_to_work/{permitId} {
