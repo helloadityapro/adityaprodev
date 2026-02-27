@@ -234,6 +234,9 @@ export default function AdminSettingsPage() {
       if (deleteDialog.isAll) {
         const snapshot = await getDocs(collection(firestore, 'permits_to_work'));
         idsToDelete = snapshot.docs.map(doc => doc.id);
+        
+        // Reset the global monotonic counter
+        updateDocumentNonBlocking(doc(firestore, 'system_settings', 'counters'), { lastPtwNumber: 0 });
       }
 
       for (const id of idsToDelete) {
@@ -267,7 +270,7 @@ export default function AdminSettingsPage() {
         await batch.commit();
       }
 
-      toast({ title: "Permanently Deleted", description: deleteDialog.isAll ? "All records deleted." : "Selected requests deleted." });
+      toast({ title: "Permanently Deleted", description: deleteDialog.isAll ? "All records deleted and counter reset." : "Selected requests deleted." });
       setSelectedPermitIds([]);
       setDeleteDialog({ open: false, targets: [], isAll: false });
     } catch (e) {
@@ -768,7 +771,7 @@ export default function AdminSettingsPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
                 {deleteDialog.isAll 
-                  ? 'This will permanently remove EVERY Permit to Work from the database. The daily sequence count will reset to 1. Reward points will be reversed. Are you absolutely sure?'
+                  ? 'This will permanently remove EVERY Permit to Work from the database. The global sequence count will reset to 1. Reward points will be reversed. Are you absolutely sure?'
                   : 'Choose how you want to handle the deletion of these records. Points will be reversed if deleted for everyone.'
                 }
             </AlertDialogDescription>

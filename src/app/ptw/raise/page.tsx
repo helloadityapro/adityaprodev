@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { TriangleAlert, Loader2, Search, ChevronsUpDown, Check, FileUp, MessageCircle, CheckCircle2 } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, setDocumentNonBlocking, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase"
-import { collection, serverTimestamp, doc, arrayUnion, getDoc, query, where, getDocs, Timestamp } from "firebase/firestore"
+import { collection, serverTimestamp, doc, arrayUnion, getDoc, query, where, getDocs, Timestamp, runTransaction } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
@@ -189,32 +189,36 @@ export default function RaisePtwPage() {
     }
 
     try {
+      // 1. Determine Serial Number using Transaction if not correction mode
+      let serialNumber = "";
+      if (isCorrectionMode && permitToCorrect) {
+        serialNumber = permitToCorrect.serialNumber;
+      } else {
+        serialNumber = await runTransaction(firestore, async (transaction) => {
+          const counterRef = doc(firestore, 'system_settings', 'counters');
+          const counterSnap = await transaction.get(counterRef);
+          let nextNum = 1;
+          if (counterSnap.exists()) {
+            nextNum = (counterSnap.data().lastPtwNumber || 0) + 1;
+          }
+          transaction.set(counterRef, { lastPtwNumber: nextNum }, { merge: true });
+          
+          const now = new Date();
+          const dateStr = format(now, 'yyyy/MM/dd');
+          return `AGEPL/PtW/${dateStr}/${nextNum}`;
+        });
+      }
+
       const permitRef = isCorrectionMode && permitIdToCorrect 
         ? doc(firestore, "permits_to_work", permitIdToCorrect)
         : doc(collection(firestore, "permits_to_work"));
       
       const permitId = permitRef.id;
-      let serialNumber = "";
       
       const maxExistingIndex = isCorrectionMode && permitToCorrect?.attachments 
         ? Math.max(0, ...(permitToCorrect.attachments.map(a => (a as any).submissionIndex || 0)))
         : 0;
       const currentSubmissionIndex = maxExistingIndex + 1;
-
-      if (isCorrectionMode && permitToCorrect) {
-        serialNumber = permitToCorrect.serialNumber;
-      } else {
-        const now = new Date();
-        const dateStr = format(now, 'yyyy/MM/dd');
-
-        try {
-          // Global sequential count logic: starting from 1 and incrementing every time
-          const snapshotTotal = await getDocs(collection(firestore, "permits_to_work"));
-          serialNumber = `AGEPL/PtW/${dateStr}/${snapshotTotal.size + 1}`;
-        } catch (e) {
-          serialNumber = `AGEPL/PtW/${dateStr}/${Date.now().toString().slice(-4)}`;
-        }
-      }
 
       const uploadFile = (file: File, path: string): Promise<any> => {
         return new Promise((resolve, reject) => {
