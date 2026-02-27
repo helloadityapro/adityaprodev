@@ -134,6 +134,19 @@
         "remarks": { "type": "string" }
       },
       "required": ["siteName", "title", "assignedToId", "priority", "status", "dueDate"]
+    },
+    "CleanupRequest": {
+      "title": "Cleanup Request",
+      "type": "object",
+      "description": "Administrative request to purge all data for a specific user.",
+      "properties": {
+        "id": { "type": "string" },
+        "targetEmail": { "type": "string" },
+        "requestedById": { "type": "string" },
+        "requestedByName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -168,6 +181,10 @@
       {
         "path": "/tasks/{taskId}",
         "definition": { "entityName": "Task" }
+      },
+      {
+        "path": "/cleanup_requests/{requestId}",
+        "definition": { "entityName": "CleanupRequest" }
       }
     ]
   }

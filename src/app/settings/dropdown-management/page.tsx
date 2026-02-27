@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, writeBatch, arrayUnion, getDocs, query, where, or, getDoc, increment } from 'firebase/firestore';
-import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserX, KeyRound, ShieldAlert, User, UserCog } from 'lucide-react';
+import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserX, KeyRound, ShieldAlert, User, UserCog, CheckCircle2, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -35,7 +35,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { format } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
-import { initiateCleanupOtp, verifyCleanupOtp } from '@/ai/flows/otp-flows';
 
 type PtwType = {
   id: string;
@@ -72,6 +71,15 @@ type Permit = {
   requestDate: any;
 };
 
+type CleanupRequest = {
+  id: string;
+  targetEmail: string;
+  requestedById: string;
+  requestedByName: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: any;
+};
+
 const ptwTypeSchema = z.object({
   name: z.string().min(1, 'PTW Type name is required.'),
 });
@@ -99,15 +107,13 @@ export default function AdminSettingsPage() {
 
   // Data Cleanup States
   const [purgeEmail, setPurgeEmail] = React.useState("");
-  const [isPurging, setIsPurging] = React.useState(false);
-  const [isOtpDialogOpen, setIsOtpDialogOpen] = React.useState(false);
-  const [otpCode, setOtpCode] = React.useState("");
-  const [isVerifying, setIsVerifying] = React.useState(false);
+  const [isRequestingPurge, setIsRequestingPurge] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isSuperAdminUser = user?.email === 'khalil@adityagreenenergy.com';
 
   React.useEffect(() => {
     if (!isUserLoading && !isProfileLoading && !isAdmin) {
@@ -126,6 +132,9 @@ export default function AdminSettingsPage() {
 
   const permitsQuery = useMemoFirebase(() => collection(firestore, 'permits_to_work'), [firestore]);
   const { data: allPermits, isLoading: permitsLoading } = useCollection<Permit>(permitsQuery);
+
+  const cleanupRequestsQuery = useMemoFirebase(() => collection(firestore, 'cleanup_requests'), [firestore]);
+  const { data: cleanupRequests, isLoading: cleanupRequestsLoading } = useCollection<CleanupRequest>(cleanupRequestsQuery);
 
   const potentialApprovers = React.useMemo(() => {
     if (!allUsers) return [];
@@ -228,7 +237,6 @@ export default function AdminSettingsPage() {
         idsToDelete = snapshot.docs.map(doc => doc.id);
       }
 
-      // Points Reversal Logic
       for (const id of idsToDelete) {
           const pRef = doc(firestore, 'permits_to_work', id);
           const pSnap = await getDoc(pRef);
@@ -270,49 +278,53 @@ export default function AdminSettingsPage() {
     }
   };
 
-  // Data Purge Flow with OTP
-  const handleInitiatePurge = async () => {
-    if (!purgeEmail.trim() || !firestore) return;
-    setIsPurging(true);
+  // Data Purge Approval Workflow
+  const handleRequestPurge = async () => {
+    if (!purgeEmail.trim() || !user || !userProfile) return;
     
-    const res = await initiateCleanupOtp();
-    if (res.success) {
-      toast({ title: 'Security OTP Sent', description: res.message });
-      setIsOtpDialogOpen(true);
-    } else {
-      toast({ variant: 'destructive', title: 'Action Blocked', description: res.message });
-    }
-    setIsPurging(false);
-  };
-
-  const handleVerifyAndExecutePurge = async () => {
-    if (!otpCode || otpCode.length !== 6) {
-      toast({ variant: 'destructive', title: 'Invalid Code', description: 'Please enter a valid 6-digit security code.' });
+    const email = purgeEmail.toLowerCase().trim();
+    const userExists = allUsers?.some(u => u.email.toLowerCase() === email);
+    
+    if (!userExists) {
+      toast({ variant: 'destructive', title: 'Not Found', description: 'No user account found with this email.' });
       return;
     }
 
-    setIsVerifying(true);
-    const verifyRes = await verifyCleanupOtp(otpCode);
-    
-    if (verifyRes.success) {
-      await executeDataPurge();
-      setIsOtpDialogOpen(false);
-      setOtpCode("");
-    } else {
-      toast({ variant: 'destructive', title: 'Verification Failed', description: verifyRes.message });
+    setIsRequestingPurge(true);
+    try {
+      await addDocumentNonBlocking(collection(firestore, 'cleanup_requests'), {
+        targetEmail: email,
+        requestedById: user.uid,
+        requestedByName: userProfile.username || user.email || 'Admin',
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+
+      toast({ title: 'Purge Requested', description: `Request for ${email} submitted for Super Admin authorization.` });
+      setPurgeEmail("");
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Request Failed', description: e.message });
+    } finally {
+      setIsRequestingPurge(false);
     }
-    setIsVerifying(false);
   };
 
-  const executeDataPurge = async () => {
-    if (!firestore) return;
-    setIsPurging(true);
-    
+  const handleProcessCleanupRequest = async (req: CleanupRequest, action: 'approved' | 'rejected') => {
+    if (!isSuperAdminUser || !firestore) return;
+
+    if (action === 'rejected') {
+      updateDocumentNonBlocking(doc(firestore, 'cleanup_requests', req.id), { status: 'rejected' });
+      toast({ title: 'Request Rejected' });
+      return;
+    }
+
+    // Approved: Execute actual purge
+    setIsDeleting(true);
     try {
-      const usersSnap = await getDocs(query(collection(firestore, 'users'), where('email', '==', purgeEmail.toLowerCase().trim())));
+      const usersSnap = await getDocs(query(collection(firestore, 'users'), where('email', '==', req.targetEmail)));
       if (usersSnap.empty) {
-        toast({ variant: 'destructive', title: 'Not Found', description: 'No user found with this email.' });
-        setIsPurging(false);
+        toast({ variant: 'destructive', title: 'Execution Failed', description: 'User account no longer exists.' });
+        updateDocumentNonBlocking(doc(firestore, 'cleanup_requests', req.id), { status: 'rejected' });
         return;
       }
 
@@ -335,17 +347,25 @@ export default function AdminSettingsPage() {
       }
 
       await deleteDocumentNonBlocking(doc(firestore, 'users', userId));
+      updateDocumentNonBlocking(doc(firestore, 'cleanup_requests', req.id), { status: 'approved' });
 
-      toast({ variant: 'success', title: 'Data Purge Complete', description: `Permanently deleted ${totalDeleted} records and associated user account.` });
-      setPurgeEmail("");
+      toast({ variant: 'success', title: 'Data Purge Complete', description: `Deleted ${totalDeleted} records and associated user account.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
     } finally {
-      setIsPurging(false);
+      setIsDeleting(false);
     }
   };
 
-  if (isUserLoading || isProfileLoading || ptwTypesLoading || sitesLoading || permitsLoading) {
+  const pendingCleanupRequests = React.useMemo(() => {
+    return cleanupRequests?.filter(r => r.status === 'pending').sort((a, b) => {
+      const da = a.createdAt?.toDate?.()?.getTime() || 0;
+      const db = b.createdAt?.toDate?.()?.getTime() || 0;
+      return db - da;
+    }) || [];
+  }, [cleanupRequests]);
+
+  if (isUserLoading || isProfileLoading || ptwTypesLoading || sitesLoading || permitsLoading || cleanupRequestsLoading) {
     return (
         <div className="space-y-6 animate-pulse">
             <Skeleton className="h-9 w-64" />
@@ -587,90 +607,113 @@ export default function AdminSettingsPage() {
         </TabsContent>
 
         <TabsContent value="cleanup" className="space-y-6 animate-in fade-in-50 duration-300">
-          <Card className="rounded-sm border-destructive/20">
-            <CardHeader className="bg-destructive/5 border-b border-destructive/10">
-              <div className="flex items-center gap-3">
-                <div className="bg-destructive/10 p-2 rounded-sm">
-                  <Eraser className="h-6 w-6 text-destructive" />
+          <div className="grid gap-8">
+            <Card className="rounded-sm border-destructive/20">
+              <CardHeader className="bg-destructive/5 border-b border-destructive/10">
+                <div className="flex items-center gap-3">
+                  <div className="bg-destructive/10 p-2 rounded-sm">
+                    <Eraser className="h-6 w-6 text-destructive" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-destructive">User Data Cleanup</CardTitle>
+                    <CardDescription>Request a permanent data purge for a user. This action requires Super Admin authorization.</CardDescription>
+                  </div>
                 </div>
-                <div>
-                  <CardTitle className="text-destructive">User Data Cleanup</CardTitle>
-                  <CardDescription>Purge all database records (Permits, Tasks, Requirements) assigned to a specific user email.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-100 rounded-sm">
+                  <ShieldAlert className="h-5 w-5 text-red-600 shrink-0" />
+                  <div className="text-xs text-red-800 leading-relaxed">
+                    <p className="font-bold uppercase mb-0.5">Approval Required</p>
+                    Once requested, the Super Admin must review and authorize the data removal. All linked Permits, Tasks, and Reports will be wiped.
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-6 space-y-6">
-              <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-100 rounded-sm">
-                <ShieldAlert className="h-5 w-5 text-red-600 shrink-0" />
-                <div className="text-xs text-red-800 leading-relaxed">
-                  <p className="font-bold uppercase mb-0.5">Sensitive Operation</p>
-                  This will permanently delete all content linked to the user email. Verification is required from project leadership.
-                </div>
-              </div>
 
-              <div className="space-y-4 max-w-md">
-                <div className="space-y-2">
-                  <Label htmlFor="purge-email">Target User Email</Label>
-                  <Input 
-                    id="purge-email" 
-                    placeholder="e.g. user@example.com" 
-                    value={purgeEmail}
-                    onChange={(e) => setPurgeEmail(e.target.value)}
-                    className="rounded-sm"
-                  />
+                <div className="space-y-4 max-w-md">
+                  <div className="space-y-2">
+                    <Label htmlFor="purge-email">Target User Email</Label>
+                    <Input 
+                      id="purge-email" 
+                      placeholder="e.g. user@example.com" 
+                      value={purgeEmail}
+                      onChange={(e) => setPurgeEmail(e.target.value)}
+                      className="rounded-sm"
+                    />
+                  </div>
+                  <Button 
+                    variant="destructive" 
+                    className="w-full rounded-sm font-bold h-11" 
+                    disabled={!purgeEmail.includes('@') || isRequestingPurge}
+                    onClick={handleRequestPurge}
+                  >
+                    {isRequestingPurge ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : <><KeyRound className="mr-2 h-4 w-4" /> Request Data Purge</>}
+                  </Button>
                 </div>
-                <Button 
-                  variant="destructive" 
-                  className="w-full rounded-sm font-bold h-11" 
-                  disabled={!purgeEmail.includes('@') || isPurging}
-                  onClick={handleInitiatePurge}
-                >
-                  {isPurging ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing...</> : <><KeyRound className="mr-2 h-4 w-4" /> Initiate Cleanup & Request OTP</>}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {pendingCleanupRequests.length > 0 && (
+              <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+                <CardHeader className="bg-primary/5 border-b">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-primary" />
+                    <CardTitle>Cleanup Authorization Queue</CardTitle>
+                  </div>
+                  <CardDescription>Data removal requests awaiting authorization from project leadership.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6">Target Account</TableHead>
+                        <TableHead>Requested By</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right px-6">Authorization</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingCleanupRequests.map(req => (
+                        <TableRow key={req.id}>
+                          <TableCell className="px-6 py-4 font-bold text-sm">{req.targetEmail}</TableCell>
+                          <TableCell className="text-xs font-medium text-muted-foreground">{req.requestedByName}</TableCell>
+                          <TableCell className="text-[11px] text-muted-foreground">
+                            {req.createdAt ? format(req.createdAt.toDate(), 'dd MMM HH:mm') : 'N/A'}
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            {isSuperAdminUser ? (
+                              <div className="flex justify-end gap-1">
+                                <Button 
+                                  size="sm" 
+                                  className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold" 
+                                  onClick={() => handleProcessCleanupRequest(req, 'approved')}
+                                  disabled={isDeleting}
+                                >
+                                  {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
+                                  Authorize
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost" 
+                                  className="h-8 rounded-sm text-red-600 hover:bg-red-50" 
+                                  onClick={() => handleProcessCleanupRequest(req, 'rejected')}
+                                >
+                                  <XCircle className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Badge variant="outline" className="text-[9px] uppercase tracking-wider font-bold">Awaiting Super Admin</Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
-
-      {/* OTP Verification Dialog */}
-      <Dialog open={isOtpDialogOpen} onOpenChange={(o) => !o && setIsOtpDialogOpen(false)}>
-        <DialogContent className="max-w-md rounded-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <ShieldAlert className="h-5 w-5" /> Confirm Permanent Deletion
-            </DialogTitle>
-            <DialogDescription>
-              A 6-digit security code has been sent to <strong>khalil@adityagreenenergy.com</strong>. Enter it below to authorize data removal for <strong>{purgeEmail}</strong>.
-              <span className="block mt-2 text-xs font-semibold text-primary">Note: Check server console logs for the code during this prototype phase.</span>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-6 space-y-4">
-            <div className="space-y-2 text-center">
-              <Label htmlFor="otp-input" className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Verification Code</Label>
-              <Input 
-                id="otp-input" 
-                placeholder="000000" 
-                maxLength={6} 
-                className="text-center text-3xl font-mono tracking-[0.5em] h-16 rounded-sm bg-muted/30 border-2 focus-visible:ring-red-500" 
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-              />
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" className="rounded-sm" onClick={() => setIsOtpDialogOpen(false)}>Cancel</Button>
-            <Button 
-              variant="destructive" 
-              className="rounded-sm font-bold flex-1" 
-              disabled={otpCode.length !== 6 || isVerifying}
-              onClick={handleVerifyAndExecutePurge}
-            >
-              {isVerifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verify & Purge All Data"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!ptwTypeToManage} onOpenChange={() => setPtwTypeToManage(null)}>
         <DialogContent className="max-w-md rounded-sm">
