@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { UserNotifications } from "@/components/user-notifications";
-import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX } from "lucide-react";
+import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, AlertCircle, RefreshCw } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
@@ -27,7 +27,7 @@ function FullPageLoader() {
     <div className="flex min-h-screen items-center justify-center bg-background animate-in fade-in duration-300">
       <div className="flex flex-col items-center gap-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-sm font-medium text-muted-foreground tracking-widest uppercase">Initializing</p>
+        <p className="text-sm font-medium text-muted-foreground tracking-widest uppercase">Initializing Aditya Pro</p>
       </div>
     </div>
   );
@@ -44,13 +44,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
 
-  // Redirection Logic
-  React.useEffect(() => {
-    if (!isUserLoading && !user && !isAuthPage) {
-      router.replace('/login');
-    }
-  }, [isUserLoading, user, isAuthPage, router]);
-
+  // Theme Sync
   React.useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     const isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -83,6 +77,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
+
+  // Redirection Logic (Moved to Effect to prevent render cycle errors)
+  React.useEffect(() => {
+    if (!isUserLoading && !user && !isAuthPage) {
+      router.replace('/login');
+    }
+  }, [isUserLoading, user, isAuthPage, router]);
 
   // Bootstrap logic for Super Admins
   React.useEffect(() => {
@@ -193,22 +194,25 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     return <FullPageLoader />;
   }
 
+  // Wait for profile resolution before performing existence check
   if (isProfileLoading) return <FullPageLoader />;
 
-  // User is authenticated but profile is missing (Account was purged)
+  // Auth is active but professional profile is missing (Purged account or incomplete registration)
   if (!userProfile && !isSuperAdmin(user.email)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
-        <UserX className="mb-4 h-16 w-16 text-destructive opacity-50" />
-        <h1 className="mb-2 text-2xl font-bold tracking-tight text-destructive">User doesn't exist</h1>
-        <p className="mb-6 max-w-sm text-muted-foreground">
-          Your professional profile could not be found. If you were recently deleted, please register to gain access.
+        <div className="bg-destructive/10 p-6 rounded-full mb-6">
+          <UserX className="h-16 w-16 text-destructive opacity-80" />
+        </div>
+        <h1 className="mb-2 text-3xl font-black uppercase tracking-tight text-destructive">Account Data Missing</h1>
+        <p className="mb-8 max-w-md text-muted-foreground text-lg leading-relaxed">
+          Your professional profile could not be found in the system. This usually happens after a data cleanup or if your registration was never completed.
         </p>
-        <div className="flex flex-col gap-2 w-full max-w-xs">
-          <Button onClick={() => router.push('/register')} className="w-full font-bold h-11">
-            Complete Registration
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <Button onClick={() => router.push('/register')} className="w-full font-black h-12 text-lg shadow-md rounded-sm">
+            <RefreshCw className="mr-2 h-5 w-5" /> Restore Profile
           </Button>
-          <Button variant="ghost" onClick={() => auth.signOut()} className="w-full flex items-center justify-center gap-2">
+          <Button variant="ghost" onClick={() => auth.signOut()} className="w-full flex items-center justify-center gap-2 font-semibold">
             <LogOut className="h-4 w-4" /> Sign Out
           </Button>
         </div>
@@ -218,10 +222,15 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   if (userProfile?.registrationRequest && !isAdmin) {
      return (
-      <div className="flex flex-col min-h-screen items-center justify-center text-center gap-6 p-4">
-        <h1 className="text-3xl font-black uppercase tracking-tight">Registration Pending</h1>
-        <p className="text-muted-foreground max-w-sm">Your professional account is currently awaiting administrative authorization.</p>
-        <Button variant="outline" onClick={() => auth.signOut()} className="rounded-sm font-bold">Sign Out</Button>
+      <div className="flex flex-col min-h-screen items-center justify-center text-center gap-6 p-4 bg-muted/30">
+        <div className="bg-yellow-500/10 p-6 rounded-full">
+          <ShieldAlert className="h-16 w-16 text-yellow-600 opacity-80" />
+        </div>
+        <h1 className="text-3xl font-black uppercase tracking-tight">Authorization Pending</h1>
+        <p className="text-muted-foreground max-w-sm text-lg">Your account has been created successfully but is currently awaiting administrative approval.</p>
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <Button variant="outline" onClick={() => auth.signOut()} className="rounded-sm font-bold h-11">Sign Out & Exit</Button>
+        </div>
       </div>
     );
   }

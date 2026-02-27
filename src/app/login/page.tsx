@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useAuth, useUser } from "@/firebase"
 import { signInWithEmailAndPassword } from "firebase/auth"
 import { useToast } from "@/hooks/use-toast"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -50,14 +50,13 @@ export default function LoginPage() {
       let title = "Login Failed";
 
       // Consolidated error mapping to account for Firebase's ambiguous 'invalid-credential' code
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
           title = "Login Failed";
-          description = "Incorrect credentials or account not found. If you were recently deleted, please register again.";
-      } else if (error.code === 'auth/wrong-password') {
-          title = "Incorrect Password";
-          description = "The password you entered is incorrect. Please try again.";
+          description = "Incorrect credentials or account not found. Please check your password or register if you are a new user.";
       } else if (error.code === 'auth/network-request-failed') {
           description = "Network error. Please check your internet connection.";
+      } else if (error.code === 'auth/user-disabled') {
+          description = "This account has been disabled. Please contact project administration.";
       }
       
       toast({
@@ -76,7 +75,7 @@ export default function LoginPage() {
         <CardHeader className="text-center pb-8 pt-10">
           <CardTitle className="text-3xl font-bold tracking-tight text-primary">Aditya Pro</CardTitle>
           <CardDescription className="mt-2">
-            Login to your account
+            Sign in to your professional account
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -87,9 +86,9 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Email Address</FormLabel>
                     <FormControl>
-                      <Input placeholder="m@example.com" {...field} />
+                      <Input placeholder="name@adityagreenenergy.com" {...field} className="rounded-sm" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -104,7 +103,7 @@ export default function LoginPage() {
                         <FormLabel>Password</FormLabel>
                         <Link
                           href="/forgot-password"
-                          className="ml-auto inline-block text-sm underline text-muted-foreground"
+                          className="ml-auto inline-block text-xs underline text-muted-foreground hover:text-primary transition-colors"
                         >
                           Forgot password?
                         </Link>
@@ -114,7 +113,7 @@ export default function LoginPage() {
                         <Input 
                           type={showPassword ? "text" : "password"} 
                           {...field} 
-                          className="pr-10"
+                          className="pr-10 rounded-sm"
                         />
                         <Button
                             type="button"
@@ -132,15 +131,15 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full h-11" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Logging in...' : 'Login'}
+              <Button type="submit" className="w-full h-11 rounded-sm font-bold" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Authenticating...</> : 'Sign In'}
               </Button>
             </form>
           </Form>
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/register" className="underline font-medium text-primary">
-              Sign up
+            New to the platform?{" "}
+            <Link href="/register" className="underline font-bold text-primary">
+              Register Here
             </Link>
           </div>
         </CardContent>
