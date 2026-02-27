@@ -2,7 +2,7 @@
 
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useUser, useDoc, useFirestore, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection } from "@/firebase";
+import { useUser, useDoc, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection, useFirestore } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, or, and } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import { MainNav } from "@/components/main-nav";
@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { UserNotifications } from "@/components/user-notifications";
-import { Loader2, Sun, Moon } from "lucide-react";
+import { Loader2, Sun, Moon, ShieldAlert } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
@@ -62,7 +62,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       localStorage.setItem('theme', 'dark');
     } else {
       document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+      setTheme('light');
     }
   };
 
@@ -188,6 +188,33 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   if (isAuthPage) return <>{children}</>;
 
   if (isUserLoading || !user) return <FullPageLoader />;
+
+  // CRITICAL SECURITY CHECK: If profile is missing for a non-bootstrap user, block access.
+  // This handles the case where a user is deleted from Firestore but their Auth record still exists.
+  if (!isProfileLoading && !userProfile && !isSuperAdmin(user.email)) {
+    return (
+      <div className="flex flex-col min-h-screen items-center justify-center text-center gap-6 p-4 max-w-lg mx-auto">
+        <div className="bg-destructive/10 p-6 rounded-full">
+          <ShieldAlert className="h-16 w-16 text-destructive" />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight">Access Denied</h1>
+          <p className="text-muted-foreground leading-relaxed">
+            Your professional profile could not be found or has been deactivated by project administration. 
+            Access to Aditya Pro services is restricted to authorized personnel only.
+          </p>
+        </div>
+        <div className="flex flex-col w-full gap-3">
+          <Button variant="outline" className="h-12 font-bold rounded-sm" onClick={() => auth.signOut()}>
+            Sign Out
+          </Button>
+          <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
+            Contact Support: khalil@adityagreenenergy.com
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (userProfile?.registrationRequest && !isAdmin) {
      return (

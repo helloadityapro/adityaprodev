@@ -351,7 +351,7 @@ export default function AdminSettingsPage() {
       await deleteDocumentNonBlocking(doc(firestore, 'users', userId));
       updateDocumentNonBlocking(doc(firestore, 'cleanup_requests', req.id), { status: 'approved' });
 
-      toast({ variant: 'success', title: 'Data Purge Complete', description: `Deleted ${totalDeleted} records and associated user account.` });
+      toast({ variant: 'success', title: 'Data Purge Complete', description: `Deleted ${totalDeleted} records and associated user profile. Session will be blocked.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
     } finally {
@@ -623,11 +623,18 @@ export default function AdminSettingsPage() {
                 </div>
               </CardHeader>
               <CardContent className="pt-6 space-y-6">
-                <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-100 rounded-sm">
-                  <ShieldAlert className="h-5 w-5 text-red-600 shrink-0" />
-                  <div className="text-xs text-red-800 leading-relaxed">
-                    <p className="font-bold uppercase mb-0.5">Approval Required</p>
-                    Once requested, the Super Admin must review and authorize the data removal. All linked Permits, Tasks, and Reports will be wiped.
+                <div className="flex flex-col gap-4 p-4 bg-red-50 border border-red-100 rounded-sm">
+                  <div className="flex items-start gap-3">
+                    <ShieldAlert className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                    <div className="text-xs text-red-800 leading-relaxed space-y-2">
+                      <p className="font-bold uppercase">Approval Workflow Information</p>
+                      <p>Once requested, the Super Admin must formally authorize the data removal. This process will:</p>
+                      <ul className="list-disc pl-4 space-y-1">
+                        <li>Permanently delete the Firestore <strong>User Profile</strong> and all associated <strong>Permits, Tasks, Reports</strong>.</li>
+                        <li><strong>Block Session:</strong> The user will immediately lose access to the platform services.</li>
+                        <li><strong>Auth Warning:</strong> Note that Firebase Auth accounts are not automatically deleted via the Client SDK. You must manually block or delete the login via the Firebase Console to prevent future sign-ins.</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
 
