@@ -43,6 +43,15 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
 
+  const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
+
+  // Redirection Logic
+  React.useEffect(() => {
+    if (!isUserLoading && !user && !isAuthPage) {
+      router.replace('/login');
+    }
+  }, [isUserLoading, user, isAuthPage, router]);
+
   React.useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     const isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -179,23 +188,14 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       }
   }, [notifications, toast, displayedNotifIds]);
 
-  const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
-
-  // CRITICAL: Order matters. Return Auth pages first to allow login/registration to render.
   if (isAuthPage) return <>{children}</>;
 
-  // Only check authenticated states after verifying we aren't on an Auth page
   if (isUserLoading || !user) {
-    if (!isUserLoading && !user) {
-      router.replace('/login');
-    }
     return <FullPageLoader />;
   }
 
-  // Wait for profile to load before performing the "Missing Profile" security block
   if (isProfileLoading) return <FullPageLoader />;
 
-  // SECURITY CHECK: Handle missing Firestore profile for authenticated users
   if (!userProfile && !isSuperAdmin(user.email)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
