@@ -35,12 +35,17 @@ const movementSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
   movementType: z.enum(["Inward", "Outward"], { required_error: "Movement type is required" }),
   sourceOrDestinationType: z.enum(["Supplier", "Site"], { required_error: "Type is required" }),
-  sourceOrDestination: z.string().min(1, "Name is required"),
+  sourceOrDestination: z.string().min(1, "Source/Destination is required"),
   movementDate: z.string().min(1, "Date is required"),
   items: z.array(itemSchema).min(1, "Add at least one item"),
 });
 
 type Site = {
+  id: string;
+  name: string;
+};
+
+type Supplier = {
   id: string;
   name: string;
 };
@@ -75,6 +80,9 @@ export default function RecordMovementPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
+  const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
+  const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
+
   const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
   const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
 
@@ -90,8 +98,13 @@ export default function RecordMovementPage() {
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
+  
   const [isTargetSitePopoverOpen, setIsTargetSitePopoverOpen] = React.useState(false);
   const [targetSiteSearchQuery, setTargetSiteSearchQuery] = React.useState("");
+
+  const [isSupplierPopoverOpen, setIsSupplierPopoverOpen] = React.useState(false);
+  const [supplierSearchQuery, setSupplierSearchQuery] = React.useState("");
+
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [submittedData, setSubmittedData] = React.useState<z.infer<typeof movementSchema> & { attachments?: any[] } | null>(null);
@@ -223,8 +236,11 @@ export default function RecordMovementPage() {
   };
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
+  
   const allSitesList = allSites ? Array.from(new Map(allSites.map(s => [s.name, s])).values()) : [];
   const filteredAllSites = allSitesList.filter(s => s.name.toLowerCase().includes(targetSiteSearchQuery.toLowerCase()));
+
+  const filteredSuppliers = allSuppliers?.filter(s => s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())) || [];
 
   if (isSubmitted && submittedData) {
     return (
@@ -437,10 +453,46 @@ export default function RecordMovementPage() {
                             </PopoverContent>
                           </Popover>
                         ) : (
-                          <div className="relative">
-                            <Input placeholder="Enter supplier name..." {...field} className="rounded-sm pr-10" />
-                            <Truck className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                          </div>
+                          <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                role="combobox" 
+                                className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}
+                              >
+                                {field.value || "Select supplier..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                              <div className="flex items-center border-b px-3">
+                                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                <Input 
+                                  placeholder="Search suppliers..." 
+                                  className="h-9 w-full border-none focus-visible:ring-0 px-0" 
+                                  value={supplierSearchQuery} 
+                                  onChange={(e) => setSupplierSearchQuery(e.target.value)}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                              <ScrollArea className="h-[200px]">
+                                {filteredSuppliers.length > 0 ? filteredSuppliers.map((supplier) => (
+                                  <Button 
+                                      key={supplier.id} 
+                                      type="button" 
+                                      variant="ghost" 
+                                      className="w-full justify-start font-normal text-left" 
+                                      onClick={() => { field.onChange(supplier.name); setIsSupplierPopoverOpen(false); }}
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4 shrink-0", supplier.name === field.value ? "opacity-100" : "opacity-0")} />
+                                    <span className="truncate">{supplier.name}</span>
+                                  </Button>
+                                )) : (
+                                  <div className="p-4 text-center text-sm text-muted-foreground">No suppliers found.</div>
+                                )}
+                              </ScrollArea>
+                            </PopoverContent>
+                          </Popover>
                         )}
                       </FormControl>
                       <FormMessage />
