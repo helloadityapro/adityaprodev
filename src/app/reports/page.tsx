@@ -34,13 +34,20 @@ import {
   ChevronsUpDown,
   MapPin
 } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { format, subDays, isAfter } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { cn } from '@/lib/utils';
 
 type DataItem = {
@@ -84,6 +91,7 @@ export default function ReportsDashboard() {
   const isManager = userProfile?.role === 'Site Manager';
 
   const [selectedSite, setSelectedSite] = React.useState<string>("All Sites");
+  const [timeRange, setTimeRange] = React.useState<number>(7);
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
 
@@ -155,22 +163,35 @@ export default function ReportsDashboard() {
   const stats = React.useMemo(() => {
     if (isLoading) return null;
 
-    const applySiteFilter = (list: DataItem[] | null) => {
+    const cutoff = subDays(new Date(), timeRange);
+
+    const applyFilters = (list: DataItem[] | null, dateField: string) => {
       if (!list) return [];
-      if (selectedSite === "All Sites") return list;
-      return list.filter(item => item.siteName === selectedSite);
+      return list.filter(item => {
+        // Site filter
+        const siteMatch = selectedSite === "All Sites" || item.siteName === selectedSite;
+        if (!siteMatch) return false;
+
+        // Date filter
+        let d: Date | null = null;
+        const val = (item as any)[dateField];
+        if (val?.toDate) d = val.toDate();
+        else if (val) d = new Date(val);
+        
+        return d && isAfter(d, cutoff);
+      });
     };
 
-    const fPermits = applySiteFilter(permits);
-    const fDprs = applySiteFilter(dprs);
-    const fMovements = applySiteFilter(movements);
-    const fRequirements = applySiteFilter(requirements);
-    const fTasks = applySiteFilter(tasks);
+    const fPermits = applyFilters(permits, 'requestDate');
+    const fDprs = applyFilters(dprs, 'reportDate');
+    const fMovements = applyFilters(movements, 'movementDate');
+    const fRequirements = applyFilters(requirements, 'createdAt');
+    const fTasks = applyFilters(tasks, 'createdAt');
 
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const lastNDays = Array.from({ length: timeRange }, (_, i) => {
       const date = subDays(new Date(), i);
       return {
-        label: format(date, 'dd MMM'),
+        label: format(date, timeRange > 7 ? 'dd/MM' : 'dd MMM'),
         date: date,
         permits: 0,
         dprs: 0,
@@ -186,7 +207,7 @@ export default function ReportsDashboard() {
       else if (val) d = new Date(val);
       
       if (d) {
-        const index = last7Days.findIndex(day => format(day.date, 'yyyy-MM-dd') === format(d!, 'yyyy-MM-dd'));
+        const index = lastNDays.findIndex(day => format(day.date, 'yyyy-MM-dd') === format(d!, 'yyyy-MM-dd'));
         return index;
       }
       return -1;
@@ -194,19 +215,19 @@ export default function ReportsDashboard() {
 
     fPermits.forEach(p => {
       const idx = processItemDate(p, 'requestDate');
-      if (idx !== -1) last7Days[idx].permits++;
+      if (idx !== -1) lastNDays[idx].permits++;
     });
     fDprs.forEach(d => {
       const idx = processItemDate(d, 'reportDate');
-      if (idx !== -1) last7Days[idx].dprs++;
+      if (idx !== -1) lastNDays[idx].dprs++;
     });
     fMovements.forEach(m => {
       const idx = processItemDate(m, 'movementDate');
-      if (idx !== -1) last7Days[idx].movements++;
+      if (idx !== -1) lastNDays[idx].movements++;
     });
     fRequirements.forEach(r => {
       const idx = processItemDate(r, 'createdAt');
-      if (idx !== -1) last7Days[idx].requirements++;
+      if (idx !== -1) lastNDays[idx].requirements++;
     });
 
     const permitStatus = [
@@ -228,7 +249,7 @@ export default function ReportsDashboard() {
     ];
 
     return {
-      dailyTrend: last7Days,
+      dailyTrend: lastNDays,
       permitDistribution: permitStatus,
       taskDistribution: taskStatus,
       requirementDistribution: requirementUrgency,
@@ -240,7 +261,7 @@ export default function ReportsDashboard() {
         tasks: fTasks.length,
       }
     };
-  }, [isLoading, permits, dprs, movements, requirements, tasks, selectedSite]);
+  }, [isLoading, permits, dprs, movements, requirements, tasks, selectedSite, timeRange]);
 
   if (isLoading) {
     return (
@@ -275,9 +296,17 @@ export default function ReportsDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-8">
-            <Calendar className="mr-1.5 h-3 w-3" /> Last 7 Days
-          </Badge>
+          <Select value={timeRange.toString()} onValueChange={(val) => setTimeRange(parseInt(val))}>
+            <SelectTrigger className="w-[140px] h-8 rounded-sm font-black uppercase text-[10px] tracking-widest bg-secondary border-none">
+              <Calendar className="mr-1.5 h-3 w-3" />
+              <SelectValue placeholder="Time Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7" className="text-[10px] font-black uppercase">Last 7 Days</SelectItem>
+              <SelectItem value="30" className="text-[10px] font-black uppercase">Last 30 Days</SelectItem>
+              <SelectItem value="90" className="text-[10px] font-black uppercase">Last 90 Days</SelectItem>
+            </SelectContent>
+          </Select>
           
           <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
             <PopoverTrigger asChild>
