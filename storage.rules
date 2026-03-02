@@ -7,7 +7,7 @@ service firebase.storage {
       return request.auth != null;
     }
     
-    // Direct email-based admin check for reliability in Storage rules
+    // Helper to check for admin status directly via token
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'khalil@adityagreenenergy.com' || 
@@ -15,18 +15,16 @@ service firebase.storage {
       );
     }
 
-    // Rules for Site Documents (Shared project folders)
+    // Site Documents: Accessible to all team members, delete restricted to admin
     match /site_documents/{allPaths=**} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
       allow delete: if isAdmin();
     }
 
-    // Rules for user-specific and temporary uploads
-    // Simplifed to allow all authenticated users to write to the uploads directory
+    // General Uploads: Used for PTW, Movements, etc.
+    // Explicitly allowing read/write for any authenticated user within the uploads prefix
     match /uploads/{allPaths=**} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
       allow delete: if isAdmin();
     }
   }

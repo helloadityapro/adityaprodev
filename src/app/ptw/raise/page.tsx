@@ -245,12 +245,11 @@ export default function RaisePtwPage() {
       }));
 
       const newAttachments = await Promise.all(processedFiles.map(file => {
-        // Explicitly including slashes to avoid concatenated path issues seen in unauthorized errors
-        const filePath = `uploads/${user.uid}/${timestamp}-${file.name}`;
+        // Explicitly ensuring slashes are present between folders for permission matching
+        const filePath = `uploads/${user.uid}/${timestamp}-${file.name.replace(/\s+/g, '_')}`;
         return uploadFile(file, filePath);
       }));
       
-      // If a Manager or Admin is raising it, skip Level 1 approval
       const isEngineerRole = userProfile.role === 'Site Engineer';
       const targetStatus = isEngineerRole ? "Pending" : "ManagerApproved";
 
