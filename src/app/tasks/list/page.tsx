@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRouter } from "next/navigation";
 
 type Task = {
   id: string;
@@ -94,9 +95,10 @@ export default function TaskListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
-  const [activeTab, setActiveTab] = React.useState("my-tasks");
+  const [activeTab, setActiveTab] = React.useState("all");
   const [actionTask, setActionTask] = React.useState<Task | null>(null);
   const [isUpdating, setIsUpdating] = React.useState(false);
   const [deletingTask, setDeletingTask] = React.useState<Task | null>(null);
@@ -105,13 +107,13 @@ export default function TaskListPage() {
   const { data: userProfile } = useDoc(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
-  const isManager = userProfile?.role === 'Site Manager';
 
   // Tasks Query
   const tasksQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
     const colRef = collection(firestore, 'tasks');
     
+    // Admins see all tasks regardless of assignment
     if (isAdmin) return colRef;
     
     // For Managers & Engineers, we use OR query to see tasks assigned TO or BY them
@@ -149,6 +151,7 @@ export default function TaskListPage() {
 
   const stats = React.useMemo(() => {
     if (!tasks) return { todo: 0, inProgress: 0, completed: 0 };
+    // For stats bar, we only count tasks assigned to the user
     const myTasks = tasks.filter(t => t.assignedToId === user?.uid);
     return {
       todo: myTasks.filter(t => t.status === 'To-do').length,
@@ -216,7 +219,7 @@ export default function TaskListPage() {
 
     try {
         deleteDocumentNonBlocking(doc(firestore, 'tasks', deletingTask.id));
-        toast({ title: "Deleted", description: "Task record removed. Note: Assignment points are not automatically reversed." });
+        toast({ title: "Deleted", description: "Task record removed." });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to complete deletion.' });
     } finally {
@@ -235,7 +238,7 @@ export default function TaskListPage() {
           </h1>
           <p className="text-muted-foreground">Monitor and update site activity assignments.</p>
         </div>
-        <Button onClick={() => window.location.href = '/tasks/create'} className="rounded-sm font-bold">
+        <Button onClick={() => router.push('/tasks/create')} className="rounded-sm font-bold">
           Assign New Task
         </Button>
       </div>
@@ -243,32 +246,32 @@ export default function TaskListPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-slate-500/5 border-slate-500/10 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Pending Tasks</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Personal Pending</CardTitle>
             <Clock className="h-4 w-4 text-slate-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.todo}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">Awaiting start</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Assigned to you</p>
           </CardContent>
         </Card>
         <Card className="bg-blue-500/5 border-blue-500/10 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Ongoing</CardTitle>
-            <Loader2 className="h-4 w-4 text-blue-500 animate-spin-slow" />
+            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">In Progress</CardTitle>
+            <Loader2 className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-700">{stats.inProgress}</div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium">Currently in progress</p>
+            <p className="text-[10px] text-muted-foreground mt-1 font-medium">Assigned to you</p>
           </CardContent>
         </Card>
         <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Finished</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Personal Finished</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-700">{stats.completed}</div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium">Tasks completed</p>
+            <p className="text-[10px] text-muted-foreground mt-1 font-medium">Assigned to you</p>
           </CardContent>
         </Card>
       </div>
@@ -277,9 +280,9 @@ export default function TaskListPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
             <TabsList className="grid w-full grid-cols-3 md:w-[400px] rounded-sm bg-muted/50">
-              <TabsTrigger value="my-tasks" className="rounded-sm text-xs font-bold uppercase tracking-tight">My Tasks</TabsTrigger>
+              <TabsTrigger value="all" className="rounded-sm text-xs font-bold uppercase tracking-tight">All {isAdmin ? 'Records' : 'Accessible'}</TabsTrigger>
+              <TabsTrigger value="my-tasks" className="rounded-sm text-xs font-bold uppercase tracking-tight">Assigned To Me</TabsTrigger>
               <TabsTrigger value="assigned-by-me" className="rounded-sm text-xs font-bold uppercase tracking-tight">Assigned By Me</TabsTrigger>
-              <TabsTrigger value="all" className="rounded-sm text-xs font-bold uppercase tracking-tight">All Records</TabsTrigger>
             </TabsList>
           </Tabs>
 
