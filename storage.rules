@@ -7,37 +7,23 @@ service firebase.storage {
       return request.auth != null;
     }
     
-    // Helper function to check if user is an Admin or Super Admin
+    // Direct email-based admin check for reliability in Storage rules
     function isAdmin() {
-      let superAdminEmails = [
-        'khalil@adityagreenenergy.com',
-        'prafulrana143@gmail.com'
-      ];
-      // Using email check as primary and firestore check as secondary
       return isSignedIn() && (
-        request.auth.token.email in superAdminEmails || 
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'Admin'
+        request.auth.token.email == 'khalil@adityagreenenergy.com' || 
+        request.auth.token.email == 'prafulrana143@gmail.com'
       );
     }
 
     // Rules for Site Documents (Shared project folders)
-    // Using recursive wildcard {allPaths=**} to support subfolders and nested files
     match /site_documents/{allPaths=**} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
       allow delete: if isAdmin();
     }
 
-    // Rules for user-specific uploads (PtW, Movements, etc.)
-    // Explicit userId matching for primary security
-    match /uploads/{userId}/{allPaths=**} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow delete: if isAdmin();
-    }
-    
-    // Catch-all for any missed upload paths to prevent "unauthorized" errors during submission
-    // This ensures that even if a path segment is structured differently, authenticated users can still upload
+    // Rules for user-specific and temporary uploads
+    // Simplifed to allow all authenticated users to write to the uploads directory
     match /uploads/{allPaths=**} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
