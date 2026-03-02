@@ -24,15 +24,21 @@ export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [showPassword, setShowPassword] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const auth = useAuth()
   const { user } = useUser()
 
+  // Set mounted state to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // Redirect if already logged in
   useEffect(() => {
-    if (user) {
+    if (mounted && user) {
       router.replace('/dashboard')
     }
-  }, [user, router])
+  }, [user, router, mounted])
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -46,7 +52,6 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
     } catch (error: any) {
-      // Standardized error message as requested for all auth failures
       toast({
         variant: "destructive",
         title: "Login Failed",
@@ -55,7 +60,8 @@ export default function LoginPage() {
     }
   }
 
-  if (user) return null;
+  // Prevent rendering until client mount and auth check
+  if (!mounted || user) return null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">

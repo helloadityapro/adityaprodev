@@ -37,6 +37,12 @@ export default function RegisterPage() {
   const { toast } = useToast()
   const { user } = useUser()
   const [isSuccess, setIsSuccess] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  // Set mounted state to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Fetch profile to check if redirection is safe
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -44,10 +50,10 @@ export default function RegisterPage() {
 
   // Redirect only if fully registered and authorized
   useEffect(() => {
-    if (user && userProfile && !isProfileLoading && !userProfile.registrationRequest) {
+    if (mounted && user && userProfile && !isProfileLoading && !userProfile.registrationRequest) {
       router.replace('/dashboard')
     }
-  }, [user, userProfile, isProfileLoading, router])
+  }, [user, userProfile, isProfileLoading, router, mounted])
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -65,7 +71,6 @@ export default function RegisterPage() {
     try {
       let uid = user?.uid;
 
-      // If user isn't logged in, create the account
       if (!uid) {
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password)
         uid = userCredential.user.uid;
@@ -82,7 +87,6 @@ export default function RegisterPage() {
         createdAt: serverTimestamp(),
       }
 
-      // Initialize the professional profile
       setDocumentNonBlocking(doc(firestore, "users", uid), userDoc, { merge: true })
 
       setIsSuccess(true);
@@ -107,7 +111,8 @@ export default function RegisterPage() {
     }
   }
 
-  // If successfully submitted, show confirmation instead of form
+  if (!mounted) return null;
+
   if (isSuccess) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">

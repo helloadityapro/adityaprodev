@@ -1,9 +1,8 @@
-
 'use client'
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -26,13 +25,19 @@ export default function ForgotPasswordPage() {
   const { toast } = useToast()
   const auth = useAuth()
   const { user } = useUser()
+  const [mounted, setMounted] = useState(false)
+
+  // Set mounted state to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) {
+    if (mounted && user) {
       router.replace('/dashboard')
     }
-  }, [user, router])
+  }, [user, router, mounted])
 
   const form = useForm<z.infer<typeof forgotPasswordSchema>>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -51,7 +56,6 @@ export default function ForgotPasswordPage() {
       })
       form.reset()
     } catch (error: any) {
-        // Even on error, show a generic success message to prevent email enumeration
         toast({
             title: "Check your email",
             description: "If an account with this email exists, a password reset link has been sent.",
@@ -60,7 +64,7 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  if (user) return null;
+  if (!mounted || user) return null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
