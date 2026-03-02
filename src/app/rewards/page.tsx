@@ -133,7 +133,8 @@ export default function RewardsPage() {
                   <TableHead className="w-16 text-center">Rank</TableHead>
                   <TableHead>Personnel</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead className="text-right px-6">Total Points</TableHead>
+                  <TableHead className="text-right px-2">Total Points</TableHead>
+                  <TableHead className="text-right px-6">Earned Reward</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -161,8 +162,11 @@ export default function RewardsPage() {
                             {leader.role}
                         </Badge>
                     </TableCell>
-                    <TableCell className="text-right px-6 font-mono text-primary">
+                    <TableCell className="text-right px-2 font-mono text-primary">
                         {(leader.totalPoints || 0).toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right px-6 font-bold text-green-700">
+                        ₹{((leader.totalPoints || 0) * pointValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </TableCell>
                   </TableRow>
                 ))}
