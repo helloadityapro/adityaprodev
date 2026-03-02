@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -18,6 +17,7 @@ import { collection, doc, serverTimestamp } from 'firebase/firestore';
 import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, Hash, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { isSuperAdmin } from '@/lib/auth-constants';
 
