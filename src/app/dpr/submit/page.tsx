@@ -10,15 +10,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, getDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Check, ChevronsUpDown, Loader2, FilePlus, Calendar, Plus, Trash2 } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, FilePlus, Calendar, Plus, Trash2, MessageCircle, CheckCircle2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { useRouter } from "next/navigation";
 
 const dprSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -42,6 +43,7 @@ export default function SubmitDPRPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc(userProfileRef);
@@ -67,6 +69,8 @@ export default function SubmitDPRPage() {
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSubmitted, setIsSubmitted] = React.useState(false);
+  const [submittedDpr, setSubmittedDpr] = React.useState<{ siteName: string, date: string, description: string } | null>(null);
 
   const form = useForm<z.infer<typeof dprSchema>>({
     resolver: zodResolver(dprSchema),
@@ -116,6 +120,12 @@ export default function SubmitDPRPage() {
         });
       }
       
+      setSubmittedDpr({
+        siteName: values.siteName,
+        date: values.reportDate,
+        description: combinedDescription
+      });
+      setIsSubmitted(true);
       toast({ title: "Success", description: "DPR submitted successfully. Points updated." });
       form.reset({ siteName: "", reportDate: format(new Date(), 'yyyy-MM-dd'), updates: [{ value: "" }] });
     } catch (e: any) {
@@ -125,7 +135,54 @@ export default function SubmitDPRPage() {
     }
   };
 
+  const triggerWhatsApp = () => {
+    if (!submittedDpr) return;
+    const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${submittedDpr.siteName}\n*Date:* ${format(new Date(submittedDpr.date), 'dd MMM yyyy')}\n*Submitted By:* ${userProfile?.username || user?.email}\n\n*Activities:*\n${submittedDpr.description}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
+
+  if (isSubmitted && submittedDpr) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-primary/10 p-4 rounded-full">
+                <CheckCircle2 className="h-12 w-12 text-primary" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold">DPR Submitted</CardTitle>
+            <CardDescription className="text-base">
+              The Daily Progress Report for <strong className="text-primary">{submittedDpr.siteName}</strong> has been logged.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm shadow-md" 
+              onClick={triggerWhatsApp}
+            >
+              <MessageCircle className="mr-2 h-5 w-5" />
+              Push to WhatsApp
+            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="h-11 rounded-sm" onClick={() => router.push('/dpr/list')}>
+                View DPR Logs
+              </Button>
+              <Button variant="secondary" className="h-11 rounded-sm" onClick={() => {
+                setIsSubmitted(false);
+                setSubmittedDpr(null);
+              }}>
+                Submit New
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-2xl mx-auto">

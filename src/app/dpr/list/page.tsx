@@ -3,12 +3,12 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp, increment } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp, increment, getDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, Printer, FilterX, FileDown } from "lucide-react";
+import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, Printer, FilterX, FileDown, MessageCircle } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -118,7 +118,8 @@ export default function DPRListPage() {
         const managerId = deletingDpr.siteManagerId;
 
         // Fetch current multiplier for accurate deduction
-        const engDoc = await getDoc(doc(firestore, 'users', engineerId));
+        const engRef = doc(firestore, 'users', engineerId);
+        const engDoc = await getDoc(engRef);
         const multiplier = engDoc.exists() ? engDoc.data()?.pointsMultiplier || 1 : 1;
         
         // Engineer loses 0.1 * multiplier
@@ -154,6 +155,12 @@ export default function DPRListPage() {
     toast({ title: "Updated", description: "Report has been updated successfully." });
     setIsSaving(false);
     setEditingDpr(null);
+  };
+
+  const handleWhatsAppShare = (dpr: DPR) => {
+    const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${dpr.siteName}\n*Date:* ${format(new Date(dpr.reportDate), 'dd MMM yyyy')}\n*Submitted By:* ${dpr.userName}\n\n*Activities:*\n${dpr.description}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
   const clearFilters = () => {
@@ -310,6 +317,9 @@ export default function DPRListPage() {
                     </TableCell>
                     <TableCell className="text-right px-6 no-print">
                         <div className="flex justify-end items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(dpr)} title="Push to WhatsApp">
+                                <MessageCircle className="h-4 w-4" />
+                            </Button>
                             {dpr.userId === user?.uid && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setEditingDpr(dpr)}>
                                     <Pencil className="h-4 w-4" />
