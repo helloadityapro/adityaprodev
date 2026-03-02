@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -8,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin, Truck, Building2, ChevronsUpDown, Check, User } from "lucide-react";
+import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin, Truck, Building2, ChevronsUpDown, Check, User, MessageCircle } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -144,7 +143,6 @@ export default function MovementListPage() {
     if (!deletingMov || !firestore) return;
 
     try {
-        // Reverse Reward Points
         const engDoc = await getDoc(doc(firestore, 'users', deletingMov.userId));
         const multiplier = engDoc.exists() ? engDoc.data()?.pointsMultiplier || 1 : 1;
         
@@ -184,6 +182,13 @@ export default function MovementListPage() {
     toast({ title: "Updated", description: "Movement details updated." });
     setIsSaving(false);
     setEditingMov(null);
+  };
+
+  const handleWhatsAppShare = (mov: MaterialMovement) => {
+    const sourceLabel = mov.movementType === 'Inward' ? 'From' : 'To';
+    const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${mov.siteName}\n*Date:* ${format(new Date(mov.movementDate), 'dd MMM yyyy')}\n*Type:* ${mov.movementType} (${sourceLabel} ${mov.sourceOrDestinationType || 'Vendor'}: ${mov.sourceOrDestination})\n*Item:* ${mov.itemName}\n*Quantity:* ${mov.quantity} ${mov.unit}\n*Recorded By:* ${mov.userName}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
   const handlePrint = () => {
@@ -384,6 +389,9 @@ export default function MovementListPage() {
                     </TableCell>
                     <TableCell className="text-right px-6 no-print">
                         <div className="flex justify-end items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(mov)} title="Push to WhatsApp">
+                                <MessageCircle className="h-4 w-4" />
+                            </Button>
                             {mov.userId === user?.uid && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => setEditingMov(mov)}>
                                     <Pencil className="h-4 w-4" />
@@ -408,7 +416,6 @@ export default function MovementListPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
       <Dialog open={!!editingMov} onOpenChange={(o) => !o && setEditingMov(null)}>
         <DialogContent className="rounded-sm max-w-lg">
             <DialogHeader>
@@ -518,7 +525,6 @@ export default function MovementListPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deletingMov} onOpenChange={(o) => !o && setDeletingMov(null)}>
         <AlertDialogContent className="rounded-sm">
             <AlertDialogHeader>

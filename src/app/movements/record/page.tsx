@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -9,19 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, getDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, MapPin, Building2, Truck } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useRouter } from "next/navigation";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
@@ -52,6 +52,7 @@ export default function RecordMovementPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc(userProfileRef);
@@ -79,6 +80,8 @@ export default function RecordMovementPage() {
   const [isTargetSitePopoverOpen, setIsTargetSitePopoverOpen] = React.useState(false);
   const [targetSiteSearchQuery, setTargetSiteSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSubmitted, setIsSubmitted] = React.useState(false);
+  const [submittedData, setSubmittedData] = React.useState<z.infer<typeof movementSchema> | null>(null);
 
   const form = useForm<z.infer<typeof movementSchema>>({
     resolver: zodResolver(movementSchema),
@@ -121,10 +124,9 @@ export default function RecordMovementPage() {
 
       await Promise.all(promises);
 
-      // Reward Points Logic for Movement
+      // Reward Points Logic
       const rateEngineer = rewardSettings?.movementEngineer ?? 0.1;
       const rateManager = rewardSettings?.movementManager ?? 0.05;
-
       const multiplier = userProfile.pointsMultiplier || 1;
       const engineerPoints = rateEngineer * values.items.length * multiplier;
       
@@ -138,6 +140,8 @@ export default function RecordMovementPage() {
         });
       }
       
+      setSubmittedData(values);
+      setIsSubmitted(true);
       toast({ title: "Success", description: `${values.items.length} movement logs recorded. Points updated.` });
       form.reset({ 
         siteName: "", 
@@ -154,9 +158,58 @@ export default function RecordMovementPage() {
     }
   };
 
+  const triggerWhatsApp = () => {
+    if (!submittedData) return;
+    const itemsList = submittedData.items.map(item => `- ${item.itemName}: ${item.quantity} ${item.unit}`).join('\n');
+    const sourceLabel = submittedData.movementType === 'Inward' ? 'From' : 'To';
+    const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${submittedData.siteName}\n*Date:* ${format(new Date(submittedData.movementDate), 'dd MMM yyyy')}\n*Type:* ${submittedData.movementType} (${sourceLabel} ${submittedData.sourceOrDestinationType}: ${submittedData.sourceOrDestination})\n*Submitted By:* ${userProfile?.username || user?.email}\n\n*Items Recorded:*\n${itemsList}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
   const allSitesList = allSites ? Array.from(new Map(allSites.map(s => [s.name, s])).values()) : [];
   const filteredAllSites = allSitesList.filter(s => s.name.toLowerCase().includes(targetSiteSearchQuery.toLowerCase()));
+
+  if (isSubmitted && submittedData) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-primary/10 p-4 rounded-full">
+                <CheckCircle2 className="h-12 w-12 text-primary" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold">Movement Recorded</CardTitle>
+            <CardDescription className="text-base">
+              {submittedData.items.length} item(s) logged for <strong className="text-primary">{submittedData.siteName}</strong>.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm shadow-md" 
+              onClick={triggerWhatsApp}
+            >
+              <MessageCircle className="mr-2 h-5 w-5" />
+              Push to WhatsApp
+            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="h-11 rounded-sm" onClick={() => router.push('/movements/list')}>
+                View Log Data
+              </Button>
+              <Button variant="secondary" className="h-11 rounded-sm" onClick={() => {
+                setIsSubmitted(false);
+                setSubmittedData(null);
+              }}>
+                Record New
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
