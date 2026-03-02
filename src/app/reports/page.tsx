@@ -5,7 +5,6 @@ import * as React from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, query, where, or, doc, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   BarChart, 
@@ -26,20 +25,27 @@ import {
   ClipboardList, 
   ArrowLeftRight, 
   CheckSquare, 
-  Users, 
   ShieldCheck, 
-  MapPin, 
   TrendingUp, 
   Calendar,
-  Filter
+  Filter,
+  Search,
+  Check,
+  ChevronsUpDown,
+  MapPin
 } from 'lucide-react';
-import { format, subDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
 type DataItem = {
   id: string;
+  siteName: string;
   createdAt?: any;
   requestDate?: any;
   movementDate?: string;
@@ -59,6 +65,12 @@ type UserProfile = {
   username: string;
   role: string;
   siteManagerId?: string;
+  assignedProjectIds?: string[];
+};
+
+type Site = {
+  id: string;
+  name: string;
 };
 
 export default function ReportsDashboard() {
@@ -70,6 +82,23 @@ export default function ReportsDashboard() {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
+
+  const [selectedSite, setSelectedSite] = React.useState<string>("All Sites");
+  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
+  const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
+
+  // Sites query for filtering
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: allSitesList } = useCollection<Site>(sitesQuery);
+
+  const accessibleSites = React.useMemo(() => {
+    if (!allSitesList || !userProfile) return [];
+    if (isAdmin) return Array.from(new Map(allSitesList.map(s => [s.name, s])).values());
+    const assignedIds = userProfile.assignedProjectIds || [];
+    return allSitesList.filter(s => assignedIds.includes(s.id));
+  }, [allSitesList, userProfile, isAdmin]);
+
+  const filteredSiteList = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
   // 1. Permits
   const permitsQuery = useMemoFirebase(() => {
@@ -120,20 +149,23 @@ export default function ReportsDashboard() {
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: tasks, isLoading: tasksLoading } = useCollection<DataItem>(tasksQuery);
 
-  // 6. Users (for Managers to see their team names if needed, or Admin for overview)
-  const usersQuery = useMemoFirebase(() => {
-    if (!isAdmin && !isManager) return null;
-    const colRef = collection(firestore, 'users');
-    if (isAdmin) return colRef;
-    return query(colRef, where('siteManagerId', '==', user?.uid));
-  }, [firestore, isAdmin, isManager, user]);
-  const { data: teamUsers } = useCollection<UserProfile>(usersQuery);
-
   const isLoading = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading;
 
   // Analytical Calculations
   const stats = React.useMemo(() => {
     if (isLoading) return null;
+
+    const applySiteFilter = (list: DataItem[] | null) => {
+      if (!list) return [];
+      if (selectedSite === "All Sites") return list;
+      return list.filter(item => item.siteName === selectedSite);
+    };
+
+    const fPermits = applySiteFilter(permits);
+    const fDprs = applySiteFilter(dprs);
+    const fMovements = applySiteFilter(movements);
+    const fRequirements = applySiteFilter(requirements);
+    const fTasks = applySiteFilter(tasks);
 
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = subDays(new Date(), i);
@@ -147,7 +179,6 @@ export default function ReportsDashboard() {
       };
     }).reverse();
 
-    // Fill last 7 days data
     const processItemDate = (item: DataItem, dateField: string) => {
       let d: Date | null = null;
       const val = (item as any)[dateField];
@@ -161,40 +192,39 @@ export default function ReportsDashboard() {
       return -1;
     };
 
-    permits?.forEach(p => {
+    fPermits.forEach(p => {
       const idx = processItemDate(p, 'requestDate');
       if (idx !== -1) last7Days[idx].permits++;
     });
-    dprs?.forEach(d => {
+    fDprs.forEach(d => {
       const idx = processItemDate(d, 'reportDate');
       if (idx !== -1) last7Days[idx].dprs++;
     });
-    movements?.forEach(m => {
+    fMovements.forEach(m => {
       const idx = processItemDate(m, 'movementDate');
       if (idx !== -1) last7Days[idx].movements++;
     });
-    requirements?.forEach(r => {
-      const idx = processItemDate(r, 'createdAt'); // Fallback if no specific date
+    fRequirements.forEach(r => {
+      const idx = processItemDate(r, 'createdAt');
       if (idx !== -1) last7Days[idx].requirements++;
     });
 
-    // Status distributions
     const permitStatus = [
-      { name: 'Approved', value: permits?.filter(p => p.status === 'Approved').length || 0, color: '#22c55e' },
-      { name: 'Pending', value: permits?.filter(p => p.status === 'Pending' || p.status === 'ManagerApproved').length || 0, color: '#eab308' },
-      { name: 'Rejected', value: permits?.filter(p => p.status === 'Rejected').length || 0, color: '#ef4444' },
+      { name: 'Approved', value: fPermits.filter(p => p.status === 'Approved').length, color: '#22c55e' },
+      { name: 'Pending', value: fPermits.filter(p => p.status === 'Pending' || p.status === 'ManagerApproved').length, color: '#eab308' },
+      { name: 'Rejected', value: fPermits.filter(p => p.status === 'Rejected').length, color: '#ef4444' },
     ];
 
     const taskStatus = [
-      { name: 'Completed', value: tasks?.filter(t => t.status === 'Completed').length || 0, color: '#22c55e' },
-      { name: 'Ongoing', value: tasks?.filter(t => t.status === 'In Progress' || t.status === 'To-do').length || 0, color: '#3b82f6' },
-      { name: 'Cancelled', value: tasks?.filter(t => t.status === 'Cancelled').length || 0, color: '#94a3b8' },
+      { name: 'Completed', value: fTasks.filter(t => t.status === 'Completed').length, color: '#22c55e' },
+      { name: 'Ongoing', value: fTasks.filter(t => t.status === 'In Progress' || t.status === 'To-do').length, color: '#3b82f6' },
+      { name: 'Cancelled', value: fTasks.filter(t => t.status === 'Cancelled').length, color: '#94a3b8' },
     ];
 
     const requirementUrgency = [
-      { name: 'High', value: requirements?.filter(r => (r as any).urgency === 'High').length || 0, color: '#ef4444' },
-      { name: 'Medium', value: requirements?.filter(r => (r as any).urgency === 'Medium').length || 0, color: '#eab308' },
-      { name: 'Low', value: requirements?.filter(r => (r as any).urgency === 'Low').length || 0, color: '#3b82f6' },
+      { name: 'High', value: fRequirements.filter(r => (r as any).urgency === 'High').length, color: '#ef4444' },
+      { name: 'Medium', value: fRequirements.filter(r => (r as any).urgency === 'Medium').length, color: '#eab308' },
+      { name: 'Low', value: fRequirements.filter(r => (r as any).urgency === 'Low').length, color: '#3b82f6' },
     ];
 
     return {
@@ -203,15 +233,14 @@ export default function ReportsDashboard() {
       taskDistribution: taskStatus,
       requirementDistribution: requirementUrgency,
       counts: {
-        permits: permits?.length || 0,
-        dprs: dprs?.length || 0,
-        movements: movements?.length || 0,
-        requirements: requirements?.length || 0,
-        tasks: tasks?.length || 0,
-        teamSize: teamUsers?.length || 0
+        permits: fPermits.length,
+        dprs: fDprs.length,
+        movements: fMovements.length,
+        requirements: fRequirements.length,
+        tasks: fTasks.length,
       }
     };
-  }, [isLoading, permits, dprs, movements, requirements, tasks, teamUsers]);
+  }, [isLoading, permits, dprs, movements, requirements, tasks, selectedSite]);
 
   if (isLoading) {
     return (
@@ -242,67 +271,104 @@ export default function ReportsDashboard() {
             <h1 className="text-3xl font-black tracking-tight uppercase">Operational Reports</h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">
-            {isAdmin ? "Global overview of all site documentation and personnel activity." : 
-             isManager ? `Reporting summary for you and your team of ${stats.counts.teamSize} engineers.` : 
-             "Summary of your personal site submissions and task performance."}
+            Operational summaries and performance data analytics.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-8">
             <Calendar className="mr-1.5 h-3 w-3" /> Last 7 Days
           </Badge>
-          <Badge variant="outline" className="rounded-sm font-bold border-primary/20 text-primary px-3 h-8">
-            <Filter className="mr-1.5 h-3 w-3" /> Filters Active
-          </Badge>
+          
+          <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="rounded-sm font-bold border-primary/20 text-primary h-8 px-3">
+                <Filter className="mr-1.5 h-3 w-3" />
+                {selectedSite}
+                <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[250px] p-0" align="end">
+              <div className="flex items-center border-b px-3">
+                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                <Input 
+                  placeholder="Filter site..." 
+                  className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" 
+                  value={siteSearchQuery}
+                  onChange={(e) => setSiteSearchQuery(e.target.value)}
+                />
+              </div>
+              <ScrollArea className="h-[200px]">
+                <div className="p-1">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start font-bold text-xs rounded-sm h-8"
+                    onClick={() => { setSelectedSite("All Sites"); setIsSitePopoverOpen(false); }}
+                  >
+                    <Check className={cn("mr-2 h-3 w-3", selectedSite === "All Sites" ? "opacity-100" : "opacity-0")} />
+                    All Sites
+                  </Button>
+                  {filteredSiteList.map(site => (
+                    <Button
+                      key={site.id}
+                      variant="ghost"
+                      className="w-full justify-start font-medium text-xs rounded-sm h-8"
+                      onClick={() => { setSelectedSite(site.name); setIsSitePopoverOpen(false); }}
+                    >
+                      <Check className={cn("mr-2 h-3 w-3", selectedSite === site.name ? "opacity-100" : "opacity-0")} />
+                      <span className="truncate">{site.name}</span>
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
-      {/* Summary Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <SummaryCard 
-          title="Permits to Work" 
+          title="Permits" 
           value={stats.counts.permits} 
           icon={ShieldCheck} 
-          description="Safety compliance logs"
+          description="Compliance logs"
           color="blue"
         />
         <SummaryCard 
-          title="Daily Reports" 
+          title="Reports" 
           value={stats.counts.dprs} 
           icon={FileText} 
-          description="Site activity updates"
+          description="Activity updates"
           color="amber"
         />
         <SummaryCard 
           title="Material Logs" 
           value={stats.counts.movements} 
           icon={ArrowLeftRight} 
-          description="Inward/Outward movements"
+          description="Stock movements"
           color="emerald"
         />
         <SummaryCard 
-          title="Site Requirements" 
+          title="Requirements" 
           value={stats.counts.requirements} 
           icon={ClipboardList} 
-          description="Resource requests"
+          description="Site requests"
           color="purple"
         />
         <SummaryCard 
-          title="Active Tasks" 
+          title="Tasks" 
           value={stats.counts.tasks} 
           icon={CheckSquare} 
-          description="Delegated work items"
+          description="Work items"
           color="slate"
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Daily Activity Chart */}
         <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-bold uppercase tracking-widest">Team Activity Volume</CardTitle>
+              <CardTitle className="text-sm font-bold uppercase tracking-widest">Document Activity Trend</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="pt-8">
@@ -335,7 +401,6 @@ export default function ReportsDashboard() {
           </CardContent>
         </Card>
 
-        {/* Distribution Card */}
         <Card className="rounded-sm border-primary/10 shadow-md flex flex-col">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center gap-2">
@@ -376,7 +441,6 @@ export default function ReportsDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Task Priority Distribution */}
         <Card className="rounded-sm border-primary/10 shadow-md">
           <CardHeader className="bg-muted/5 border-b py-4">
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
@@ -406,7 +470,6 @@ export default function ReportsDashboard() {
           </CardContent>
         </Card>
 
-        {/* Requirements Status */}
         <Card className="rounded-sm border-primary/10 shadow-md">
           <CardHeader className="bg-muted/5 border-b py-4">
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
