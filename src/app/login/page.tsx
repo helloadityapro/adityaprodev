@@ -1,3 +1,4 @@
+
 'use client'
 
 import Link from "next/link"
@@ -33,7 +34,7 @@ export default function LoginPage() {
     setMounted(true)
   }, [])
 
-  // Redirect if already logged in
+  // Redirect if already logged in and has profile (Profile check handled by shell)
   useEffect(() => {
     if (mounted && user) {
       router.replace('/dashboard')
@@ -52,10 +53,22 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
     } catch (error: any) {
+      console.error("Login Error:", error.code);
+      
+      let errorMessage = "Invalid email or password. Please try again.";
+      
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        errorMessage = "Account not found or invalid credentials. If you haven't registered, please click 'Register Here' below.";
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = "Incorrect password. Please try again or reset your password.";
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = "Too many failed attempts. Your account has been temporarily locked. Please reset your password or try again later.";
+      }
+
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: "User doesn't exist, please register to login",
+        description: errorMessage,
       });
     }
   }

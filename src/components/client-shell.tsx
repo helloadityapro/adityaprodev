@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -78,7 +79,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
 
-  // Redirection Logic handles in Effect to avoid bad setState during render
+  // Redirection Logic
   React.useEffect(() => {
     if (!isUserLoading && !user && !isAuthPage) {
       router.replace('/login');
@@ -204,16 +205,17 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <div className="bg-destructive/10 p-6 rounded-full mb-6">
           <UserX className="h-16 w-16 text-destructive opacity-80" />
         </div>
-        <h1 className="mb-2 text-3xl font-black uppercase tracking-tight text-destructive">User doesn't exist</h1>
+        <h1 className="mb-2 text-3xl font-black uppercase tracking-tight text-destructive">Profile Not Found</h1>
         <p className="mb-8 max-w-md text-muted-foreground text-lg leading-relaxed">
-          Please register to login. Your professional profile could not be found in the database.
+          Your account is authenticated, but your professional profile could not be found in the database. 
+          This happens if your data was cleared or registration was not completed.
         </p>
         <div className="flex flex-col gap-3 w-full max-w-xs">
           <Button onClick={() => router.push('/register')} className="w-full font-black h-12 text-lg shadow-md rounded-sm">
             <RefreshCw className="mr-2 h-5 w-5" /> Restore Profile
           </Button>
           <Button variant="ghost" onClick={() => auth.signOut()} className="w-full flex items-center justify-center gap-2 font-semibold">
-            <LogOut className="h-4 w-4" /> Sign Out
+            <LogOut className="h-4 w-4" /> Sign Out & Re-login
           </Button>
         </div>
       </div>
