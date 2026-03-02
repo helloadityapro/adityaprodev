@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -25,6 +26,7 @@ import {
   BarChart3,
   BookOpen,
   Coins,
+  Truck,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -236,6 +238,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <Link href="/settings/rewards">
                   <Coins className="h-4 w-4 text-amber-600" />
                   <span className="font-medium">Rewards Setup</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Suppliers" isActive={pathname.startsWith('/settings/suppliers')} className="rounded-sm">
+                <Link href="/settings/suppliers">
+                  <Truck className="h-4 w-4" />
+                  <span className="font-medium">Suppliers</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

@@ -34,6 +34,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /suppliers/{supplierId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /system_settings/{settingId} {
       allow read: if isSignedIn();
       // Allow any signed in user to update counters for serial number generation

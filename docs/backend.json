@@ -21,6 +21,21 @@
       },
       "required": ["id", "username", "email", "mobile", "role"]
     },
+    "Supplier": {
+      "title": "Supplier",
+      "type": "object",
+      "description": "Information about material suppliers.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "gstin": { "type": "string" },
+        "address": { "type": "string" },
+        "mobile": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "gstin", "mobile"]
+    },
     "SystemSettings": {
       "title": "System Settings",
       "type": "object",
@@ -157,6 +172,10 @@
       {
         "path": "/users/{userId}",
         "definition": { "entityName": "User" }
+      },
+      {
+        "path": "/suppliers/{supplierId}",
+        "definition": { "entityName": "Supplier" }
       },
       {
         "path": "/system_settings/{settingId}",
