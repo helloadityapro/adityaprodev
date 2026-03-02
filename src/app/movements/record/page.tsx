@@ -530,7 +530,7 @@ export default function RecordMovementPage() {
                   {selectedSite ? (
                     <div className="p-4 bg-primary/5 rounded-sm border border-primary/10 text-xs animate-in fade-in duration-300 h-full">
                       <p className="font-bold text-primary uppercase tracking-widest text-[9px] mb-3 flex items-center gap-1.5">
-                        <MapPin className="h-3 w-3" /> {movementType === 'Inward' ? 'MOVEMENT TO (Current Site)' : 'MOVEMENT FROM (Current Site)'}
+                        <MapPin className="h-3 w-3" /> {movementType === 'Inward' ? 'MOVEMENT TO' : 'MOVEMENT FROM'}
                       </p>
                       <div className="grid grid-cols-2 gap-y-3 gap-x-2">
                         <div>
@@ -564,14 +564,14 @@ export default function RecordMovementPage() {
                     <div className="p-4 bg-amber-500/5 rounded-sm border border-amber-500/10 text-xs animate-in fade-in duration-300 h-full">
                       <p className="font-bold text-amber-700 uppercase tracking-widest text-[9px] mb-3 flex items-center gap-1.5">
                         {sourceOrDestinationType === 'Supplier' ? <Truck className="h-3 w-3" /> : <Building2 className="h-3 w-3" />}
-                        {movementType === 'Inward' ? `MOVEMENT FROM (${sourceOrDestinationType})` : `MOVEMENT TO (${sourceOrDestinationType})`}
+                        {movementType === 'Inward' ? 'MOVEMENT FROM' : 'MOVEMENT TO'}
                       </p>
                       {sourceOrDestinationType === 'Supplier' ? (
                         <div className="space-y-3">
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">GSTIN</p>
-                              <p className="font-mono font-bold flex items-center gap-1"><Hash className="h-2.5 w-2.5" /> {(selectedTarget as Supplier).gstin}</p>
+                              <p className="font-mono font-bold flex items-center gap-1 uppercase"><Hash className="h-2.5 w-2.5" /> {(selectedTarget as Supplier).gstin}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Mobile</p>
