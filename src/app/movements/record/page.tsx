@@ -530,7 +530,7 @@ export default function RecordMovementPage() {
                   {selectedSite ? (
                     <div className="p-4 bg-primary/5 rounded-sm border border-primary/10 text-xs animate-in fade-in duration-300 h-full">
                       <p className="font-bold text-primary uppercase tracking-widest text-[9px] mb-3 flex items-center gap-1.5">
-                        <MapPin className="h-3 w-3" /> Selected Site Details
+                        <MapPin className="h-3 w-3" /> {movementType === 'Inward' ? 'MOVEMENT TO (Current Site)' : 'MOVEMENT FROM (Current Site)'}
                       </p>
                       <div className="grid grid-cols-2 gap-y-3 gap-x-2">
                         <div>
@@ -564,7 +564,7 @@ export default function RecordMovementPage() {
                     <div className="p-4 bg-amber-500/5 rounded-sm border border-amber-500/10 text-xs animate-in fade-in duration-300 h-full">
                       <p className="font-bold text-amber-700 uppercase tracking-widest text-[9px] mb-3 flex items-center gap-1.5">
                         {sourceOrDestinationType === 'Supplier' ? <Truck className="h-3 w-3" /> : <Building2 className="h-3 w-3" />}
-                        {sourceOrDestinationType} Information
+                        {movementType === 'Inward' ? `MOVEMENT FROM (${sourceOrDestinationType})` : `MOVEMENT TO (${sourceOrDestinationType})`}
                       </p>
                       {sourceOrDestinationType === 'Supplier' ? (
                         <div className="space-y-3">
