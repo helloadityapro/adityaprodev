@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin, Truck, Building2, ChevronsUpDown, Check, User, MessageCircle } from "lucide-react";
+import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin, Truck, Building2, ChevronsUpDown, Check, User, MessageCircle, FileText, ExternalLink } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+type Attachment = {
+  url: string;
+  name: string;
+  contentType: string;
+};
+
 type MaterialMovement = {
   id: string;
   siteName: string;
@@ -55,6 +61,7 @@ type MaterialMovement = {
   createdAt: any;
   editedBy?: string;
   editedAt?: any;
+  attachments?: Attachment[];
 };
 
 type Site = {
@@ -71,6 +78,7 @@ export default function MovementListPage() {
   const [endDate, setEndDate] = React.useState("");
   const [editingMov, setEditingMov] = React.useState<MaterialMovement | null>(null);
   const [deletingMov, setDeletingMov] = React.useState<MaterialMovement | null>(null);
+  const [viewAttachments, setViewAttachments] = React.useState<Attachment[] | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
 
   const [isEditSitePopoverOpen, setIsEditSitePopoverOpen] = React.useState(false);
@@ -389,6 +397,17 @@ export default function MovementListPage() {
                     </TableCell>
                     <TableCell className="text-right px-6 no-print">
                         <div className="flex justify-end items-center gap-1">
+                            {mov.attachments && mov.attachments.length > 0 && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-primary" 
+                                onClick={() => setViewAttachments(mov.attachments || null)} 
+                                title="View Invoices"
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(mov)} title="Push to WhatsApp">
                                 <MessageCircle className="h-4 w-4" />
                             </Button>
@@ -415,6 +434,39 @@ export default function MovementListPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* View Attachments Dialog */}
+      <Dialog open={!!viewAttachments} onOpenChange={(o) => !o && setViewAttachments(null)}>
+        <DialogContent className="rounded-sm max-w-md">
+          <DialogHeader>
+            <DialogTitle>Attached Invoices / Documents</DialogTitle>
+            <DialogDescription>Review uploaded files for this movement record.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            {viewAttachments?.map((att, idx) => (
+              <div key={idx} className="flex items-center justify-between p-3 border rounded-sm bg-muted/5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-background rounded-sm border">
+                    {att.contentType.includes('pdf') ? <FileText className="h-4 w-4 text-red-500" /> : <FileText className="h-4 w-4 text-blue-500" />}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold truncate max-w-[200px]">{att.name}</span>
+                    <span className="text-[9px] uppercase text-muted-foreground font-black tracking-tighter">{att.contentType.split('/')[1]}</span>
+                  </div>
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                  <a href={att.url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </Button>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewAttachments(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editingMov} onOpenChange={(o) => !o && setEditingMov(null)}>
         <DialogContent className="rounded-sm max-w-lg">

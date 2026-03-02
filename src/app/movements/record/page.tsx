@@ -7,14 +7,15 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
 import { collection, doc, serverTimestamp, increment } from "firebase/firestore";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, MessageCircle } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, MessageCircle, FileUp, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
@@ -43,6 +44,16 @@ type Site = {
   name: string;
 };
 
+type UserProfile = {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  mobile?: string;
+  siteManagerId?: string;
+  pointsMultiplier?: number;
+};
+
 type RewardSettings = {
   movementEngineer?: number;
   movementManager?: number;
@@ -50,12 +61,13 @@ type RewardSettings = {
 
 export default function RecordMovementPage() {
   const firestore = useFirestore();
+  const firebaseApp = useFirebaseApp();
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc(userProfileRef);
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
@@ -81,7 +93,10 @@ export default function RecordMovementPage() {
   const [targetSiteSearchQuery, setTargetSiteSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
-  const [submittedData, setSubmittedData] = React.useState<z.infer<typeof movementSchema> | null>(null);
+  const [submittedData, setSubmittedData] = React.useState<z.infer<typeof movementSchema> & { attachments?: any[] } | null>(null);
+  
+  // File upload state
+  const [invoiceFiles, setInvoiceFiles] = React.useState<File[]>([]);
 
   const form = useForm<z.infer<typeof movementSchema>>({
     resolver: zodResolver(movementSchema),
@@ -103,10 +118,51 @@ export default function RecordMovementPage() {
   const movementType = form.watch("movementType");
   const sourceOrDestinationType = form.watch("sourceOrDestinationType");
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setInvoiceFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setInvoiceFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadFiles = async (userId: string): Promise<any[]> => {
+    const storage = getStorage(firebaseApp);
+    const results: any[] = [];
+    const timestamp = Date.now();
+
+    for (const file of invoiceFiles) {
+      const storagePath = `uploads/${userId}/movements/${timestamp}-${file.name}`;
+      const storageRef = ref(storage, storagePath);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      const downloadUrl = await new Promise<string>((resolve, reject) => {
+        uploadTask.on('state_changed', null, reject, async () => {
+          const url = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(url);
+        });
+      });
+
+      results.push({
+        url: downloadUrl,
+        name: file.name,
+        contentType: file.type,
+        timestamp: new Date().toISOString()
+      });
+    }
+    return results;
+  };
+
   const onSubmit = async (values: z.infer<typeof movementSchema>) => {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
     try {
+      // 1. Upload files if any
+      const attachments = await uploadFiles(user.uid);
+
+      // 2. Create records
       const promises = values.items.map(item => {
         return addDocumentNonBlocking(collection(firestore, 'material_movements'), {
           siteName: values.siteName,
@@ -115,6 +171,7 @@ export default function RecordMovementPage() {
           sourceOrDestination: values.sourceOrDestination,
           movementDate: values.movementDate,
           ...item,
+          attachments,
           userId: user.uid,
           userName: userProfile?.username || user.email,
           siteManagerId: userProfile?.siteManagerId || null,
@@ -140,7 +197,7 @@ export default function RecordMovementPage() {
         });
       }
       
-      setSubmittedData(values);
+      setSubmittedData({ ...values, attachments });
       setIsSubmitted(true);
       toast({ title: "Success", description: `${values.items.length} movement logs recorded. Points updated.` });
       form.reset({ 
@@ -151,6 +208,7 @@ export default function RecordMovementPage() {
         movementDate: format(new Date(), 'yyyy-MM-dd'),
         items: [{ itemName: "", quantity: 0, unit: "Numbers" }] 
       });
+      setInvoiceFiles([]);
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
@@ -162,7 +220,7 @@ export default function RecordMovementPage() {
     if (!submittedData) return;
     const itemsList = submittedData.items.map(item => `- ${item.itemName}: ${item.quantity} ${item.unit}`).join('\n');
     const sourceLabel = submittedData.movementType === 'Inward' ? 'From' : 'To';
-    const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${submittedData.siteName}\n*Date:* ${format(new Date(submittedData.movementDate), 'dd MMM yyyy')}\n*Type:* ${submittedData.movementType} (${sourceLabel} ${submittedData.sourceOrDestinationType}: ${submittedData.sourceOrDestination})\n*Submitted By:* ${userProfile?.username || user?.email}\n\n*Items Recorded:*\n${itemsList}`;
+    const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${submittedData.siteName}\n*Date:* ${format(new Date(submittedData.movementDate), 'dd MMM yyyy')}\n*Type:* ${submittedData.movementType} (${sourceLabel} ${submittedData.sourceOrDestinationType}: ${submittedData.sourceOrDestination})\n*Submitted By:* ${userProfile?.username || user?.email}\n\n*Items Recorded:*\n${itemsList}${submittedData.attachments?.length ? `\n\n_Note: Invoices/Photos uploaded to system._` : ''}`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -201,6 +259,7 @@ export default function RecordMovementPage() {
               <Button variant="secondary" className="h-11 rounded-sm" onClick={() => {
                 setIsSubmitted(false);
                 setSubmittedData(null);
+                form.reset();
               }}>
                 Record New
               </Button>
@@ -223,7 +282,7 @@ export default function RecordMovementPage() {
       <Card className="shadow-md border-primary/10 rounded-sm">
         <CardHeader>
           <CardTitle>Material Movement Form</CardTitle>
-          <CardDescription>Select site and record the movement details.</CardDescription>
+          <CardDescription>Select site and record the movement details. You can also upload invoices.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -390,6 +449,55 @@ export default function RecordMovementPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="flex items-center gap-2 font-bold uppercase text-[10px] tracking-widest text-muted-foreground">
+                  <FileUp className="h-3 w-3" /> Invoice / Delivery Challan
+                </Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="relative">
+                    <Input 
+                      type="file" 
+                      multiple 
+                      accept="image/*,application/pdf"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="invoice-upload"
+                    />
+                    <Button 
+                      asChild 
+                      variant="outline" 
+                      className="w-full border-dashed h-20 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 transition-all"
+                    >
+                      <label htmlFor="invoice-upload" className="cursor-pointer">
+                        <FileUp className="h-6 w-6 text-primary" />
+                        <span className="text-xs font-bold uppercase tracking-tight">Upload or Capture Invoice</span>
+                      </label>
+                    </Button>
+                  </div>
+                  
+                  {invoiceFiles.length > 0 && (
+                    <div className="border rounded-sm bg-muted/5 p-2 overflow-y-auto max-h-20 space-y-1">
+                      {invoiceFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-background p-1.5 rounded-sm border text-[10px]">
+                          <div className="flex items-center gap-2 truncate">
+                            {file.type.includes('pdf') ? <FileText className="h-3 w-3 text-red-500" /> : <CheckCircle2 className="h-3 w-3 text-green-500" />}
+                            <span className="truncate">{file.name}</span>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-5 w-5 text-destructive" 
+                            onClick={() => removeFile(idx)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
