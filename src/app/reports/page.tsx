@@ -91,7 +91,7 @@ export default function ReportsDashboard() {
   const isManager = userProfile?.role === 'Site Manager';
 
   const [selectedSite, setSelectedSite] = React.useState<string>("All Sites");
-  const [timeRange, setTimeRange] = React.useState<number>(7); // 0 for Custom Range
+  const [timeRange, setTimeRange] = React.useState<number>(7); // -1 for Custom Range, 0 for Today
   const [customStartDate, setCustomStartDate] = React.useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
   const [customEndDate, setCustomEndDate] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
@@ -169,7 +169,7 @@ export default function ReportsDashboard() {
     let endDateRange = new Date();
     let effectiveDays: number;
 
-    if (timeRange > 0) {
+    if (timeRange >= 0) {
       startDateRange = startOfDay(subDays(new Date(), timeRange));
       endDateRange = endOfDay(new Date());
       effectiveDays = timeRange + 1;
@@ -321,14 +321,15 @@ export default function ReportsDashboard() {
                 <SelectValue placeholder="Time Range" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="0" className="text-[10px] font-black uppercase">Today</SelectItem>
                 <SelectItem value="7" className="text-[10px] font-black uppercase">Last 7 Days</SelectItem>
                 <SelectItem value="30" className="text-[10px] font-black uppercase">Last 30 Days</SelectItem>
                 <SelectItem value="90" className="text-[10px] font-black uppercase">Last 90 Days</SelectItem>
-                <SelectItem value="0" className="text-[10px] font-black uppercase">Custom Range</SelectItem>
+                <SelectItem value="-1" className="text-[10px] font-black uppercase">Custom Range</SelectItem>
               </SelectContent>
             </Select>
 
-            {timeRange === 0 && (
+            {timeRange === -1 && (
               <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
                 <Input 
                   type="date" 
