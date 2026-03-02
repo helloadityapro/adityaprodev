@@ -220,10 +220,10 @@ export default function RaisePtwPage() {
         : 0;
       const currentSubmissionIndex = maxExistingIndex + 1;
 
-      const uploadFile = (file: File, path: string): Promise<any> => {
+      const uploadFile = (file: File, storagePath: string): Promise<any> => {
         return new Promise((resolve, reject) => {
           const storage = getStorage(firebaseApp);
-          const storageRef = ref(storage, path);
+          const storageRef = ref(storage, storagePath);
           const uploadTask = uploadBytesResumable(storageRef, file);
           uploadTask.on('state_changed', null, reject, () => getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve({ 
             url, 
@@ -244,7 +244,11 @@ export default function RaisePtwPage() {
         return file;
       }));
 
-      const newAttachments = await Promise.all(processedFiles.map(file => uploadFile(file, `uploads/${user.uid}/${timestamp}-${file.name}`)));
+      const newAttachments = await Promise.all(processedFiles.map(file => {
+        // Explicitly including slashes to avoid concatenated path issues seen in unauthorized errors
+        const filePath = `uploads/${user.uid}/${timestamp}-${file.name}`;
+        return uploadFile(file, filePath);
+      }));
       
       // If a Manager or Admin is raising it, skip Level 1 approval
       const isEngineerRole = userProfile.role === 'Site Engineer';
