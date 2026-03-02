@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, MessageCircle, FileUp, FileText, X } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, MessageCircle, FileUp, FileText, X, MapPin, Hash, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
@@ -43,11 +43,18 @@ const movementSchema = z.object({
 type Site = {
   id: string;
   name: string;
+  projectCompany: string;
+  acCapacity: string;
+  dcCapacity: string;
 };
 
 type Supplier = {
   id: string;
   name: string;
+  gstin: string;
+  mobile: string;
+  address: string;
+  email: string;
 };
 
 type UserProfile = {
@@ -130,6 +137,21 @@ export default function RecordMovementPage() {
 
   const movementType = form.watch("movementType");
   const sourceOrDestinationType = form.watch("sourceOrDestinationType");
+  const sourceOrDestinationValue = form.watch("sourceOrDestination");
+  const siteNameValue = form.watch("siteName");
+
+  const selectedSite = React.useMemo(() => {
+    return accessibleSites.find(s => s.name === siteNameValue);
+  }, [accessibleSites, siteNameValue]);
+
+  const selectedTarget = React.useMemo(() => {
+    if (!sourceOrDestinationValue) return null;
+    if (sourceOrDestinationType === 'Site') {
+      return allSites?.find(s => s.name === sourceOrDestinationValue);
+    } else {
+      return allSuppliers?.find(s => s.name === sourceOrDestinationValue);
+    }
+  }, [sourceOrDestinationValue, sourceOrDestinationType, allSites, allSuppliers]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -498,6 +520,97 @@ export default function RecordMovementPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
+                </div>
+              </div>
+
+              {/* Detail Cards Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Current Site Details */}
+                <div className="space-y-2">
+                  {selectedSite ? (
+                    <div className="p-4 bg-primary/5 rounded-sm border border-primary/10 text-xs animate-in fade-in duration-300 h-full">
+                      <p className="font-bold text-primary uppercase tracking-widest text-[9px] mb-3 flex items-center gap-1.5">
+                        <MapPin className="h-3 w-3" /> Selected Site Details
+                      </p>
+                      <div className="grid grid-cols-2 gap-y-3 gap-x-2">
+                        <div>
+                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Company</p>
+                          <p className="font-bold truncate" title={selectedSite.projectCompany}>{selectedSite.projectCompany}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Site ID</p>
+                          <p className="font-mono">{selectedSite.id.slice(0, 8)}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">AC Capacity</p>
+                          <p className="font-bold">{selectedSite.acCapacity}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">DC Capacity</p>
+                          <p className="font-bold">{selectedSite.dcCapacity}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-full border border-dashed rounded-sm flex items-center justify-center p-8 bg-muted/5">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold text-center">Select current site to view details</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Source/Destination Details */}
+                <div className="space-y-2">
+                  {selectedTarget ? (
+                    <div className="p-4 bg-amber-500/5 rounded-sm border border-amber-500/10 text-xs animate-in fade-in duration-300 h-full">
+                      <p className="font-bold text-amber-700 uppercase tracking-widest text-[9px] mb-3 flex items-center gap-1.5">
+                        {sourceOrDestinationType === 'Supplier' ? <Truck className="h-3 w-3" /> : <Building2 className="h-3 w-3" />}
+                        {sourceOrDestinationType} Information
+                      </p>
+                      {sourceOrDestinationType === 'Supplier' ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">GSTIN</p>
+                              <p className="font-mono font-bold flex items-center gap-1"><Hash className="h-2.5 w-2.5" /> {(selectedTarget as Supplier).gstin}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Mobile</p>
+                              <p className="font-bold flex items-center gap-1"><Smartphone className="h-2.5 w-2.5" /> {(selectedTarget as Supplier).mobile}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Address</p>
+                            <p className="font-medium leading-relaxed">{(selectedTarget as Supplier).address}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-y-3 gap-x-2">
+                          <div>
+                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Company</p>
+                            <p className="font-bold truncate">{(selectedTarget as Site).projectCompany}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Site ID</p>
+                            <p className="font-mono">{(selectedTarget as Site).id.slice(0, 8)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">AC Capacity</p>
+                            <p className="font-bold">{(selectedTarget as Site).acCapacity}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">DC Capacity</p>
+                            <p className="font-bold">{(selectedTarget as Site).dcCapacity}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="h-full border border-dashed rounded-sm flex items-center justify-center p-8 bg-muted/5">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold text-center">
+                        Select {sourceOrDestinationType === 'Supplier' ? 'supplier' : 'target site'} to view info
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
