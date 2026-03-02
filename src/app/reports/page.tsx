@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -32,9 +31,10 @@ import {
   Search,
   Check,
   ChevronsUpDown,
-  MapPin
+  MapPin,
+  CalendarRange
 } from 'lucide-react';
-import { format, subDays, isAfter } from 'date-fns';
+import { format, subDays, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -91,7 +91,9 @@ export default function ReportsDashboard() {
   const isManager = userProfile?.role === 'Site Manager';
 
   const [selectedSite, setSelectedSite] = React.useState<string>("All Sites");
-  const [timeRange, setTimeRange] = React.useState<number>(7);
+  const [timeRange, setTimeRange] = React.useState<number>(7); // 0 for Custom Range
+  const [customStartDate, setCustomStartDate] = React.useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
+  const [customEndDate, setCustomEndDate] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
 
@@ -163,7 +165,22 @@ export default function ReportsDashboard() {
   const stats = React.useMemo(() => {
     if (isLoading) return null;
 
-    const cutoff = subDays(new Date(), timeRange);
+    let startDateRange: Date;
+    let endDateRange = new Date();
+    let effectiveDays: number;
+
+    if (timeRange > 0) {
+      startDateRange = startOfDay(subDays(new Date(), timeRange));
+      endDateRange = endOfDay(new Date());
+      effectiveDays = timeRange + 1;
+    } else {
+      if (!customStartDate || !customEndDate) return null;
+      startDateRange = startOfDay(new Date(customStartDate));
+      endDateRange = endOfDay(new Date(customEndDate));
+      
+      effectiveDays = Math.max(1, Math.ceil((endDateRange.getTime() - startDateRange.getTime()) / (1000 * 60 * 60 * 24)));
+      if (effectiveDays > 365) effectiveDays = 365; // Cap for visualization
+    }
 
     const applyFilters = (list: DataItem[] | null, dateField: string) => {
       if (!list) return [];
@@ -178,7 +195,7 @@ export default function ReportsDashboard() {
         if (val?.toDate) d = val.toDate();
         else if (val) d = new Date(val);
         
-        return d && isAfter(d, cutoff);
+        return d && d >= startDateRange && d <= endDateRange;
       });
     };
 
@@ -188,10 +205,10 @@ export default function ReportsDashboard() {
     const fRequirements = applyFilters(requirements, 'createdAt');
     const fTasks = applyFilters(tasks, 'createdAt');
 
-    const lastNDays = Array.from({ length: timeRange }, (_, i) => {
-      const date = subDays(new Date(), i);
+    const trendDays = Array.from({ length: effectiveDays }, (_, i) => {
+      const date = subDays(endDateRange, i);
       return {
-        label: format(date, timeRange > 7 ? 'dd/MM' : 'dd MMM'),
+        label: format(date, effectiveDays > 7 ? 'dd/MM' : 'dd MMM'),
         date: date,
         permits: 0,
         dprs: 0,
@@ -207,7 +224,8 @@ export default function ReportsDashboard() {
       else if (val) d = new Date(val);
       
       if (d) {
-        const index = lastNDays.findIndex(day => format(day.date, 'yyyy-MM-dd') === format(d!, 'yyyy-MM-dd'));
+        const dateStr = format(d!, 'yyyy-MM-dd');
+        const index = trendDays.findIndex(day => format(day.date, 'yyyy-MM-dd') === dateStr);
         return index;
       }
       return -1;
@@ -215,19 +233,19 @@ export default function ReportsDashboard() {
 
     fPermits.forEach(p => {
       const idx = processItemDate(p, 'requestDate');
-      if (idx !== -1) lastNDays[idx].permits++;
+      if (idx !== -1) trendDays[idx].permits++;
     });
     fDprs.forEach(d => {
       const idx = processItemDate(d, 'reportDate');
-      if (idx !== -1) lastNDays[idx].dprs++;
+      if (idx !== -1) trendDays[idx].dprs++;
     });
     fMovements.forEach(m => {
       const idx = processItemDate(m, 'movementDate');
-      if (idx !== -1) lastNDays[idx].movements++;
+      if (idx !== -1) trendDays[idx].movements++;
     });
     fRequirements.forEach(r => {
       const idx = processItemDate(r, 'createdAt');
-      if (idx !== -1) lastNDays[idx].requirements++;
+      if (idx !== -1) trendDays[idx].requirements++;
     });
 
     const permitStatus = [
@@ -249,7 +267,7 @@ export default function ReportsDashboard() {
     ];
 
     return {
-      dailyTrend: lastNDays,
+      dailyTrend: trendDays,
       permitDistribution: permitStatus,
       taskDistribution: taskStatus,
       requirementDistribution: requirementUrgency,
@@ -261,7 +279,7 @@ export default function ReportsDashboard() {
         tasks: fTasks.length,
       }
     };
-  }, [isLoading, permits, dprs, movements, requirements, tasks, selectedSite, timeRange]);
+  }, [isLoading, permits, dprs, movements, requirements, tasks, selectedSite, timeRange, customStartDate, customEndDate]);
 
   if (isLoading) {
     return (
@@ -296,17 +314,38 @@ export default function ReportsDashboard() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={timeRange.toString()} onValueChange={(val) => setTimeRange(parseInt(val))}>
-            <SelectTrigger className="w-[140px] h-8 rounded-sm font-black uppercase text-[10px] tracking-widest bg-secondary border-none">
-              <Calendar className="mr-1.5 h-3 w-3" />
-              <SelectValue placeholder="Time Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7" className="text-[10px] font-black uppercase">Last 7 Days</SelectItem>
-              <SelectItem value="30" className="text-[10px] font-black uppercase">Last 30 Days</SelectItem>
-              <SelectItem value="90" className="text-[10px] font-black uppercase">Last 90 Days</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={timeRange.toString()} onValueChange={(val) => setTimeRange(parseInt(val))}>
+              <SelectTrigger className="w-[140px] h-8 rounded-sm font-black uppercase text-[10px] tracking-widest bg-secondary border-none">
+                <Calendar className="mr-1.5 h-3 w-3" />
+                <SelectValue placeholder="Time Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7" className="text-[10px] font-black uppercase">Last 7 Days</SelectItem>
+                <SelectItem value="30" className="text-[10px] font-black uppercase">Last 30 Days</SelectItem>
+                <SelectItem value="90" className="text-[10px] font-black uppercase">Last 90 Days</SelectItem>
+                <SelectItem value="0" className="text-[10px] font-black uppercase">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {timeRange === 0 && (
+              <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+                <Input 
+                  type="date" 
+                  className="h-8 w-32 rounded-sm text-[10px] font-bold border-primary/20 bg-background" 
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                />
+                <span className="text-[10px] font-black uppercase text-muted-foreground">to</span>
+                <Input 
+                  type="date" 
+                  className="h-8 w-32 rounded-sm text-[10px] font-bold border-primary/20 bg-background" 
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
           
           <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
             <PopoverTrigger asChild>
