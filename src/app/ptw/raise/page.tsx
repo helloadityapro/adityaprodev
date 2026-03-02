@@ -225,13 +225,20 @@ export default function RaisePtwPage() {
           const storage = getStorage(firebaseApp);
           const storageRef = ref(storage, storagePath);
           const uploadTask = uploadBytesResumable(storageRef, file);
-          uploadTask.on('state_changed', null, reject, () => getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve({ 
-            url, 
-            contentType: file.type, 
-            name: file.name,
-            submissionIndex: currentSubmissionIndex,
-            timestamp: new Date().toISOString()
-          })));
+          uploadTask.on('state_changed', 
+            null, 
+            (error) => {
+              console.error("Storage Error:", error);
+              reject(error);
+            }, 
+            () => getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve({ 
+              url, 
+              contentType: file.type, 
+              name: file.name,
+              submissionIndex: currentSubmissionIndex,
+              timestamp: new Date().toISOString()
+            }))
+          );
         });
       };
 
@@ -246,7 +253,9 @@ export default function RaisePtwPage() {
 
       const newAttachments = await Promise.all(processedFiles.map(file => {
         // Explicitly ensuring slashes are present between folders for permission matching
-        const filePath = `uploads/${user.uid}/${timestamp}-${file.name.replace(/\s+/g, '_')}`;
+        // Sanitizing the filename to prevent issues with special characters
+        const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const filePath = `uploads/${user.uid}/${timestamp}-${safeName}`;
         return uploadFile(file, filePath);
       }));
       

@@ -1,31 +1,9 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // Helper function to check if user is signed in
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    // Helper to check for admin status directly via token
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'khalil@adityagreenenergy.com' || 
-        request.auth.token.email == 'prafulrana143@gmail.com'
-      );
-    }
-
-    // Site Documents: Accessible to all team members, delete restricted to admin
-    match /site_documents/{allPaths=**} {
-      allow read, write: if isSignedIn();
-      allow delete: if isAdmin();
-    }
-
-    // General Uploads: Used for PTW, Movements, etc.
-    // Explicitly allowing read/write for any authenticated user within the uploads prefix
-    match /uploads/{allPaths=**} {
-      allow read, write: if isSignedIn();
-      allow delete: if isAdmin();
+    // Broadest possible permission for authenticated users to resolve persistent blocks.
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
