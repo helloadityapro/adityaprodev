@@ -52,7 +52,7 @@ type MaterialMovement = {
   quantity: number;
   unit: string;
   movementType: "Inward" | "Outward";
-  sourceOrDestinationType: "Vendor" | "Site";
+  sourceOrDestinationType: "Supplier" | "Site";
   sourceOrDestination: string;
   movementDate: string;
   userId: string;
@@ -194,7 +194,7 @@ export default function MovementListPage() {
 
   const handleWhatsAppShare = (mov: MaterialMovement) => {
     const sourceLabel = mov.movementType === 'Inward' ? 'From' : 'To';
-    const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${mov.siteName}\n*Date:* ${format(new Date(mov.movementDate), 'dd MMM yyyy')}\n*Type:* ${mov.movementType} (${sourceLabel} ${mov.sourceOrDestinationType || 'Vendor'}: ${mov.sourceOrDestination})\n*Item:* ${mov.itemName}\n*Quantity:* ${mov.quantity} ${mov.unit}\n*Recorded By:* ${mov.userName}`;
+    const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${mov.siteName}\n*Date:* ${format(new Date(mov.movementDate), 'dd MMM yyyy')}\n*Type:* ${mov.movementType} (${sourceLabel} ${mov.sourceOrDestinationType || 'Supplier'}: ${mov.sourceOrDestination})\n*Item:* ${mov.itemName}\n*Quantity:* ${mov.quantity} ${mov.unit}\n*Recorded By:* ${mov.userName}`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -367,7 +367,7 @@ export default function MovementListPage() {
                                     {mov.movementType === 'Inward' ? 'From' : 'To'}:
                                 </span>
                                 <Badge variant="secondary" className="text-[9px] h-4 rounded-sm px-1.5 font-bold uppercase tracking-tighter">
-                                    {mov.sourceOrDestinationType || 'Vendor'}
+                                    {mov.sourceOrDestinationType || 'Supplier'}
                                 </Badge>
                             </div>
                             <span className="text-[11px] font-medium text-primary flex items-center gap-1">
@@ -483,13 +483,13 @@ export default function MovementListPage() {
                 <div className="space-y-3">
                     <Label>{editingMov?.movementType === 'Inward' ? 'Inward From' : 'Outward To'}</Label>
                     <RadioGroup
-                        value={editingMov?.sourceOrDestinationType || "Vendor"}
+                        value={editingMov?.sourceOrDestinationType || "Supplier"}
                         onValueChange={(val: any) => setEditingMov(prev => prev ? { ...prev, sourceOrDestinationType: val, sourceOrDestination: "" } : null)}
                         className="flex gap-4 mb-2"
                     >
                         <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="Vendor" id="edit-vendor" />
-                            <Label htmlFor="edit-vendor" className="font-normal cursor-pointer flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> Vendor</Label>
+                            <RadioGroupItem value="Supplier" id="edit-supplier" />
+                            <Label htmlFor="edit-supplier" className="font-normal cursor-pointer flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> Supplier</Label>
                         </div>
                         <div className="flex items-center space-x-2">
                             <RadioGroupItem value="Site" id="edit-site" />
@@ -531,7 +531,7 @@ export default function MovementListPage() {
                             </PopoverContent>
                         </Popover>
                     ) : (
-                        <Input value={editingMov?.sourceOrDestination || ""} onChange={(e) => setEditingMov(prev => prev ? { ...prev, sourceOrDestination: e.target.value } : null)} placeholder="Vendor name" />
+                        <Input value={editingMov?.sourceOrDestination || ""} onChange={(e) => setEditingMov(prev => prev ? { ...prev, sourceOrDestination: e.target.value } : null)} placeholder="Supplier name" />
                     )}
                 </div>
 

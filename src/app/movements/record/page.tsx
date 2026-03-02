@@ -34,7 +34,7 @@ const itemSchema = z.object({
 const movementSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
   movementType: z.enum(["Inward", "Outward"], { required_error: "Movement type is required" }),
-  sourceOrDestinationType: z.enum(["Vendor", "Site"], { required_error: "Type is required" }),
+  sourceOrDestinationType: z.enum(["Supplier", "Site"], { required_error: "Type is required" }),
   sourceOrDestination: z.string().min(1, "Name is required"),
   movementDate: z.string().min(1, "Date is required"),
   items: z.array(itemSchema).min(1, "Add at least one item"),
@@ -96,7 +96,6 @@ export default function RecordMovementPage() {
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [submittedData, setSubmittedData] = React.useState<z.infer<typeof movementSchema> & { attachments?: any[] } | null>(null);
   
-  // File upload state
   const [invoiceFiles, setInvoiceFiles] = React.useState<File[]>([]);
 
   const form = useForm<z.infer<typeof movementSchema>>({
@@ -104,7 +103,7 @@ export default function RecordMovementPage() {
     defaultValues: { 
       siteName: "", 
       movementType: "Inward",
-      sourceOrDestinationType: "Vendor",
+      sourceOrDestinationType: "Supplier",
       sourceOrDestination: "",
       movementDate: format(new Date(), 'yyyy-MM-dd'),
       items: [{ itemName: "", quantity: 0, unit: "Numbers" }]
@@ -160,10 +159,8 @@ export default function RecordMovementPage() {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
     try {
-      // 1. Upload files if any
       const attachments = await uploadFiles(user.uid);
 
-      // 2. Create records
       const promises = values.items.map(item => {
         return addDocumentNonBlocking(collection(firestore, 'material_movements'), {
           siteName: values.siteName,
@@ -182,7 +179,6 @@ export default function RecordMovementPage() {
 
       await Promise.all(promises);
 
-      // Reward Points Logic
       const rateEngineer = rewardSettings?.movementEngineer ?? 0.1;
       const rateManager = rewardSettings?.movementManager ?? 0.05;
       const multiplier = userProfile.pointsMultiplier || 1;
@@ -204,7 +200,7 @@ export default function RecordMovementPage() {
       form.reset({ 
         siteName: "", 
         movementType: values.movementType,
-        sourceOrDestinationType: "Vendor",
+        sourceOrDestinationType: "Supplier",
         sourceOrDestination: "",
         movementDate: format(new Date(), 'yyyy-MM-dd'),
         items: [{ itemName: "", quantity: 0, unit: "Numbers" }] 
@@ -383,8 +379,8 @@ export default function RecordMovementPage() {
                           className="flex gap-4"
                         >
                           <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl><RadioGroupItem value="Vendor" /></FormControl>
-                            <FormLabel className="font-normal cursor-pointer flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Vendor</FormLabel>
+                            <FormControl><RadioGroupItem value="Supplier" /></FormControl>
+                            <FormLabel className="font-normal cursor-pointer flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Supplier</FormLabel>
                           </FormItem>
                           <FormItem className="flex items-center space-x-2 space-y-0">
                             <FormControl><RadioGroupItem value="Site" /></FormControl>
@@ -442,7 +438,7 @@ export default function RecordMovementPage() {
                           </Popover>
                         ) : (
                           <div className="relative">
-                            <Input placeholder="Enter vendor name..." {...field} className="rounded-sm pr-10" />
+                            <Input placeholder="Enter supplier name..." {...field} className="rounded-sm pr-10" />
                             <Truck className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
                           </div>
                         )}
