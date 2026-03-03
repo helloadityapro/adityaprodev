@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -6,15 +5,18 @@ import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@
 import { collection, doc, query, where, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, AlertCircle } from "lucide-react";
+import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, AlertCircle, User } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 type SiteVisit = {
   id: string;
   siteName: string;
+  managerName: string;
+  managerId: string;
   startTime: any;
   startLat: number;
   startLng: number;
@@ -26,18 +28,28 @@ export default function ActiveSiteVisitsPage() {
   const { user } = useUser();
   const router = useRouter();
 
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+
   const visitsQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || isProfileLoading) return null;
+    const colRef = collection(firestore, 'site_visits');
+    
+    if (isAdmin) {
+      return query(colRef, where('status', '==', 'ongoing'));
+    }
+    
     return query(
-      collection(firestore, 'site_visits'),
+      colRef,
       where('managerId', '==', user.uid),
       where('status', '==', 'ongoing')
     );
-  }, [firestore, user]);
+  }, [firestore, user, isAdmin, isProfileLoading]);
 
   const { data: visits, isLoading } = useCollection<SiteVisit>(visitsQuery);
 
-  if (isLoading) {
+  if (isLoading || isProfileLoading) {
     return (
       <div className="space-y-6 max-w-4xl mx-auto">
         <Skeleton className="h-10 w-48" />
@@ -48,16 +60,13 @@ export default function ActiveSiteVisitsPage() {
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <Navigation className="h-8 w-8" /> Active Site Presence
-          </h1>
-          <p className="text-muted-foreground">Manage your current ongoing site visits.</p>
-        </div>
-        <Button onClick={() => router.push('/site-visits/start')} variant="outline" className="rounded-sm font-bold border-primary text-primary">
-          Start New Visit
-        </Button>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+          <Navigation className="h-8 w-8" /> {isAdmin ? "Global Active Presence" : "My Active Site Presence"}
+        </h1>
+        <p className="text-muted-foreground">
+          {isAdmin ? "Monitoring all ongoing site visits across the organization." : "Manage your current ongoing site visits."}
+        </p>
       </div>
 
       {visits && visits.length > 0 ? (
@@ -78,7 +87,13 @@ export default function ActiveSiteVisitsPage() {
                     Visit in progress
                   </div>
                 </div>
-                <CardTitle className="text-2xl font-black mt-2 text-foreground">{visit.siteName}</CardTitle>
+                <div className="mt-2 flex flex-col gap-1">
+                  <CardTitle className="text-2xl font-black text-foreground">{visit.siteName}</CardTitle>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                    <User className="h-3.5 w-3.5" />
+                    {visit.managerName} {visit.managerId === user?.uid && "(You)"}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -98,19 +113,23 @@ export default function ActiveSiteVisitsPage() {
                   <div className="bg-muted/30 p-4 rounded-sm border border-dashed flex flex-col justify-center items-center text-center gap-2">
                     <HardHat className="h-8 w-8 text-primary/40" />
                     <p className="text-xs text-muted-foreground italic font-medium leading-relaxed">
-                      Please finish the visit report before leaving the site premises to capture end coordinates correctly.
+                      {visit.managerId === user?.uid 
+                        ? "Please finish the visit report before leaving the site premises to capture end coordinates correctly."
+                        : `Manager is currently performing site activities at ${visit.siteName}.`}
                     </p>
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="bg-muted/10 border-t p-4">
-                <Button 
-                  className="w-full h-12 text-lg font-black rounded-sm shadow-md" 
-                  onClick={() => router.push(`/site-visits/${visit.id}/finish`)}
-                >
-                  Complete Visit Report <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </CardFooter>
+              {visit.managerId === user?.uid && (
+                <CardFooter className="bg-muted/10 border-t p-4">
+                  <Button 
+                    className="w-full h-12 text-lg font-black rounded-sm shadow-md" 
+                    onClick={() => router.push(`/site-visits/${visit.id}/finish`)}
+                  >
+                    Complete Visit Report <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </CardFooter>
+              )}
             </Card>
           ))}
         </div>
@@ -119,11 +138,15 @@ export default function ActiveSiteVisitsPage() {
           <Navigation className="h-16 w-16 text-muted-foreground/20 mb-4" />
           <h3 className="text-xl font-bold">No Active Visits</h3>
           <p className="text-muted-foreground max-w-sm mx-auto mt-2">
-            You are not currently logged in at any site. Click "Start Visit" when you arrive at a project location.
+            {isAdmin 
+              ? "There are currently no managers logged in at any project site." 
+              : "You are not currently logged in at any site. Click 'Start Visit' when you arrive at a project location."}
           </p>
-          <Button onClick={() => router.push('/site-visits/start')} className="mt-6 font-bold h-11 px-8 rounded-sm">
-            Check-in to Site
-          </Button>
+          {!isAdmin && (
+            <Button onClick={() => router.push('/site-visits/start')} className="mt-6 font-bold h-11 px-8 rounded-sm">
+              Check-in to Site
+            </Button>
+          )}
         </div>
       )}
     </div>

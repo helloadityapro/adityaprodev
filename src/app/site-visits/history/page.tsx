@@ -6,7 +6,7 @@ import { collection, query, where, orderBy, limit, doc } from "firebase/firestor
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, Navigation, History, ExternalLink, UserCheck, Timer, FileText, ImageIcon, Search, FilterX, Calendar, Users, Maximize2, X } from "lucide-react";
+import { MapPin, Navigation, History, ExternalLink, UserCheck, Timer, FileText, ImageIcon, Search, FilterX, Calendar, Users, Maximize2, X, User } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,11 +68,11 @@ export default function SiteVisitsHistoryPage() {
   const [enlargedImage, setEnlargedImage] = React.useState<string | null>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   const historyQuery = useMemoFirebase(() => {
-    if (!user) return null;
+    if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'site_visits');
     if (isAdmin) return query(colRef, orderBy('startTime', 'desc'), limit(100));
     return query(
@@ -81,7 +81,7 @@ export default function SiteVisitsHistoryPage() {
       orderBy('startTime', 'desc'),
       limit(50)
     );
-  }, [firestore, user, isAdmin]);
+  }, [firestore, user, isAdmin, isProfileLoading]);
 
   const { data: visits, isLoading } = useCollection<SiteVisit>(historyQuery);
 
@@ -89,25 +89,26 @@ export default function SiteVisitsHistoryPage() {
     if (!visits) return [];
     return visits.filter(v => 
       v.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (v.purpose || '').toLowerCase().includes(searchTerm.toLowerCase())
+      (v.purpose || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (v.managerName || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [visits, searchTerm]);
 
-  if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-48" /><Skeleton className="h-[500px] w-full" /></div>;
+  if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-48" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <History className="h-8 w-8" /> Visit Logs & Reports
+            <History className="h-8 w-8" /> {isAdmin ? "Organization Visit Logs" : "Visit Logs & Reports"}
           </h1>
           <p className="text-muted-foreground">Historical records of site presence and audit reports.</p>
         </div>
         <div className="relative w-full md:w-72">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search by site or purpose..." 
+            placeholder="Search by site, manager, or purpose..." 
             className="pl-8 rounded-sm h-10 border-primary/20"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -117,57 +118,66 @@ export default function SiteVisitsHistoryPage() {
 
       <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow>
-                <TableHead>Start Date & Time</TableHead>
-                <TableHead>Project Site</TableHead>
-                {isAdmin && <TableHead>Manager</TableHead>}
-                <TableHead>Purpose</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right px-6">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredVisits.length > 0 ? filteredVisits.map((visit) => (
-                <TableRow key={visit.id} className="hover:bg-muted/5 transition-colors">
-                  <TableCell className="font-mono text-xs font-bold text-muted-foreground">
-                    {formatTimestamp(visit.startTime)}
-                  </TableCell>
-                  <TableCell className="font-black text-sm">{visit.siteName}</TableCell>
-                  {isAdmin && <TableCell className="text-xs font-bold">{visit.managerName}</TableCell>}
-                  <TableCell>
-                    <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">
-                      {visit.purpose || '—'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
-                      <Timer className="h-3 w-3" />
-                      {calculateDuration(visit.startTime, visit.endTime)}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>
-                      {visit.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right px-6">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewVisit(visit)}>
-                      <FileText className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              )) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 7 : 6} className="h-32 text-center text-muted-foreground italic">
-                    No visit records found.
-                  </TableCell>
+                  <TableHead>Start Date & Time</TableHead>
+                  <TableHead>Project Site</TableHead>
+                  {isAdmin && <TableHead>Site Manager</TableHead>}
+                  <TableHead>Purpose</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right px-6">Action</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredVisits.length > 0 ? filteredVisits.map((visit) => (
+                  <TableRow key={visit.id} className="hover:bg-muted/5 transition-colors">
+                    <TableCell className="font-mono text-xs font-bold text-muted-foreground">
+                      {formatTimestamp(visit.startTime)}
+                    </TableCell>
+                    <TableCell className="font-black text-sm">{visit.siteName}</TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-xs font-bold">
+                          <User className="h-3 w-3 text-primary" />
+                          {visit.managerName}
+                        </div>
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">
+                        {visit.purpose || '—'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
+                        <Timer className="h-3 w-3" />
+                        {calculateDuration(visit.startTime, visit.endTime)}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>
+                        {visit.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right px-6">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewVisit(visit)}>
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={isAdmin ? 7 : 6} className="h-32 text-center text-muted-foreground italic">
+                      No visit records found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -177,9 +187,15 @@ export default function SiteVisitsHistoryPage() {
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-1">
                 <DialogTitle className="text-2xl font-black">{viewVisit?.siteName} Visit Report</DialogTitle>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold">
-                  <Calendar className="h-3.5 w-3.5" />
-                  {formatTimestamp(viewVisit?.startTime)}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {formatTimestamp(viewVisit?.startTime)}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-primary font-bold">
+                    <User className="h-3.5 w-3.5" />
+                    Submitted by {viewVisit?.managerName}
+                  </div>
                 </div>
               </div>
               <Badge className="bg-primary h-6 text-[10px] uppercase font-black px-3 rounded-sm">{viewVisit?.status}</Badge>
