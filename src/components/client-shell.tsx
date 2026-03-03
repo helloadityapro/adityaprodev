@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { UserNotifications } from "@/components/user-notifications";
 import { QuickActions } from "@/components/quick-actions";
+import { GlobalSearch } from "@/components/global-search";
 import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, AlertCircle, RefreshCw } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
@@ -249,6 +250,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <SidebarInset>
         <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6 sticky top-0 z-10">
           <SidebarTrigger />
+          <div className="flex-1 max-w-md">
+            <GlobalSearch />
+          </div>
           <div className="flex-1" />
           <QuickActions />
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
