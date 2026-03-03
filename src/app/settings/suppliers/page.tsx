@@ -79,6 +79,21 @@ export default function SuppliersManagementPage() {
     defaultValues: { name: '', gstin: '', address: '', mobile: '', email: '' },
   });
 
+  // Sync form values when editing or resetting
+  React.useEffect(() => {
+    if (supplierToEdit) {
+      form.reset({
+        name: supplierToEdit.name,
+        gstin: supplierToEdit.gstin,
+        address: supplierToEdit.address,
+        mobile: supplierToEdit.mobile,
+        email: supplierToEdit.email || '',
+      });
+    } else if (!isAddDialogOpen) {
+      form.reset({ name: '', gstin: '', address: '', mobile: '', email: '' });
+    }
+  }, [supplierToEdit, isAddDialogOpen, form]);
+
   const onAddSubmit = (values: z.infer<typeof supplierSchema>) => {
     addDocumentNonBlocking(collection(firestore, 'suppliers'), {
       ...values,
@@ -137,13 +152,11 @@ export default function SuppliersManagementPage() {
         let errors = 0;
 
         dataRows.forEach((line) => {
-          // Simple CSV parsing (splits by comma, handles basic quoted strings)
           const columns = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
           
           if (columns.length >= 4) {
             const [name, gstin, mobile, address, email] = columns;
             
-            // Basic validation for bulk import
             if (name && gstin.length === 15 && mobile.length >= 10) {
               const newDocRef = doc(collection(firestore, 'suppliers'));
               batch.set(newDocRef, {
@@ -243,7 +256,7 @@ export default function SuppliersManagementPage() {
         </CardHeader>
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-muted/30">
+            <TableHeader>
               <TableRow>
                 <TableHead className="px-6">Supplier Details</TableHead>
                 <TableHead>GSTIN</TableHead>
@@ -353,21 +366,21 @@ export default function SuppliersManagementPage() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-4 py-4">
                 <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Company Name</FormLabel><FormControl><Input {...field} className="rounded-sm" defaultValue={supplierToEdit.name} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Company Name</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="gstin" render={({ field }) => (
-                    <FormItem><FormLabel>GSTIN</FormLabel><FormControl><Input {...field} className="rounded-sm font-mono uppercase" defaultValue={supplierToEdit.gstin} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>GSTIN</FormLabel><FormControl><Input {...field} className="rounded-sm font-mono uppercase" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="mobile" render={({ field }) => (
-                    <FormItem><FormLabel>Mobile Number</FormLabel><FormControl><Input {...field} className="rounded-sm" defaultValue={supplierToEdit.mobile} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Mobile Number</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
                 <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input {...field} className="rounded-sm" defaultValue={supplierToEdit.email} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="address" render={({ field }) => (
-                  <FormItem><FormLabel>Business Address</FormLabel><FormControl><Input {...field} className="rounded-sm" defaultValue={supplierToEdit.address} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Business Address</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <DialogFooter className="pt-4 border-t">
                   <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Cancel</Button></DialogClose>
