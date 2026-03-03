@@ -1,8 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch, arrayUnion } from 'firebase/firestore';
+import { collection, doc, writeBatch, arrayUnion, getDoc, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -31,6 +32,9 @@ type Permit = {
   siteName: string;
   ptwType: string;
   status: string;
+  siteEngineerId: string;
+  siteManagerId?: string;
+  timeline?: any[];
   requestDate: any;
 };
 
@@ -106,12 +110,42 @@ export default function PermitManagementPage() {
     if (!firestore || deleteDialog.targets.length === 0) return;
     setIsDeleting(true);
     try {
+      // Point reversal logic
+      for (const id of deleteDialog.targets) {
+          const pRef = doc(firestore, 'permits_to_work', id);
+          const pSnap = await getDoc(pRef);
+          if (pSnap.exists()) {
+              const pData = pSnap.data() as Permit;
+              if (pData.status === 'Approved') {
+                  const hasRejection = (pData.timeline || []).some((t: any) => t.status === 'Rejected');
+                  const basePoints = hasRejection ? 0.5 : 1.0;
+                  
+                  // Revert Engineer
+                  const engRef = doc(firestore, 'users', pData.siteEngineerId);
+                  const engSnap = await getDoc(engRef);
+                  if (engSnap.exists()) {
+                      const m = engSnap.data()?.pointsMultiplier || 1;
+                      updateDocumentNonBlocking(engRef, {
+                          totalPoints: increment(-(basePoints * m))
+                      });
+                  }
+
+                  // Revert Manager
+                  if (pData.siteManagerId) {
+                      updateDocumentNonBlocking(doc(firestore, 'users', pData.siteManagerId), {
+                          totalPoints: increment(-(basePoints * 0.5))
+                      });
+                  }
+              }
+          }
+      }
+
       const batch = writeBatch(firestore);
       deleteDialog.targets.forEach(id => {
         batch.delete(doc(firestore, 'permits_to_work', id));
       });
       await batch.commit();
-      toast({ title: "Permanently Deleted", description: "Selected requests deleted for everyone." });
+      toast({ title: "Permanently Deleted", description: "Selected requests deleted and points reversed." });
       setSelectedIds([]);
       setDeleteDialog({ open: false, targets: [] });
     } catch (e) {
@@ -136,7 +170,7 @@ export default function PermitManagementPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight">Permit Management</h1>
-        <p className="text-muted-foreground">Cleanup requests and manage administrative visibility.</p>
+        <p className="text-muted-foreground">Cleanup requests and manage administrative visibility. Point rewards are reversed on deletion.</p>
       </div>
 
       <div className="flex items-center justify-between gap-4 p-4 bg-muted/40 border rounded-sm">
@@ -221,7 +255,7 @@ export default function PermitManagementPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {deleteDialog.targets.length > 1 ? 'Requests' : 'Request'}</AlertDialogTitle>
             <AlertDialogDescription>
-                Choose how you want to handle the deletion of these records.
+                Choose how you want to handle the deletion of these records. Points will be reversed for all users if deleted for everyone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-col gap-3 py-4">
@@ -234,7 +268,7 @@ export default function PermitManagementPage() {
             </div>
             <div className="flex flex-col gap-1 p-3 border border-destructive/20 rounded-sm bg-destructive/5">
                 <p className="text-sm font-bold text-destructive">Delete for everyone</p>
-                <p className="text-xs text-muted-foreground">Permanently removes these records from the database for all users. This action cannot be undone.</p>
+                <p className="text-xs text-muted-foreground">Permanently removes these records from the database for all users and reverses reward points. This action cannot be undone.</p>
                 <Button variant="destructive" className="mt-2 w-full rounded-sm" onClick={handleDeleteForEveryone} disabled={isDeleting}>
                     {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete for everyone"}
                 </Button>

@@ -113,7 +113,7 @@ export default function DPRListPage() {
     if (!deletingDpr || !firestore) return;
 
     try {
-        // Point Deduction Logic
+        // Point Deduction Logic (Reversing 1.0 for Engineer, 0.25 for Manager)
         const engineerId = deletingDpr.userId;
         const managerId = deletingDpr.siteManagerId;
 
@@ -122,15 +122,15 @@ export default function DPRListPage() {
         const engDoc = await getDoc(engRef);
         const multiplier = engDoc.exists() ? engDoc.data()?.pointsMultiplier || 1 : 1;
         
-        // Engineer loses 0.1 * multiplier
-        updateDocumentNonBlocking(doc(firestore, 'users', engineerId), {
-            totalPoints: increment(-(0.1 * multiplier))
+        // 1. Deduct from Engineer (base 1.0 * X-Factor)
+        updateDocumentNonBlocking(engRef, {
+            totalPoints: increment(-(1.0 * multiplier))
         });
 
-        // Manager loses 0.05
+        // 2. Deduct from Manager (base 0.25)
         if (managerId) {
             updateDocumentNonBlocking(doc(firestore, 'users', managerId), {
-                totalPoints: increment(-0.05)
+                totalPoints: increment(-0.25)
             });
         }
 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -239,6 +240,7 @@ export default function AdminSettingsPage() {
         updateDocumentNonBlocking(doc(firestore, 'system_settings', 'counters'), { lastPtwNumber: 0 });
       }
 
+      // 1. Revert Points for all Approved permits in the deletion list
       for (const id of idsToDelete) {
           const pRef = doc(firestore, 'permits_to_work', id);
           const pSnap = await getDoc(pRef);
@@ -248,6 +250,7 @@ export default function AdminSettingsPage() {
                   const hasRejection = (pData.timeline || []).some((t: any) => t.status === 'Rejected');
                   const basePoints = hasRejection ? 0.5 : 1.0;
                   
+                  // Revert Engineer points
                   const engRef = doc(firestore, 'users', pData.siteEngineerId);
                   const engSnap = await getDoc(engRef);
                   if (engSnap.exists()) {
@@ -256,10 +259,18 @@ export default function AdminSettingsPage() {
                           totalPoints: increment(-(basePoints * m))
                       });
                   }
+
+                  // Revert Manager points (50% inheritance)
+                  if (pData.siteManagerId) {
+                      updateDocumentNonBlocking(doc(firestore, 'users', pData.siteManagerId), {
+                          totalPoints: increment(-(basePoints * 0.5))
+                      });
+                  }
               }
           }
       }
 
+      // 2. Perform Batch Deletion
       const batchSize = 500;
       for (let i = 0; i < idsToDelete.length; i += batchSize) {
         const batch = writeBatch(firestore);
@@ -270,7 +281,7 @@ export default function AdminSettingsPage() {
         await batch.commit();
       }
 
-      toast({ title: "Permanently Deleted", description: deleteDialog.isAll ? "All records deleted and counter reset." : "Selected requests deleted." });
+      toast({ title: "Permanently Deleted", description: deleteDialog.isAll ? "All records deleted, counter reset, and points reversed." : "Selected requests deleted and points reversed." });
       setSelectedPermitIds([]);
       setDeleteDialog({ open: false, targets: [], isAll: false });
     } catch (e) {

@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -151,13 +152,16 @@ export default function MovementListPage() {
     if (!deletingMov || !firestore) return;
 
     try {
+        // Point Deduction Logic (Reversing 0.1 for Engineer, 0.05 for Manager)
         const engDoc = await getDoc(doc(firestore, 'users', deletingMov.userId));
         const multiplier = engDoc.exists() ? engDoc.data()?.pointsMultiplier || 1 : 1;
         
+        // 1. Deduct from Engineer (0.1 base * multiplier)
         updateDocumentNonBlocking(doc(firestore, 'users', deletingMov.userId), {
             totalPoints: increment(-(0.1 * multiplier))
         });
 
+        // 2. Deduct from Manager (0.05 base)
         if (deletingMov.siteManagerId) {
             updateDocumentNonBlocking(doc(firestore, 'users', deletingMov.siteManagerId), {
                 totalPoints: increment(-0.05)
@@ -165,7 +169,7 @@ export default function MovementListPage() {
         }
 
         deleteDocumentNonBlocking(doc(firestore, 'material_movements', deletingMov.id));
-        toast({ title: "Deleted", description: "Movement record and points removed." });
+        toast({ title: "Deleted", description: "Movement record and associated points removed." });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Error', description: 'Failed to reverse points during deletion.' });
     } finally {
