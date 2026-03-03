@@ -167,7 +167,16 @@
         "selfieUrl": { "type": "string" },
         "purpose": { "type": "string", "enum": ["Kick-off visit", "Regular visit", "Site team meetup", "Vendor meetup"] },
         "details": { "type": "string" },
-        "tasks": { "type": "array", "items": { "type": "string" } },
+        "tasks": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" },
+              "photoUrl": { "type": "string" }
+            }
+          } 
+        },
         "customerAvailable": { "type": "boolean" },
         "customerNames": { "type": "string" },
         "status": { "type": "string", "enum": ["ongoing", "completed"] },

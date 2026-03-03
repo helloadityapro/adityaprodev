@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, MapPin, Loader2, Plus, Trash2, CheckCircle2, UserCheck, AlertCircle, Users } from "lucide-react";
+import { Camera, MapPin, Loader2, Plus, Trash2, CheckCircle2, UserCheck, AlertCircle, Users, ImageIcon, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -20,6 +20,12 @@ import { format } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const PURPOSES = ["Kick-off visit", "Regular visit", "Site team meetup", "Vendor meetup"];
+
+type TaskItem = {
+  text: string;
+  photoUrl: string | null;
+  localPhoto?: string | null; // For UI preview before upload
+};
 
 export default function FinishSiteVisitPage() {
   const params = useParams();
@@ -42,7 +48,7 @@ export default function FinishSiteVisitPage() {
   const [details, setDetails] = React.useState("");
   const [customerAvailable, setCustomerAvailable] = React.useState("no");
   const [customerNames, setCustomerNames] = React.useState("");
-  const [tasks, setTasks] = React.useState<string[]>([""]);
+  const [tasks, setTasks] = React.useState<TaskItem[]>([{ text: "", photoUrl: null }]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const startCamera = async () => {
@@ -71,10 +77,8 @@ export default function FinishSiteVisitPage() {
       canvas.height = videoRef.current.videoHeight;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        // Draw video frame
         ctx.drawImage(videoRef.current, 0, 0);
         
-        // Add Timestamp Overlay
         const timestamp = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
         ctx.font = "bold 24px Inter, sans-serif";
         ctx.fillStyle = "white";
@@ -87,7 +91,6 @@ export default function FinishSiteVisitPage() {
         const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
         setSelfie(dataUrl);
         
-        // Stop stream
         const stream = videoRef.current.srcObject as MediaStream;
         stream?.getTracks().forEach(track => track.stop());
         setIsCameraActive(false);
@@ -109,11 +112,31 @@ export default function FinishSiteVisitPage() {
     });
   };
 
-  const addTask = () => setTasks([...tasks, ""]);
+  const addTask = () => setTasks([...tasks, { text: "", photoUrl: null }]);
   const removeTask = (index: number) => setTasks(tasks.filter((_, i) => i !== index));
-  const updateTask = (index: number, val: string) => {
+  const updateTaskText = (index: number, val: string) => {
     const newTasks = [...tasks];
-    newTasks[index] = val;
+    newTasks[index].text = val;
+    setTasks(newTasks);
+  };
+
+  const handleTaskPhotoChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const newTasks = [...tasks];
+        newTasks[index].localPhoto = event.target?.result as string;
+        setTasks(newTasks);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeTaskPhoto = (index: number) => {
+    const newTasks = [...tasks];
+    newTasks[index].localPhoto = null;
+    newTasks[index].photoUrl = null;
     setTasks(newTasks);
   };
 
@@ -133,18 +156,31 @@ export default function FinishSiteVisitPage() {
 
     try {
       const storage = getStorage(firebaseApp);
-      const selfieRef = ref(storage, `site_visits/${user.uid}/${Date.now()}.jpg`);
+      
+      // 1. Upload Selfie
+      const selfieRef = ref(storage, `site_visits/${user.uid}/selfie_${Date.now()}.jpg`);
       await uploadString(selfieRef, selfie, 'data_url');
       const selfieUrl = await getDownloadURL(selfieRef);
 
+      // 2. Upload Task Photos
+      const finalTasks = await Promise.all(tasks.map(async (task, idx) => {
+        if (task.localPhoto) {
+          const taskPhotoRef = ref(storage, `site_visits/${user.uid}/task_${idx}_${Date.now()}.jpg`);
+          await uploadString(taskPhotoRef, task.localPhoto, 'data_url');
+          const url = await getDownloadURL(taskPhotoRef);
+          return { text: task.text, photoUrl: url };
+        }
+        return { text: task.text, photoUrl: null };
+      }));
+
       await updateDocumentNonBlocking(visitRef, {
         endTime: serverTimestamp(),
-        endLat: endLocation?.lat || visit.startLat, // Fallback to start if GPS fails at end
+        endLat: endLocation?.lat || visit.startLat,
         endLng: endLocation?.lng || visit.startLng,
         selfieUrl,
         purpose,
         details,
-        tasks: tasks.filter(t => t.trim() !== ""),
+        tasks: finalTasks.filter(t => t.text.trim() !== ""),
         customerAvailable: customerAvailable === "yes",
         customerNames: customerAvailable === "yes" ? customerNames : "",
         status: 'completed',
@@ -262,18 +298,52 @@ export default function FinishSiteVisitPage() {
                 <Label className="text-xs font-bold uppercase tracking-wider">Tasks Performed / Actions Taken</Label>
                 <Button variant="ghost" size="sm" onClick={addTask} className="text-primary font-bold"><Plus className="h-3.5 w-3.5 mr-1" /> Add Item</Button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {tasks.map((task, idx) => (
-                  <div key={idx} className="flex gap-2 animate-in slide-in-from-top-1">
-                    <Input 
-                      placeholder={`Action item #${idx + 1}`} 
-                      value={task} 
-                      onChange={e => updateTask(idx, e.target.value)}
-                      className="rounded-sm"
-                    />
-                    {tasks.length > 1 && (
-                      <Button variant="ghost" size="icon" className="text-destructive shrink-0" onClick={() => removeTask(idx)}><Trash2 className="h-4 w-4" /></Button>
-                    )}
+                  <div key={idx} className="space-y-2 p-4 border rounded-sm bg-muted/5 animate-in slide-in-from-top-1">
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder={`Action item #${idx + 1}`} 
+                        value={task.text} 
+                        onChange={e => updateTaskText(idx, e.target.value)}
+                        className="rounded-sm flex-1"
+                      />
+                      {tasks.length > 1 && (
+                        <Button variant="ghost" size="icon" className="text-destructive shrink-0" onClick={() => removeTask(idx)}><Trash2 className="h-4 w-4" /></Button>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                      {task.localPhoto ? (
+                        <div className="relative h-20 w-32 rounded-sm overflow-hidden border shadow-sm group">
+                          <img src={task.localPhoto} className="h-full w-full object-cover" alt="Task proof" />
+                          <Button 
+                            variant="destructive" 
+                            size="icon" 
+                            className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" 
+                            onClick={() => removeTaskPhoto(idx)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            capture="environment" 
+                            className="hidden" 
+                            id={`task-photo-${idx}`}
+                            onChange={e => handleTaskPhotoChange(idx, e)}
+                          />
+                          <Button variant="outline" size="sm" asChild className="h-8 text-[10px] font-bold rounded-sm cursor-pointer">
+                            <label htmlFor={`task-photo-${idx}`}>
+                              <Camera className="h-3 w-3 mr-1.5" /> ADD TASK PHOTO
+                            </label>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

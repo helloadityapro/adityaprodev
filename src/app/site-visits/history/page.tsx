@@ -6,7 +6,7 @@ import { collection, query, where, orderBy, limit, doc } from "firebase/firestor
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, Navigation, History, ExternalLink, UserCheck, Timer, FileText, ImageIcon, Search, FilterX, Calendar, Users } from "lucide-react";
+import { MapPin, Navigation, History, ExternalLink, UserCheck, Timer, FileText, ImageIcon, Search, FilterX, Calendar, Users, Maximize2, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { cn } from "@/lib/utils";
+
+type TaskItem = {
+  text: string;
+  photoUrl: string | null;
+};
 
 type SiteVisit = {
   id: string;
@@ -30,7 +35,7 @@ type SiteVisit = {
   endLng?: number;
   purpose?: string;
   details?: string;
-  tasks?: string[];
+  tasks?: TaskItem[];
   selfieUrl?: string;
   customerAvailable?: boolean;
   customerNames?: string;
@@ -60,6 +65,7 @@ export default function SiteVisitsHistoryPage() {
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = React.useState("");
   const [viewVisit, setViewVisit] = React.useState<SiteVisit | null>(null);
+  const [enlargedImage, setEnlargedImage] = React.useState<string | null>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc(userProfileRef);
@@ -166,7 +172,7 @@ export default function SiteVisitsHistoryPage() {
       </Card>
 
       <Dialog open={!!viewVisit} onOpenChange={(o) => !o && setViewVisit(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0 rounded-sm">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 rounded-sm">
           <DialogHeader className="p-6 border-b bg-muted/5">
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-1">
@@ -184,13 +190,15 @@ export default function SiteVisitsHistoryPage() {
             {viewVisit && (
               <div className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Visual Metadata */}
                   <div className="space-y-6">
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Verification Selfie</Label>
                       {viewVisit.selfieUrl ? (
-                        <div className="relative aspect-video rounded-sm overflow-hidden border shadow-inner bg-muted">
+                        <div className="relative aspect-video rounded-sm overflow-hidden border shadow-inner bg-muted cursor-pointer group" onClick={() => setEnlargedImage(viewVisit.selfieUrl || null)}>
                           <img src={viewVisit.selfieUrl} className="w-full h-full object-cover" alt="Verification" />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
+                            <Maximize2 className="h-6 w-6 text-white opacity-0 group-hover:opacity-100" />
+                          </div>
                         </div>
                       ) : (
                         <div className="aspect-video bg-muted/50 rounded-sm border border-dashed flex flex-col items-center justify-center text-muted-foreground">
@@ -230,7 +238,6 @@ export default function SiteVisitsHistoryPage() {
                     )}
                   </div>
 
-                  {/* Visit Narrative */}
                   <div className="space-y-6">
                     <div className="space-y-1">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Purpose</Label>
@@ -247,17 +254,26 @@ export default function SiteVisitsHistoryPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                  {/* Task List */}
                   <div className="space-y-4">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
                       <Navigation className="h-3.5 w-3.5" /> Action Items & Observations
                     </Label>
                     {viewVisit.tasks && viewVisit.tasks.length > 0 ? (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {viewVisit.tasks.map((task, i) => (
-                          <div key={i} className="flex items-start gap-3 p-3 bg-primary/[0.02] border border-primary/5 rounded-sm">
-                            <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary shrink-0">{i+1}</div>
-                            <span className="text-sm font-medium">{task}</span>
+                          <div key={i} className="flex flex-col gap-2 p-3 bg-primary/[0.02] border border-primary/5 rounded-sm">
+                            <div className="flex items-start gap-3">
+                              <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary shrink-0">{i+1}</div>
+                              <span className="text-sm font-medium">{task.text}</span>
+                            </div>
+                            {task.photoUrl && (
+                              <div className="ml-8 mt-1 relative h-24 w-40 rounded-sm overflow-hidden border shadow-sm cursor-pointer group" onClick={() => setEnlargedImage(task.photoUrl)}>
+                                <img src={task.photoUrl} className="h-full w-full object-cover" alt={`Proof for task ${i+1}`} />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
+                                  <Maximize2 className="h-4 w-4 text-white opacity-0 group-hover:opacity-100" />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -266,7 +282,6 @@ export default function SiteVisitsHistoryPage() {
                     )}
                   </div>
 
-                  {/* Location Audit */}
                   <div className="space-y-4">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
                       <MapPin className="h-3.5 w-3.5" /> GPS Audit (Logistics)
@@ -302,6 +317,17 @@ export default function SiteVisitsHistoryPage() {
           <div className="p-4 border-t bg-muted/5 flex justify-end">
             <Button variant="outline" className="rounded-sm font-bold" onClick={() => setViewVisit(null)}>Close Report</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!enlargedImage} onOpenChange={(o) => !o && setEnlargedImage(null)}>
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm">
+          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 bg-black/20 hover:bg-black/40 rounded-full shadow-sm" onClick={() => setEnlargedImage(null)}>
+            <X className="h-6 w-6" />
+          </Button>
+          {enlargedImage && (
+            <img src={enlargedImage} className="max-w-full max-h-full object-contain shadow-2xl" alt="Enlarged proof" />
+          )}
         </DialogContent>
       </Dialog>
     </div>
