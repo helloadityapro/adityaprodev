@@ -1,9 +1,8 @@
-
 "use client";
 
 import * as React from "react";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, increment, serverTimestamp, getDocs, writeBatch } from "firebase/firestore";
+import { collection, doc, increment, serverTimestamp, getDocs, writeBatch, query, where } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,12 +72,10 @@ export default function AdminRewardsSettingsPage() {
   const [isUpdatingRates, setIsUpdatingRates] = React.useState(false);
   const [isSyncing, setIsSyncing] = React.useState(false);
   
-  // Manual Point Adjustment States
   const [selectedUserForPoints, setSelectedUserForPoints] = React.useState<UserProfile | null>(null);
   const [adjustmentValue, setAdjustmentValue] = React.useState<string>("");
   const [isSubmittingRequest, setIsSubmittingRequest] = React.useState(false);
 
-  // Rate States
   const [rates, setRates] = React.useState<Partial<RewardSettings>>({
     ptwNoCorrection: 1.0,
     ptwWithCorrection: 0.5,
@@ -154,16 +151,12 @@ export default function AdminRewardsSettingsPage() {
     toast({ title: 'Multiplier Updated', description: `Performance X-Factor set to ${multiplier}x.` });
   };
 
-  /**
-   * Powerful tool to recalculate the entire platform scoreboard.
-   * Scans Approved Permits, DPRs, and Movements to rebuild point balances.
-   */
   const handleRecalculateScoreboard = async () => {
-    if (!isSuperAdminUser) return;
+    if (!isSuperAdminUser || !allUsers) return;
     setIsSyncing(true);
     try {
       const userPointsMap: Record<string, number> = {};
-      if (allUsers) allUsers.forEach(u => userPointsMap[u.id] = 0);
+      allUsers.forEach(u => userPointsMap[u.id] = 0);
 
       // 1. Process Approved Permits
       const permitsSnap = await getDocs(query(collection(firestore, 'permits_to_work'), where('status', '==', 'Approved')));
@@ -208,7 +201,6 @@ export default function AdminRewardsSettingsPage() {
         }
       });
 
-      // Batch Update all user points
       const batch = writeBatch(firestore);
       Object.entries(userPointsMap).forEach(([uid, total]) => {
         batch.update(doc(firestore, 'users', uid), { totalPoints: total });
@@ -551,7 +543,6 @@ export default function AdminRewardsSettingsPage() {
         </Card>
       </div>
 
-      {/* Manual Adjustment Dialog */}
       <Dialog open={!!selectedUserForPoints} onOpenChange={(o) => !o && setSelectedUserForPoints(null)}>
         <DialogContent className="max-w-md rounded-sm">
           <DialogHeader>

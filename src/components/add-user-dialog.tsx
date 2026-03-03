@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -76,7 +75,9 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
         email: values.email,
         mobile: values.mobile,
         role: values.role,
-        registrationRequest: false, // Admin-created users are pre-approved
+        registrationRequest: false,
+        totalPoints: 0,
+        pointsMultiplier: 1,
         assignedProjectIds: [],
         createdAt: serverTimestamp(),
       };
@@ -106,7 +107,6 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
       onOpenChange(isOpen);
     }
   }
-
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

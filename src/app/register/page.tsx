@@ -39,16 +39,13 @@ export default function RegisterPage() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [mounted, setMounted] = useState(false)
 
-  // Set mounted state to prevent hydration mismatch
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Fetch profile to check if redirection is safe
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
-  // Redirect only if fully registered and authorized
   useEffect(() => {
     if (mounted && user && userProfile && !isProfileLoading && !userProfile.registrationRequest) {
       router.replace('/dashboard')
@@ -84,6 +81,8 @@ export default function RegisterPage() {
         role: values.role,
         registrationRequest: true,
         assignedProjectIds: [],
+        totalPoints: 0,
+        pointsMultiplier: 1,
         createdAt: serverTimestamp(),
       }
 

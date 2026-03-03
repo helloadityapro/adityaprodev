@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from "react";
@@ -45,7 +44,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
 
-  // Theme Sync
   React.useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     const isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -79,14 +77,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
 
-  // Redirection Logic
   React.useEffect(() => {
     if (!isUserLoading && !user && !isAuthPage) {
       router.replace('/login');
     }
   }, [isUserLoading, user, isAuthPage, router]);
 
-  // Bootstrap logic for Super Admins
   React.useEffect(() => {
     if (user && !isProfileLoading) {
       if (!isSuperAdmin(user.email)) return;
@@ -99,6 +95,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           email: user.email,
           role: 'Admin',
           registrationRequest: false,
+          totalPoints: userProfile?.totalPoints ?? 0,
+          pointsMultiplier: userProfile?.pointsMultiplier ?? 1,
           updatedAt: serverTimestamp(),
         };
 
@@ -113,6 +111,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           }
           updateData.mobile = user.phoneNumber || 'N/A';
           updateData.assignedProjectIds = [];
+          updateData.totalPoints = 0;
+          updateData.pointsMultiplier = 1;
         }
 
         setDocumentNonBlocking(doc(firestore, "users", user.uid), updateData, { merge: true });
@@ -195,10 +195,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     return <FullPageLoader />;
   }
 
-  // Wait for profile resolution before performing existence check
   if (isProfileLoading) return <FullPageLoader />;
 
-  // Auth is active but professional profile is missing (Purged account or incomplete registration)
   if (!userProfile && !isSuperAdmin(user.email)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
