@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -101,7 +100,8 @@ export default function SiteDocumentsPage() {
     setIsUploading(true);
     const storage = getStorage(firebaseApp);
     const timestamp = Date.now();
-    const storagePath = `site_documents/${siteId}/${timestamp}-${file.name}`;
+    // Use explicit path separators to avoid permission errors
+    const storagePath = `site_documents/${siteId}/${timestamp}-${file.name.replace(/\s+/g, '_')}`;
     const storageRef = ref(storage, storagePath);
     
     const uploadTask = uploadBytesResumable(storageRef, file);

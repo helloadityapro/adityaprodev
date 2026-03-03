@@ -169,7 +169,8 @@ export default function RecordMovementPage() {
     const timestamp = Date.now();
 
     for (const file of invoiceFiles) {
-      const storagePath = `uploads/${userId}/movements/${timestamp}-${file.name}`;
+      // Ensure explicit path separation to satisfy security rules
+      const storagePath = `uploads/${userId}/movements/${timestamp}-${file.name.replace(/\s+/g, '_')}`;
       const storageRef = ref(storage, storagePath);
       const uploadTask = uploadBytesResumable(storageRef, file);
 

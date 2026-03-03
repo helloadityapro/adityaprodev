@@ -252,8 +252,7 @@ export default function RaisePtwPage() {
       }));
 
       const newAttachments = await Promise.all(processedFiles.map(file => {
-        // Explicitly ensuring slashes are present between folders for permission matching
-        // Sanitizing the filename to prevent issues with special characters
+        // Ensure path uses explicit slash separators to avoid permission errors
         const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const filePath = `uploads/${user.uid}/${timestamp}-${safeName}`;
         return uploadFile(file, filePath);
