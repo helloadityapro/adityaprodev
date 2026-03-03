@@ -405,15 +405,17 @@ export default function RewardsPage() {
                     </TableCell>
                     {isAdmin && (
                       <TableCell className="text-right px-6">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm"
-                          onClick={() => setSelectedHistoryUser(leader)}
-                          title="View Earning History"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex justify-end">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm"
+                            onClick={() => setSelectedHistoryUser(leader)}
+                            title="View Earning History"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -446,6 +448,10 @@ export default function RewardsPage() {
                             <div className="flex justify-between items-center text-xs">
                                 <span className="font-medium">PtW (No Correction)</span>
                                 <Badge className="bg-green-100 text-green-800 border-green-200">+{settings?.ptwNoCorrection?.toFixed(2) || '1.00'}</Badge>
+                            </div>
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="font-medium text-amber-700">PtW (With Correction)</span>
+                                <Badge variant="outline" className="border-amber-200 text-amber-700 bg-amber-50">+{settings?.ptwWithCorrection?.toFixed(2) || '0.50'}</Badge>
                             </div>
                             <div className="flex justify-between items-center text-xs">
                                 <span className="font-medium">Movement Log</span>
