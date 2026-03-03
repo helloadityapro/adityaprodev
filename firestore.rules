@@ -29,7 +29,8 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         request.auth.uid == userId || 
         isAdmin() || 
-        (isSiteManager() && get(/databases/$(database)/documents/users/$(userId)).data.siteManagerId == request.auth.uid)
+        (isSiteManager() && get(/databases/$(database)/documents/users/$(userId)).data.siteManagerId == request.auth.uid) ||
+        (getUserData().siteManagerId == userId)
       );
       allow delete: if isAdmin();
     }
