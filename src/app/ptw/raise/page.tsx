@@ -534,7 +534,7 @@ export default function RaisePtwPage() {
 
               <div className="space-y-6">
                 <div className="space-y-3">
-                  <Label className="flex items-center gap-2 font-semibold"><FileUp className="h-4 w-4 text-primary" /> Reference Documents</Label>
+                  <Label className="flex items-center gap-2 font-semibold"><FileUp className="h-4 w-4 text-primary" /> Reference documents</Label>
                   <Input type="file" multiple onChange={(e) => setReferenceDocs(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
                 </div>
                 <div className="space-y-3">
