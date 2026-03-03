@@ -3,15 +3,27 @@
 
 import * as React from "react";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, doc, query, orderBy, limit } from "firebase/firestore";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { collection, doc, query, orderBy, limit, where, or, and, getDocs } from "firebase/firestore";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info } from "lucide-react";
+import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogClose
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import { isSuperAdmin } from "@/lib/auth-constants";
+import { format } from "date-fns";
 
 type UserProfile = {
   id: string;
@@ -32,9 +44,218 @@ type RewardSettings = {
   taskCompletion?: number;
 };
 
+type EarningEntry = {
+  id: string;
+  type: 'PTW' | 'DPR' | 'Movement';
+  title: string;
+  site: string;
+  date: any;
+  basePoints: number;
+  multiplier: number;
+  finalPoints: number;
+  isInherited: boolean;
+};
+
+function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { targetUser: UserProfile | null, open: boolean, onOpenChange: (o: boolean) => void, settings: RewardSettings | null }) {
+  const firestore = useFirestore();
+  const [entries, setEntries] = React.useState<EarningEntry[]>([]);
+  const [isLoading, setIsLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!open || !targetUser || !firestore || !settings) return;
+
+    const fetchHistory = async () => {
+      setIsLoading(true);
+      const history: EarningEntry[] = [];
+      const userId = targetUser.id;
+      const multiplier = targetUser.pointsMultiplier || 1;
+
+      try {
+        // 1. Fetch Permits (Approved only)
+        const ptwQuery = query(
+          collection(firestore, 'permits_to_work'),
+          and(
+            where('status', '==', 'Approved'),
+            or(where('siteEngineerId', '==', userId), where('siteManagerId', '==', userId))
+          )
+        );
+        const ptwSnap = await getDocs(ptwQuery);
+        ptwSnap.forEach(d => {
+          const data = d.data();
+          const isManager = data.siteManagerId === userId;
+          const hasRejection = (data.timeline || []).some((t: any) => t.status === 'Rejected');
+          const baseRate = hasRejection ? (settings.ptwWithCorrection || 0.5) : (settings.ptwNoCorrection || 1.0);
+          
+          history.push({
+            id: d.id,
+            type: 'PTW',
+            title: `Permit ${data.serialNumber}`,
+            site: data.siteName,
+            date: data.statusChangeDate || data.requestDate,
+            basePoints: baseRate,
+            multiplier: isManager ? 1 : multiplier,
+            finalPoints: isManager ? (baseRate * 0.5) : (baseRate * multiplier),
+            isInherited: isManager && data.siteEngineerId !== userId
+          });
+        });
+
+        // 2. Fetch DPRs
+        const dprQuery = query(
+          collection(firestore, 'dprs'),
+          or(where('userId', '==', userId), where('siteManagerId', '==', userId))
+        );
+        const dprSnap = await getDocs(dprQuery);
+        dprSnap.forEach(d => {
+          const data = d.data();
+          const isManager = data.siteManagerId === userId;
+          const baseRate = 1.0;
+
+          history.push({
+            id: d.id,
+            type: 'DPR',
+            title: `Daily Progress Report`,
+            site: data.siteName,
+            date: data.createdAt,
+            basePoints: baseRate,
+            multiplier: isManager ? 1 : multiplier,
+            finalPoints: isManager ? 0.25 : (baseRate * multiplier),
+            isInherited: isManager && data.userId !== userId
+          });
+        });
+
+        // 3. Fetch Movements
+        const movQuery = query(
+          collection(firestore, 'material_movements'),
+          or(where('userId', '==', userId), where('siteManagerId', '==', userId))
+        );
+        const movSnap = await getDocs(movQuery);
+        movSnap.forEach(d => {
+          const data = d.data();
+          const isManager = data.siteManagerId === userId;
+          const baseRate = settings.movementEngineer || 0.1;
+
+          history.push({
+            id: d.id,
+            type: 'Movement',
+            title: `Material Log: ${data.itemName}`,
+            site: data.siteName,
+            date: data.createdAt,
+            basePoints: baseRate,
+            multiplier: isManager ? 1 : multiplier,
+            finalPoints: isManager ? (baseRate * 0.5) : (baseRate * multiplier),
+            isInherited: isManager && data.userId !== userId
+          });
+        });
+
+        setEntries(history.sort((a, b) => {
+          const da = a.date?.toDate?.()?.getTime() || 0;
+          const db = b.date?.toDate?.()?.getTime() || 0;
+          return db - da;
+        }));
+      } catch (e) {
+        console.error("History fetch failed", e);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, [open, targetUser, firestore, settings]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 rounded-sm">
+        <DialogHeader className="p-6 pb-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-500/10 rounded-sm">
+              <History className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <DialogTitle>Earning History: {targetUser?.username}</DialogTitle>
+              <DialogDescription>Detailed audit of reward points accumulated across the platform.</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-hidden flex flex-col mt-4">
+          {isLoading ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 py-20">
+              <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+              <p className="text-sm font-medium text-muted-foreground animate-pulse">Auditing documentation logs...</p>
+            </div>
+          ) : entries.length > 0 ? (
+            <ScrollArea className="flex-1 px-6 pb-6">
+              <Table>
+                <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                  <TableRow>
+                    <TableHead>Activity</TableHead>
+                    <TableHead>Site</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Base</TableHead>
+                    <TableHead className="text-right">Points</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {entries.map((entry) => (
+                    <TableRow key={entry.id} className="hover:bg-muted/5 transition-colors">
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm leading-tight">{entry.title}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {entry.date ? format(entry.date.toDate(), 'dd MMM yyyy HH:mm') : '—'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs font-medium text-muted-foreground">{entry.site}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          {entry.type === 'PTW' && <FileCheck className="h-3 w-3 text-blue-500" />}
+                          {entry.type === 'DPR' && <FileText className="h-3 w-3 text-amber-500" />}
+                          {entry.type === 'Movement' && <ArrowLeftRight className="h-3 w-3 text-emerald-500" />}
+                          <span className="text-[10px] font-black uppercase tracking-tighter">{entry.type}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-[10px] text-muted-foreground">
+                        {entry.basePoints.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end">
+                          <span className="font-black text-primary text-sm">+{entry.finalPoints.toFixed(2)}</span>
+                          {entry.isInherited ? (
+                            <Badge variant="outline" className="h-3.5 px-1 text-[8px] font-black border-amber-200 text-amber-700 bg-amber-50">INHERITED</Badge>
+                          ) : entry.multiplier > 1 && (
+                            <span className="text-[8px] font-bold text-muted-foreground">x{entry.multiplier} Factor</span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center py-32 text-center text-muted-foreground italic">
+              <History className="h-12 w-12 opacity-10 mb-4" />
+              <p>No document earning records found for this user.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t bg-muted/5 flex justify-end">
+          <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Close History</Button></DialogClose>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function RewardsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+
+  const [selectedHistoryUser, setSelectedHistoryUser] = React.useState<UserProfile | null>(null);
 
   // Fetch current user's profile
   const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -51,6 +272,7 @@ export default function RewardsPage() {
   );
   const { data: leaders, isLoading: isLeadersLoading } = useCollection<UserProfile>(leadersQuery);
 
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const pointValue = settings?.pointValueInRs || 1;
   const userPoints = userProfile?.totalPoints || 0;
   const monetaryValue = userPoints * pointValue;
@@ -71,11 +293,24 @@ export default function RewardsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-          <Trophy className="h-8 w-8 text-amber-500" /> Points Bank
-        </h1>
-        <p className="text-muted-foreground">Track your earned rewards and professional performance ranking.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+            <Trophy className="h-8 w-8 text-amber-500" /> Points Bank
+          </h1>
+          <p className="text-muted-foreground">Track your earned rewards and professional performance ranking.</p>
+        </div>
+        
+        {userProfile && (
+          <Button 
+            onClick={() => setSelectedHistoryUser(userProfile)} 
+            variant="outline" 
+            className="rounded-sm font-bold border-primary text-primary hover:bg-primary/5 h-11 px-6 shadow-sm"
+          >
+            <History className="mr-2 h-4 w-4" />
+            View My History
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -132,7 +367,8 @@ export default function RewardsPage() {
                   <TableHead>Personnel</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead className="text-right px-2">Total Points</TableHead>
-                  <TableHead className="text-right px-6">Earned Reward</TableHead>
+                  <TableHead className="text-right">Earned Reward</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -163,8 +399,23 @@ export default function RewardsPage() {
                     <TableCell className="text-right px-2 font-mono text-primary">
                         {(leader.totalPoints || 0).toFixed(2)}
                     </TableCell>
-                    <TableCell className="text-right px-6 font-bold text-green-700">
+                    <TableCell className="text-right font-bold text-green-700">
                         ₹{((leader.totalPoints || 0) * pointValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right px-6">
+                      {isAdmin ? (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm"
+                          onClick={() => setSelectedHistoryUser(leader)}
+                          title="View Earning History"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <div className="w-8" />
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -234,6 +485,13 @@ export default function RewardsPage() {
             </Card>
         </div>
       </div>
+
+      <EarningHistoryDialog 
+        targetUser={selectedHistoryUser} 
+        open={!!selectedHistoryUser} 
+        onOpenChange={(o) => !o && setSelectedHistoryUser(null)} 
+        settings={settings || null}
+      />
     </div>
   );
 }
