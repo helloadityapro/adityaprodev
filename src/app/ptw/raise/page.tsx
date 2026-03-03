@@ -94,7 +94,6 @@ export default function RaisePtwPage() {
   const [selectedSite, setSelectedSite] = React.useState<Site | null>(null);
   const [files, setFiles] = React.useState<File[]>([]);
   const [referenceDocs, setReferenceDocs] = React.useState<File[]>([]);
-  const [vlogFile, setVlogFile] = React.useState<File | null>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [submittedPermit, setSubmittedPermit] = React.useState<{id: string, serialNumber: string, siteName: string, managerMobile?: string} | null>(null);
@@ -244,7 +243,6 @@ export default function RaisePtwPage() {
 
       const timestamp = Date.now();
       let allFilesToUpload: File[] = [...files, ...referenceDocs];
-      if (vlogFile) allFilesToUpload.push(new File([vlogFile], `attestation-${vlogFile.name}`, { type: vlogFile.type }));
 
       const processedFiles = await Promise.all(allFilesToUpload.map(async (file) => {
         if (file.type.startsWith('image/')) return imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
@@ -268,7 +266,7 @@ export default function RaisePtwPage() {
         userName: userProfile.username || user.email || 'User',
         userRole: userProfile.role,
         remarks: values.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with corrections." : "Initial permit creation."),
-        action: isCorrectionMode ? "Resubmitted" : "Created",
+        action: iCorrectionMode ? "Resubmitted" : "Created",
         submissionIndex: currentSubmissionIndex
       };
 
@@ -395,7 +393,6 @@ export default function RaisePtwPage() {
                 setSelectedSite(null);
                 setFiles([]);
                 setReferenceDocs([]);
-                setVlogFile(null);
               }}>
                 Raise Another
               </Button>
@@ -540,15 +537,9 @@ export default function RaisePtwPage() {
                   <Label className="flex items-center gap-2 font-semibold"><FileUp className="h-4 w-4 text-primary" /> Reference Documents</Label>
                   <Input type="file" multiple onChange={(e) => setReferenceDocs(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                    <Label className="flex items-center gap-2 font-semibold"><FileUp className="h-4 w-4 text-primary" /> Additional Attachments</Label>
-                    <Input type="file" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
-                  </div>
-                  <div className="space-y-3">
-                    <Label className="flex items-center gap-2 font-semibold"><FileUp className="h-4 w-4 text-primary" /> Self Attestation (Vlog)</Label>
-                    <Input type="file" accept="video/*" onChange={(e) => setVlogFile(e.target.files ? e.target.files[0] : null)} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
-                  </div>
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2 font-semibold"><FileUp className="h-4 w-4 text-primary" /> Additional Attachments</Label>
+                  <Input type="file" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
                 </div>
               </div>
 
