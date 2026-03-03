@@ -266,7 +266,7 @@ export default function RaisePtwPage() {
         userName: userProfile.username || user.email || 'User',
         userRole: userProfile.role,
         remarks: values.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with corrections." : "Initial permit creation."),
-        action: iCorrectionMode ? "Resubmitted" : "Created",
+        action: isCorrectionMode ? "Resubmitted" : "Created",
         submissionIndex: currentSubmissionIndex
       };
 
@@ -538,7 +538,7 @@ export default function RaisePtwPage() {
                   <Input type="file" multiple onChange={(e) => setReferenceDocs(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
                 </div>
                 <div className="space-y-3">
-                  <Label className="flex items-center gap-2 font-semibold"><FileUp className="h-4 w-4 text-primary" /> Additional Attachments</Label>
+                  <Label className="flex items-center gap-2 font-semibold"><FileUp className="h-4 w-4 text-primary" /> Work related files</Label>
                   <Input type="file" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
                 </div>
               </div>
