@@ -27,6 +27,8 @@ import {
   BookOpen,
   Coins,
   Truck,
+  Navigation,
+  Activity,
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -89,6 +91,38 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroup>
+
+      {userRole === 'Site Manager' && (
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Site Visits</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Start Site Visit" isActive={pathname === '/site-visits/start'} className="rounded-sm">
+                <Link href="/site-visits/start">
+                  <Navigation className="h-4 w-4" />
+                  <span className="font-medium">Start Visit</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Active Visits" isActive={pathname === '/site-visits/active'} className="rounded-sm">
+                <Link href="/site-visits/active">
+                  <Activity className="h-4 w-4" />
+                  <span className="font-medium">Active Visits</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Visit History" isActive={pathname === '/site-visits/history'} className="rounded-sm">
+                <Link href="/site-visits/history">
+                  <History className="h-4 w-4" />
+                  <span className="font-medium">Visit History</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+      )}
 
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Task Management</SidebarGroupLabel>

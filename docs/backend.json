@@ -150,34 +150,30 @@
       },
       "required": ["siteName", "title", "assignedToId", "priority", "status", "dueDate"]
     },
-    "CleanupRequest": {
-      "title": "Cleanup Request",
+    "SiteVisit": {
+      "title": "Site Visit Report",
       "type": "object",
-      "description": "Administrative request to purge all data for a specific user.",
       "properties": {
         "id": { "type": "string" },
-        "targetEmail": { "type": "string" },
-        "requestedById": { "type": "string" },
-        "requestedByName": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "managerId": { "type": "string" },
+        "managerName": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "startLat": { "type": "number" },
+        "startLng": { "type": "number" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "endLat": { "type": "number" },
+        "endLng": { "type": "number" },
+        "selfieUrl": { "type": "string" },
+        "purpose": { "type": "string", "enum": ["Kick-off visit", "Regular visit", "Site team meetup", "Vendor meetup"] },
+        "details": { "type": "string" },
+        "tasks": { "type": "array", "items": { "type": "string" } },
+        "customerAvailable": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["ongoing", "completed"] },
         "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "RedemptionRequest": {
-      "title": "Redemption Request",
-      "type": "object",
-      "description": "User request to redeem reward points for cash/rewards.",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "userName": { "type": "string" },
-        "points": { "type": "number" },
-        "amountInRs": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "processedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "points", "amountInRs", "status"]
+      "required": ["siteId", "siteName", "managerId", "startTime", "startLat", "startLng", "status"]
     }
   },
   "auth": {
@@ -190,40 +186,8 @@
         "definition": { "entityName": "User" }
       },
       {
-        "path": "/suppliers/{supplierId}",
-        "definition": { "entityName": "Supplier" }
-      },
-      {
-        "path": "/system_settings/{settingId}",
-        "definition": { "entityName": "SystemSettings" }
-      },
-      {
-        "path": "/permits_to_work/{permitId}",
-        "definition": { "entityName": "PermitToWork" }
-      },
-      {
-        "path": "/dprs/{dprId}",
-        "definition": { "entityName": "DPR" }
-      },
-      {
-        "path": "/requirements/{reqId}",
-        "definition": { "entityName": "Requirement" }
-      },
-      {
-        "path": "/material_movements/{movementId}",
-        "definition": { "entityName": "MaterialMovement" }
-      },
-      {
-        "path": "/tasks/{taskId}",
-        "definition": { "entityName": "Task" }
-      },
-      {
-        "path": "/cleanup_requests/{requestId}",
-        "definition": { "entityName": "CleanupRequest" }
-      },
-      {
-        "path": "/redemption_requests/{requestId}",
-        "definition": { "entityName": "RedemptionRequest" }
+        "path": "/site_visits/{visitId}",
+        "definition": { "entityName": "SiteVisit" }
       }
     ]
   }

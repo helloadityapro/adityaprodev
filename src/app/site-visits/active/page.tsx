@@ -1,0 +1,131 @@
+
+"use client";
+
+import * as React from "react";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
+import { collection, doc, query, where, orderBy } from "firebase/firestore";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, AlertCircle } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { useRouter } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+
+type SiteVisit = {
+  id: string;
+  siteName: string;
+  startTime: any;
+  startLat: number;
+  startLng: number;
+  status: 'ongoing' | 'completed';
+};
+
+export default function ActiveSiteVisitsPage() {
+  const firestore = useFirestore();
+  const { user } = useUser();
+  const router = useRouter();
+
+  const visitsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(
+      collection(firestore, 'site_visits'),
+      where('managerId', '==', user.uid),
+      where('status', '==', 'ongoing')
+    );
+  }, [firestore, user]);
+
+  const { data: visits, isLoading } = useCollection<SiteVisit>(visitsQuery);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8 max-w-4xl mx-auto">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+            <Navigation className="h-8 w-8" /> Active Site Presence
+          </h1>
+          <p className="text-muted-foreground">Manage your current ongoing site visits.</p>
+        </div>
+        <Button onClick={() => router.push('/site-visits/start')} variant="outline" className="rounded-sm font-bold border-primary text-primary">
+          Start New Visit
+        </Button>
+      </div>
+
+      {visits && visits.length > 0 ? (
+        <div className="grid gap-6">
+          {visits.map((visit) => (
+            <Card key={visit.id} className="border-l-4 border-l-primary shadow-md overflow-hidden animate-in fade-in slide-in-from-left-4 duration-500">
+              <CardHeader className="bg-primary/5 pb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-primary text-white font-bold uppercase text-[10px] tracking-widest rounded-sm">Ongoing</Badge>
+                    <div className="flex items-center text-xs text-muted-foreground gap-1">
+                      <Clock className="h-3 w-3" />
+                      Started {formatDistanceToNow(visit.startTime?.toDate() || new Date(), { addSuffix: true })}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-black text-primary uppercase">
+                    <Timer className="h-3 w-3 animate-pulse" />
+                    Visit in progress
+                  </div>
+                </div>
+                <CardTitle className="text-2xl font-black mt-2 text-foreground">{visit.siteName}</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Start Time</span>
+                      <span className="font-bold text-sm">{visit.startTime ? format(visit.startTime.toDate(), 'dd MMM yyyy, HH:mm') : '—'}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Entry Location</span>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5 text-primary" />
+                        <span className="font-mono text-xs">{visit.startLat.toFixed(5)}, {visit.startLng.toFixed(5)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-muted/30 p-4 rounded-sm border border-dashed flex flex-col justify-center items-center text-center gap-2">
+                    <HardHat className="h-8 w-8 text-primary/40" />
+                    <p className="text-xs text-muted-foreground italic font-medium leading-relaxed">
+                      Please finish the visit report before leaving the site premises to capture end coordinates correctly.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="bg-muted/10 border-t p-4">
+                <Button 
+                  className="w-full h-12 text-lg font-black rounded-sm shadow-md" 
+                  onClick={() => router.push(`/site-visits/${visit.id}/finish`)}
+                >
+                  Complete Visit Report <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-24 text-center bg-card border border-dashed rounded-sm border-primary/20">
+          <Navigation className="h-16 w-16 text-muted-foreground/20 mb-4" />
+          <h3 className="text-xl font-bold">No Active Visits</h3>
+          <p className="text-muted-foreground max-w-sm mx-auto mt-2">
+            You are not currently logged in at any site. Click "Start Visit" when you arrive at a project location.
+          </p>
+          <Button onClick={() => router.push('/site-visits/start')} className="mt-6 font-bold h-11 px-8 rounded-sm">
+            Check-in to Site
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
