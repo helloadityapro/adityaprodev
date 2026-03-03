@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -8,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat, Settings2, RotateCcw, Plus, Minus, ShieldCheck, History, CheckCircle2, XCircle, LayoutGrid, Zap, RefreshCcw } from "lucide-react";
+import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat, Settings2, RotateCcw, Plus, Minus, ShieldCheck, History, CheckCircle2, XCircle, LayoutGrid, Zap, RefreshCcw, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type UserProfile = {
   id: string;
@@ -58,6 +60,17 @@ type PointRequest = {
   requestedByName: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
+};
+
+type RedemptionRequest = {
+  id: string;
+  userId: string;
+  userName: string;
+  points: number;
+  amountInRs: number;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: any;
+  processedAt?: any;
 };
 
 export default function AdminRewardsSettingsPage() {
@@ -107,6 +120,9 @@ export default function AdminRewardsSettingsPage() {
 
   const requestsQuery = useMemoFirebase(() => collection(firestore, 'point_adjustment_requests'), [firestore]);
   const { data: allRequests, isLoading: isRequestsLoading } = useCollection<PointRequest>(requestsQuery);
+
+  const redemptionsQuery = useMemoFirebase(() => collection(firestore, 'redemption_requests'), [firestore]);
+  const { data: redemptionRequests, isLoading: isRedemptionsLoading } = useCollection<RedemptionRequest>(redemptionsQuery);
 
   React.useEffect(() => {
     if (settings) {
@@ -289,6 +305,48 @@ export default function AdminRewardsSettingsPage() {
     }
   };
 
+  const handleProcessRedemption = async (req: RedemptionRequest, action: 'approved' | 'rejected') => {
+    if (!isSuperAdminUser || !user) return;
+
+    try {
+      const reqRef = doc(firestore, 'redemption_requests', req.id);
+      
+      if (action === 'approved') {
+        const userRef = doc(firestore, 'users', req.userId);
+        // Deduct points from user
+        updateDocumentNonBlocking(userRef, { totalPoints: increment(-req.points) });
+
+        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+          userId: req.userId,
+          title: "Redemption Approved",
+          description: `Your request to redeem ${req.points} points (₹${req.amountInRs.toFixed(2)}) has been approved and processed.`,
+          link: "/rewards",
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+          userId: req.userId,
+          title: "Redemption Rejected",
+          description: `Your request to redeem ${req.points} points has been rejected. No points were deducted.`,
+          link: "/rewards",
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      updateDocumentNonBlocking(reqRef, {
+        status: action,
+        processedAt: serverTimestamp(),
+        processedById: user.uid
+      });
+
+      toast({ title: `Redemption ${action}`, description: `The request has been marked as ${action}.` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    }
+  };
+
   const pendingRequests = React.useMemo(() => {
     return allRequests?.filter(r => r.status === 'pending').sort((a, b) => {
       const da = a.createdAt?.toDate?.()?.getTime() || 0;
@@ -296,6 +354,14 @@ export default function AdminRewardsSettingsPage() {
       return db - da;
     }) || [];
   }, [allRequests]);
+
+  const pendingRedemptions = React.useMemo(() => {
+    return redemptionRequests?.filter(r => r.status === 'pending').sort((a, b) => {
+      const da = a.createdAt?.toDate?.()?.getTime() || 0;
+      const db = b.createdAt?.toDate?.()?.getTime() || 0;
+      return db - da;
+    }) || [];
+  }, [redemptionRequests]);
 
   const filteredUsers = React.useMemo(() => {
     if (!allUsers) return [];
@@ -305,175 +371,308 @@ export default function AdminRewardsSettingsPage() {
     ).sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
   }, [allUsers, userSearch]);
 
-  if (isProfileLoading || isUsersLoading || isRequestsLoading || isUserLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
+  if (isProfileLoading || isUsersLoading || isRequestsLoading || isUserLoading || isRedemptionsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   if (!isAdmin) return null;
 
   return (
     <div className="space-y-8 pb-20 max-w-5xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <Coins className="h-8 w-8 text-amber-600" /> Rewards Administration
-          </h1>
-          <p className="text-muted-foreground">Configure the points economy and process manual performance adjustments.</p>
-        </div>
-        {isSuperAdminUser && (
-          <Button onClick={handleRecalculateScoreboard} disabled={isSyncing} variant="outline" className="rounded-sm font-bold border-amber-500 text-amber-700 hover:bg-amber-50">
-            {isSyncing ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
-            Recalculate Scoreboard
-          </Button>
-        )}
+      <div className="flex flex-col gap-1">
+        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+          <Coins className="h-8 w-8 text-amber-600" /> Rewards Setup
+        </h1>
+        <p className="text-muted-foreground">Manage reward economy, approve redemptions and adjust balances.</p>
       </div>
 
-      <div className="flex flex-col gap-8">
-        <Card className="w-full rounded-sm border-primary/10 shadow-md">
-          <CardHeader className="bg-primary/5 border-b py-4">
-            <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                <CardTitle>Global Point Value</CardTitle>
-            </div>
-            <CardDescription>Define the monetary value of one reward point.</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="point-value" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Value in Rupees (₹)</Label>
-                <div className="flex gap-2">
-                  <Input 
-                    id="point-value" 
-                    type="number" 
-                    step="0.1" 
-                    value={pointValueInput} 
-                    onChange={(e) => setPointValueInput(e.target.value)}
-                    className="rounded-sm font-mono font-bold text-lg h-11"
-                  />
-                  <Button onClick={handleUpdatePointValue} disabled={isUpdatingGlobal} className="rounded-sm font-bold h-11 px-8">
-                    {isUpdatingGlobal ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                    Set Value
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="economy" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-8 rounded-sm max-w-2xl bg-muted/50 border border-primary/10">
+          <TabsTrigger value="economy" className="rounded-sm font-bold"><LayoutGrid className="h-4 w-4 mr-2" /> Economy & Rates</TabsTrigger>
+          <TabsTrigger value="redemptions" className="rounded-sm font-bold relative">
+            <CreditCard className="h-4 w-4 mr-2" /> Redemptions
+            {pendingRedemptions.length > 0 && <Badge className="absolute -top-2 -right-2 h-5 min-w-5 flex items-center justify-center p-0 text-[10px] bg-red-500">{pendingRedemptions.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="personnel" className="rounded-sm font-bold"><UserCog className="h-4 w-4 mr-2" /> Personnel Mgt</TabsTrigger>
+        </TabsList>
 
-        <Card className="w-full rounded-sm border-amber-500/10 shadow-md">
-          <CardHeader className="bg-amber-500/5 border-b py-4">
-            <div className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-amber-600" />
-                <CardTitle>Activity Reward Rates</CardTitle>
-            </div>
-            <CardDescription>Set how many points are awarded for specific site actions. Managers receive percentage inheritances automatically.</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b pb-1">Permit to Work</h3>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-bold">PtW (No Correction)</Label>
-                  <Input type="number" step="0.05" value={rates.ptwNoCorrection} onChange={e => setRates({...rates, ptwNoCorrection: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-bold">PtW (With Correction)</Label>
-                  <Input type="number" step="0.05" value={rates.ptwWithCorrection} onChange={e => setRates({...rates, ptwWithCorrection: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
-                </div>
-                <p className="text-[9px] text-muted-foreground italic">Manager gets 50% inheritance</p>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b pb-1">DPR</h3>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-bold">DPR (Engineer)</Label>
-                  <Input type="number" step="0.01" value={rates.dprEngineer} onChange={e => setRates({...rates, dprEngineer: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-bold">DPR (Manager)</Label>
-                  <Input type="number" step="0.01" value={rates.dprManager} onChange={e => setRates({...rates, dprManager: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b pb-1">Materials</h3>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-bold">Movement (Engineer)</Label>
-                  <Input type="number" step="0.01" value={rates.movementEngineer} onChange={e => setRates({...rates, movementEngineer: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
-                </div>
-                <p className="text-[9px] text-muted-foreground italic">Manager gets 50% inheritance</p>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b pb-1">Tasks</h3>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-bold">Assignment (Assigner)</Label>
-                  <Input type="number" step="0.01" value={rates.taskAssignment} onChange={e => setRates({...rates, taskAssignment: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-bold">Completion (Assignee)</Label>
-                  <Input type="number" step="0.01" value={rates.taskCompletion} onChange={e => setRates({...rates, taskCompletion: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
-                </div>
-              </div>
-            </div>
-            <Button onClick={handleUpdateRates} disabled={isUpdatingRates} className="w-full rounded-sm font-bold h-11 bg-primary hover:bg-primary/90">
-              {isUpdatingRates ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              Update Reward Economy
-            </Button>
-          </CardContent>
-        </Card>
-
-        {pendingRequests.length > 0 && (
-          <Card className="w-full rounded-sm border-red-500/20 shadow-md overflow-hidden">
-            <CardHeader className="bg-red-500/5 border-b flex flex-row items-center justify-between">
-              <div className="space-y-1">
+        <TabsContent value="economy" className="space-y-8 animate-in fade-in-50 duration-300">
+          <div className="grid gap-8">
+            <Card className="rounded-sm border-primary/10 shadow-md">
+              <CardHeader className="bg-primary/5 border-b py-4">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-red-600" />
-                  <CardTitle className="text-red-700">Manual Adjustments Awaiting Approval</CardTitle>
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                    <CardTitle>Global Point Value</CardTitle>
                 </div>
-                <CardDescription>Sensitive performance adjustments requiring Super Admin oversight.</CardDescription>
+                <CardDescription>Define the monetary value of one reward point.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="point-value" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Value in Rupees (₹)</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        id="point-value" 
+                        type="number" 
+                        step="0.1" 
+                        value={pointValueInput} 
+                        onChange={(e) => setPointValueInput(e.target.value)}
+                        className="rounded-sm font-mono font-bold text-lg h-11"
+                      />
+                      <Button onClick={handleUpdatePointValue} disabled={isUpdatingGlobal} className="rounded-sm font-bold h-11 px-8">
+                        {isUpdatingGlobal ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                        Set Value
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-sm border-amber-500/10 shadow-md">
+              <CardHeader className="bg-amber-500/5 border-b py-4">
+                <div className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-amber-600" />
+                    <CardTitle>Activity Reward Rates</CardTitle>
+                </div>
+                <CardDescription>Set point rewards for site actions. Managers receive inheritance based on these base values.</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b pb-1">Permit to Work</h3>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold">PtW (No Correction)</Label>
+                      <Input type="number" step="0.05" value={rates.ptwNoCorrection} onChange={e => setRates({...rates, ptwNoCorrection: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold">PtW (With Correction)</Label>
+                      <Input type="number" step="0.05" value={rates.ptwWithCorrection} onChange={e => setRates({...rates, ptwWithCorrection: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b pb-1">DPR</h3>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold">DPR (Engineer)</Label>
+                      <Input type="number" step="0.01" value={rates.dprEngineer} onChange={e => setRates({...rates, dprEngineer: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold">DPR (Manager)</Label>
+                      <Input type="number" step="0.01" value={rates.dprManager} onChange={e => setRates({...rates, dprManager: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b pb-1">Materials</h3>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold">Movement (Engineer)</Label>
+                      <Input type="number" step="0.01" value={rates.movementEngineer} onChange={e => setRates({...rates, movementEngineer: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b pb-1">Tasks</h3>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold">Assignment (Assigner)</Label>
+                      <Input type="number" step="0.01" value={rates.taskAssignment} onChange={e => setRates({...rates, taskAssignment: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] uppercase font-bold">Completion (Assignee)</Label>
+                      <Input type="number" step="0.01" value={rates.taskCompletion} onChange={e => setRates({...rates, taskCompletion: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <Button onClick={handleUpdateRates} disabled={isUpdatingRates} className="flex-1 rounded-sm font-bold h-11">
+                    {isUpdatingRates ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                    Save Rate Changes
+                  </Button>
+                  {isSuperAdminUser && (
+                    <Button onClick={handleRecalculateScoreboard} disabled={isSyncing} variant="outline" className="flex-1 rounded-sm font-bold border-amber-500 text-amber-700">
+                      {isSyncing ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
+                      Sync Historical Records
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="redemptions" className="space-y-8 animate-in fade-in-50 duration-300">
+          <Card className="rounded-sm border-green-500/20 shadow-md overflow-hidden">
+            <CardHeader className="bg-green-500/5 border-b">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-green-600" />
+                <CardTitle>Pending Redemptions</CardTitle>
               </div>
-              <Badge variant="destructive" className="rounded-sm">{pendingRequests.length} Pending</Badge>
+              <CardDescription>Approve or reject personnel requests to convert points to cash/rewards.</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
-              <ScrollArea className="h-[250px]">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="px-6">Personnel</TableHead>
+                    <TableHead>Points</TableHead>
+                    <TableHead>Redemption Value</TableHead>
+                    <TableHead>Date Requested</TableHead>
+                    <TableHead className="text-right px-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingRedemptions.length > 0 ? pendingRedemptions.map(req => (
+                    <TableRow key={req.id}>
+                      <TableCell className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm">{req.userName}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase">{allUsers?.find(u => u.id === req.userId)?.role}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono font-bold text-primary">{req.points.toFixed(2)} Pts</TableCell>
+                      <TableCell className="font-bold text-green-700">₹{req.amountInRs.toFixed(2)}</TableCell>
+                      <TableCell className="text-[11px] text-muted-foreground">
+                        {req.createdAt ? format(req.createdAt.toDate(), 'dd MMM yyyy HH:mm') : 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        {isSuperAdminUser ? (
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700" onClick={() => handleProcessRedemption(req, 'approved')} title="Approve Redemption">
+                              <CheckCircle2 className="h-4 w-4 mr-1.5" /> Approve
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-8 rounded-sm text-red-600 hover:bg-red-50" onClick={() => handleProcessRedemption(req, 'rejected')} title="Reject Redemption">
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="text-[9px] uppercase tracking-wider">Awaiting Super Admin</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-24 text-muted-foreground italic">
+                        No pending redemption requests in queue.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="personnel" className="space-y-8 animate-in fade-in-50 duration-300">
+          {pendingRequests.length > 0 && (
+            <Card className="w-full rounded-sm border-red-500/20 shadow-md overflow-hidden">
+              <CardHeader className="bg-red-500/5 border-b flex flex-row items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-red-600" />
+                    <CardTitle className="text-red-700">Manual Adjustments Awaiting Approval</CardTitle>
+                  </div>
+                  <CardDescription>Sensitive performance adjustments requiring Super Admin oversight.</CardDescription>
+                </div>
+                <Badge variant="destructive" className="rounded-sm">{pendingRequests.length} Pending</Badge>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[250px]">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6">Personnel</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead className="text-right px-6">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingRequests.map(req => (
+                        <TableRow key={req.id}>
+                          <TableCell className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-sm">{req.userName}</span>
+                              <span className="text-[10px] uppercase text-muted-foreground">Requested By {req.requestedByName}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {req.type === 'clear' ? (
+                              <Badge variant="outline" className="text-[9px] uppercase border-red-200 text-red-700">Clear Balance</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[9px] uppercase border-blue-200 text-blue-700">Adjustment</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <span className={cn("font-mono font-bold", req.amount >= 0 ? "text-green-600" : "text-red-600")}>
+                              {req.amount > 0 ? `+${req.amount.toFixed(2)}` : req.amount.toFixed(2)} Pts
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            {isSuperAdminUser ? (
+                              <div className="flex justify-end gap-1">
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleProcessRequest(req, 'approved')}><CheckCircle2 className="h-4 w-4" /></Button>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => handleProcessRequest(req, 'rejected')}><XCircle className="h-4 w-4" /></Button>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground italic">Awaiting Super Admin...</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="w-full rounded-sm border-primary/10 shadow-md overflow-hidden">
+            <CardHeader className="bg-muted/5 border-b flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                      <Star className="h-5 w-5 text-primary" />
+                      <CardTitle>Personnel Scoreboard Management</CardTitle>
+                  </div>
+                  <CardDescription>Assign performance multipliers (X-Factors) and trigger manual adjustments.</CardDescription>
+              </div>
+              <div className="relative w-full md:w-64">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Search personnel..." className="h-10 pl-9 text-sm rounded-sm" value={userSearch} onChange={e => setUserSearch(e.target.value)} />
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[600px]">
                 <Table>
                   <TableHeader className="bg-muted/30">
                     <TableRow>
-                      <TableHead className="px-6">Personnel</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead className="text-right px-6">Actions</TableHead>
+                      <TableHead className="px-6">User</TableHead>
+                      <TableHead className="text-center">Current Points</TableHead>
+                      <TableHead className="text-center">X-Factor (Multiplier)</TableHead>
+                      <TableHead className="text-right px-6">Management</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pendingRequests.map(req => (
-                      <TableRow key={req.id}>
-                        <TableCell className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-sm">{req.userName}</span>
-                            <span className="text-[10px] uppercase text-muted-foreground">Requested By {req.requestedByName}</span>
-                          </div>
+                    {filteredUsers.map(u => (
+                      <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
+                        <TableCell className="px-6">
+                            <div className="flex flex-col">
+                                <span className="font-bold text-sm">{u.username}</span>
+                                <span className="text-[10px] text-muted-foreground uppercase tracking-tight">{u.role}</span>
+                            </div>
                         </TableCell>
-                        <TableCell>
-                          {req.type === 'clear' ? (
-                            <Badge variant="outline" className="text-[9px] uppercase border-red-200 text-red-700">Clear Balance</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[9px] uppercase border-blue-200 text-blue-700">Adjustment</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className={cn("font-mono font-bold", req.amount >= 0 ? "text-green-600" : "text-red-600")}>
-                            {req.amount > 0 ? `+${req.amount.toFixed(2)}` : req.amount.toFixed(2)} Pts
-                          </span>
+                        <TableCell className="text-center font-mono font-black text-primary">{(u.totalPoints || 0).toFixed(2)}</TableCell>
+                        <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <Input 
+                                  type="number" step="0.1" min="0.1" defaultValue={u.pointsMultiplier || 1.0}
+                                  className="w-16 h-8 text-center font-bold text-amber-700 bg-amber-50 border-amber-200 rounded-sm text-xs"
+                                  onBlur={(e) => handleUpdateUserMultiplier(u.id, parseFloat(e.target.value))}
+                              />
+                              <span className="text-xs font-bold text-muted-foreground">x</span>
+                            </div>
                         </TableCell>
                         <TableCell className="text-right px-6">
-                          {isSuperAdminUser ? (
-                            <div className="flex justify-end gap-1">
-                              <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleProcessRequest(req, 'approved')}><CheckCircle2 className="h-4 w-4" /></Button>
-                              <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => handleProcessRequest(req, 'rejected')}><XCircle className="h-4 w-4" /></Button>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground italic">Awaiting Super Admin...</span>
-                          )}
+                            <Button variant="outline" size="sm" className="h-8 rounded-sm text-xs font-bold border-primary/20 hover:bg-primary hover:text-white transition-all" onClick={() => setSelectedUserForPoints(u)}>
+                              <Settings2 className="h-3.5 w-3.5 mr-1.5" /> Adjust
+                            </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -482,66 +681,8 @@ export default function AdminRewardsSettingsPage() {
               </ScrollArea>
             </CardContent>
           </Card>
-        )}
-
-        <Card className="w-full rounded-sm border-primary/10 shadow-md overflow-hidden">
-          <CardHeader className="bg-muted/5 border-b flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                    <Star className="h-5 w-5 text-primary" />
-                    <CardTitle>Personnel Performance Scoreboard</CardTitle>
-                </div>
-                <CardDescription>Assign performance multipliers (X-Factors) and trigger manual adjustments.</CardDescription>
-            </div>
-            <div className="relative w-full md:w-64">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search personnel..." className="h-10 pl-9 text-sm rounded-sm" value={userSearch} onChange={e => setUserSearch(e.target.value)} />
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[600px]">
-              <Table>
-                <TableHeader className="bg-muted/30">
-                  <TableRow>
-                    <TableHead className="px-6">User</TableHead>
-                    <TableHead className="text-center">Current Points</TableHead>
-                    <TableHead className="text-center">X-Factor (Multiplier)</TableHead>
-                    <TableHead className="text-right px-6">Management</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map(u => (
-                    <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
-                      <TableCell className="px-6">
-                          <div className="flex flex-col">
-                              <span className="font-bold text-sm">{u.username}</span>
-                              <span className="text-[10px] text-muted-foreground uppercase tracking-tight">{u.role}</span>
-                          </div>
-                      </TableCell>
-                      <TableCell className="text-center font-mono font-black text-primary">{(u.totalPoints || 0).toFixed(2)}</TableCell>
-                      <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <Input 
-                                type="number" step="0.1" min="0.1" defaultValue={u.pointsMultiplier || 1.0}
-                                className="w-16 h-8 text-center font-bold text-amber-700 bg-amber-50 border-amber-200 rounded-sm text-xs"
-                                onBlur={(e) => handleUpdateUserMultiplier(u.id, parseFloat(e.target.value))}
-                            />
-                            <span className="text-xs font-bold text-muted-foreground">x</span>
-                          </div>
-                      </TableCell>
-                      <TableCell className="text-right px-6">
-                          <Button variant="outline" size="sm" className="h-8 rounded-sm text-xs font-bold border-primary/20 hover:bg-primary hover:text-white transition-all" onClick={() => setSelectedUserForPoints(u)}>
-                            <Settings2 className="h-3.5 w-3.5 mr-1.5" /> Adjust
-                          </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </div>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={!!selectedUserForPoints} onOpenChange={(o) => !o && setSelectedUserForPoints(null)}>
         <DialogContent className="max-w-md rounded-sm">
@@ -560,7 +701,7 @@ export default function AdminRewardsSettingsPage() {
                 <Input 
                   type="number" 
                   step="0.1" 
-                  placeholder="e.g. +5.0 or -2.5" 
+                  placeholder="e.g. +5.0" 
                   value={adjustmentValue} 
                   onChange={(e) => setAdjustmentValue(e.target.value)} 
                   className="rounded-sm font-mono h-11" 

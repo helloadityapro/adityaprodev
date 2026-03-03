@@ -1,12 +1,13 @@
+
 "use client";
 
 import * as React from "react";
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, doc, query, orderBy, limit, where, or, and, getDocs } from "firebase/firestore";
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking } from "@/firebase";
+import { collection, doc, query, orderBy, limit, where, or, and, getDocs, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight } from "lucide-react";
+import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -17,12 +18,16 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogClose
+  DialogClose,
+  DialogFooter
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 type UserProfile = {
   id: string;
@@ -53,6 +58,14 @@ type EarningEntry = {
   multiplier: number;
   finalPoints: number;
   isInherited: boolean;
+};
+
+type RedemptionRequest = {
+  id: string;
+  points: number;
+  amountInRs: number;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: any;
 };
 
 function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { targetUser: UserProfile | null, open: boolean, onOpenChange: (o: boolean) => void, settings: RewardSettings | null }) {
@@ -255,8 +268,12 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
 export default function RewardsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
 
   const [selectedHistoryUser, setSelectedHistoryUser] = React.useState<UserProfile | null>(null);
+  const [isRedeemDialogOpen, setIsRedeemDialogOpen] = React.useState(false);
+  const [redeemPoints, setRedeemPoints] = React.useState<string>("");
+  const [isRedeeming, setIsRedeeming] = React.useState(false);
 
   // Fetch current user's profile
   const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -277,6 +294,38 @@ export default function RewardsPage() {
   const pointValue = settings?.pointValueInRs || 1;
   const userPoints = userProfile?.totalPoints || 0;
   const monetaryValue = userPoints * pointValue;
+
+  const handleInitiateRedemption = async () => {
+    const pts = parseFloat(redeemPoints);
+    if (isNaN(pts) || pts <= 0) {
+      toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Enter a valid point amount.' });
+      return;
+    }
+    if (pts > userPoints) {
+      toast({ variant: 'destructive', title: 'Insufficient Balance', description: `You only have ${userPoints.toFixed(2)} points.` });
+      return;
+    }
+
+    setIsRedeeming(true);
+    try {
+      await addDocumentNonBlocking(collection(firestore, 'redemption_requests'), {
+        userId: user!.uid,
+        userName: userProfile!.username,
+        points: pts,
+        amountInRs: pts * pointValue,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+
+      toast({ title: 'Request Submitted', description: `Your request to redeem ${pts} points (₹${(pts * pointValue).toFixed(2)}) is pending approval.` });
+      setIsRedeemDialogOpen(false);
+      setRedeemPoints("");
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Submission Failed', description: e.message });
+    } finally {
+      setIsRedeeming(false);
+    }
+  };
 
   if (isUserLoading || isLeadersLoading) {
     return (
@@ -302,16 +351,26 @@ export default function RewardsPage() {
           <p className="text-muted-foreground">Track your earned rewards and professional performance ranking.</p>
         </div>
         
-        {userProfile && (
+        <div className="flex items-center gap-2">
+          {userProfile && (
+            <Button 
+              onClick={() => setSelectedHistoryUser(userProfile)} 
+              variant="outline" 
+              className="rounded-sm font-bold border-primary text-primary hover:bg-primary/5 h-11 px-6 shadow-sm"
+            >
+              <History className="mr-2 h-4 w-4" />
+              View My History
+            </Button>
+          )}
           <Button 
-            onClick={() => setSelectedHistoryUser(userProfile)} 
-            variant="outline" 
-            className="rounded-sm font-bold border-primary text-primary hover:bg-primary/5 h-11 px-6 shadow-sm"
+            onClick={() => setIsRedeemDialogOpen(true)}
+            className="rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-6 shadow-md"
+            disabled={userPoints <= 0}
           >
-            <History className="mr-2 h-4 w-4" />
-            View My History
+            <CreditCard className="mr-2 h-4 w-4" />
+            Redeem Points
           </Button>
-        )}
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -490,6 +549,71 @@ export default function RewardsPage() {
             </Card>
         </div>
       </div>
+
+      {/* Redemption Dialog */}
+      <Dialog open={isRedeemDialogOpen} onOpenChange={setIsRedeemDialogOpen}>
+        <DialogContent className="max-w-md rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-green-600" />
+              Redeem Reward Points
+            </DialogTitle>
+            <DialogDescription>
+              Submit a request to convert your points into rewards. Each point is currently valued at ₹{pointValue.toFixed(2)}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-muted/30 rounded-sm border space-y-1">
+                <p className="text-[10px] font-bold uppercase text-muted-foreground">Available Points</p>
+                <p className="text-2xl font-black text-primary font-mono">{userPoints.toFixed(2)}</p>
+              </div>
+              <div className="p-4 bg-green-50 rounded-sm border border-green-100 space-y-1">
+                <p className="text-[10px] font-bold uppercase text-green-700">Max Wallet Value</p>
+                <p className="text-2xl font-black text-green-700 font-mono">₹{monetaryValue.toFixed(2)}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-xs font-bold uppercase tracking-wider">Points to Redeem</Label>
+              <div className="relative">
+                <Input 
+                  type="number" 
+                  placeholder="0.00" 
+                  value={redeemPoints} 
+                  onChange={(e) => setRedeemPoints(e.target.value)}
+                  className="rounded-sm font-mono h-12 text-lg pr-12"
+                />
+                <div className="absolute right-3 top-3 text-xs font-bold text-muted-foreground uppercase">Pts</div>
+              </div>
+              {redeemPoints && !isNaN(parseFloat(redeemPoints)) && (
+                <div className="flex items-center gap-2 text-sm font-bold text-green-700 bg-green-50 p-2 rounded-sm border border-green-100">
+                  <TrendingUp className="h-4 w-4" />
+                  Redemption Value: ₹{(parseFloat(redeemPoints) * pointValue).toFixed(2)}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-amber-50 p-3 rounded-sm border border-amber-100 flex items-start gap-2">
+              <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-amber-800 leading-relaxed">
+                Requests are typically processed within 3-5 business days. Once approved, the equivalent amount will be dispatched via registered channel.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
+            <Button 
+              onClick={handleInitiateRedemption} 
+              disabled={isRedeeming || !redeemPoints || parseFloat(redeemPoints) <= 0 || parseFloat(redeemPoints) > userPoints}
+              className="rounded-sm font-black bg-green-600 hover:bg-green-700 min-w-[120px]"
+            >
+              {isRedeeming ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+              Send Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <EarningHistoryDialog 
         targetUser={selectedHistoryUser} 

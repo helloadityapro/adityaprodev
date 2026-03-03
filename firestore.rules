@@ -157,6 +157,13 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /redemption_requests/{requestId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     match /projects/{projectId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /sites/{siteId} { allow read: if isSignedIn(); allow write: if isAdmin() || isSiteManager(); }
     match /ptw_types/{ptwTypeId} { allow read: if isSignedIn(); allow write: if isAdmin(); }

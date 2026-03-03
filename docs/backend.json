@@ -162,6 +162,22 @@
         "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
         "createdAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "RedemptionRequest": {
+      "title": "Redemption Request",
+      "type": "object",
+      "description": "User request to redeem reward points for cash/rewards.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "points": { "type": "number" },
+        "amountInRs": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "processedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "points", "amountInRs", "status"]
     }
   },
   "auth": {
@@ -204,6 +220,10 @@
       {
         "path": "/cleanup_requests/{requestId}",
         "definition": { "entityName": "CleanupRequest" }
+      },
+      {
+        "path": "/redemption_requests/{requestId}",
+        "definition": { "entityName": "RedemptionRequest" }
       }
     ]
   }
