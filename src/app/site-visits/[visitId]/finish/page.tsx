@@ -64,7 +64,6 @@ export default function FinishSiteVisitPage() {
       setHasCameraPermission(true);
       setIsCameraActive(true);
       
-      // Since video tag is always rendered (even if hidden), videoRef.current is guaranteed to exist
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
@@ -89,10 +88,8 @@ export default function FinishSiteVisitPage() {
       const ctx = canvas.getContext("2d");
       
       if (ctx) {
-        // Draw the frame
         ctx.drawImage(video, 0, 0);
         
-        // Add timestamp overlay
         const timestamp = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
         ctx.font = "bold 24px sans-serif";
         ctx.fillStyle = "white";
@@ -105,7 +102,6 @@ export default function FinishSiteVisitPage() {
         const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
         setSelfie(dataUrl);
         
-        // Stop the stream
         const stream = video.srcObject as MediaStream;
         stream?.getTracks().forEach(track => track.stop());
         setIsCameraActive(false);
@@ -173,17 +169,18 @@ export default function FinishSiteVisitPage() {
 
     try {
       const storage = getStorage(firebaseApp);
+      const metadata = { contentType: 'image/jpeg' };
       
-      // 1. Upload Selfie
+      // 1. Upload Selfie with metadata to prevent storage access issues
       const selfieRef = ref(storage, `site_visits/${user.uid}/selfie_${Date.now()}.jpg`);
-      await uploadString(selfieRef, selfie, 'data_url');
+      await uploadString(selfieRef, selfie, 'data_url', metadata);
       const selfieUrl = await getDownloadURL(selfieRef);
 
-      // 2. Upload Task Photos
+      // 2. Upload Task Photos with metadata
       const finalTasks = await Promise.all(tasks.map(async (task, idx) => {
         if (task.localPhoto) {
           const taskPhotoRef = ref(storage, `site_visits/${user.uid}/task_${idx}_${Date.now()}.jpg`);
-          await uploadString(taskPhotoRef, task.localPhoto, 'data_url');
+          await uploadString(taskPhotoRef, task.localPhoto, 'data_url', metadata);
           const url = await getDownloadURL(taskPhotoRef);
           return { text: task.text, photoUrl: url };
         }
@@ -207,7 +204,7 @@ export default function FinishSiteVisitPage() {
       toast({ title: 'Report Submitted', description: `Visit to ${visit.siteName} has been documented.` });
       router.push('/site-visits/history');
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Submission Failed', description: e.message });
+      toast({ variant: 'destructive', title: 'Submission Failed', description: e.message || 'An error occurred during file upload or database update.' });
       setIsSubmitting(false);
     }
   };
@@ -236,7 +233,6 @@ export default function FinishSiteVisitPage() {
       </div>
 
       <div className="grid gap-8">
-        {/* Verification Selfie Section */}
         <Card className="rounded-sm shadow-md overflow-hidden border-primary/10">
           <CardHeader className="bg-primary/5 py-4 border-b">
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
@@ -245,7 +241,6 @@ export default function FinishSiteVisitPage() {
           </CardHeader>
           <CardContent className="pt-6">
             <div className="flex flex-col items-center gap-4">
-              {/* Always keep video tag in DOM to prevent race conditions with refs */}
               <div className={cn("relative w-full max-w-sm aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
                 <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
                 <div className="absolute bottom-4 left-0 right-0 flex justify-center">
@@ -290,7 +285,6 @@ export default function FinishSiteVisitPage() {
           </CardContent>
         </Card>
 
-        {/* Visit Details */}
         <Card className="rounded-sm shadow-md border-primary/10">
           <CardHeader>
             <CardTitle>Documentation Details</CardTitle>
