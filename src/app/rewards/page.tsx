@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -185,55 +184,57 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
             </div>
           ) : entries.length > 0 ? (
             <ScrollArea className="flex-1 px-6 pb-6">
-              <Table>
-                <TableHeader className="bg-muted/30 sticky top-0 z-10">
-                  <TableRow>
-                    <TableHead>Activity</TableHead>
-                    <TableHead>Site</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Base</TableHead>
-                    <TableHead className="text-right">Points</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {entries.map((entry) => (
-                    <TableRow key={entry.id} className="hover:bg-muted/5 transition-colors">
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-sm leading-tight">{entry.title}</span>
-                          <span className="text-[10px] text-muted-foreground font-mono">
-                            {entry.date ? format(entry.date.toDate(), 'dd MMM yyyy HH:mm') : '—'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-xs font-medium text-muted-foreground">{entry.site}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          {entry.type === 'PTW' && <FileCheck className="h-3 w-3 text-blue-500" />}
-                          {entry.type === 'DPR' && <FileText className="h-3 w-3 text-amber-500" />}
-                          {entry.type === 'Movement' && <ArrowLeftRight className="h-3 w-3 text-emerald-500" />}
-                          <span className="text-[10px] font-black uppercase tracking-tighter">{entry.type}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-[10px] text-muted-foreground">
-                        {entry.basePoints.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex flex-col items-end">
-                          <span className="font-black text-primary text-sm">+{entry.finalPoints.toFixed(2)}</span>
-                          {entry.isInherited ? (
-                            <Badge variant="outline" className="h-3.5 px-1 text-[8px] font-black border-amber-200 text-amber-700 bg-amber-50">INHERITED</Badge>
-                          ) : entry.multiplier > 1 && (
-                            <span className="text-[8px] font-bold text-muted-foreground">x{entry.multiplier} Factor</span>
-                          )}
-                        </div>
-                      </TableCell>
+              <div className="min-w-[700px]">
+                <Table>
+                  <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                    <TableRow>
+                      <TableHead className="py-2">Activity</TableHead>
+                      <TableHead className="py-2">Site</TableHead>
+                      <TableHead className="py-2">Type</TableHead>
+                      <TableHead className="text-right py-2">Base</TableHead>
+                      <TableHead className="text-right py-2">Points</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {entries.map((entry) => (
+                      <TableRow key={entry.id} className="hover:bg-muted/5 transition-colors">
+                        <TableCell className="py-2">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm leading-tight">{entry.title}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {entry.date ? format(entry.date.toDate(), 'dd MMM yyyy HH:mm') : '—'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <span className="text-xs font-medium text-muted-foreground">{entry.site}</span>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-1.5">
+                            {entry.type === 'PTW' && <FileCheck className="h-3 w-3 text-blue-500" />}
+                            {entry.type === 'DPR' && <FileText className="h-3 w-3 text-amber-500" />}
+                            {entry.type === 'Movement' && <ArrowLeftRight className="h-3 w-3 text-emerald-500" />}
+                            <span className="text-[10px] font-black uppercase tracking-tighter">{entry.type}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-[10px] text-muted-foreground py-2">
+                          {entry.basePoints.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right py-2">
+                          <div className="flex flex-col items-end">
+                            <span className="font-black text-primary text-sm">+{entry.finalPoints.toFixed(2)}</span>
+                            {entry.isInherited ? (
+                              <Badge variant="outline" className="h-3.5 px-1 text-[8px] font-black border-amber-200 text-amber-700 bg-amber-50">INHERITED</Badge>
+                            ) : entry.multiplier > 1 && (
+                              <span className="text-[8px] font-bold text-muted-foreground">x{entry.multiplier} Factor</span>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </ScrollArea>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center py-32 text-center text-muted-foreground italic">
