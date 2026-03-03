@@ -547,7 +547,7 @@ export default function RaisePtwPage() {
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-5 bg-primary/5 border-primary/20 shadow-sm">
                   <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isProcessing || isSubmitted} /></FormControl>
                   <div className="space-y-1">
-                    <FormLabel className="text-sm font-semibold text-primary uppercase">Safety Undertaking</FormLabel>
+                    <FormLabel className="text-sm font-bold text-primary uppercase">Safety Undertaking</FormLabel>
                     <p className="text-sm text-muted-foreground leading-relaxed">
                       I, <strong className="text-primary font-bold">{userProfile?.username || 'user'}</strong>, hereby undertake that the work will be carried out safely as per company SOPs and PPE will be used at all times.
                     </p>
