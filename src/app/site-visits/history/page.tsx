@@ -1,13 +1,12 @@
-
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, where, orderBy, limit } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, doc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, Navigation, History, ExternalLink, UserCheck, Timer, FileText, ImageIcon, Search, FilterX, Calendar } from "lucide-react";
+import { MapPin, Navigation, History, ExternalLink, UserCheck, Timer, FileText, ImageIcon, Search, FilterX, Calendar, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { cn } from "@/lib/utils";
 
 type SiteVisit = {
   id: string;
@@ -33,6 +33,7 @@ type SiteVisit = {
   tasks?: string[];
   selfieUrl?: string;
   customerAvailable?: boolean;
+  customerNames?: string;
   status: 'ongoing' | 'completed';
 };
 
@@ -218,6 +219,15 @@ export default function SiteVisitsHistoryPage() {
                         </div>
                       </div>
                     </div>
+
+                    {viewVisit.customerAvailable && viewVisit.customerNames && (
+                      <div className="p-4 bg-green-50 border border-green-100 rounded-sm">
+                        <Label className="text-[9px] font-black uppercase text-green-700 mb-2 flex items-center gap-1.5">
+                          <Users className="h-3.5 w-3.5" /> Met with Representative(s)
+                        </Label>
+                        <p className="text-sm font-bold text-green-900 leading-tight">{viewVisit.customerNames}</p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Visit Narrative */}

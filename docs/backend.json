@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -170,6 +169,7 @@
         "details": { "type": "string" },
         "tasks": { "type": "array", "items": { "type": "string" } },
         "customerAvailable": { "type": "boolean" },
+        "customerNames": { "type": "string" },
         "status": { "type": "string", "enum": ["ongoing", "completed"] },
         "createdAt": { "type": "string", "format": "date-time" }
       },

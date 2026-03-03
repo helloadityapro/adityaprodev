@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, MapPin, Loader2, Plus, Trash2, CheckCircle2, UserCheck, AlertCircle } from "lucide-react";
+import { Camera, MapPin, Loader2, Plus, Trash2, CheckCircle2, UserCheck, AlertCircle, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -41,6 +41,7 @@ export default function FinishSiteVisitPage() {
   const [purpose, setPurpose] = React.useState("");
   const [details, setDetails] = React.useState("");
   const [customerAvailable, setCustomerAvailable] = React.useState("no");
+  const [customerNames, setCustomerNames] = React.useState("");
   const [tasks, setTasks] = React.useState<string[]>([""]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -122,6 +123,11 @@ export default function FinishSiteVisitPage() {
       return;
     }
 
+    if (customerAvailable === 'yes' && !customerNames.trim()) {
+      toast({ variant: 'destructive', title: 'Missing Info', description: 'Please provide the names of the customer representatives.' });
+      return;
+    }
+
     setIsSubmitting(true);
     const endLocation = await getCurrentLocation();
 
@@ -140,6 +146,7 @@ export default function FinishSiteVisitPage() {
         details,
         tasks: tasks.filter(t => t.trim() !== ""),
         customerAvailable: customerAvailable === "yes",
+        customerNames: customerAvailable === "yes" ? customerNames : "",
         status: 'completed',
         updatedAt: serverTimestamp()
       });
@@ -272,9 +279,9 @@ export default function FinishSiteVisitPage() {
               </div>
             </div>
 
-            <div className="space-y-3 p-4 bg-muted/20 rounded-sm border">
+            <div className="space-y-4 p-4 bg-muted/20 rounded-sm border">
               <Label className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                <UserCheck className="h-4 w-4 text-primary" /> Was Customer or Representative Available?
+                <UserCheck className="h-4 w-4 text-primary" /> Was Customer or Representative Available During Visit?
               </Label>
               <RadioGroup value={customerAvailable} onValueChange={setCustomerAvailable} className="flex gap-6 mt-2">
                 <div className="flex items-center space-x-2">
@@ -286,6 +293,20 @@ export default function FinishSiteVisitPage() {
                   <Label htmlFor="c-no" className="font-bold cursor-pointer">NO</Label>
                 </div>
               </RadioGroup>
+
+              {customerAvailable === 'yes' && (
+                <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <Label className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                    <Users className="h-4 w-4 text-primary" /> Representative Name(s)
+                  </Label>
+                  <Input 
+                    placeholder="Enter names of persons met at site..." 
+                    value={customerNames}
+                    onChange={e => setCustomerNames(e.target.value)}
+                    className="rounded-sm bg-background"
+                  />
+                </div>
+              )}
             </div>
           </CardContent>
           <CardFooter className="bg-muted/10 border-t p-6">
