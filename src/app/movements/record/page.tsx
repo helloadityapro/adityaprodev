@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -69,7 +70,6 @@ type UserProfile = {
 
 type RewardSettings = {
   movementEngineer?: number;
-  movementManager?: number;
 };
 
 export default function RecordMovementPage() {
@@ -169,7 +169,6 @@ export default function RecordMovementPage() {
     const timestamp = Date.now();
 
     for (const file of invoiceFiles) {
-      // Ensure explicit path separation to satisfy security rules
       const storagePath = `uploads/${userId}/movements/${timestamp}-${file.name.replace(/\s+/g, '_')}`;
       const storageRef = ref(storage, storagePath);
       const uploadTask = uploadBytesResumable(storageRef, file);
@@ -215,18 +214,21 @@ export default function RecordMovementPage() {
 
       await Promise.all(promises);
 
+      // Reward Points Logic
       const rateEngineer = rewardSettings?.movementEngineer ?? 0.1;
-      const rateManager = rewardSettings?.movementManager ?? 0.05;
       const multiplier = userProfile.pointsMultiplier || 1;
-      const engineerPoints = rateEngineer * values.items.length * multiplier;
       
+      // 1. Award Engineer
+      const engineerPoints = rateEngineer * values.items.length * multiplier;
       updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
         totalPoints: increment(engineerPoints)
       });
 
+      // 2. Award Manager (50% of base points as per user request)
       if (userProfile.siteManagerId) {
+        const managerPoints = (rateEngineer * 0.5) * values.items.length;
         updateDocumentNonBlocking(doc(firestore, 'users', userProfile.siteManagerId), {
-            totalPoints: increment(rateManager * values.items.length)
+            totalPoints: increment(managerPoints)
         });
       }
       
@@ -572,7 +574,7 @@ export default function RecordMovementPage() {
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">GSTIN</p>
-                              <p className="font-mono font-bold flex items-center gap-1 uppercase"><Hash className="h-2.5 w-2.5" /> {(selectedTarget as Supplier).gstin}</p>
+                              <p className="font-mono font-bold flex items-center gap-1 uppercase"><Hash className="h-2.5 w-2.5" /> {(selectedTarget as Supplier).gstin.toUpperCase()}</p>
                             </div>
                             <div>
                               <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Mobile</p>

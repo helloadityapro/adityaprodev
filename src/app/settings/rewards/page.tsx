@@ -1,14 +1,15 @@
+
 "use client";
 
 import * as React from "react";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, increment, serverTimestamp } from "firebase/firestore";
+import { collection, doc, increment, serverTimestamp, getDocs, writeBatch } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat, Settings2, RotateCcw, Plus, Minus, ShieldCheck, History, CheckCircle2, XCircle, LayoutGrid, Zap } from "lucide-react";
+import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat, Settings2, RotateCcw, Plus, Minus, ShieldCheck, History, CheckCircle2, XCircle, LayoutGrid, Zap, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
@@ -70,6 +71,7 @@ export default function AdminRewardsSettingsPage() {
   const [userSearch, setUserSearch] = React.useState("");
   const [isUpdatingGlobal, setIsUpdatingGlobal] = React.useState(false);
   const [isUpdatingRates, setIsUpdatingRates] = React.useState(false);
+  const [isSyncing, setIsSyncing] = React.useState(false);
   
   // Manual Point Adjustment States
   const [selectedUserForPoints, setSelectedUserForPoints] = React.useState<UserProfile | null>(null);
@@ -82,8 +84,8 @@ export default function AdminRewardsSettingsPage() {
     ptwWithCorrection: 0.5,
     movementEngineer: 0.1,
     movementManager: 0.05,
-    dprEngineer: 0.1,
-    dprManager: 0.05,
+    dprEngineer: 1.0,
+    dprManager: 0.25,
     taskAssignment: 0.1,
     taskCompletion: 0.1
   });
@@ -117,8 +119,8 @@ export default function AdminRewardsSettingsPage() {
         ptwWithCorrection: settings.ptwWithCorrection ?? 0.5,
         movementEngineer: settings.movementEngineer ?? 0.1,
         movementManager: settings.movementManager ?? 0.05,
-        dprEngineer: settings.dprEngineer ?? 0.1,
-        dprManager: settings.dprManager ?? 0.05,
+        dprEngineer: settings.dprEngineer ?? 1.0,
+        dprManager: settings.dprManager ?? 0.25,
         taskAssignment: settings.taskAssignment ?? 0.1,
         taskCompletion: settings.taskCompletion ?? 0.1
       });
@@ -150,6 +152,75 @@ export default function AdminRewardsSettingsPage() {
       pointsMultiplier: multiplier
     });
     toast({ title: 'Multiplier Updated', description: `Performance X-Factor set to ${multiplier}x.` });
+  };
+
+  /**
+   * Powerful tool to recalculate the entire platform scoreboard.
+   * Scans Approved Permits, DPRs, and Movements to rebuild point balances.
+   */
+  const handleRecalculateScoreboard = async () => {
+    if (!isSuperAdminUser) return;
+    setIsSyncing(true);
+    try {
+      const userPointsMap: Record<string, number> = {};
+      if (allUsers) allUsers.forEach(u => userPointsMap[u.id] = 0);
+
+      // 1. Process Approved Permits
+      const permitsSnap = await getDocs(query(collection(firestore, 'permits_to_work'), where('status', '==', 'Approved')));
+      permitsSnap.docs.forEach(d => {
+        const p = d.data();
+        const hasRejection = (p.timeline || []).some((t: any) => t.status === 'Rejected');
+        const baseVal = hasRejection ? (rates.ptwWithCorrection || 0.5) : (rates.ptwNoCorrection || 1.0);
+        
+        const engineer = allUsers?.find(u => u.id === p.siteEngineerId);
+        const multiplier = engineer?.pointsMultiplier || 1;
+        
+        userPointsMap[p.siteEngineerId] = (userPointsMap[p.siteEngineerId] || 0) + (baseVal * multiplier);
+        if (p.siteManagerId) {
+          userPointsMap[p.siteManagerId] = (userPointsMap[p.siteManagerId] || 0) + (baseVal * 0.5);
+        }
+      });
+
+      // 2. Process DPRs
+      const dprsSnap = await getDocs(collection(firestore, 'dprs'));
+      dprsSnap.docs.forEach(d => {
+        const r = d.data();
+        const engineer = allUsers?.find(u => u.id === r.userId);
+        const multiplier = engineer?.pointsMultiplier || 1;
+        
+        userPointsMap[r.userId] = (userPointsMap[r.userId] || 0) + (1.0 * multiplier);
+        if (r.siteManagerId) {
+          userPointsMap[r.siteManagerId] = (userPointsMap[r.siteManagerId] || 0) + 0.25;
+        }
+      });
+
+      // 3. Process Movements
+      const movsSnap = await getDocs(collection(firestore, 'material_movements'));
+      movsSnap.docs.forEach(d => {
+        const m = d.data();
+        const engineer = allUsers?.find(u => u.id === m.userId);
+        const multiplier = engineer?.pointsMultiplier || 1;
+        const baseRate = rates.movementEngineer || 0.1;
+
+        userPointsMap[m.userId] = (userPointsMap[m.userId] || 0) + (baseRate * multiplier);
+        if (m.siteManagerId) {
+          userPointsMap[m.siteManagerId] = (userPointsMap[m.siteManagerId] || 0) + (baseRate * 0.5);
+        }
+      });
+
+      // Batch Update all user points
+      const batch = writeBatch(firestore);
+      Object.entries(userPointsMap).forEach(([uid, total]) => {
+        batch.update(doc(firestore, 'users', uid), { totalPoints: total });
+      });
+      await batch.commit();
+
+      toast({ variant: 'success', title: 'Scoreboard Synced', description: 'Points recalculated for all users based on current records.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Sync Failed', description: e.message });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleInitiateRequest = async (type: 'adjust' | 'clear') => {
@@ -204,7 +275,6 @@ export default function AdminRewardsSettingsPage() {
           updateDocumentNonBlocking(userRef, { totalPoints: increment(req.amount) });
         }
 
-        // Notify Target User
         addDocumentNonBlocking(collection(firestore, 'notifications'), {
           userId: req.userId,
           title: "Account Balance Adjusted",
@@ -249,15 +319,22 @@ export default function AdminRewardsSettingsPage() {
 
   return (
     <div className="space-y-8 pb-20 max-w-5xl mx-auto">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-          <Coins className="h-8 w-8 text-amber-600" /> Rewards Administration
-        </h1>
-        <p className="text-muted-foreground">Configure the points economy and process manual performance adjustments.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+            <Coins className="h-8 w-8 text-amber-600" /> Rewards Administration
+          </h1>
+          <p className="text-muted-foreground">Configure the points economy and process manual performance adjustments.</p>
+        </div>
+        {isSuperAdminUser && (
+          <Button onClick={handleRecalculateScoreboard} disabled={isSyncing} variant="outline" className="rounded-sm font-bold border-amber-500 text-amber-700 hover:bg-amber-50">
+            {isSyncing ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
+            Recalculate Scoreboard
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-8">
-        {/* Section 1: Global Point Value */}
         <Card className="w-full rounded-sm border-primary/10 shadow-md">
           <CardHeader className="bg-primary/5 border-b py-4">
             <div className="flex items-center gap-2">
@@ -289,14 +366,13 @@ export default function AdminRewardsSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Section 2: Activity Reward Rates */}
         <Card className="w-full rounded-sm border-amber-500/10 shadow-md">
           <CardHeader className="bg-amber-500/5 border-b py-4">
             <div className="flex items-center gap-2">
                 <Zap className="h-5 w-5 text-amber-600" />
                 <CardTitle>Activity Reward Rates</CardTitle>
             </div>
-            <CardDescription>Set how many points are awarded for specific site actions.</CardDescription>
+            <CardDescription>Set how many points are awarded for specific site actions. Managers receive percentage inheritances automatically.</CardDescription>
           </CardHeader>
           <CardContent className="pt-6 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -310,6 +386,7 @@ export default function AdminRewardsSettingsPage() {
                   <Label className="text-[10px] uppercase font-bold">PtW (With Correction)</Label>
                   <Input type="number" step="0.05" value={rates.ptwWithCorrection} onChange={e => setRates({...rates, ptwWithCorrection: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
                 </div>
+                <p className="text-[9px] text-muted-foreground italic">Manager gets 50% inheritance</p>
               </div>
 
               <div className="space-y-4">
@@ -330,10 +407,7 @@ export default function AdminRewardsSettingsPage() {
                   <Label className="text-[10px] uppercase font-bold">Movement (Engineer)</Label>
                   <Input type="number" step="0.01" value={rates.movementEngineer} onChange={e => setRates({...rates, movementEngineer: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-bold">Movement (Manager)</Label>
-                  <Input type="number" step="0.01" value={rates.movementManager} onChange={e => setRates({...rates, movementManager: parseFloat(e.target.value)})} className="h-9 rounded-sm font-mono" />
-                </div>
+                <p className="text-[9px] text-muted-foreground italic">Manager gets 50% inheritance</p>
               </div>
 
               <div className="space-y-4">
@@ -355,7 +429,6 @@ export default function AdminRewardsSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Section 3: Approvals Required (Conditional) */}
         {pendingRequests.length > 0 && (
           <Card className="w-full rounded-sm border-red-500/20 shadow-md overflow-hidden">
             <CardHeader className="bg-red-500/5 border-b flex flex-row items-center justify-between">
@@ -419,7 +492,6 @@ export default function AdminRewardsSettingsPage() {
           </Card>
         )}
 
-        {/* Section 4: Personnel Performance */}
         <Card className="w-full rounded-sm border-primary/10 shadow-md overflow-hidden">
           <CardHeader className="bg-muted/5 border-b flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1">

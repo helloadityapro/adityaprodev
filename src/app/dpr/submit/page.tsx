@@ -34,11 +34,6 @@ type Site = {
   name: string;
 };
 
-type RewardSettings = {
-  dprEngineer?: number;
-  dprManager?: number;
-};
-
 export default function SubmitDPRPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -52,9 +47,6 @@ export default function SubmitDPRPage() {
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
-
-  const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
-  const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
@@ -87,10 +79,9 @@ export default function SubmitDPRPage() {
   });
 
   const onSubmit = async (values: z.infer<typeof dprSchema>) => {
-    if (!user) return;
+    if (!user || !userProfile) return;
     setIsSubmitting(true);
     try {
-      // Combine paragraphs into a single description for storage
       const combinedDescription = values.updates.map(u => u.value.trim()).join('\n\n');
       
       addDocumentNonBlocking(collection(firestore, 'dprs'), {
@@ -103,20 +94,18 @@ export default function SubmitDPRPage() {
         createdAt: serverTimestamp(),
       });
 
-      // Reward Points Logic for DPR
-      const rateEngineer = rewardSettings?.dprEngineer ?? 0.1;
-      const rateManager = rewardSettings?.dprManager ?? 0.05;
-
-      const multiplier = userProfile?.pointsMultiplier || 1;
-      const engineerPoints = rateEngineer * multiplier;
+      // Reward Points Logic for DPR (Engineer 1.0, Manager 0.25)
+      const engineerPoints = 1.0 * (userProfile?.pointsMultiplier || 1);
       
+      // 1. Award Engineer
       updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
         totalPoints: increment(engineerPoints)
       });
 
+      // 2. Award Manager
       if (userProfile?.siteManagerId) {
         updateDocumentNonBlocking(doc(firestore, 'users', userProfile.siteManagerId), {
-            totalPoints: increment(rateManager)
+            totalPoints: increment(0.25)
         });
       }
       
@@ -126,7 +115,7 @@ export default function SubmitDPRPage() {
         description: combinedDescription
       });
       setIsSubmitted(true);
-      toast({ title: "Success", description: "DPR submitted successfully. Points updated." });
+      toast({ title: "Success", description: "DPR submitted. Points awarded to you and your manager." });
       form.reset({ siteName: "", reportDate: format(new Date(), 'yyyy-MM-dd'), updates: [{ value: "" }] });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });

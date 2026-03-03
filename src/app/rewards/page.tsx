@@ -7,7 +7,7 @@ import { collection, doc, query, orderBy, limit } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Coins, Award, TrendingUp, Medal, Star, User } from "lucide-react";
+import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -27,9 +27,7 @@ type RewardSettings = {
   ptwNoCorrection?: number;
   ptwWithCorrection?: number;
   movementEngineer?: number;
-  movementManager?: number;
   dprEngineer?: number;
-  dprManager?: number;
   taskAssignment?: number;
   taskCompletion?: number;
 };
@@ -48,7 +46,7 @@ export default function RewardsPage() {
 
   // Fetch top scorers for leaderboard
   const leadersQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'users'), orderBy('totalPoints', 'desc'), limit(10)), 
+    query(collection(firestore, 'users'), orderBy('totalPoints', 'desc'), limit(15)), 
     [firestore]
   );
   const { data: leaders, isLoading: isLeadersLoading } = useCollection<UserProfile>(leadersQuery);
@@ -177,52 +175,43 @@ export default function RewardsPage() {
 
         <div className="space-y-6">
             <Card className="rounded-sm border-primary/10">
-                <CardHeader>
-                    <CardTitle className="text-sm font-bold uppercase text-primary">Current Points System</CardTitle>
+                <CardHeader className="pb-3 flex flex-row items-center gap-2">
+                    <Info className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-sm font-bold uppercase text-primary">Reward Economy Rules</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="font-medium">PtW (No Correction)</span>
-                            <Badge className="bg-green-100 text-green-800 border-green-200">+{settings?.ptwNoCorrection?.toFixed(2) || '1.00'}</Badge>
+                    <div className="space-y-3">
+                        <div className="flex flex-col gap-1">
+                            <div className="flex justify-between items-center text-[11px]">
+                                <span className="font-bold text-muted-foreground uppercase">Engineer Submits:</span>
+                                <span className="font-black text-primary">100% Points</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px]">
+                                <span className="font-bold text-muted-foreground uppercase">Manager Inherits:</span>
+                                <Badge className="h-4 text-[9px] bg-amber-100 text-amber-800 border-amber-200">50% Share</Badge>
+                            </div>
                         </div>
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="font-medium">PtW (With Correction)</span>
-                            <Badge className="bg-blue-100 text-blue-800 border-blue-200">+{settings?.ptwWithCorrection?.toFixed(2) || '0.50'}</Badge>
-                        </div>
-                        <Separator className="my-1 opacity-50" />
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="font-medium">Movement Log (Engineer)</span>
-                            <Badge className="bg-slate-100 text-slate-800 border-slate-200">+{settings?.movementEngineer?.toFixed(2) || '0.10'}</Badge>
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="font-medium">Movement Log (Manager)</span>
-                            <Badge className="bg-slate-50 text-slate-600 border-slate-100">+{settings?.movementManager?.toFixed(2) || '0.05'}</Badge>
-                        </div>
-                        <Separator className="my-1 opacity-50" />
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="font-medium">DPR Submission (Engineer)</span>
-                            <Badge className="bg-slate-100 text-slate-800 border-slate-200">+{settings?.dprEngineer?.toFixed(2) || '0.10'}</Badge>
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="font-medium">DPR Submission (Manager)</span>
-                            <Badge className="bg-slate-50 text-slate-600 border-slate-100">+{settings?.dprManager?.toFixed(2) || '0.05'}</Badge>
-                        </div>
-                        <Separator className="my-1 opacity-50" />
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="font-medium">Task Assignment (Assigner)</span>
-                            <Badge className="bg-amber-100 text-amber-800 border-amber-200">+{settings?.taskAssignment?.toFixed(2) || '0.10'}</Badge>
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                            <span className="font-medium">Task Completion (Assignee)</span>
-                            <Badge className="bg-green-100 text-green-800 border-green-200">+{settings?.taskCompletion?.toFixed(2) || '0.10'}</Badge>
+                        <Separator />
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="font-medium">PtW (No Correction)</span>
+                                <Badge className="bg-green-100 text-green-800 border-green-200">+{settings?.ptwNoCorrection?.toFixed(2) || '1.00'}</Badge>
+                            </div>
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="font-medium">Movement Log</span>
+                                <Badge className="bg-slate-100 text-slate-800 border-slate-200">+{settings?.movementEngineer?.toFixed(2) || '0.10'}</Badge>
+                            </div>
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="font-medium">DPR Submission</span>
+                                <Badge className="bg-blue-100 text-blue-800 border-blue-200">+1.00</Badge>
+                            </div>
                         </div>
                     </div>
                     <Separator />
                     <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-sm border border-primary/10">
                         <TrendingUp className="h-4 w-4 text-primary" />
                         <div className="text-[10px] leading-relaxed italic text-muted-foreground">
-                            Rewards are dynamically adjusted by project administration based on site documentation goals.
+                            Engineer points are multiplied by their X-Factor. Manager inheritance is based on the base rate.
                         </div>
                     </div>
                 </CardContent>

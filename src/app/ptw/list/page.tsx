@@ -277,7 +277,9 @@ export default function PtwListPage() {
 
     // Rewards Point Logic
     if (targetStatus === 'Approved') {
-        const engineerDoc = await getDoc(doc(firestore, 'users', permit.siteEngineerId));
+        const engineerRef = doc(firestore, 'users', permit.siteEngineerId);
+        const engineerDoc = await getDoc(engineerRef);
+        
         if (engineerDoc.exists()) {
             const engineerData = engineerDoc.data();
             const multiplier = engineerData.pointsMultiplier || 1;
@@ -285,22 +287,30 @@ export default function PtwListPage() {
             // Check for any rejections in lifecycle
             const hasRejection = (permit.timeline || []).some(t => t.status === 'Rejected');
             
-            // Fetch configured rates or fallback to defaults
             const baseNoCorrection = rewardSettings?.ptwNoCorrection ?? 1.0;
             const baseWithCorrection = rewardSettings?.ptwWithCorrection ?? 0.5;
             
             const basePoints = hasRejection ? baseWithCorrection : baseNoCorrection;
-            const pointsToAdd = basePoints * multiplier;
-
-            updateDocumentNonBlocking(doc(firestore, 'users', permit.siteEngineerId), {
-                totalPoints: increment(pointsToAdd)
+            
+            // 1. Award Engineer
+            const pointsForEngineer = basePoints * multiplier;
+            updateDocumentNonBlocking(engineerRef, {
+                totalPoints: increment(pointsForEngineer)
             });
+
+            // 2. Award Manager (50% of base points as per user request)
+            if (permit.siteManagerId) {
+                const pointsForManager = basePoints * 0.5;
+                updateDocumentNonBlocking(doc(firestore, 'users', permit.siteManagerId), {
+                    totalPoints: increment(pointsForManager)
+                });
+            }
 
             // Notification for points
             addDocumentNonBlocking(collection(firestore, 'notifications'), {
                 userId: permit.siteEngineerId,
                 title: "Points Earned!",
-                description: `You earned ${pointsToAdd.toFixed(2)} points for permit ${permit.serialNumber}.`,
+                description: `You earned ${pointsForEngineer.toFixed(2)} points for permit ${permit.serialNumber}.`,
                 link: `/rewards`,
                 read: false,
                 createdAt: serverTimestamp(),
