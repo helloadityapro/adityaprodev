@@ -250,10 +250,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6 sticky top-0 z-10">
           <SidebarTrigger />
           <div className="flex-1" />
+          <QuickActions />
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
             {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </Button>
-          <QuickActions />
           <UserNotifications />
           <UserNav />
         </header>
