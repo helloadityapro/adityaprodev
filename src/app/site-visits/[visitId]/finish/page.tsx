@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, MapPin, Loader2, Plus, Trash2, CheckCircle2, UserCheck, AlertCircle, Users, ImageIcon, X } from "lucide-react";
+import { Camera, MapPin, Loader2, Plus, Trash2, CheckCircle2, UserCheck, AlertCircle, Users, ImageIcon, X, Maximize2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -18,13 +18,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
 
 const PURPOSES = ["Kick-off visit", "Regular visit", "Site team meetup", "Vendor meetup"];
 
 type TaskItem = {
   text: string;
   photoUrl: string | null;
-  localPhoto?: string | null; // For UI preview before upload
+  localPhoto?: string | null;
 };
 
 export default function FinishSiteVisitPage() {
@@ -53,48 +54,64 @@ export default function FinishSiteVisitPage() {
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
+      });
       setHasCameraPermission(true);
       setIsCameraActive(true);
+      
+      // Since video tag is always rendered (even if hidden), videoRef.current is guaranteed to exist
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
       setHasCameraPermission(false);
+      setIsCameraActive(false);
       toast({
         variant: 'destructive',
         title: 'Camera Access Denied',
-        description: 'Please enable camera permissions to capture the mandatory selfie.',
+        description: 'Please enable camera permissions to capture the mandatory verification selfie.',
       });
     }
   };
 
   const capturePhoto = () => {
-    if (videoRef.current) {
+    if (videoRef.current && videoRef.current.readyState === 4) {
+      const video = videoRef.current;
       const canvas = document.createElement("canvas");
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
       const ctx = canvas.getContext("2d");
+      
       if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0);
+        // Draw the frame
+        ctx.drawImage(video, 0, 0);
         
+        // Add timestamp overlay
         const timestamp = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
-        ctx.font = "bold 24px Inter, sans-serif";
+        ctx.font = "bold 24px sans-serif";
         ctx.fillStyle = "white";
-        ctx.strokeStyle = "black";
+        ctx.shadowColor = "black";
+        ctx.shadowBlur = 4;
         ctx.lineWidth = 2;
         const textWidth = ctx.measureText(timestamp).width;
-        ctx.strokeText(timestamp, canvas.width - textWidth - 20, canvas.height - 30);
         ctx.fillText(timestamp, canvas.width - textWidth - 20, canvas.height - 30);
 
         const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
         setSelfie(dataUrl);
         
-        const stream = videoRef.current.srcObject as MediaStream;
+        // Stop the stream
+        const stream = video.srcObject as MediaStream;
         stream?.getTracks().forEach(track => track.stop());
         setIsCameraActive(false);
       }
+    } else {
+      toast({ variant: 'destructive', title: 'Camera Not Ready', description: 'Please wait for the video feed to initialize.' });
     }
   };
 
@@ -197,12 +214,14 @@ export default function FinishSiteVisitPage() {
 
   if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   if (!visit) return <div className="p-8 text-center italic">Visit log not found.</div>;
+  
   if (visit.status === 'completed') {
     return (
-      <div className="p-8 flex flex-col items-center justify-center text-center gap-4">
+      <div className="p-8 flex flex-col items-center justify-center text-center gap-4 min-h-[60vh]">
         <CheckCircle2 className="h-16 w-16 text-green-500" />
         <h2 className="text-2xl font-bold">Visit Already Completed</h2>
-        <Button onClick={() => router.push('/site-visits/history')}>View Visit History</Button>
+        <p className="text-muted-foreground">The visit report for {visit.siteName} has already been published.</p>
+        <Button onClick={() => router.push('/site-visits/history')} className="rounded-sm font-bold">View Visit History</Button>
       </div>
     );
   }
@@ -213,22 +232,32 @@ export default function FinishSiteVisitPage() {
         <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
           <CheckCircle2 className="h-8 w-8" /> Finalize Visit Report
         </h1>
-        <p className="text-muted-foreground">Provide details of your activities at <strong>{visit.siteName}</strong>.</p>
+        <p className="text-muted-foreground">Documenting presence and activities at <strong>{visit.siteName}</strong>.</p>
       </div>
 
       <div className="grid gap-8">
-        {/* Verification Selfie */}
+        {/* Verification Selfie Section */}
         <Card className="rounded-sm shadow-md overflow-hidden border-primary/10">
           <CardHeader className="bg-primary/5 py-4 border-b">
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-              <Camera className="h-4 w-4 text-primary" /> Manager Verification (Mandatory)
+              <Camera className="h-4 w-4 text-primary" /> Audit Verification (Selfie)
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="flex flex-col items-center gap-4">
-              {selfie ? (
+              {/* Always keep video tag in DOM to prevent race conditions with refs */}
+              <div className={cn("relative w-full max-w-sm aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
+                <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                  <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 bg-white hover:bg-white/90 text-black border-4 border-primary shadow-xl" title="Capture">
+                    <Camera className="h-6 w-6" />
+                  </Button>
+                </div>
+              </div>
+
+              {selfie && !isCameraActive && (
                 <div className="relative group">
-                  <img src={selfie} className="w-full max-w-sm aspect-video object-cover rounded-sm border shadow-lg" alt="Verification" />
+                  <img src={selfie} className="w-full max-w-sm aspect-video object-cover rounded-sm border-2 border-primary shadow-lg" alt="Verification" />
                   <Button 
                     variant="destructive" 
                     size="icon" 
@@ -237,20 +266,16 @@ export default function FinishSiteVisitPage() {
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
-                </div>
-              ) : isCameraActive ? (
-                <div className="space-y-4 w-full flex flex-col items-center">
-                  <div className="relative w-full max-w-sm aspect-video bg-black rounded-sm overflow-hidden shadow-2xl">
-                    <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                  <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-sm backdrop-blur-sm">
+                    TIMESTAMPED VERIFICATION IMAGE
                   </div>
-                  <Button onClick={capturePhoto} className="w-full max-w-sm rounded-sm font-bold h-12 shadow-md">
-                    Capture Timestamped Selfie
-                  </Button>
                 </div>
-              ) : (
+              )}
+
+              {!selfie && !isCameraActive && (
                 <Button onClick={startCamera} variant="outline" className="w-full h-24 border-dashed rounded-sm flex flex-col gap-2 hover:bg-primary/5">
                   <Camera className="h-8 w-8 text-primary" />
-                  <span className="font-bold">Open Camera for Verification</span>
+                  <span className="font-bold uppercase text-xs tracking-wider text-primary">Open Camera for Presence Audit</span>
                 </Button>
               )}
               
@@ -258,7 +283,7 @@ export default function FinishSiteVisitPage() {
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Camera Access Required</AlertTitle>
-                  <AlertDescription>Please enable camera access in your browser settings to verify your site presence.</AlertDescription>
+                  <AlertDescription>Please enable camera permissions in your browser settings to verify your site presence.</AlertDescription>
                 </Alert>
               )}
             </div>
@@ -268,8 +293,8 @@ export default function FinishSiteVisitPage() {
         {/* Visit Details */}
         <Card className="rounded-sm shadow-md border-primary/10">
           <CardHeader>
-            <CardTitle>Report Details</CardTitle>
-            <CardDescription>Document the purpose and outcomes of this site visit.</CardDescription>
+            <CardTitle>Documentation Details</CardTitle>
+            <CardDescription>Log the outcomes and discussions of this site visit.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -285,7 +310,7 @@ export default function FinishSiteVisitPage() {
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-wider">What happened in this visit?</Label>
               <Textarea 
-                placeholder="Describe discussions, site status, or findings..." 
+                placeholder="Detail the progress, findings, or critical discussions..." 
                 rows={5} 
                 value={details}
                 onChange={e => setDetails(e.target.value)}
@@ -295,18 +320,18 @@ export default function FinishSiteVisitPage() {
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-bold uppercase tracking-wider">Tasks Performed / Actions Taken</Label>
-                <Button variant="ghost" size="sm" onClick={addTask} className="text-primary font-bold"><Plus className="h-3.5 w-3.5 mr-1" /> Add Item</Button>
+                <Label className="text-xs font-bold uppercase tracking-wider">Actions Taken / Task Checklist</Label>
+                <Button variant="ghost" size="sm" onClick={addTask} className="text-primary font-bold h-8 px-2"><Plus className="h-3.5 w-3.5 mr-1" /> Add Action</Button>
               </div>
               <div className="space-y-4">
                 {tasks.map((task, idx) => (
-                  <div key={idx} className="space-y-2 p-4 border rounded-sm bg-muted/5 animate-in slide-in-from-top-1">
+                  <div key={idx} className="space-y-3 p-4 border rounded-sm bg-muted/5 animate-in slide-in-from-top-1">
                     <div className="flex gap-2">
                       <Input 
                         placeholder={`Action item #${idx + 1}`} 
                         value={task.text} 
                         onChange={e => updateTaskText(idx, e.target.value)}
-                        className="rounded-sm flex-1"
+                        className="rounded-sm flex-1 bg-background"
                       />
                       {tasks.length > 1 && (
                         <Button variant="ghost" size="icon" className="text-destructive shrink-0" onClick={() => removeTask(idx)}><Trash2 className="h-4 w-4" /></Button>
@@ -336,9 +361,9 @@ export default function FinishSiteVisitPage() {
                             id={`task-photo-${idx}`}
                             onChange={e => handleTaskPhotoChange(idx, e)}
                           />
-                          <Button variant="outline" size="sm" asChild className="h-8 text-[10px] font-bold rounded-sm cursor-pointer">
+                          <Button variant="outline" size="sm" asChild className="h-8 text-[10px] font-bold rounded-sm cursor-pointer border-primary/20 text-primary hover:bg-primary/5">
                             <label htmlFor={`task-photo-${idx}`}>
-                              <Camera className="h-3 w-3 mr-1.5" /> ADD TASK PHOTO
+                              <ImageIcon className="h-3 w-3 mr-1.5" /> ADD PHOTO PROOF
                             </label>
                           </Button>
                         </div>
@@ -349,31 +374,31 @@ export default function FinishSiteVisitPage() {
               </div>
             </div>
 
-            <div className="space-y-4 p-4 bg-muted/20 rounded-sm border">
+            <div className="space-y-4 p-4 bg-primary/[0.02] rounded-sm border border-primary/10">
               <Label className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                <UserCheck className="h-4 w-4 text-primary" /> Was Customer or Representative Available During Visit?
+                <Users className="h-4 w-4 text-primary" /> Customer Availability
               </Label>
               <RadioGroup value={customerAvailable} onValueChange={setCustomerAvailable} className="flex gap-6 mt-2">
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="yes" id="c-yes" />
-                  <Label htmlFor="c-yes" className="font-bold cursor-pointer">YES</Label>
+                  <Label htmlFor="c-yes" className="font-bold cursor-pointer text-sm">Yes, present at site</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="no" id="c-no" />
-                  <Label htmlFor="c-no" className="font-bold cursor-pointer">NO</Label>
+                  <Label htmlFor="c-no" className="font-bold cursor-pointer text-sm">No, not available</Label>
                 </div>
               </RadioGroup>
 
               {customerAvailable === 'yes' && (
                 <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <Label className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
-                    <Users className="h-4 w-4 text-primary" /> Representative Name(s)
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2">
+                    <UserCheck className="h-3 w-3 text-primary" /> Representative Name(s)
                   </Label>
                   <Input 
-                    placeholder="Enter names of persons met at site..." 
+                    placeholder="Enter names of persons met..." 
                     value={customerNames}
                     onChange={e => setCustomerNames(e.target.value)}
-                    className="rounded-sm bg-background"
+                    className="rounded-sm bg-background h-11"
                   />
                 </div>
               )}
@@ -385,7 +410,7 @@ export default function FinishSiteVisitPage() {
               onClick={onSubmit}
               disabled={isSubmitting || !selfie || !purpose || details.trim().length < 10}
             >
-              {isSubmitting ? <><Loader2 className="mr-2 h-6 w-6 animate-spin" /> Publishing Report...</> : 'End Visit & Submit Report'}
+              {isSubmitting ? <><Loader2 className="mr-2 h-6 w-6 animate-spin" /> Publishing Visit Report...</> : 'End Visit & Publish Report'}
             </Button>
           </CardFooter>
         </Card>
