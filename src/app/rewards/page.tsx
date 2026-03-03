@@ -325,7 +325,7 @@ export default function RewardsPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-green-500/5 border-green-500/20 rounded-sm">
+        <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-green-600">Estimated Value</CardTitle>
             <Coins className="h-4 w-4 text-green-500" />
@@ -368,7 +368,7 @@ export default function RewardsPage() {
                   <TableHead>Role</TableHead>
                   <TableHead className="text-right px-2">Total Points</TableHead>
                   <TableHead className="text-right">Earned Reward</TableHead>
-                  <TableHead className="text-right px-6">Actions</TableHead>
+                  {isAdmin && <TableHead className="text-right px-6">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -402,8 +402,8 @@ export default function RewardsPage() {
                     <TableCell className="text-right font-bold text-green-700">
                         ₹{((leader.totalPoints || 0) * pointValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </TableCell>
-                    <TableCell className="text-right px-6">
-                      {isAdmin ? (
+                    {isAdmin && (
+                      <TableCell className="text-right px-6">
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -413,10 +413,8 @@ export default function RewardsPage() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
-                      ) : (
-                        <div className="w-8" />
-                      )}
-                    </TableCell>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
