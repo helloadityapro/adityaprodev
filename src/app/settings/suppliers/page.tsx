@@ -13,8 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, serverTimestamp } from 'firebase/firestore';
-import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, Hash, CheckCircle2 } from 'lucide-react';
+import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, Hash, CheckCircle2, FileDown, FileUp, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +48,9 @@ export default function SuppliersManagementPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [supplierToEdit, setSupplierToEdit] = React.useState<Supplier | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [isImporting, setIsImporting] = React.useState(false);
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
@@ -98,6 +101,87 @@ export default function SuppliersManagementPage() {
     toast({ title: 'Supplier Removed' });
   };
 
+  const handleDownloadTemplate = () => {
+    const headers = ['Name', 'GSTIN', 'Mobile', 'Address', 'Email'];
+    const row = ['Sample Supplier Ltd', '27AAAAA0000A1Z5', '9876543210', '123 Solar Street, Pune', 'info@samplesolar.com'];
+    const csvContent = [headers.join(','), row.join(',')].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'supplier_import_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+        if (lines.length < 2) {
+          toast({ variant: 'destructive', title: 'Import Failed', description: 'The file is empty or missing data rows.' });
+          return;
+        }
+
+        const dataRows = lines.slice(1);
+        const batch = writeBatch(firestore);
+        let count = 0;
+        let errors = 0;
+
+        dataRows.forEach((line) => {
+          // Simple CSV parsing (splits by comma, handles basic quoted strings)
+          const columns = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+          
+          if (columns.length >= 4) {
+            const [name, gstin, mobile, address, email] = columns;
+            
+            // Basic validation for bulk import
+            if (name && gstin.length === 15 && mobile.length >= 10) {
+              const newDocRef = doc(collection(firestore, 'suppliers'));
+              batch.set(newDocRef, {
+                name,
+                gstin: gstin.toUpperCase(),
+                mobile,
+                address: address || 'N/A',
+                email: email || '',
+                createdAt: serverTimestamp(),
+              });
+              count++;
+            } else {
+              errors++;
+            }
+          } else {
+            errors++;
+          }
+        });
+
+        if (count > 0) {
+          await batch.commit();
+          toast({ 
+            title: 'Import Successful', 
+            description: `Successfully imported ${count} suppliers. ${errors > 0 ? `${errors} rows skipped due to errors.` : ''}` 
+          });
+        } else {
+          toast({ variant: 'destructive', title: 'Import Failed', description: 'No valid data rows found in the file.' });
+        }
+      } catch (err: any) {
+        toast({ variant: 'destructive', title: 'Import Error', description: err.message });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
   if (isUserLoading || isProfileLoading || suppliersLoading) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -118,9 +202,27 @@ export default function SuppliersManagementPage() {
           </h1>
           <p className="text-muted-foreground">Manage organizational material suppliers and their credentials.</p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="rounded-sm font-bold shadow-md">
-          <Plus className="mr-2 h-4 w-4" /> Add New Supplier
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={handleDownloadTemplate} className="rounded-sm font-bold border-primary text-primary">
+            <FileDown className="mr-2 h-4 w-4" /> Template
+          </Button>
+          <div className="relative">
+            <input 
+              type="file" 
+              accept=".csv" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleBulkImport} 
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="rounded-sm font-bold border-primary text-primary">
+              {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+              Bulk Import
+            </Button>
+          </div>
+          <Button onClick={() => setIsAddDialogOpen(true)} className="rounded-sm font-bold shadow-md">
+            <Plus className="mr-2 h-4 w-4" /> Add New
+          </Button>
+        </div>
       </div>
 
       <Card className="rounded-sm shadow-sm overflow-hidden border-primary/10">
