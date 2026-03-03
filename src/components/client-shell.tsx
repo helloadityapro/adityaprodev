@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { UserNotifications } from "@/components/user-notifications";
+import { QuickActions } from "@/components/quick-actions";
 import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, AlertCircle, RefreshCw } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
@@ -252,6 +253,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
             {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </Button>
+          <QuickActions />
           <UserNotifications />
           <UserNav />
         </header>
