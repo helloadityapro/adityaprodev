@@ -6,7 +6,7 @@ import { collection, query, where, orderBy, limit, doc } from "firebase/firestor
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, Navigation, History, ExternalLink, UserCheck, Timer, FileText, ImageIcon, Search, FilterX, Calendar, Users, Maximize2, X, User } from "lucide-react";
+import { MapPin, Navigation, History, ExternalLink, UserCheck, Timer, FileText, ImageIcon, Search, FilterX, Calendar, Users, Maximize2, X, User, FolderArchive } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -198,7 +198,12 @@ export default function SiteVisitsHistoryPage() {
                   </div>
                 </div>
               </div>
-              <Badge className="bg-primary h-6 text-[10px] uppercase font-black px-3 rounded-sm">{viewVisit?.status}</Badge>
+              <div className="flex flex-col items-end gap-2">
+                <Badge className="bg-primary h-6 text-[10px] uppercase font-black px-3 rounded-sm">{viewVisit?.status}</Badge>
+                <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase bg-muted/20 px-2 py-0.5 rounded-sm">
+                  <FolderArchive className="h-3 w-3" /> site_visits/{viewVisit?.managerId}
+                </div>
+              </div>
             </div>
           </DialogHeader>
           
