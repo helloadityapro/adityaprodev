@@ -196,7 +196,7 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
             </div>
           ) : entries.length > 0 ? (
             <ScrollArea className="flex-1 px-6 pb-6">
-              <div className="min-w-[700px]">
+              <div className="min-w-[800px]">
                 <Table>
                   <TableHeader className="bg-muted/30 sticky top-0 z-10">
                     <TableRow>
@@ -419,67 +419,71 @@ export default function RewardsPage() {
             <CardDescription>Top contributors based on site documentation and activity logs.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead className="w-16 text-center">Rank</TableHead>
-                  <TableHead>Personnel</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead className="text-right px-2">Total Points</TableHead>
-                  <TableHead className="text-right">Earned Reward</TableHead>
-                  {isAdmin && <TableHead className="text-right px-6">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {leaders?.map((leader, index) => (
-                  <TableRow key={leader.id} className={cn("hover:bg-muted/5 transition-colors", leader.id === user?.uid && "bg-primary/5 font-bold")}>
-                    <TableCell className="text-center font-mono">
-                        {index === 0 ? <Trophy className="h-5 w-5 text-amber-500 mx-auto" /> : 
-                         index === 1 ? <Medal className="h-5 w-5 text-slate-400 mx-auto" /> :
-                         index === 2 ? <Medal className="h-5 w-5 text-amber-700 mx-auto" /> :
-                         index + 1}
-                    </TableCell>
-                    <TableCell>
-                        <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8 border">
-                                <AvatarFallback className="text-[10px]">{leader.username?.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col">
-                                <span className="text-sm">{leader.username}</span>
-                                <span className="text-[9px] text-muted-foreground uppercase">{leader.email}</span>
+            <ScrollArea className="w-full">
+              <div className="min-w-[600px]">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="w-16 text-center">Rank</TableHead>
+                      <TableHead>Personnel</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead className="text-right px-2">Total Points</TableHead>
+                      <TableHead className="text-right">Earned Reward</TableHead>
+                      {isAdmin && <TableHead className="text-right px-6">Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {leaders?.map((leader, index) => (
+                      <TableRow key={leader.id} className={cn("hover:bg-muted/5 transition-colors", leader.id === user?.uid && "bg-primary/5 font-bold")}>
+                        <TableCell className="text-center font-mono">
+                            {index === 0 ? <Trophy className="h-5 w-5 text-amber-500 mx-auto" /> : 
+                             index === 1 ? <Medal className="h-5 w-5 text-slate-400 mx-auto" /> :
+                             index === 2 ? <Medal className="h-5 w-5 text-amber-700 mx-auto" /> :
+                             index + 1}
+                        </TableCell>
+                        <TableCell>
+                            <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8 border">
+                                    <AvatarFallback className="text-[10px]">{leader.username?.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex flex-col">
+                                    <span className="text-sm">{leader.username}</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase">{leader.email}</span>
+                                </div>
                             </div>
-                        </div>
-                    </TableCell>
-                    <TableCell>
-                        <Badge variant="outline" className="text-[10px] rounded-sm py-0 h-5 font-bold uppercase border-primary/20">
-                            {leader.role}
-                        </Badge>
-                    </TableCell>
-                    <TableCell className="text-right px-2 font-mono text-primary">
-                        {(leader.totalPoints || 0).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-green-700">
-                        ₹{((leader.totalPoints || 0) * pointValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    {isAdmin && (
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm"
-                            onClick={() => setSelectedHistoryUser(leader)}
-                            title="View Earning History"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                        </TableCell>
+                        <TableCell>
+                            <Badge variant="outline" className="text-[10px] rounded-sm py-0 h-5 font-bold uppercase border-primary/20">
+                                {leader.role}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-right px-2 font-mono text-primary">
+                            {(leader.totalPoints || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-green-700">
+                            ₹{((leader.totalPoints || 0) * pointValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        {isAdmin && (
+                          <TableCell className="text-right px-6">
+                            <div className="flex justify-end">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm"
+                                onClick={() => setSelectedHistoryUser(leader)}
+                                title="View Earning History"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </ScrollArea>
           </CardContent>
         </Card>
 
