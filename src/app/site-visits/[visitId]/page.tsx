@@ -69,6 +69,12 @@ export default function SiteVisitDetailPage() {
   const visitRef = useMemoFirebase(() => doc(firestore, 'site_visits', visitId), [firestore, visitId]);
   const { data: visit, isLoading } = useDoc<SiteVisit>(visitRef);
 
+  const handlePrint = () => {
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
+  };
+
   if (isLoading) return (
     <div className="space-y-8 max-w-5xl mx-auto p-6">
       <Skeleton className="h-10 w-48" />
@@ -88,12 +94,6 @@ export default function SiteVisitDetailPage() {
       <Button variant="outline" className="mt-6" onClick={() => router.push('/site-visits/history')}>Back to History</Button>
     </div>
   );
-
-  const handlePrint = () => {
-    if (typeof window !== 'undefined') {
-      window.print();
-    }
-  };
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-20 px-4">
@@ -154,7 +154,7 @@ export default function SiteVisitDetailPage() {
                 {visit.selfieUrl ? (
                   <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/10 shadow-lg bg-muted group cursor-pointer" onClick={() => setEnlargedImage(visit.selfieUrl || null)}>
                     <img src={visit.selfieUrl} className="w-full h-full object-cover" alt="Verification Selfie" />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
                       <Maximize2 className="h-8 w-8 text-white opacity-0 group-hover:opacity-100" />
                     </div>
                     <div className="absolute bottom-3 left-3 bg-black/60 text-white text-[9px] font-black uppercase px-2 py-1 rounded-sm backdrop-blur-sm">
@@ -179,7 +179,7 @@ export default function SiteVisitDetailPage() {
                       <p className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Entry Coordinates</p>
                       <p className="font-mono text-xs font-bold mt-1">{visit.startLat.toFixed(6)}, {visit.startLng.toFixed(6)}</p>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-primary hover:bg-primary/10 rounded-sm" asChild>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 text-primary hover:bg-primary/10 rounded-sm no-print" asChild>
                       <a href={`https://www.google.com/maps/search/?api=1&query=${visit.startLat},${visit.startLng}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
                     </Button>
                   </div>
@@ -189,7 +189,7 @@ export default function SiteVisitDetailPage() {
                         <p className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Exit Coordinates</p>
                         <p className="font-mono text-xs font-bold mt-1">{visit.endLat.toFixed(6)}, {visit.endLng.toFixed(6)}</p>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-9 w-9 text-primary hover:bg-primary/10 rounded-sm" asChild>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 text-primary hover:bg-primary/10 rounded-sm no-print" asChild>
                         <a href={`https://www.google.com/maps/search/?api=1&query=${visit.endLat},${visit.endLng}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
                       </Button>
                     </div>
@@ -248,7 +248,7 @@ export default function SiteVisitDetailPage() {
                           {task.photoUrl && (
                             <div className="relative aspect-video w-full cursor-pointer group" onClick={() => setEnlargedImage(task.photoUrl)}>
                               <img src={task.photoUrl} className="w-full h-full object-cover" alt={`Proof for task ${i+1}`} />
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
                                 <Maximize2 className="h-8 w-8 text-white opacity-0 group-hover:opacity-100" />
                               </div>
                               <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded-sm text-[8px] font-black text-white uppercase tracking-widest">
