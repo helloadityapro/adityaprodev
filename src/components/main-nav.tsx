@@ -31,7 +31,8 @@ import {
   CalendarCheck,
   Clock,
   LogOut,
-  UserCheck
+  UserCheck,
+  ChevronDown
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -40,7 +41,11 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenuBadge,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from "@/components/ui/sidebar"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendingPtwCount: number }) {
   const pathname = usePathname()
@@ -58,14 +63,39 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Attendance" isActive={pathname.startsWith('/attendance')} className="rounded-sm">
-              <Link href="/attendance">
-                <CalendarCheck className="h-4 w-4 text-emerald-600" />
-                <span className="font-medium">Attendance</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          
+          <Collapsible asChild defaultOpen={pathname.startsWith('/attendance')} className="group/collapsible">
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton tooltip="Attendance" isActive={pathname.startsWith('/attendance')} className="rounded-sm">
+                  <CalendarCheck className="h-4 w-4 text-emerald-600" />
+                  <span className="font-medium">Attendance</span>
+                  <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/attendance/check-in' || pathname === '/attendance/check-out'}>
+                      <Link href="/attendance">
+                        <Clock className="h-4 w-4" />
+                        <span>Check-in / Out</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/attendance/history'}>
+                      <Link href="/attendance/history">
+                        <History className="h-4 w-4" />
+                        <span>View History</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
+
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Documents" isActive={pathname.startsWith('/documents')} className="rounded-sm">
               <Link href="/documents">

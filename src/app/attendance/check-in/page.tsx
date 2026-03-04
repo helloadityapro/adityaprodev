@@ -7,12 +7,13 @@ import { collection, doc, serverTimestamp } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Loader2, CalendarCheck, Clock, Navigation, Camera, Trash2, AlertCircle, UserCircle2 } from "lucide-react";
+import { MapPin, Loader2, CalendarCheck, Clock, Navigation, Camera, Trash2, AlertCircle, UserCircle2, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 export default function CheckInPage() {
   const firestore = useFirestore();
@@ -124,11 +125,18 @@ export default function CheckInPage() {
 
   return (
     <div className="space-y-8 max-w-2xl mx-auto py-8 px-4">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2">
-          <CalendarCheck className="h-8 w-8" /> Workday Attendance
-        </h1>
-        <p className="text-muted-foreground">Start your professional day with verified GPS and Profile Check-in.</p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2">
+            <CalendarCheck className="h-8 w-8" /> Workday Attendance
+          </h1>
+          <p className="text-muted-foreground">Start your professional day with verified GPS and Profile Check-in.</p>
+        </div>
+        <Button variant="outline" size="sm" asChild className="rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
+          <Link href="/attendance/history">
+            <History className="mr-2 h-4 w-4" /> History
+          </Link>
+        </Button>
       </div>
 
       <Card className="shadow-lg border-primary/10 rounded-sm">
