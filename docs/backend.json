@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -116,6 +117,22 @@
     "/requirements/{reqId}": {
       "schema": "object",
       "description": "Site material requirements."
+    },
+    "/dprs/{dprId}": {
+      "schema": "object",
+      "description": "Daily progress reports."
+    },
+    "/material_movements/{movementId}": {
+      "schema": "object",
+      "description": "Material inward/outward logs."
+    },
+    "/notifications/{notifId}": {
+      "schema": "object",
+      "description": "User activity and system notifications."
+    },
+    "/site_documents/{docId}": {
+      "schema": "object",
+      "description": "General site documentation files."
     }
   }
 }
