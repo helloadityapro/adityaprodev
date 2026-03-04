@@ -36,9 +36,10 @@ service cloud.firestore {
     }
 
     match /site_visits/{visitId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.managerId == request.auth.uid);
-      allow create: if isSignedIn() && isSiteManager();
-      allow update: if isSignedIn() && resource.data.managerId == request.auth.uid;
+      // Allow managers to read/update their own visits, and admins to oversee everything
+      allow read: if isSignedIn() && (resource.data.managerId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && (isSiteManager() || isAdmin());
+      allow update: if isSignedIn() && (resource.data.managerId == request.auth.uid || isAdmin());
       allow delete: if isAdmin();
     }
 
