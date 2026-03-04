@@ -1,26 +1,20 @@
+
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
 import { collection, query, where, orderBy, limit, doc } from "firebase/firestore";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, Navigation, History, ExternalLink, UserCheck, Timer, FileText, ImageIcon, Search, FilterX, Calendar, Users, Maximize2, X, User, FolderArchive } from "lucide-react";
+import { History, Timer, FileText, Search, User, ArrowRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { cn } from "@/lib/utils";
-
-type TaskItem = {
-  text: string;
-  photoUrl: string | null;
-};
+import Link from "next/link";
 
 type SiteVisit = {
   id: string;
@@ -29,16 +23,7 @@ type SiteVisit = {
   managerId: string;
   startTime: any;
   endTime?: any;
-  startLat: number;
-  startLng: number;
-  endLat?: number;
-  endLng?: number;
   purpose?: string;
-  details?: string;
-  tasks?: TaskItem[];
-  selfieUrl?: string;
-  customerAvailable?: boolean;
-  customerNames?: string;
   status: 'ongoing' | 'completed';
 };
 
@@ -64,8 +49,6 @@ export default function SiteVisitsHistoryPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [viewVisit, setViewVisit] = React.useState<SiteVisit | null>(null);
-  const [enlargedImage, setEnlargedImage] = React.useState<string | null>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
@@ -133,7 +116,7 @@ export default function SiteVisitsHistoryPage() {
               </TableHeader>
               <TableBody>
                 {filteredVisits.length > 0 ? filteredVisits.map((visit) => (
-                  <TableRow key={visit.id} className="hover:bg-muted/5 transition-colors">
+                  <TableRow key={visit.id} className="hover:bg-muted/5 transition-colors group">
                     <TableCell className="font-mono text-xs font-bold text-muted-foreground">
                       {formatTimestamp(visit.startTime)}
                     </TableCell>
@@ -163,8 +146,12 @@ export default function SiteVisitsHistoryPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right px-6">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewVisit(visit)}>
-                        <FileText className="h-4 w-4" />
+                      <Button variant="ghost" size="sm" asChild className="rounded-sm text-primary hover:text-primary hover:bg-primary/5">
+                        <Link href={`/site-visits/${visit.id}`}>
+                          <FileText className="h-4 w-4 mr-1.5" />
+                          View Report
+                          <ArrowRight className="ml-1.5 h-3 w-3 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                        </Link>
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -180,181 +167,6 @@ export default function SiteVisitsHistoryPage() {
           </div>
         </CardContent>
       </Card>
-
-      <Dialog open={!!viewVisit} onOpenChange={(o) => !o && setViewVisit(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 rounded-sm">
-          <DialogHeader className="p-6 border-b bg-muted/5">
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <DialogTitle className="text-2xl font-black">{viewVisit?.siteName} Visit Report</DialogTitle>
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {formatTimestamp(viewVisit?.startTime)}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-primary font-bold">
-                    <User className="h-3.5 w-3.5" />
-                    Submitted by {viewVisit?.managerName}
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <Badge className="bg-primary h-6 text-[10px] uppercase font-black px-3 rounded-sm">{viewVisit?.status}</Badge>
-                <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase bg-muted/20 px-2 py-0.5 rounded-sm">
-                  <FolderArchive className="h-3 w-3" /> site_visits/{viewVisit?.managerId}
-                </div>
-              </div>
-            </div>
-          </DialogHeader>
-          
-          <ScrollArea className="flex-1 p-6">
-            {viewVisit && (
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Verification Selfie</Label>
-                      {viewVisit.selfieUrl ? (
-                        <div className="relative aspect-video rounded-sm overflow-hidden border shadow-inner bg-muted cursor-pointer group" onClick={() => setEnlargedImage(viewVisit.selfieUrl || null)}>
-                          <img src={viewVisit.selfieUrl} className="w-full h-full object-cover" alt="Verification" />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
-                            <Maximize2 className="h-6 w-6 text-white opacity-0 group-hover:opacity-100" />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="aspect-video bg-muted/50 rounded-sm border border-dashed flex flex-col items-center justify-center text-muted-foreground">
-                          <ImageIcon className="h-8 w-8 opacity-20 mb-2" />
-                          <p className="text-[10px] font-bold uppercase">No image captured</p>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-3 bg-muted/20 border rounded-sm">
-                        <Label className="text-[9px] font-black uppercase text-muted-foreground mb-1 block">Visit Duration</Label>
-                        <div className="flex items-center gap-2 text-primary font-black">
-                          <Timer className="h-4 w-4" />
-                          {calculateDuration(viewVisit.startTime, viewVisit.endTime)}
-                        </div>
-                      </div>
-                      <div className="p-3 bg-muted/20 border rounded-sm">
-                        <Label className="text-[9px] font-black uppercase text-muted-foreground mb-1 block">Customer Rep</Label>
-                        <div className="flex items-center gap-2 font-bold text-sm">
-                          {viewVisit.customerAvailable ? (
-                            <><UserCheck className="h-4 w-4 text-green-600" /> Present</>
-                          ) : (
-                            <><FilterX className="h-4 w-4 text-red-600" /> Absent</>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {viewVisit.customerAvailable && viewVisit.customerNames && (
-                      <div className="p-4 bg-green-50 border border-green-100 rounded-sm">
-                        <Label className="text-[9px] font-black uppercase text-green-700 mb-2 flex items-center gap-1.5">
-                          <Users className="h-3.5 w-3.5" /> Met with Representative(s)
-                        </Label>
-                        <p className="text-sm font-bold text-green-900 leading-tight">{viewVisit.customerNames}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-6">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Purpose</Label>
-                      <p className="font-bold text-lg text-primary">{viewVisit.purpose || 'Regular field audit'}</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Summary of Activities</Label>
-                      <div className="p-4 bg-muted/10 border rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium">
-                        {viewVisit.details || 'No detailed log provided for this visit.'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                  <div className="space-y-4">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                      <Navigation className="h-3.5 w-3.5" /> Action Items & Observations
-                    </Label>
-                    {viewVisit.tasks && viewVisit.tasks.length > 0 ? (
-                      <div className="space-y-3">
-                        {viewVisit.tasks.map((task, i) => (
-                          <div key={i} className="flex flex-col gap-2 p-3 bg-primary/[0.02] border border-primary/5 rounded-sm">
-                            <div className="flex items-start gap-3">
-                              <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary shrink-0">{i+1}</div>
-                              <span className="text-sm font-medium">{task.text}</span>
-                            </div>
-                            {task.photoUrl && (
-                              <div className="ml-8 mt-1 relative h-24 w-40 rounded-sm overflow-hidden border shadow-sm cursor-pointer group" onClick={() => setEnlargedImage(task.photoUrl)}>
-                                <img src={task.photoUrl} className="h-full w-full object-cover" alt={`Proof for task ${i+1}`} />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
-                                  <Maximize2 className="h-4 w-4 text-white opacity-0 group-hover:opacity-100" />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground italic pl-2">No specific tasks logged.</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                      <MapPin className="h-3.5 w-3.5" /> GPS Audit (Logistics)
-                    </Label>
-                    <div className="space-y-2">
-                      <div className="p-3 bg-muted/20 border rounded-sm flex items-center justify-between">
-                        <div>
-                          <p className="text-[9px] font-black uppercase text-muted-foreground">Entry GPS</p>
-                          <p className="font-mono text-[11px]">{viewVisit.startLat.toFixed(5)}, {viewVisit.startLng.toFixed(5)}</p>
-                        </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" asChild>
-                          <a href={`https://www.google.com/maps/search/?api=1&query=${viewVisit.startLat},${viewVisit.startLng}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3.5 w-3.5" /></a>
-                        </Button>
-                      </div>
-                      {viewVisit.endLat && (
-                        <div className="p-3 bg-muted/20 border rounded-sm flex items-center justify-between">
-                          <div>
-                            <p className="text-[9px] font-black uppercase text-muted-foreground">Exit GPS</p>
-                            <p className="font-mono text-[11px]">{viewVisit.endLat.toFixed(5)}, {viewVisit.endLng.toFixed(5)}</p>
-                          </div>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" asChild>
-                            <a href={`https://www.google.com/maps/search/?api=1&query=${viewVisit.endLat},${viewVisit.endLng}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3.5 w-3.5" /></a>
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </ScrollArea>
-          
-          <div className="p-4 border-t bg-muted/5 flex justify-end">
-            <Button variant="outline" className="rounded-sm font-bold" onClick={() => setViewVisit(null)}>Close Report</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!enlargedImage} onOpenChange={(o) => !o && setEnlargedImage(null)}>
-        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Enlarged View</DialogTitle>
-            <DialogDescription>Full screen preview of the selected site visit photo.</DialogDescription>
-          </DialogHeader>
-          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 bg-black/20 hover:bg-black/40 rounded-full shadow-sm" onClick={() => setEnlargedImage(null)}>
-            <X className="h-6 w-6" />
-          </Button>
-          {enlargedImage && (
-            <img src={enlargedImage} className="max-w-full max-h-full object-contain shadow-2xl" alt="Enlarged proof" />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
