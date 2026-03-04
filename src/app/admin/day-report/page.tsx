@@ -180,7 +180,7 @@ export default function AdminDayReportPage() {
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Target Personnel</Label>
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">SELECT USER</Label>
             <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-[240px] justify-between h-10 rounded-sm font-bold border-primary/20">
