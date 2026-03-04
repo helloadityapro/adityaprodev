@@ -7,7 +7,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, Navigation, History, UserCheck, Timer, FileText, ImageIcon, Users, Maximize2, X, User, FolderArchive, ArrowLeft, Printer, ExternalLink } from "lucide-react";
+import { MapPin, Navigation, History, UserCheck, Timer, FileText, ImageIcon, Users, Maximize2, X, User, FolderArchive, ArrowLeft, Printer, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
