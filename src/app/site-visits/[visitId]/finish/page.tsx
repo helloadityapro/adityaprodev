@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, MapPin, Loader2, Plus, Trash2, CheckCircle2, UserCheck, AlertCircle, Users, ImageIcon, X, Maximize2 } from "lucide-react";
+import { Camera, MapPin, Loader2, Plus, Trash2, CheckCircle2, UserCheck, AlertCircle, Users, ImageIcon, X, Maximize2, UserCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -171,12 +171,10 @@ export default function FinishSiteVisitPage() {
       const storage = getStorage(firebaseApp);
       const metadata = { contentType: 'image/jpeg' };
       
-      // 1. Upload Selfie with metadata to prevent storage access issues
       const selfieRef = ref(storage, `site_visits/${user.uid}/selfie_${Date.now()}.jpg`);
       await uploadString(selfieRef, selfie, 'data_url', metadata);
       const selfieUrl = await getDownloadURL(selfieRef);
 
-      // 2. Upload Task Photos with metadata
       const finalTasks = await Promise.all(tasks.map(async (task, idx) => {
         if (task.localPhoto) {
           const taskPhotoRef = ref(storage, `site_visits/${user.uid}/task_${idx}_${Date.now()}.jpg`);
@@ -224,7 +222,7 @@ export default function FinishSiteVisitPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl mx-auto pb-20">
+    <div className="space-y-8 max-w-3xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
           <CheckCircle2 className="h-8 w-8" /> Finalize Visit Report
@@ -238,11 +236,20 @@ export default function FinishSiteVisitPage() {
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <Camera className="h-4 w-4 text-primary" /> Audit Verification (Selfie)
             </CardTitle>
+            <CardDescription className="text-[10px] font-bold text-amber-700 uppercase tracking-tighter">Selfie must include face and upper body profile</CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="flex flex-col items-center gap-4">
               <div className={cn("relative w-full max-w-sm aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
                 <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                
+                {/* Silhouette Overlay */}
+                <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-40">
+                  <div className="w-24 h-24 rounded-full border-2 border-white mt-4" />
+                  <div className="w-40 h-24 rounded-t-full border-2 border-t-2 border-x-2 border-white -mt-2" />
+                  <p className="text-white text-[8px] font-black uppercase mt-2 bg-black/20 px-2 rounded-full tracking-widest text-center">Center face & shoulders</p>
+                </div>
+
                 <div className="absolute bottom-4 left-0 right-0 flex justify-center">
                   <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 bg-white hover:bg-white/90 text-black border-4 border-primary shadow-xl" title="Capture">
                     <Camera className="h-6 w-6" />
@@ -261,16 +268,19 @@ export default function FinishSiteVisitPage() {
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
-                  <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-sm backdrop-blur-sm">
-                    TIMESTAMPED VERIFICATION IMAGE
+                  <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-sm backdrop-blur-sm uppercase">
+                    Verification Profile Captured
                   </div>
                 </div>
               )}
 
               {!selfie && !isCameraActive && (
-                <Button onClick={startCamera} variant="outline" className="w-full h-24 border-dashed rounded-sm flex flex-col gap-2 hover:bg-primary/5">
-                  <Camera className="h-8 w-8 text-primary" />
-                  <span className="font-bold uppercase text-xs tracking-wider text-primary">Open Camera for Presence Audit</span>
+                <Button onClick={startCamera} variant="outline" className="w-full h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all">
+                  <UserCircle2 className="h-8 w-8 text-primary" />
+                  <div className="flex flex-col items-center text-center">
+                    <span className="font-bold uppercase text-xs tracking-wider text-primary">Open Camera for Presence Audit</span>
+                    <span className="text-[10px] text-muted-foreground mt-1 px-8 leading-tight uppercase font-medium">Front profile including face and upper body is mandatory</span>
+                  </div>
                 </Button>
               )}
               
@@ -278,7 +288,7 @@ export default function FinishSiteVisitPage() {
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Camera Access Required</AlertTitle>
-                  <AlertDescription>Please enable camera permissions in your browser settings to verify your site presence.</AlertDescription>
+                  <AlertDescription>Please enable camera permissions in your browser settings to verify your site presence with a profile selfie.</AlertDescription>
                 </Alert>
               )}
             </div>
