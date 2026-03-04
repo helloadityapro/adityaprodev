@@ -31,9 +31,11 @@
         "checkInTime": { "type": "string", "format": "date-time" },
         "checkInLat": { "type": "number" },
         "checkInLng": { "type": "number" },
+        "checkInSelfieUrl": { "type": "string" },
         "checkOutTime": { "type": "string", "format": "date-time" },
         "checkOutLat": { "type": "number" },
         "checkOutLng": { "type": "number" },
+        "checkOutSelfieUrl": { "type": "string" },
         "status": { "type": "string", "enum": ["ongoing", "completed"] },
         "date": { "type": "string", "description": "YYYY-MM-DD format" }
       }

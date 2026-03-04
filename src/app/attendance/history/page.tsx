@@ -4,17 +4,16 @@
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
 import { collection, query, where, orderBy, limit, doc } from "firebase/firestore";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, History, Search, User, Navigation, Timer, LogIn, LogOut, ExternalLink, Calendar } from "lucide-react";
+import { MapPin, History, Search, User, Timer, LogIn, LogOut, ImageIcon, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { isSuperAdmin } from "@/lib/auth-constants";
-import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 type AttendanceEntry = {
   id: string;
@@ -26,6 +25,8 @@ type AttendanceEntry = {
   checkInLng: number;
   checkOutLat?: number;
   checkOutLng?: number;
+  checkInSelfieUrl?: string;
+  checkOutSelfieUrl?: string;
   status: 'ongoing' | 'completed';
   date: string;
 };
@@ -58,6 +59,7 @@ export default function AttendanceHistoryPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [viewImage, setViewImage] = React.useState<string | null>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
@@ -85,7 +87,7 @@ export default function AttendanceHistoryPage() {
     );
   }, [entries, searchTerm]);
 
-  if (isLoading || isProfileLoading) return <div className="p-8 space-y-4 max-w-5xl mx-auto"><Skeleton className="h-12 w-48" /><Skeleton className="h-[500px] w-full" /></div>;
+  if (isLoading || isProfileLoading) return <div className="p-8 space-y-4 max-w-5xl mx-auto"><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto py-8">
@@ -94,17 +96,14 @@ export default function AttendanceHistoryPage() {
           <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2">
             <History className="h-8 w-8" /> {isAdmin ? "Global Attendance Logs" : "My Attendance History"}
           </h1>
-          <p className="text-muted-foreground">Historical records of work session check-ins and check-outs.</p>
+          <p className="text-muted-foreground">Historical records with GPS and Photo verification.</p>
         </div>
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by name or date..." 
-            className="pl-8 rounded-sm h-10 border-primary/20 bg-background"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
+        <Input 
+          placeholder="Search by name or date..." 
+          className="w-full md:w-72 rounded-sm border-primary/20"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
       <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
@@ -113,87 +112,85 @@ export default function AttendanceHistoryPage() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="w-32">Date</TableHead>
+                  <TableHead>Date</TableHead>
                   {isAdmin && <TableHead>Personnel</TableHead>}
-                  <TableHead className="text-center">Check-in</TableHead>
-                  <TableHead className="text-center">Check-out</TableHead>
-                  <TableHead className="text-center">Total Duration</TableHead>
-                  <TableHead className="text-right px-6">Audit Info</TableHead>
+                  <TableHead className="text-center">Entry (Photo/GPS)</TableHead>
+                  <TableHead className="text-center">Exit (Photo/GPS)</TableHead>
+                  <TableHead className="text-center">Duration</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredEntries.length > 0 ? filteredEntries.map((entry) => (
-                  <TableRow key={entry.id} className="hover:bg-muted/5 transition-colors">
-                    <TableCell className="font-bold text-sm">
-                      {formatDate(entry.checkInTime)}
-                    </TableCell>
+                  <TableRow key={entry.id}>
+                    <TableCell className="font-bold text-sm">{formatDate(entry.checkInTime)}</TableCell>
                     {isAdmin && (
                       <TableCell>
-                        <div className="flex items-center gap-2 text-xs font-bold">
-                          <User className="h-3.5 w-3.5 text-primary" />
-                          {entry.userName}
+                        <div className="flex items-center gap-2 text-xs font-bold uppercase">
+                          <User className="h-3 w-3" /> {entry.userName}
                         </div>
                       </TableCell>
                     )}
                     <TableCell className="text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
-                          <LogIn className="h-3 w-3" />
-                          {formatTime(entry.checkInTime)}
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="flex items-center gap-1 text-xs font-bold text-emerald-700">
+                            <LogIn className="h-3 w-3" /> {formatTime(entry.checkInTime)}
+                          </div>
+                          <div className="flex gap-1">
+                            {entry.checkInSelfieUrl && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => setViewImage(entry.checkInSelfieUrl!)}><ImageIcon className="h-3 w-3" /></Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
+                              <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkInLat},${entry.checkInLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
+                            </Button>
+                          </div>
                         </div>
-                        <Badge variant="outline" className="text-[8px] h-3 px-1 border-emerald-200 text-emerald-700 bg-emerald-50">ENTRY</Badge>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        {entry.checkOutTime ? (
-                          <>
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                              <LogOut className="h-3 w-3" />
-                              {formatTime(entry.checkOutTime)}
+                      {entry.checkOutTime ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-1 text-xs font-bold text-slate-700">
+                              <LogOut className="h-3 w-3" /> {formatTime(entry.checkOutTime)}
                             </div>
-                            <Badge variant="outline" className="text-[8px] h-3 px-1 border-slate-200 text-slate-700 bg-slate-50">EXIT</Badge>
-                          </>
-                        ) : (
-                          <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm animate-pulse bg-blue-100 text-blue-800">Ongoing</Badge>
-                        )}
-                      </div>
+                            <div className="flex gap-1">
+                              {entry.checkOutSelfieUrl && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => setViewImage(entry.checkOutSelfieUrl!)}><ImageIcon className="h-3 w-3" /></Button>
+                              )}
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
+                                <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm animate-pulse">Ongoing</Badge>
+                      )}
                     </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1.5 text-xs font-black text-primary">
-                        <Timer className="h-3.5 w-3.5" />
-                        {calculateDuration(entry.checkInTime, entry.checkOutTime)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right px-6">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" title="Check-in Location" asChild>
-                          <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkInLat},${entry.checkInLng}`} target="_blank" rel="noopener noreferrer">
-                            <MapPin className="h-4 w-4" />
-                          </a>
-                        </Button>
-                        {entry.checkOutLat && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" title="Check-out Location" asChild>
-                            <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </Button>
-                        )}
-                      </div>
+                    <TableCell className="text-center font-black text-primary">
+                      <Timer className="h-3 w-3 inline mr-1" />
+                      {calculateDuration(entry.checkInTime, entry.checkOutTime)}
                     </TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow>
-                    <TableCell colSpan={isAdmin ? 6 : 5} className="h-32 text-center text-muted-foreground italic">
-                      No attendance records found.
-                    </TableCell>
-                  </TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? 5 : 4} className="h-32 text-center text-muted-foreground italic">No records.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!viewImage} onOpenChange={() => setViewImage(null)}>
+        <DialogContent className="max-w-lg p-0 bg-black border-none rounded-sm overflow-hidden">
+          <DialogHeader className="sr-only"><DialogTitle>Verification Photo</DialogTitle></DialogHeader>
+          <div className="relative aspect-square flex items-center justify-center">
+            {viewImage && <img src={viewImage} className="max-w-full max-h-full object-contain" alt="Verification" />}
+            <Button variant="ghost" size="icon" className="absolute top-2 right-2 text-white bg-black/20 rounded-full" onClick={() => setViewImage(null)}><X className="h-6 w-6" /></Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
