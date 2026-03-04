@@ -177,36 +177,34 @@ export default function SiteDocumentsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <Button variant="ghost" size="sm" className="w-fit mb-2 -ml-2" onClick={() => router.push('/documents')}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Explorer
-          </Button>
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <FileIcon className="h-8 w-8" /> {site.name} Documents
-          </h1>
-          <p className="text-muted-foreground">Shared files and documentation for this project site.</p>
-        </div>
+      <div className="flex flex-col gap-1">
+        <Button variant="ghost" size="sm" className="w-fit mb-2 -ml-2" onClick={() => router.push('/documents')}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Explorer
+        </Button>
+        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+          <FileIcon className="h-8 w-8" /> {site.name} Documents
+        </h1>
+        <p className="text-muted-foreground">Shared files and documentation for this project site.</p>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Input 
-              type="file" 
-              className="hidden" 
-              id="file-upload" 
-              onChange={handleUpload}
-              disabled={isUploading}
-            />
-            <Button asChild disabled={isUploading} className="rounded-sm font-bold">
-              <label htmlFor="file-upload" className="cursor-pointer">
-                {isUploading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {Math.round(uploadProgress)}%</>
-                ) : (
-                  <><Upload className="mr-2 h-4 w-4" /> Upload Document</>
-                )}
-              </label>
-            </Button>
-          </div>
+      <div className="flex justify-end gap-2">
+        <div className="relative">
+          <Input 
+            type="file" 
+            className="hidden" 
+            id="file-upload" 
+            onChange={handleUpload}
+            disabled={isUploading}
+          />
+          <Button asChild disabled={isUploading} className="rounded-sm font-bold">
+            <label htmlFor="file-upload" className="cursor-pointer">
+              {isUploading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {Math.round(uploadProgress)}%</>
+              ) : (
+                <><Upload className="mr-2 h-4 w-4" /> Upload Document</>
+              )}
+            </label>
+          </Button>
         </div>
       </div>
 

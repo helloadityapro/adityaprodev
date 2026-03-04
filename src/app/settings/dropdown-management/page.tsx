@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -492,7 +491,7 @@ export default function AdminSettingsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Site</TableHead>
+                        <TableHead>Site Name</TableHead>
                         <TableHead>Company</TableHead>
                         <TableHead className="text-right"></TableHead>
                       </TableRow>
@@ -560,7 +559,7 @@ export default function AdminSettingsPage() {
                         />
                       </TableHead>
                       <TableHead>Serial No</TableHead>
-                      <TableHead>Site</TableHead>
+                      <TableHead>Site Name</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Engineer</TableHead>
                       <TableHead>Manager</TableHead>
