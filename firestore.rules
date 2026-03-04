@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -8,7 +7,8 @@ service cloud.firestore {
     }
 
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(path) ? get(path).data : {};
     }
 
     function isAdmin() {
@@ -16,11 +16,14 @@ service cloud.firestore {
         'khalil@adityagreenenergy.com',
         'prafulrana143@gmail.com'
       ];
-      return isSignedIn() && (request.auth.token.email in superAdminEmails || getUserData().role == 'Admin');
+      return isSignedIn() && (
+        request.auth.token.email in superAdminEmails || 
+        getUserData().get('role', '') == 'Admin'
+      );
     }
 
     function isSiteManager() {
-      return isSignedIn() && getUserData().role == 'Site Manager';
+      return isSignedIn() && getUserData().get('role', '') == 'Site Manager';
     }
 
     match /users/{userId} {
@@ -29,17 +32,22 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         request.auth.uid == userId || 
         isAdmin() || 
-        (isSiteManager() && get(/databases/$(database)/documents/users/$(userId)).data.siteManagerId == request.auth.uid) ||
-        (getUserData().siteManagerId == userId)
+        (isSiteManager() && get(/databases/$(database)/documents/users/$(userId)).data.siteManagerId == request.auth.uid)
       );
       allow delete: if isAdmin();
     }
 
     match /site_visits/{visitId} {
       // Allow managers to read/update their own visits, and admins to oversee everything
-      allow read: if isSignedIn() && (resource.data.managerId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (
+        (exists(resource.data) && resource.data.managerId == request.auth.uid) || 
+        isAdmin()
+      );
       allow create: if isSignedIn() && (isSiteManager() || isAdmin());
-      allow update: if isSignedIn() && (resource.data.managerId == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() && (
+        (exists(resource.data) && resource.data.managerId == request.auth.uid) || 
+        isAdmin()
+      );
       allow delete: if isAdmin();
     }
 
