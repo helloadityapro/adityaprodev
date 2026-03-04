@@ -40,13 +40,13 @@ service cloud.firestore {
     match /site_visits/{visitId} {
       // Allow managers to read/update their own visits, and admins to oversee everything
       allow read: if isSignedIn() && (
-        (exists(resource.data) && resource.data.managerId == request.auth.uid) || 
-        isAdmin()
+        isAdmin() || 
+        resource.data.managerId == request.auth.uid
       );
       allow create: if isSignedIn() && (isSiteManager() || isAdmin());
       allow update: if isSignedIn() && (
-        (exists(resource.data) && resource.data.managerId == request.auth.uid) || 
-        isAdmin()
+        isAdmin() || 
+        resource.data.managerId == request.auth.uid
       );
       allow delete: if isAdmin();
     }
