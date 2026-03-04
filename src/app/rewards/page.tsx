@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -283,9 +282,9 @@ export default function RewardsPage() {
   const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
   const { data: settings } = useDoc<RewardSettings>(settingsRef);
 
-  // Fetch top scorers for leaderboard
+  // Fetch all users for leaderboard without limit
   const leadersQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'users'), orderBy('totalPoints', 'desc'), limit(15)), 
+    query(collection(firestore, 'users'), orderBy('totalPoints', 'desc')), 
     [firestore]
   );
   const { data: leaders, isLoading: isLeadersLoading } = useCollection<UserProfile>(leadersQuery);
