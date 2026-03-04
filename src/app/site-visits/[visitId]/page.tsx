@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -6,7 +7,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, Navigation, History, UserCheck, Timer, FileText, ImageIcon, Users, Maximize2, X, User, FolderArchive, ArrowLeft, Printer, ExternalLink, CheckCircle2 } from "lucide-react";
+import { MapPin, Navigation, History, UserCheck, Timer, FileText, ImageIcon, Users, Maximize2, X, User, FolderArchive, ArrowLeft, Printer, ExternalLink, CheckCircle2, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ export default function SiteVisitDetailPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const [enlargedImage, setEnlargedImage] = React.useState<string | null>(null);
+  const [zoom, setZoom] = React.useState(1);
 
   const visitRef = useMemoFirebase(() => doc(firestore, 'site_visits', visitId), [firestore, visitId]);
   const { data: visit, isLoading } = useDoc<SiteVisit>(visitRef);
@@ -152,7 +154,7 @@ export default function SiteVisitDetailPage() {
                   <UserCheck className="h-4 w-4" /> Presence Verification
                 </Label>
                 {visit.selfieUrl ? (
-                  <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/10 shadow-lg bg-muted group cursor-pointer" onClick={() => setEnlargedImage(visit.selfieUrl || null)}>
+                  <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/10 shadow-lg bg-muted group cursor-pointer" onClick={() => { setZoom(1); setEnlargedImage(visit.selfieUrl || null); }}>
                     <img src={visit.selfieUrl} className="w-full h-full object-cover" alt="Verification Selfie" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
                       <Maximize2 className="h-8 w-8 text-white opacity-0 group-hover:opacity-100" />
@@ -246,7 +248,7 @@ export default function SiteVisitDetailPage() {
                             <span className="text-sm font-bold leading-snug pt-0.5">{task.text}</span>
                           </div>
                           {task.photoUrl && (
-                            <div className="relative aspect-video w-full cursor-pointer group" onClick={() => setEnlargedImage(task.photoUrl)}>
+                            <div className="relative aspect-video w-full cursor-pointer group" onClick={() => { setZoom(1); setEnlargedImage(task.photoUrl); }}>
                               <img src={task.photoUrl} className="w-full h-full object-cover" alt={`Proof for task ${i+1}`} />
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
                                 <Maximize2 className="h-8 w-8 text-white opacity-0 group-hover:opacity-100" />
@@ -279,18 +281,36 @@ export default function SiteVisitDetailPage() {
         </CardFooter>
       </Card>
 
-      <Dialog open={!!enlargedImage} onOpenChange={(o) => !o && setEnlargedImage(null)}>
-        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm">
+      <Dialog open={!!enlargedImage} onOpenChange={(o) => { if(!o) setZoom(1); setEnlargedImage(null); }}>
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>Audit Image Detail</DialogTitle>
             <DialogDescription>Enlarged high-resolution view of site audit proof.</DialogDescription>
           </DialogHeader>
-          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 bg-black/20 hover:bg-black/40 rounded-full shadow-sm" onClick={() => setEnlargedImage(null)}>
+          
+          <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.min(prev + 0.25, 4))} title="Zoom In">
+              <ZoomIn className="h-5 w-5" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} title="Zoom Out">
+              <ZoomOut className="h-5 w-5" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(1)} title="Reset Zoom">
+              <RotateCcw className="h-5 w-5" />
+            </Button>
+          </div>
+
+          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 bg-black/20 hover:bg-black/40 rounded-full shadow-sm" onClick={() => { setZoom(1); setEnlargedImage(null); }}>
             <X className="h-6 w-6" />
           </Button>
-          {enlargedImage && (
-            <img src={enlargedImage} className="max-w-full max-h-full object-contain shadow-2xl" alt="Audit Evidence" />
-          )}
+          
+          <div className="relative w-full h-full flex items-center justify-center overflow-auto p-4">
+            <div className="transition-transform duration-200 ease-out flex items-center justify-center" style={{ transform: `scale(${zoom})` }}>
+              {enlargedImage && (
+                <img src={enlargedImage} className="max-w-full max-h-full object-contain shadow-2xl" alt="Audit Evidence" />
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

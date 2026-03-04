@@ -7,7 +7,7 @@ import { collection, query, where, limit, doc, or } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, History, Search, User, Timer, LogIn, LogOut, ImageIcon, X } from "lucide-react";
+import { MapPin, History, Search, User, Timer, LogIn, LogOut, ImageIcon, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,7 @@ export default function AttendanceHistoryPage() {
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = React.useState("");
   const [viewImage, setViewImage] = React.useState<string | null>(null);
+  const [zoom, setZoom] = React.useState(1);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
@@ -164,7 +165,7 @@ export default function AttendanceHistoryPage() {
                           </div>
                           <div className="flex gap-1">
                             {entry.checkInSelfieUrl && (
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => setViewImage(entry.checkInSelfieUrl!)}><ImageIcon className="h-3 w-3" /></Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => { setZoom(1); setViewImage(entry.checkInSelfieUrl!); }}><ImageIcon className="h-3 w-3" /></Button>
                             )}
                             <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
                               <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkInLat},${entry.checkInLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
@@ -182,7 +183,7 @@ export default function AttendanceHistoryPage() {
                             </div>
                             <div className="flex gap-1">
                               {entry.checkOutSelfieUrl && (
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => setViewImage(entry.checkOutSelfieUrl!)}><ImageIcon className="h-3 w-3" /></Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => { setZoom(1); setViewImage(entry.checkOutSelfieUrl!); }}><ImageIcon className="h-3 w-3" /></Button>
                               )}
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
                                 <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
@@ -208,15 +209,30 @@ export default function AttendanceHistoryPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!viewImage} onOpenChange={() => setViewImage(null)}>
-        <DialogContent className="max-w-lg p-0 bg-black border-none rounded-sm overflow-hidden">
+      <Dialog open={!!viewImage} onOpenChange={(o) => { if(!o) setZoom(1); setViewImage(null); }}>
+        <DialogContent className="max-w-[90vw] h-[85vh] p-0 bg-black border-none rounded-sm overflow-hidden flex flex-col items-center justify-center">
           <DialogHeader className="sr-only">
             <DialogTitle>Verification Photo</DialogTitle>
             <DialogDescription>Attendance check-in/out verification selfie.</DialogDescription>
           </DialogHeader>
-          <div className="relative aspect-square flex items-center justify-center">
-            {viewImage && <img src={viewImage} className="max-w-full max-h-full object-contain" alt="Verification" />}
-            <Button variant="ghost" size="icon" className="absolute top-2 right-2 text-white bg-black/20 rounded-full" onClick={() => setViewImage(null)}><X className="h-6 w-6" /></Button>
+          
+          <div className="absolute top-4 left-4 flex gap-2 z-50">
+            <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.min(prev + 0.25, 4))} title="Zoom In">
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} title="Zoom Out">
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(1)} title="Reset Zoom">
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="relative w-full h-full flex items-center justify-center overflow-auto">
+            <div className="transition-transform duration-200 ease-out" style={{ transform: `scale(${zoom})` }}>
+              {viewImage && <img src={viewImage} className="max-w-full max-h-full object-contain shadow-2xl" alt="Verification" />}
+            </div>
+            <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white bg-black/20 rounded-full z-50 hover:bg-black/40" onClick={() => { setZoom(1); setViewImage(null); }}><X className="h-6 w-6" /></Button>
           </div>
         </DialogContent>
       </Dialog>

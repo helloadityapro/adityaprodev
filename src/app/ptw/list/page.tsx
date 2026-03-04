@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs, or, increment, getDoc } from "firebase/firestore";
@@ -195,6 +195,7 @@ export default function PtwListPage() {
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
   const [viewerImages, setViewerImages] = React.useState<{ images: Attachment[], initialIndex: number } | null>(null);
+  const [zoom, setZoom] = React.useState(1);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
@@ -684,7 +685,7 @@ export default function PtwListPage() {
                                       <CarouselItem key={idx} className="pl-2 basis-1/2 md:basis-1/3 lg:basis-1/4">
                                         <Card 
                                           className="overflow-hidden border-none group rounded-sm shadow-sm hover:shadow-md transition-all cursor-pointer"
-                                          onClick={() => setViewerImages({ images, initialIndex: idx })}
+                                          onClick={() => { setZoom(1); setViewerImages({ images, initialIndex: idx }); }}
                                         >
                                           <CardContent className="p-0 aspect-square relative flex items-center justify-center bg-muted/30">
                                             <img 
@@ -692,7 +693,7 @@ export default function PtwListPage() {
                                               alt={img.name} 
                                               className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300" 
                                             />
-                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
                                               <Maximize2 className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </div>
                                           </CardContent>
@@ -788,7 +789,7 @@ export default function PtwListPage() {
                                     {file.contentType.startsWith('image/') ? (
                                       <div 
                                         className="h-10 w-10 rounded-sm border overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
-                                        onClick={() => setViewerImages({ images: [file], initialIndex: 0 })}
+                                        onClick={() => { setZoom(1); setViewerImages({ images: [file], initialIndex: 0 }); }}
                                       >
                                         <img src={file.url} alt={file.name} className="h-full w-full object-cover" />
                                       </div>
@@ -822,21 +823,40 @@ export default function PtwListPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!viewerImages} onOpenChange={() => setViewerImages(null)}>
+      <Dialog open={!!viewerImages} onOpenChange={(o) => { if(!o) setZoom(1); setViewerImages(null); }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm">
           <DialogHeader className="sr-only">
             <DialogTitle>Full Screen Document Viewer</DialogTitle>
             <DialogDescription>Viewing images from submission in full size.</DialogDescription>
           </DialogHeader>
-          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 bg-black/20 hover:bg-black/40 rounded-full shadow-sm" onClick={() => setViewerImages(null)}>
+          
+          <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.min(prev + 0.25, 4))} title="Zoom In">
+              <ZoomIn className="h-5 w-5" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} title="Zoom Out">
+              <ZoomOut className="h-5 w-5" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(1)} title="Reset Zoom">
+              <RotateCcw className="h-5 w-5" />
+            </Button>
+            <Badge variant="outline" className="h-10 px-3 flex items-center justify-center bg-black/40 text-white border-white/10 rounded-full font-mono font-bold">
+              {Math.round(zoom * 100)}%
+            </Badge>
+          </div>
+
+          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 bg-black/20 hover:bg-black/40 rounded-full shadow-sm" onClick={() => { setZoom(1); setViewerImages(null); }}>
             <X className="h-6 w-6" />
           </Button>
+          
           {viewerImages && (
             <Carousel className="w-full h-full flex items-center justify-center" opts={{ startIndex: viewerImages.initialIndex }}>
               <CarouselContent className="h-full">
                 {viewerImages.images.map((img, idx) => (
-                  <CarouselItem key={idx} className="flex items-center justify-center h-full w-full">
-                    <img src={img.url} alt={img.name} className="max-w-full max-h-full object-contain shadow-2xl" />
+                  <CarouselItem key={idx} className="flex items-center justify-center h-full w-full overflow-auto">
+                    <div className="transition-transform duration-200 ease-out flex items-center justify-center" style={{ transform: `scale(${zoom})` }}>
+                      <img src={img.url} alt={img.name} className="max-w-full max-h-full object-contain shadow-2xl" />
+                    </div>
                   </CarouselItem>
                 ))}
               </CarouselContent>
