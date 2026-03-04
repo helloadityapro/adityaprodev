@@ -97,6 +97,7 @@
     border: none !important;
     background: white !important;
     color: black !important;
+    z-index: 9999 !important;
   }
   .no-print {
     display: none !important;
@@ -104,6 +105,12 @@
   body, html {
     overflow: visible !important;
     height: auto !important;
+  }
+  /* Force containers to expand for printing */
+  .sidebar-inset, [data-sidebar="inset"], .flex-1, main, div {
+    overflow: visible !important;
+    height: auto !important;
+    position: static !important;
   }
   * {
     -webkit-print-color-adjust: exact !important;

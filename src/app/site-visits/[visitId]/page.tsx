@@ -102,7 +102,7 @@ export default function SiteVisitDetailPage() {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to History
         </Button>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrint} className="rounded-sm font-bold">
+          <Button variant="outline" size="sm" onClick={handlePrint} className="rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
             <Printer className="mr-2 h-4 w-4" /> Print Report
           </Button>
         </div>

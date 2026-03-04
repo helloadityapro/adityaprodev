@@ -260,7 +260,7 @@ export default function AdminDayReportPage() {
                   </div>
                 </div>
               </div>
-              <Button onClick={handlePrint} variant="outline" className="rounded-sm font-bold border-primary text-primary no-print h-11 px-6 bg-white shadow-sm">
+              <Button onClick={handlePrint} variant="outline" className="rounded-sm font-bold border-primary text-primary no-print h-11 px-6 bg-white shadow-sm hover:bg-primary/5">
                 <Printer className="h-4 w-4 mr-2" />
                 Print Activity Report
               </Button>
