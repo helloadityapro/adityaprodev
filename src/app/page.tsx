@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect } from 'react';
@@ -23,13 +22,8 @@ export default function RootPage() {
         return;
       }
 
-      const isAdmin = isSuperAdmin(user.email) || userProfile?.role === 'Admin';
-      
-      if (isAdmin) {
-        router.replace('/dashboard');
-      } else {
-        router.replace('/ptw/list');
-      }
+      // Default all users to the Rewards (Points Bank) page as their home
+      router.replace('/rewards');
     }
   }, [user, isUserLoading, isProfileLoading, userProfile, router]);
 

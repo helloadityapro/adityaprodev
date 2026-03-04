@@ -48,7 +48,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (mounted && user && userProfile && !isProfileLoading && !userProfile.registrationRequest) {
-      router.replace('/dashboard')
+      router.replace('/rewards')
     }
   }, [user, userProfile, isProfileLoading, router, mounted])
 

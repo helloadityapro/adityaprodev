@@ -35,7 +35,7 @@ export default function ForgotPasswordPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (mounted && user) {
-      router.replace('/dashboard')
+      router.replace('/rewards')
     }
   }, [user, router, mounted])
 

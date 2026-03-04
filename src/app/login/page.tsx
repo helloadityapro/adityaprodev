@@ -1,4 +1,3 @@
-
 'use client'
 
 import Link from "next/link"
@@ -34,10 +33,10 @@ export default function LoginPage() {
     setMounted(true)
   }, [])
 
-  // Redirect if already logged in and has profile (Profile check handled by shell)
+  // Redirect if already logged in
   useEffect(() => {
     if (mounted && user) {
-      router.replace('/dashboard')
+      router.replace('/rewards')
     }
   }, [user, router, mounted])
 
