@@ -26,7 +26,8 @@ import {
   Camera,
   CheckCircle2,
   AlertCircle,
-  FileCheck
+  FileCheck,
+  Loader2
 } from 'lucide-react';
 import { format, startOfDay, endOfDay, parseISO, differenceInMinutes } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -45,7 +46,7 @@ type UserProfile = {
 
 export default function AdminDayReportPage() {
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const router = useRouter();
 
   const [selectedUserId, setSelectedUserId] = React.useState<string>("");
