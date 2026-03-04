@@ -343,6 +343,10 @@ export default function SiteVisitsHistoryPage() {
 
       <Dialog open={!!enlargedImage} onOpenChange={(o) => !o && setEnlargedImage(null)}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Enlarged View</DialogTitle>
+            <DialogDescription>Full screen preview of the selected site visit photo.</DialogDescription>
+          </DialogHeader>
           <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 bg-black/20 hover:bg-black/40 rounded-full shadow-sm" onClick={() => setEnlargedImage(null)}>
             <X className="h-6 w-6" />
           </Button>
