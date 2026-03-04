@@ -4,7 +4,6 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  FolderKanban,
   FilePlus,
   List,
   Users,
@@ -47,16 +46,6 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Main</SidebarGroupLabel>
         <SidebarMenu>
-          {userRole === 'Admin' && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Projects" isActive={pathname === '/dashboard'} className="rounded-sm">
-                <Link href="/dashboard">
-                  <FolderKanban className="h-4 w-4" />
-                  <span className="font-medium">Projects</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Reports" isActive={pathname === '/reports'} className="rounded-sm">
               <Link href="/reports">
