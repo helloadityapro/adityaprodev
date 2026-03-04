@@ -28,6 +28,10 @@ import {
   Truck,
   Navigation,
   Activity,
+  CalendarCheck,
+  Clock,
+  LogOut,
+  UserCheck
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -51,6 +55,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <Link href="/reports">
                 <BarChart3 className="h-4 w-4" />
                 <span className="font-medium">Reports</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Attendance" isActive={pathname.startsWith('/attendance')} className="rounded-sm">
+              <Link href="/attendance">
+                <CalendarCheck className="h-4 w-4 text-emerald-600" />
+                <span className="font-medium">Attendance</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

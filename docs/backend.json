@@ -21,6 +21,23 @@
       },
       "required": ["id", "username", "email", "mobile", "role"]
     },
+    "Attendance": {
+      "title": "Workday Attendance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "checkInTime": { "type": "string", "format": "date-time" },
+        "checkInLat": { "type": "number" },
+        "checkInLng": { "type": "number" },
+        "checkOutTime": { "type": "string", "format": "date-time" },
+        "checkOutLat": { "type": "number" },
+        "checkOutLng": { "type": "number" },
+        "status": { "type": "string", "enum": ["ongoing", "completed"] },
+        "date": { "type": "string", "description": "YYYY-MM-DD format" }
+      }
+    },
     "Supplier": {
       "title": "Supplier",
       "type": "object",
@@ -93,6 +110,10 @@
     "/users/{userId}": {
       "schema": { "$ref": "#/backend/entities/User" },
       "description": "User profiles and roles."
+    },
+    "/attendance/{attendanceId}": {
+      "schema": { "$ref": "#/backend/entities/Attendance" },
+      "description": "Daily check-in and check-out logs."
     },
     "/site_visits/{visitId}": {
       "schema": { "$ref": "#/backend/entities/SiteVisit" },
