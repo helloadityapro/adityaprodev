@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -103,6 +104,7 @@ export default function CheckInPage() {
       await addDocumentNonBlocking(collection(firestore, 'attendance'), {
         userId: user.uid,
         userName: userProfile.username || user.email,
+        siteManagerId: userProfile.siteManagerId || null,
         checkInTime: serverTimestamp(),
         checkInLat: location.lat,
         checkInLng: location.lng,

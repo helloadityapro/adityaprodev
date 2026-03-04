@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, where, orderBy, limit, doc } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, doc, or } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
@@ -63,19 +63,37 @@ export default function AttendanceHistoryPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
+  const showPersonnelColumn = isAdmin || isManager;
 
   const attendanceQuery = useMemoFirebase(() => {
-    if (!user || isProfileLoading) return null;
+    if (!user || !userProfile || isProfileLoading) return null;
     const colRef = collection(firestore, 'attendance');
-    if (isAdmin) return query(colRef, orderBy('checkInTime', 'desc'), limit(100));
+    
+    if (isAdmin) {
+      return query(colRef, orderBy('checkInTime', 'desc'), limit(100));
+    }
+    
+    if (isManager) {
+      // Managers see their own and their team's records via siteManagerId
+      return query(
+        colRef,
+        or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid)),
+        orderBy('checkInTime', 'desc'),
+        limit(100)
+      );
+    }
+    
+    // Engineers see only their own
     return query(
       colRef,
       where('userId', '==', user.uid),
       orderBy('checkInTime', 'desc'),
       limit(50)
     );
-  }, [firestore, user, isAdmin, isProfileLoading]);
+  }, [firestore, user, userProfile, isAdmin, isManager, isProfileLoading]);
 
   const { data: entries, isLoading } = useCollection<AttendanceEntry>(attendanceQuery);
 
@@ -89,12 +107,14 @@ export default function AttendanceHistoryPage() {
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4 max-w-5xl mx-auto"><Skeleton className="h-[500px] w-full" /></div>;
 
+  const headerTitle = isAdmin ? "Global Attendance Logs" : (isManager ? "Team Attendance Activity" : "My Attendance History");
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto py-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2">
-            <History className="h-8 w-8" /> {isAdmin ? "Global Attendance Logs" : "My Attendance History"}
+            <History className="h-8 w-8" /> {headerTitle}
           </h1>
           <p className="text-muted-foreground">Historical records with GPS and Photo verification.</p>
         </div>
@@ -113,7 +133,7 @@ export default function AttendanceHistoryPage() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  {isAdmin && <TableHead>Personnel</TableHead>}
+                  {showPersonnelColumn && <TableHead>Personnel</TableHead>}
                   <TableHead className="text-center">Entry (Photo/GPS)</TableHead>
                   <TableHead className="text-center">Exit (Photo/GPS)</TableHead>
                   <TableHead className="text-center">Duration</TableHead>
@@ -123,7 +143,7 @@ export default function AttendanceHistoryPage() {
                 {filteredEntries.length > 0 ? filteredEntries.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell className="font-bold text-sm">{formatDate(entry.checkInTime)}</TableCell>
-                    {isAdmin && (
+                    {showPersonnelColumn && (
                       <TableCell>
                         <div className="flex items-center gap-2 text-xs font-bold uppercase">
                           <User className="h-3 w-3" /> {entry.userName}
@@ -174,7 +194,7 @@ export default function AttendanceHistoryPage() {
                     </TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={isAdmin ? 5 : 4} className="h-32 text-center text-muted-foreground italic">No records.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={showPersonnelColumn ? 5 : 4} className="h-32 text-center text-muted-foreground italic">No records.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
