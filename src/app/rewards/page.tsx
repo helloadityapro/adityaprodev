@@ -20,7 +20,7 @@ import {
   DialogClose,
   DialogFooter
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -175,7 +175,7 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 rounded-sm">
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 rounded-sm">
         <DialogHeader className="p-6 pb-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-amber-500/10 rounded-sm">
@@ -196,7 +196,7 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
             </div>
           ) : entries.length > 0 ? (
             <ScrollArea className="flex-1 px-6 pb-6">
-              <div className="min-w-[800px]">
+              <div className="min-w-[900px] pb-4">
                 <Table>
                   <TableHeader className="bg-muted/30 sticky top-0 z-10">
                     <TableRow>
@@ -210,7 +210,7 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
                   <TableBody>
                     {entries.map((entry) => (
                       <TableRow key={entry.id} className="hover:bg-muted/5 transition-colors">
-                        <TableCell className="py-2">
+                        <TableCell className="py-3">
                           <div className="flex flex-col">
                             <span className="font-bold text-sm leading-tight">{entry.title}</span>
                             <span className="text-[10px] text-muted-foreground font-mono">
@@ -218,10 +218,10 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="py-2">
+                        <TableCell className="py-3">
                           <span className="text-xs font-medium text-muted-foreground">{entry.site}</span>
                         </TableCell>
-                        <TableCell className="py-2">
+                        <TableCell className="py-3">
                           <div className="flex items-center gap-1.5">
                             {entry.type === 'PTW' && <FileCheck className="h-3 w-3 text-blue-500" />}
                             {entry.type === 'DPR' && <FileText className="h-3 w-3 text-amber-500" />}
@@ -229,10 +229,10 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
                             <span className="text-[10px] font-black uppercase tracking-tighter">{entry.type}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-mono text-[10px] text-muted-foreground py-2">
+                        <TableCell className="text-right font-mono text-[10px] text-muted-foreground py-3">
                           {entry.basePoints.toFixed(2)}
                         </TableCell>
-                        <TableCell className="text-right py-2">
+                        <TableCell className="text-right py-3">
                           <div className="flex flex-col items-end">
                             <span className="font-black text-primary text-sm">+{entry.finalPoints.toFixed(2)}</span>
                             {entry.isInherited ? (
@@ -247,6 +247,7 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
                   </TableBody>
                 </Table>
               </div>
+              <ScrollBar orientation="horizontal" />
             </ScrollArea>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center py-32 text-center text-muted-foreground italic">
@@ -420,7 +421,7 @@ export default function RewardsPage() {
           </CardHeader>
           <CardContent className="p-0">
             <ScrollArea className="w-full">
-              <div className="min-w-[600px]">
+              <div className="min-w-[700px] pb-2">
                 <Table>
                   <TableHeader className="bg-muted/30">
                     <TableRow>
@@ -483,6 +484,7 @@ export default function RewardsPage() {
                   </TableBody>
                 </Table>
               </div>
+              <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </CardContent>
         </Card>
