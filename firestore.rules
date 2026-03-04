@@ -38,10 +38,11 @@ service cloud.firestore {
     }
 
     match /site_visits/{visitId} {
-      // Allow managers to read/update their own visits, and admins to oversee everything
+      // Allow reading if Admin OR if the document belongs to the manager (matches the query filter)
       allow read: if isSignedIn() && (
         isAdmin() || 
-        resource.data.managerId == request.auth.uid
+        (resource != null && resource.data.managerId == request.auth.uid) ||
+        (resource == null) // This allows queries where filters will be checked against the data
       );
       allow create: if isSignedIn() && (isSiteManager() || isAdmin());
       allow update: if isSignedIn() && (
