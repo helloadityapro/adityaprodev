@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, where, orderBy, limit, doc, or } from "firebase/firestore";
+import { collection, query, where, limit, doc, or } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
@@ -72,25 +72,23 @@ export default function AttendanceHistoryPage() {
     if (!user || !userProfile || isProfileLoading) return null;
     const colRef = collection(firestore, 'attendance');
     
+    // We remove orderBy from Firestore query to avoid index requirements
+    // Sorting is handled in memory via filteredEntries useMemo
     if (isAdmin) {
-      return query(colRef, orderBy('checkInTime', 'desc'), limit(100));
+      return query(colRef, limit(100));
     }
     
     if (isManager) {
-      // Managers see their own and their team's records via siteManagerId
       return query(
         colRef,
         or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid)),
-        orderBy('checkInTime', 'desc'),
         limit(100)
       );
     }
     
-    // Engineers see only their own
     return query(
       colRef,
       where('userId', '==', user.uid),
-      orderBy('checkInTime', 'desc'),
       limit(50)
     );
   }, [firestore, user, userProfile, isAdmin, isManager, isProfileLoading]);
@@ -99,7 +97,15 @@ export default function AttendanceHistoryPage() {
 
   const filteredEntries = React.useMemo(() => {
     if (!entries) return [];
-    return entries.filter(e => 
+    
+    // Sort in memory: Latest check-ins first
+    const sorted = [...entries].sort((a, b) => {
+        const dateA = a.checkInTime?.toDate?.()?.getTime() || 0;
+        const dateB = b.checkInTime?.toDate?.()?.getTime() || 0;
+        return dateB - dateA;
+    });
+
+    return sorted.filter(e => 
       e.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.date.includes(searchTerm)
     );
@@ -194,7 +200,7 @@ export default function AttendanceHistoryPage() {
                     </TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={showPersonnelColumn ? 5 : 4} className="h-32 text-center text-muted-foreground italic">No records.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={showPersonnelColumn ? 5 : 4} className="h-32 text-center text-muted-foreground italic">No records found.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -204,7 +210,10 @@ export default function AttendanceHistoryPage() {
 
       <Dialog open={!!viewImage} onOpenChange={() => setViewImage(null)}>
         <DialogContent className="max-w-lg p-0 bg-black border-none rounded-sm overflow-hidden">
-          <DialogHeader className="sr-only"><DialogTitle>Verification Photo</DialogTitle></DialogHeader>
+          <DialogHeader className="sr-only">
+            <DialogTitle>Verification Photo</DialogTitle>
+            <DialogDescription>Attendance check-in/out verification selfie.</DialogDescription>
+          </DialogHeader>
           <div className="relative aspect-square flex items-center justify-center">
             {viewImage && <img src={viewImage} className="max-w-full max-h-full object-contain" alt="Verification" />}
             <Button variant="ghost" size="icon" className="absolute top-2 right-2 text-white bg-black/20 rounded-full" onClick={() => setViewImage(null)}><X className="h-6 w-6" /></Button>

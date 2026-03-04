@@ -56,13 +56,12 @@ service cloud.firestore {
     match /site_visits/{visitId} {
       allow read: if isSignedIn() && (
         isAdmin() || 
-        (resource != null && resource.data.managerId == request.auth.uid) ||
-        (resource == null)
+        resource.data.managerId == request.auth.uid
       );
       allow create: if isSignedIn() && (isSiteManager() || isAdmin());
       allow update: if isSignedIn() && (
         isAdmin() || 
-        (resource != null && resource.data.managerId == request.auth.uid)
+        resource.data.managerId == request.auth.uid
       );
       allow delete: if isAdmin();
     }

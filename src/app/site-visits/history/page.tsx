@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, where, orderBy, limit, doc } from "firebase/firestore";
+import { collection, query, where, limit, doc } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
@@ -57,11 +57,13 @@ export default function SiteVisitsHistoryPage() {
   const historyQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'site_visits');
-    if (isAdmin) return query(colRef, orderBy('startTime', 'desc'), limit(100));
+    
+    // Removing orderBy to bypass index requirements
+    if (isAdmin) return query(colRef, limit(100));
+    
     return query(
       colRef,
       where('managerId', '==', user.uid),
-      orderBy('startTime', 'desc'),
       limit(50)
     );
   }, [firestore, user, isAdmin, isProfileLoading]);
@@ -70,7 +72,15 @@ export default function SiteVisitsHistoryPage() {
 
   const filteredVisits = React.useMemo(() => {
     if (!visits) return [];
-    return visits.filter(v => 
+    
+    // Sort in memory: Latest visits first
+    const sorted = [...visits].sort((a, b) => {
+        const dateA = a.startTime?.toDate?.()?.getTime() || 0;
+        const dateB = b.startTime?.toDate?.()?.getTime() || 0;
+        return dateB - dateA;
+    });
+
+    return sorted.filter(v => 
       v.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (v.purpose || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (v.managerName || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -84,7 +94,7 @@ export default function SiteVisitsHistoryPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <History className="h-8 w-8" /> {isAdmin ? "Organization Visit Logs" : "Visit Logs & Reports"}
+            <History className="h-8 w-8" /> {isAdmin ? "Organization Visit Logs" : "My Site Visit Logs"}
           </h1>
           <p className="text-muted-foreground">Historical records of site presence and audit reports.</p>
         </div>
