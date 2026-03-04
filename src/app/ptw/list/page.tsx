@@ -86,13 +86,6 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
   const managerRef = useMemoFirebase(() => (permit.status === 'Pending' && permit.siteManagerId) ? doc(firestore, 'users', permit.siteManagerId) : null, [firestore, permit.siteManagerId, permit.status]);
   const { data: managerProfile } = useDoc(managerRef);
 
-  const adminsQuery = useMemoFirebase(() => {
-    if (permit.status !== 'ManagerApproved') return null;
-    return query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'), limit(1));
-  }, [firestore, permit.status]);
-  const { data: adminDocs } = useCollection(adminsQuery);
-  const adminProfile = adminDocs?.[0];
-
   const statusConfig = {
     Pending: { 
       label: managerProfile ? `Pending with ${managerProfile.username}` : 'Pending Manager', 
@@ -100,7 +93,7 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
       className: 'bg-yellow-100 text-yellow-800 border-yellow-200' 
     },
     ManagerApproved: { 
-      label: adminProfile ? `Pending with ${adminProfile.username}` : 'Pending Admin', 
+      label: 'Pending with Admin', 
       icon: Clock, 
       className: 'bg-blue-100 text-blue-800 border-blue-200' 
     },
