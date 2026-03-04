@@ -153,7 +153,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (!user) return null;
     return query(collection(firestore, 'notifications'), where('userId', '==', user.uid));
   }, [user, firestore]);
-  const { data: unsortedNotifications } = useCollection(notificationsQuery);
+  const { data: unsortedNotifications } = useCollection<Notification>(notificationsQuery);
 
   const notifications = React.useMemo(() => {
     if (!unsortedNotifications) return null;
@@ -210,7 +210,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           Your account is authenticated, but your professional profile could not be found in the database. 
           This happens if your data was cleared or registration was not completed.
         </p>
-        <div className="flex flex-col gap-3 w-full max-w-xs">
+        <div className="flex flex-col gap-3 w-full max-xs">
           <Button onClick={() => router.push('/register')} className="w-full font-black h-12 text-lg shadow-md rounded-sm">
             <RefreshCw className="mr-2 h-5 w-5" /> Restore Profile
           </Button>
@@ -238,7 +238,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-full overflow-hidden">
       <Sidebar>
         <SidebarHeader className="px-6 py-4 border-b">
           <span className="text-sm font-bold tracking-widest text-primary uppercase">Aditya Pro</span>
@@ -247,8 +247,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <MainNav userRole={userRole} pendingPtwCount={pendingPtwCount} />
         </SidebarContent>
       </Sidebar>
-      <SidebarInset>
-        <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:px-6 sticky top-0 z-10">
+      <SidebarInset className="flex flex-col h-full overflow-hidden">
+        <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-background px-4 lg:px-6 z-10">
           <SidebarTrigger />
           <div className="flex-1 max-w-md">
             <GlobalSearch />
@@ -261,7 +261,11 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <UserNotifications />
           <UserNav />
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-muted/40">{children}</main>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/40">
+          <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6 min-h-full">
+            {children}
+          </div>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

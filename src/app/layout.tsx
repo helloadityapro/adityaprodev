@@ -20,11 +20,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} h-full`} suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body className="antialiased font-sans">
+      <body className="antialiased font-sans h-full overflow-hidden">
         <FirebaseClientProvider>
           <FirebaseErrorListener />
           <ClientShell>{children}</ClientShell>
