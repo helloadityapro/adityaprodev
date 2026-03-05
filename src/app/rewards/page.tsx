@@ -181,7 +181,6 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
             <History className="h-4 w-4 text-primary shrink-0" />
             <DialogTitle className="text-sm font-bold truncate tracking-tight uppercase">Audit: {targetUser?.username}</DialogTitle>
           </div>
-          <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-4 w-4" /></Button></DialogClose>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col bg-background min-h-0">
@@ -477,9 +476,8 @@ export default function RewardsPage() {
 
         <div className="space-y-6">
             <Card className="rounded-sm border-primary/10">
-                <CardHeader className="pb-3 flex flex-row items-center gap-2">
-                    <Info className="h-4 w-4 text-primary" />
-                    <CardTitle className="text-sm font-bold uppercase text-primary">Reward Economy Rules</CardTitle>
+                <CardHeader>
+                    <CardTitle className="text-xs font-bold uppercase text-primary">Reward Economy Rules</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="space-y-3">
