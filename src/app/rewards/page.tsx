@@ -175,16 +175,16 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[85vh] flex flex-col p-0 rounded-sm overflow-hidden">
+      <DialogContent className="max-w-xl max-h-[85vh] flex flex-col p-0 rounded-sm overflow-hidden border-none shadow-2xl">
         <DialogHeader className="p-4 px-6 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3 min-w-0">
-            <History className="h-4 w-4 text-amber-600 shrink-0" />
-            <DialogTitle className="text-sm font-bold truncate">Audit: {targetUser?.username}</DialogTitle>
+            <History className="h-4 w-4 text-primary shrink-0" />
+            <DialogTitle className="text-sm font-bold truncate tracking-tight uppercase">Audit: {targetUser?.username}</DialogTitle>
           </div>
           <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-4 w-4" /></Button></DialogClose>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-hidden flex flex-col bg-background">
           {isLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-20">
               <Loader2 className="h-8 w-8 animate-spin text-primary opacity-20" />
@@ -192,47 +192,43 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
             </div>
           ) : entries.length > 0 ? (
             <ScrollArea className="flex-1">
-              <div className="divide-y border-b">
+              <div className="divide-y divide-border/50">
                 {entries.map((entry) => (
-                  <div key={entry.id} className="group flex items-center justify-between py-2.5 px-6 hover:bg-accent/5 transition-all duration-200">
+                  <div key={entry.id} className="group flex items-center justify-between py-2 px-6 hover:bg-primary/[0.02] transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={cn(
-                        "h-8 w-8 rounded-sm flex items-center justify-center shrink-0 border",
-                        entry.type === 'PTW' ? "bg-blue-50 border-blue-100 text-blue-600" : 
-                        entry.type === 'DPR' ? "bg-amber-50 border-amber-100 text-amber-600" : 
-                        "bg-emerald-50 border-emerald-100 text-emerald-600"
+                        "h-6 w-6 rounded-[2px] flex items-center justify-center shrink-0",
+                        entry.type === 'PTW' ? "bg-blue-500/10 text-blue-600" : 
+                        entry.type === 'DPR' ? "bg-amber-500/10 text-amber-600" : 
+                        "bg-emerald-500/10 text-emerald-600"
                       )}>
-                        {entry.type === 'PTW' && <FileCheck className="h-4 w-4" />}
-                        {entry.type === 'DPR' && <FileText className="h-4 w-4" />}
-                        {entry.type === 'Movement' && <ArrowLeftRight className="h-4 w-4" />}
+                        {entry.type === 'PTW' && <FileCheck className="h-3 w-3" />}
+                        {entry.type === 'DPR' && <FileText className="h-3 w-3" />}
+                        {entry.type === 'Movement' && <ArrowLeftRight className="h-3 w-3" />}
                       </div>
                       <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-[11px] text-foreground truncate leading-none mb-1 uppercase tracking-tight">{entry.title}</span>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-xs text-foreground truncate">{entry.title}</span>
-                          <span className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-tighter">
-                            {entry.type}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-0.5">
-                          <p className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1 truncate max-w-[150px]">
-                            <MapPin className="h-2 w-2" /> {entry.site}
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1 truncate max-w-[120px]">
+                            <MapPin className="h-2 w-2 opacity-50" /> {entry.site}
                           </p>
+                          <span className="text-[9px] font-medium text-muted-foreground/40">•</span>
                           <p className="text-[9px] font-medium text-muted-foreground/40 flex items-center gap-1">
-                            <Clock className="h-2 w-2" />
-                            {entry.date ? format(entry.date.toDate(), 'dd MMM yy, HH:mm') : '—'}
+                            <Clock className="h-2 w-2 opacity-50" />
+                            {entry.date ? format(entry.date.toDate(), 'dd MMM, HH:mm') : '—'}
                           </p>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                    <div className="flex items-center gap-2 shrink-0 ml-4">
                       {entry.isInherited ? (
-                        <span className="text-[7px] font-black text-amber-700 bg-amber-100 px-1 py-0.5 rounded-sm uppercase tracking-tighter border border-amber-200">Inherited</span>
+                        <span className="text-[7px] font-black text-amber-700 bg-amber-100 px-1 py-0.5 rounded-sm uppercase tracking-tighter">Inherited</span>
                       ) : entry.multiplier > 1 ? (
-                        <span className="text-[7px] font-black text-primary bg-primary/5 px-1 py-0.5 rounded-sm uppercase tracking-tighter border border-primary/10">x{entry.multiplier} Factor</span>
+                        <span className="text-[7px] font-black text-primary bg-primary/5 px-1 py-0.5 rounded-sm uppercase tracking-tighter">x{entry.multiplier}</span>
                       ) : null}
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm font-black text-primary tabular-nums">+{entry.finalPoints.toFixed(2)}</span>
-                        <Trophy className="h-2.5 w-2.5 text-primary/40" />
+                      <div className="flex items-center gap-1 min-w-[45px] justify-end">
+                        <span className="text-xs font-black text-primary tabular-nums">+{entry.finalPoints.toFixed(2)}</span>
+                        <Trophy className="h-2.5 w-2.5 text-primary/30" />
                       </div>
                     </div>
                   </div>
@@ -242,7 +238,7 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center py-32 text-center text-muted-foreground/40">
               <History className="h-10 w-10 opacity-10 mb-4" />
-              <p className="text-[10px] font-black uppercase tracking-widest">No activity found</p>
+              <p className="text-[10px] font-black uppercase tracking-widest">No activity recorded</p>
             </div>
           )}
         </div>
