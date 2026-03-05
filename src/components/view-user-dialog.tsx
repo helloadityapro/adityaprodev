@@ -219,7 +219,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
         <div className="p-4 px-8 bg-muted/[0.02] flex justify-end shrink-0">
           <DialogClose asChild>
             <Button type="button" variant="ghost" className="rounded-sm font-black uppercase text-[10px] h-9 px-8 tracking-widest text-muted-foreground hover:text-foreground">
-              Close Audit
+              CLOSE
             </Button>
           </DialogClose>
         </div>
