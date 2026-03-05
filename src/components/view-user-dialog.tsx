@@ -139,7 +139,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                         <UserCog className="h-4 w-4 text-primary" />
                         <div className="flex flex-col">
                           <span className="text-xs font-bold uppercase tracking-tight">{mappedManager.username}</span>
-                          <span className="text-[9px] text-muted-foreground font-black uppercase">Direct Supervisor</span>
+                          <span className="text-[9px] text-muted-foreground font-black uppercase">Site Manager</span>
                         </div>
                       </div>
                     </div>
