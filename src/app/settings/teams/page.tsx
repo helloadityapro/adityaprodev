@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check, MapPin, PlusCircle, Loader2 } from 'lucide-react';
+import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check, MapPin, PlusCircle, Loader2, ShieldAlert } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,18 @@ type Site = {
 
 type SortKey = 'engineer' | 'manager' | 'sites';
 
+const RESCUE_NAMES = [
+  "Shayad Shaikh",
+  "Shahabaj Shaikh",
+  "Omkar Puri",
+  "Abhay Chaudhari",
+  "Mahesh Shivpuje",
+  "Dnyaneshwar Aglave",
+  "Dipak Kshirsagar",
+  "Santosh Gulabrao Maghade",
+  "Vaibhav Samshette"
+].map(n => n.toLowerCase());
+
 export default function TeamMappingPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -56,16 +68,25 @@ export default function TeamMappingPage() {
     }
   }, [isProfileLoading, isAdmin, isManager, router]);
 
-  // We fetch all users and filter in memory to avoid missing users due to case sensitivity or Firestore query inconsistencies
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<User>(usersQuery);
 
   const managers = React.useMemo(() => {
-    return allUsers?.filter(u => u.role === 'Site Manager') || [];
+    return allUsers?.filter(u => {
+      const role = (u.role || '').trim().toLowerCase();
+      return role === 'site manager' || role === 'manager';
+    }) || [];
   }, [allUsers]);
 
   const engineers = React.useMemo(() => {
-    return allUsers?.filter(u => u.role === 'Site Engineer') || [];
+    return allUsers?.filter(u => {
+      const role = (u.role || '').trim().toLowerCase();
+      const username = (u.username || '').trim().toLowerCase();
+      // Robust classification: Match role case-insensitively OR match the specific requested names
+      const isEngineerRole = role === 'site engineer' || role === 'engineer';
+      const isRescueTarget = RESCUE_NAMES.includes(username);
+      return isEngineerRole || isRescueTarget;
+    }) || [];
   }, [allUsers]);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
@@ -92,14 +113,8 @@ export default function TeamMappingPage() {
   // Sort state
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
 
-  /**
-   * Recalculates and updates a Manager's assignedProjectIds based on all reporting engineers.
-   * This ensures Managers "inherit" all site access from their reporting team members.
-   */
   const syncManagerSites = async (managerId: string) => {
     const batch = writeBatch(firestore);
-    
-    // Fetch all engineers reporting to this manager
     const q = query(collection(firestore, 'users'), where('siteManagerId', '==', managerId));
     const snap = await getDocs(q);
     
@@ -120,14 +135,16 @@ export default function TeamMappingPage() {
 
     try {
         const engineerRef = doc(firestore, 'users', selectedEngineerId);
-        await updateDocumentNonBlocking(engineerRef, { siteManagerId: selectedManagerId });
+        await updateDocumentNonBlocking(engineerRef, { 
+          siteManagerId: selectedManagerId,
+          role: 'Site Engineer' // Ensure the role is standardized on mapping
+        });
 
-        // Trigger inherited site sync
         await syncManagerSites(selectedManagerId);
 
         toast({
-            title: 'Engineer Assigned',
-            description: 'Reporting structure updated and site access synchronized.',
+            title: 'Team Link Created',
+            description: 'Personnel has been mapped and site access synchronized.',
         });
         
         setSelectedEngineerId(null);
@@ -147,13 +164,11 @@ export default function TeamMappingPage() {
     try {
         const engineerRef = doc(firestore, 'users', engineerId);
         await updateDocumentNonBlocking(engineerRef, { siteManagerId: null });
-
-        // Recalculate old manager's inherited sites
         await syncManagerSites(oldManagerId);
 
         toast({
             title: 'Mapping Removed',
-            description: 'The engineer mapping has been cleared and manager access updated.',
+            description: 'Personnel moved to unmapped list.',
         });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Error', description: e.message });
@@ -178,7 +193,6 @@ export default function TeamMappingPage() {
         const userRef = doc(firestore, 'users', siteManagementUser.id);
         await updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
 
-        // If it's an engineer, sync updated access to their manager
         if (siteManagementUser.role === 'Site Engineer' && siteManagementUser.siteManagerId) {
             await syncManagerSites(siteManagementUser.siteManagerId);
         }
@@ -216,8 +230,15 @@ export default function TeamMappingPage() {
 
   const unmappedEngineers = React.useMemo(() => {
     if (!engineers) return [];
-    // Ensure we catch any Site Engineer who lacks a siteManagerId (null, undefined, or empty string)
-    return engineers.filter(e => !e.siteManagerId || String(e.siteManagerId).trim() === "");
+    return engineers.filter(e => {
+      const username = (e.username || '').trim().toLowerCase();
+      const hasManager = e.siteManagerId && String(e.siteManagerId).trim() !== "" && String(e.siteManagerId) !== "null";
+      
+      // EXCEPTION: Always allow these rescue users to show in the dropdown to allow "Moving" to a fresh link
+      if (RESCUE_NAMES.includes(username)) return true;
+      
+      return !hasManager;
+    });
   }, [engineers]);
 
   const filteredUnmappedEngineers = React.useMemo(() => {
@@ -232,7 +253,7 @@ export default function TeamMappingPage() {
     
     return engineers
       .filter(e => {
-        if (isAdmin) return e.siteManagerId && String(e.siteManagerId).trim() !== "";
+        if (isAdmin) return e.siteManagerId && String(e.siteManagerId).trim() !== "" && String(e.siteManagerId) !== "null";
         return e.siteManagerId === user?.uid;
       })
       .filter(e => {
@@ -290,7 +311,9 @@ export default function TeamMappingPage() {
       {isAdmin && (
         <Card className="rounded-sm border-primary/10 bg-primary/5">
           <CardHeader>
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-primary">Map Site Engineer to Manager</CardTitle>
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-primary flex items-center gap-2">
+              <UserPlus className="h-4 w-4" /> Map Site Engineer to Manager
+            </CardTitle>
             <CardDescription>Assign an engineer to a supervisor. Sites assigned to the engineer will sync to the manager.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -379,7 +402,7 @@ export default function TeamMappingPage() {
                     <div className="flex items-center border-b px-3">
                       <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                       <Input
-                        placeholder="Search unmapped engineers..."
+                        placeholder="Search engineers..."
                         className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm"
                         value={engineerSearchQuery}
                         onChange={(e) => setEngineerSearchQuery(e.target.value)}
@@ -407,11 +430,16 @@ export default function TeamMappingPage() {
                                   e.id === selectedEngineerId ? "opacity-100" : "opacity-0"
                                 )}
                               />
-                              {e.username}
+                              <div className="flex flex-col items-start overflow-hidden">
+                                <span className="truncate">{e.username}</span>
+                                {RESCUE_NAMES.includes((e.username || '').toLowerCase()) && (
+                                  <Badge variant="outline" className="text-[8px] h-3 px-1 py-0 border-amber-500 text-amber-700 bg-amber-50 rounded-sm">Rescue Identified</Badge>
+                                )}
+                              </div>
                             </Button>
                           ))
                         ) : (
-                          <p className="p-4 text-center text-sm text-muted-foreground">No unmapped engineers.</p>
+                          <p className="p-4 text-center text-sm text-muted-foreground">No available engineers.</p>
                         )}
                       </div>
                     </ScrollArea>
