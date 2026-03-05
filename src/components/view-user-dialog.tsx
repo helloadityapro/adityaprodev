@@ -12,14 +12,18 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { useCollection, useFirestore, useMemoFirebase, useDoc, useUser } from '@/firebase';
-import { collection, query, where, doc, orderBy } from 'firebase/firestore';
-import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight, X, UserPlus } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase, useDoc, useUser, updateDocumentNonBlocking } from '@/firebase';
+import { collection, query, where, doc, orderBy, getDocs } from 'firebase/firestore';
+import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight, X, UserPlus, Check, ChevronsUpDown, Search, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 
 type UserProfile = {
   id: string;
@@ -47,6 +51,13 @@ interface ViewUserDialogProps {
 export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps) {
   const firestore = useFirestore();
   const { user: authUser } = useUser();
+  const { toast } = useToast();
+
+  const [isMappingMode, setIsMappingMode] = React.useState(false);
+  const [selectedManagerId, setSelectedManagerId] = React.useState<string | null>(null);
+  const [managerSearchQuery, setManagerSearchQuery] = React.useState("");
+  const [isManagerPopoverOpen, setIsManagerPopoverOpen] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   const currentUserProfileRef = useMemoFirebase(() => authUser ? doc(firestore, 'users', authUser.uid) : null, [firestore, authUser]);
   const { data: currentUserProfile } = useDoc<UserProfile>(currentUserProfileRef);
@@ -71,6 +82,18 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
   }, [firestore, user]);
   const { data: mappedManager } = useDoc<UserProfile>(managerRef);
 
+  const potentialManagers = React.useMemo(() => {
+    if (!allUsers) return [];
+    return allUsers.filter(u => u.role === 'Admin' || u.role === 'Site Manager');
+  }, [allUsers]);
+
+  const filteredManagers = React.useMemo(() => {
+    return potentialManagers.filter(m => 
+      (m.username || '').toLowerCase().includes(managerSearchQuery.toLowerCase()) ||
+      (m.email || '').toLowerCase().includes(managerSearchQuery.toLowerCase())
+    );
+  }, [potentialManagers, managerSearchQuery]);
+
   const globalRank = React.useMemo(() => {
     if (!allUsers || !user) return null;
     const index = allUsers.findIndex(u => u.id === user.id);
@@ -81,6 +104,57 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
     if (!user?.assignedProjectIds || !allSites) return [];
     return allSites.filter(s => user.assignedProjectIds?.includes(s.id)).sort((a, b) => a.name.localeCompare(b.name));
   }, [user, allSites]);
+
+  /**
+   * Recalculates and updates a Manager's assignedProjectIds based on all reporting engineers.
+   */
+  const syncManagerSites = async (managerId: string) => {
+    try {
+      const q = query(collection(firestore, 'users'), where('siteManagerId', '==', managerId));
+      const snap = await getDocs(q);
+      
+      const allTeamSites = new Set<string>();
+      snap.docs.forEach(d => {
+          const data = d.data();
+          (data.assignedProjectIds || []).forEach((id: string) => allTeamSites.add(id));
+      });
+
+      const managerRef = doc(firestore, 'users', managerId);
+      updateDocumentNonBlocking(managerRef, { assignedProjectIds: Array.from(allTeamSites) });
+    } catch (e) {
+      console.error("Manager inheritance sync failed", e);
+    }
+  };
+
+  const handleSaveMapping = async () => {
+    if (!user || !selectedManagerId) return;
+    setIsSaving(true);
+    try {
+      const userRef = doc(firestore, 'users', user.id);
+      updateDocumentNonBlocking(userRef, { 
+        siteManagerId: selectedManagerId,
+        role: 'Site Engineer' // Ensure they are categorized as engineer when mapped
+      });
+
+      await syncManagerSites(selectedManagerId);
+      
+      toast({ title: 'Mapping Updated', description: 'Reporting structure updated successfully.' });
+      setIsMappingMode(false);
+      setSelectedManagerId(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (!open) {
+      setIsMappingMode(false);
+      setSelectedManagerId(null);
+      setManagerSearchQuery("");
+    }
+  }, [open]);
 
   if (!user) return null;
 
@@ -155,11 +229,58 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                     <div className="flex flex-col items-start gap-3 px-1">
                       <div className="text-xs italic text-muted-foreground/60">No supervisor mapped to this engineer.</div>
                       {isViewerAdmin && (
-                        <Button variant="outline" size="sm" asChild className="h-8 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5 px-4 text-[10px] uppercase tracking-wider">
-                          <Link href="/settings/teams">
+                        !isMappingMode ? (
+                          <Button variant="outline" size="sm" onClick={() => setIsMappingMode(true)} className="h-8 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5 px-4 text-[10px] uppercase tracking-wider">
                             <UserPlus className="h-3 w-3 mr-1.5" /> Add Reporting Manager
-                          </Link>
-                        </Button>
+                          </Button>
+                        ) : (
+                          <div className="w-full space-y-3 p-3 border rounded-sm bg-primary/5 border-primary/10 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Select Supervisor</Label>
+                            <Popover open={isManagerPopoverOpen} onOpenChange={setIsManagerPopoverOpen}>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" className="w-full justify-between h-9 text-[11px] font-medium rounded-sm border-primary/20 bg-background">
+                                  {selectedManagerId ? potentialManagers.find(m => m.id === selectedManagerId)?.username : "Choose Personnel..."}
+                                  <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[300px] p-0 shadow-2xl border-primary/10" align="start">
+                                <div className="flex items-center border-b px-3 bg-muted/50">
+                                  <Search className="mr-2 h-3.5 w-3.5 shrink-0 opacity-50 text-primary" />
+                                  <Input 
+                                    placeholder="Search managers..." 
+                                    className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs bg-transparent" 
+                                    value={managerSearchQuery} 
+                                    onChange={e => setManagerSearchQuery(e.target.value)}
+                                  />
+                                </div>
+                                <ScrollArea className="h-[200px]">
+                                  <div className="p-1">
+                                    {filteredManagers.map(m => (
+                                      <Button 
+                                        key={m.id} 
+                                        variant="ghost" 
+                                        className="w-full justify-start h-9 text-xs rounded-sm font-medium" 
+                                        onClick={() => { setSelectedManagerId(m.id); setIsManagerPopoverOpen(false); }}
+                                      >
+                                        <Check className={cn("mr-2 h-3 w-3 text-primary", selectedManagerId === m.id ? "opacity-100" : "opacity-0")} />
+                                        <div className="flex flex-col items-start overflow-hidden">
+                                          <span className="truncate">{m.username}</span>
+                                          <span className="text-[9px] text-muted-foreground uppercase">{m.role}</span>
+                                        </div>
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </ScrollArea>
+                              </PopoverContent>
+                            </Popover>
+                            <div className="flex gap-2">
+                              <Button size="sm" className="h-8 text-[10px] font-black uppercase tracking-widest flex-1 shadow-md" onClick={handleSaveMapping} disabled={!selectedManagerId || isSaving}>
+                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <ShieldCheck className="h-3 w-3 mr-1.5" />} Confirm
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-8 text-[10px] font-bold uppercase tracking-widest" onClick={() => setIsMappingMode(false)} disabled={isSaving}>Cancel</Button>
+                            </div>
+                          </div>
+                        )
                       )}
                     </div>
                   )
@@ -169,7 +290,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                       <div key={eng.id} className="flex items-center justify-between py-3 px-4 bg-background hover:bg-primary/[0.01] transition-colors">
                         <div className="flex flex-col gap-0.5">
                           <span className="text-xs font-bold text-foreground truncate">{eng.username}</span>
-                          <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">{eng.email}</span>
+                          <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">{eng.email}</span>
                         </div>
                         <Badge variant="outline" className="text-[8px] h-4 rounded-sm border-primary/20 text-primary font-black bg-primary/5 px-1.5 uppercase">Engineer</Badge>
                       </div>
@@ -216,7 +337,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                           <div className="flex flex-col gap-1 min-w-0">
                             <span className="font-bold text-sm tracking-tight text-foreground group-hover:text-primary transition-colors">{site.name}</span>
                             {assignedEng && (
-                              <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground uppercase font-black">
+                              <div className="flex items-center gap-1.5 text-[9px] font-black text-muted-foreground uppercase">
                                 <User className="h-2.5 w-2.5 opacity-50 text-primary" />
                                 <span className="opacity-60">Team Lead:</span>
                                 <span className="text-foreground/80 font-bold">{assignedEng.username}</span>
