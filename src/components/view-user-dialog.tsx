@@ -14,7 +14,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, query, where, doc, orderBy } from 'firebase/firestore';
-import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight } from 'lucide-react';
+import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -80,18 +80,32 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
       <DialogContent className="sm:max-w-[950px] w-[95vw] rounded-sm max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl bg-background">
         <DialogHeader className="p-8 pb-6 shrink-0 text-left space-y-4">
           <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <DialogTitle className="text-3xl font-black tracking-tighter text-foreground uppercase">
-                  {user.username}
-                </DialogTitle>
-                <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-2 h-5 bg-primary/10 text-primary border-none">
-                  {user.role}
-                </Badge>
+            <div className="space-y-4 min-w-0">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <DialogTitle className="text-3xl font-black tracking-tighter text-foreground uppercase">
+                    {user.username}
+                  </DialogTitle>
+                  <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-2 h-5 bg-primary/10 text-primary border-none">
+                    {user.role}
+                  </Badge>
+                </div>
+                <DialogDescription className="text-sm font-medium text-muted-foreground/70">
+                  User Profile
+                </DialogDescription>
               </div>
-              <DialogDescription className="text-sm font-medium text-muted-foreground/70">
-                User Profile
-              </DialogDescription>
+
+              {/* Contact Information moved to Header */}
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Mail className="h-3.5 w-3.5" />
+                  <span className="text-xs font-semibold">{user.email}</span>
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Smartphone className="h-3.5 w-3.5" />
+                  <span className="text-xs font-semibold">{user.mobile || 'N/A'}</span>
+                </div>
+              </div>
             </div>
             
             <div className="flex items-center gap-8 pr-8">
@@ -113,30 +127,6 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-background">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-0 h-full">
             <div className="md:col-span-2 border-r border-border/50 p-8 space-y-10">
-              <div className="space-y-6">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 border-b pb-2">Credentials</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-sm bg-muted/50 flex items-center justify-center text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[9px] font-bold text-muted-foreground uppercase">Email Address</span>
-                      <span className="text-sm font-semibold">{user.email}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-sm bg-muted/50 flex items-center justify-center text-muted-foreground">
-                      <Smartphone className="h-4 w-4" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[9px] font-bold text-muted-foreground uppercase">Verified Mobile</span>
-                      <span className="text-sm font-semibold">{user.mobile || 'N/A'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               <div className="space-y-6">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 border-b pb-2">Hierarchy</h3>
                 {user.role === 'Site Engineer' ? (
