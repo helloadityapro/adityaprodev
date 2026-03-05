@@ -447,7 +447,7 @@ export default function RewardsPage() {
                                 {leader.role}
                             </Badge>
                         </TableCell>
-                        <TableCell className="text-right px-2 font-mono text-primary">
+                        <TableCell className="text-right px-2 font-bold text-primary">
                             {(leader.totalPoints || 0).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right font-bold text-green-700">
