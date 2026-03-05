@@ -6,7 +6,7 @@ import { collection, doc, query, orderBy, limit, where, or, and, getDocs, server
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send } from "lucide-react";
+import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send, MapPin, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -175,90 +175,86 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 rounded-sm">
-        <DialogHeader className="p-6 pb-0">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 rounded-sm overflow-hidden">
+        <DialogHeader className="p-6 bg-muted/10 border-b">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-500/10 rounded-sm">
+            <div className="p-2 bg-amber-500/10 rounded-sm shrink-0">
               <History className="h-5 w-5 text-amber-600" />
             </div>
-            <div>
-              <DialogTitle>Earning History: {targetUser?.username}</DialogTitle>
-              <DialogDescription>Detailed audit of reward points accumulated across the platform.</DialogDescription>
+            <div className="min-w-0">
+              <DialogTitle className="truncate">Earning History: {targetUser?.username}</DialogTitle>
+              <DialogDescription className="truncate">Audit log of professional reward points accumulation.</DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col mt-4">
+        <div className="flex-1 overflow-hidden flex flex-col">
           {isLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-20">
               <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
-              <p className="text-sm font-medium text-muted-foreground animate-pulse">Auditing documentation logs...</p>
+              <p className="text-sm font-medium text-muted-foreground animate-pulse uppercase tracking-widest">Auditing Logs...</p>
             </div>
           ) : entries.length > 0 ? (
-            <ScrollArea className="flex-1 px-6 pb-6">
-              <div className="min-w-[900px] pb-4">
-                <Table>
-                  <TableHeader className="bg-muted/30 sticky top-0 z-10">
-                    <TableRow>
-                      <TableHead className="py-2">Activity</TableHead>
-                      <TableHead className="py-2">Site</TableHead>
-                      <TableHead className="py-2">Type</TableHead>
-                      <TableHead className="text-right py-2">Base</TableHead>
-                      <TableHead className="text-right py-2">Points</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {entries.map((entry) => (
-                      <TableRow key={entry.id} className="hover:bg-muted/5 transition-colors">
-                        <TableCell className="py-3">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-sm leading-tight">{entry.title}</span>
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                              {entry.date ? format(entry.date.toDate(), 'dd MMM yyyy HH:mm') : '—'}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <span className="text-xs font-medium text-muted-foreground">{entry.site}</span>
-                        </TableCell>
-                        <TableCell className="py-3">
-                          <div className="flex items-center gap-1.5">
-                            {entry.type === 'PTW' && <FileCheck className="h-3 w-3 text-blue-500" />}
-                            {entry.type === 'DPR' && <FileText className="h-3 w-3 text-amber-500" />}
-                            {entry.type === 'Movement' && <ArrowLeftRight className="h-3 w-3 text-emerald-500" />}
-                            <span className="text-[10px] font-black uppercase tracking-tighter">{entry.type}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-[10px] text-muted-foreground py-3">
-                          {entry.basePoints.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right py-3">
-                          <div className="flex flex-col items-end">
-                            <span className="font-black text-primary text-sm">+{entry.finalPoints.toFixed(2)}</span>
-                            {entry.isInherited ? (
-                              <Badge variant="outline" className="h-3.5 px-1 text-[8px] font-black border-amber-200 text-amber-700 bg-amber-50">INHERITED</Badge>
-                            ) : entry.multiplier > 1 && (
-                              <span className="text-[8px] font-bold text-muted-foreground">x{entry.multiplier} Factor</span>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+            <ScrollArea className="flex-1 p-6">
+              <div className="space-y-3">
+                {entries.map((entry) => (
+                  <div key={entry.id} className="group flex items-center justify-between p-4 rounded-sm border bg-card hover:bg-accent/5 transition-all duration-200">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className={cn(
+                        "h-12 w-12 rounded-sm flex items-center justify-center shrink-0 border",
+                        entry.type === 'PTW' ? "bg-blue-50 border-blue-100 text-blue-600" : 
+                        entry.type === 'DPR' ? "bg-amber-50 border-amber-100 text-amber-600" : 
+                        "bg-emerald-50 border-emerald-100 text-emerald-600"
+                      )}>
+                        {entry.type === 'PTW' && <FileCheck className="h-6 w-6" />}
+                        {entry.type === 'DPR' && <FileText className="h-6 w-6" />}
+                        {entry.type === 'Movement' && <ArrowLeftRight className="h-6 w-6" />}
+                      </div>
+                      <div className="flex flex-col min-w-0 gap-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-foreground truncate">{entry.title}</span>
+                          <Badge variant="outline" className="text-[8px] h-3.5 px-1 py-0 border-primary/10 text-muted-foreground/60 uppercase font-black tracking-tighter">
+                            {entry.type}
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1 truncate">
+                          <MapPin className="h-2.5 w-2.5" /> {entry.site}
+                        </p>
+                        <p className="text-[9px] font-medium text-muted-foreground/40 mt-0.5 flex items-center gap-1">
+                          <Clock className="h-2 w-2" />
+                          {entry.date ? format(entry.date.toDate(), 'dd MMM yyyy, HH:mm') : '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end shrink-0 gap-1.5 ml-4">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xl font-black text-primary tabular-nums">+{entry.finalPoints.toFixed(2)}</span>
+                        <div className="bg-primary/5 p-1 rounded-full border border-primary/10">
+                          <Trophy className="h-3 w-3 text-primary" />
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        {entry.isInherited ? (
+                          <span className="text-[8px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-sm uppercase tracking-tighter border border-amber-200">Inherited</span>
+                        ) : entry.multiplier > 1 ? (
+                          <span className="text-[8px] font-black text-primary bg-primary/5 px-1.5 py-0.5 rounded-sm uppercase tracking-tighter border border-primary/10">x{entry.multiplier} Factor</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <ScrollBar orientation="horizontal" />
             </ScrollArea>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center py-32 text-center text-muted-foreground italic">
               <History className="h-12 w-12 opacity-10 mb-4" />
-              <p>No document earning records found for this user.</p>
+              <p className="text-sm font-bold uppercase tracking-widest">No activity found</p>
             </div>
           )}
         </div>
 
         <div className="p-4 border-t bg-muted/5 flex justify-end">
-          <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Close History</Button></DialogClose>
+          <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold h-10 px-6">Close Audit</Button></DialogClose>
         </div>
       </DialogContent>
     </Dialog>
