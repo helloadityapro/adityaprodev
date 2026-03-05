@@ -77,7 +77,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] w-[95vw] rounded-sm max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl bg-background">
+      <DialogContent className="sm:max-w-[950px] w-[95vw] rounded-sm max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl bg-background">
         <DialogHeader className="p-8 pb-6 shrink-0 text-left space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
@@ -90,7 +90,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                 </Badge>
               </div>
               <DialogDescription className="text-sm font-medium text-muted-foreground/70">
-                Personnel Profile & Performance Audit
+                User Profile
               </DialogDescription>
             </div>
             
@@ -112,7 +112,6 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
 
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-background">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-0 h-full">
-            {/* Sidebar info */}
             <div className="md:col-span-2 border-r border-border/50 p-8 space-y-10">
               <div className="space-y-6">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 border-b pb-2">Credentials</h3>
@@ -173,7 +172,6 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
               </div>
             </div>
 
-            {/* Assets/Sites info */}
             <div className="md:col-span-3 p-8 bg-muted/[0.02]">
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b pb-2">
