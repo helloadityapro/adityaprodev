@@ -21,10 +21,10 @@ import { Badge } from '@/components/ui/badge';
 
 type User = {
   id: string;
-  username: string;
-  email: string;
-  role: 'Admin' | 'Site Manager' | 'Site Engineer';
-  siteManagerId?: string;
+  username?: string;
+  email?: string;
+  role?: 'Admin' | 'Site Manager' | 'Site Engineer';
+  siteManagerId?: string | null;
   assignedProjectIds?: string[];
 };
 
@@ -204,20 +204,21 @@ export default function TeamMappingPage() {
   const filteredManagers = React.useMemo(() => {
     if (!managers) return [];
     return managers.filter(m => 
-      m.username.toLowerCase().includes(managerSearchQuery.toLowerCase()) ||
-      m.email.toLowerCase().includes(managerSearchQuery.toLowerCase())
+      (m.username || '').toLowerCase().includes(managerSearchQuery.toLowerCase()) ||
+      (m.email || '').toLowerCase().includes(managerSearchQuery.toLowerCase())
     );
   }, [managers, managerSearchQuery]);
 
   const unmappedEngineers = React.useMemo(() => {
     if (!engineers) return [];
-    return engineers.filter(e => !e.siteManagerId);
+    // Defensive check for empty or whitespace strings
+    return engineers.filter(e => !e.siteManagerId || e.siteManagerId.trim() === "");
   }, [engineers]);
 
   const filteredUnmappedEngineers = React.useMemo(() => {
     return unmappedEngineers.filter(e => 
-      e.username.toLowerCase().includes(engineerSearchQuery.toLowerCase()) ||
-      e.email.toLowerCase().includes(engineerSearchQuery.toLowerCase())
+      (e.username || '').toLowerCase().includes(engineerSearchQuery.toLowerCase()) ||
+      (e.email || '').toLowerCase().includes(engineerSearchQuery.toLowerCase())
     );
   }, [unmappedEngineers, engineerSearchQuery]);
 
@@ -226,13 +227,13 @@ export default function TeamMappingPage() {
     
     return engineers
       .filter(e => {
-        if (isAdmin) return e.siteManagerId;
+        if (isAdmin) return e.siteManagerId && e.siteManagerId.trim() !== "";
         return e.siteManagerId === user?.uid;
       })
       .filter(e => {
         const manager = managers.find(m => m.id === e.siteManagerId);
         const matchesEngineer = (e.username || '').toLowerCase().includes(tableEngineerSearch.toLowerCase());
-        const matchesManager = isAdmin ? (manager?.username.toLowerCase().includes(tableManagerSearch.toLowerCase()) ?? false) : true;
+        const matchesManager = isAdmin ? ((manager?.username || '').toLowerCase().includes(tableManagerSearch.toLowerCase()) ?? false) : true;
         return matchesEngineer && matchesManager;
       })
       .sort((a, b) => {
@@ -260,7 +261,7 @@ export default function TeamMappingPage() {
   const availableSitesToAssign = React.useMemo(() => {
     const list = allSites?.filter(site => !localAssignedSites.includes(site.id)) || [];
     return list.filter(site => 
-      site.name.toLowerCase().includes(siteSearchQuery.toLowerCase())
+      (site.name || '').toLowerCase().includes(siteSearchQuery.toLowerCase())
     );
   }, [allSites, localAssignedSites, siteSearchQuery]);
 

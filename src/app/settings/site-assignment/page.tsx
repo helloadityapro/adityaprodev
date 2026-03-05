@@ -19,10 +19,10 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 
 type User = {
   id: string;
-  username: string;
-  email: string;
-  role: 'Admin' | 'Site Manager' | 'Site Engineer';
-  siteManagerId?: string;
+  username?: string;
+  email?: string;
+  role?: 'Admin' | 'Site Manager' | 'Site Engineer';
+  siteManagerId?: string | null;
   assignedProjectIds?: string[];
 };
 
@@ -90,15 +90,15 @@ export default function SiteAssignmentPage() {
     }) || [];
     
     return list.filter(u => 
-      u.username.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(userSearchQuery.toLowerCase())
+      (u.username || '').toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(userSearchQuery.toLowerCase())
     );
   }, [users, isAdmin, user, userSearchQuery]);
 
   const availableSitesToAssign = React.useMemo(() => {
     const list = sites?.filter(site => !localAssignedSites.includes(site.id)) || [];
     return list.filter(site => 
-      site.name.toLowerCase().includes(siteSearchQuery.toLowerCase())
+      (site.name || '').toLowerCase().includes(siteSearchQuery.toLowerCase())
     );
   }, [sites, localAssignedSites, siteSearchQuery]);
 
