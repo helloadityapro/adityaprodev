@@ -231,12 +231,8 @@ export default function TeamMappingPage() {
   const unmappedEngineers = React.useMemo(() => {
     if (!engineers) return [];
     return engineers.filter(e => {
-      const username = (e.username || '').trim().toLowerCase();
+      // Logic: An engineer is "unmapped" if they don't have a valid manager ID
       const hasManager = e.siteManagerId && String(e.siteManagerId).trim() !== "" && String(e.siteManagerId) !== "null";
-      
-      // EXCEPTION: Always allow these rescue users to show in the dropdown to allow "Moving" to a fresh link
-      if (RESCUE_NAMES.includes(username)) return true;
-      
       return !hasManager;
     });
   }, [engineers]);
@@ -561,9 +557,8 @@ export default function TeamMappingPage() {
                           <Users className="h-12 w-12 mb-4 opacity-20" />
                           <p className="font-medium italic">No reporting engineers found matching your filters.</p>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
+                      </TableRow>
+                    )}
                 </TableBody>
               </Table>
             </div>
