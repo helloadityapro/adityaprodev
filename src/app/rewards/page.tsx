@@ -148,7 +148,7 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
           history.push({
             id: d.id,
             type: 'Movement',
-            title: `Material Log: ${data.itemName}`,
+            title: `Log: ${data.itemName}`,
             site: data.siteName,
             date: data.createdAt,
             basePoints: baseRate,
@@ -175,70 +175,64 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 rounded-sm overflow-hidden">
-        <DialogHeader className="p-6 bg-muted/10 border-b">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-500/10 rounded-sm shrink-0">
-              <History className="h-5 w-5 text-amber-600" />
-            </div>
-            <div className="min-w-0">
-              <DialogTitle className="truncate">Earning History: {targetUser?.username}</DialogTitle>
-              <DialogDescription className="truncate">Audit log of professional reward points accumulation.</DialogDescription>
-            </div>
+      <DialogContent className="max-w-xl max-h-[85vh] flex flex-col p-0 rounded-sm overflow-hidden">
+        <DialogHeader className="p-4 px-6 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <History className="h-4 w-4 text-amber-600 shrink-0" />
+            <DialogTitle className="text-sm font-bold truncate">Audit: {targetUser?.username}</DialogTitle>
           </div>
+          <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-4 w-4" /></Button></DialogClose>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col">
           {isLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-20">
-              <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
-              <p className="text-sm font-medium text-muted-foreground animate-pulse uppercase tracking-widest">Auditing Logs...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-primary opacity-20" />
+              <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">Synchronizing Logs</p>
             </div>
           ) : entries.length > 0 ? (
-            <ScrollArea className="flex-1 p-6">
-              <div className="space-y-3">
+            <ScrollArea className="flex-1">
+              <div className="divide-y border-b">
                 {entries.map((entry) => (
-                  <div key={entry.id} className="group flex items-center justify-between p-4 rounded-sm border bg-card hover:bg-accent/5 transition-all duration-200">
-                    <div className="flex items-center gap-4 min-w-0">
+                  <div key={entry.id} className="group flex items-center justify-between py-2.5 px-6 hover:bg-accent/5 transition-all duration-200">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div className={cn(
-                        "h-12 w-12 rounded-sm flex items-center justify-center shrink-0 border",
+                        "h-8 w-8 rounded-sm flex items-center justify-center shrink-0 border",
                         entry.type === 'PTW' ? "bg-blue-50 border-blue-100 text-blue-600" : 
                         entry.type === 'DPR' ? "bg-amber-50 border-amber-100 text-amber-600" : 
                         "bg-emerald-50 border-emerald-100 text-emerald-600"
                       )}>
-                        {entry.type === 'PTW' && <FileCheck className="h-6 w-6" />}
-                        {entry.type === 'DPR' && <FileText className="h-6 w-6" />}
-                        {entry.type === 'Movement' && <ArrowLeftRight className="h-6 w-6" />}
+                        {entry.type === 'PTW' && <FileCheck className="h-4 w-4" />}
+                        {entry.type === 'DPR' && <FileText className="h-4 w-4" />}
+                        {entry.type === 'Movement' && <ArrowLeftRight className="h-4 w-4" />}
                       </div>
-                      <div className="flex flex-col min-w-0 gap-0.5">
+                      <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm text-foreground truncate">{entry.title}</span>
-                          <Badge variant="outline" className="text-[8px] h-3.5 px-1 py-0 border-primary/10 text-muted-foreground/60 uppercase font-black tracking-tighter">
+                          <span className="font-bold text-xs text-foreground truncate">{entry.title}</span>
+                          <span className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-tighter">
                             {entry.type}
-                          </Badge>
+                          </span>
                         </div>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1 truncate">
-                          <MapPin className="h-2.5 w-2.5" /> {entry.site}
-                        </p>
-                        <p className="text-[9px] font-medium text-muted-foreground/40 mt-0.5 flex items-center gap-1">
-                          <Clock className="h-2 w-2" />
-                          {entry.date ? format(entry.date.toDate(), 'dd MMM yyyy, HH:mm') : '—'}
-                        </p>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1 truncate max-w-[150px]">
+                            <MapPin className="h-2 w-2" /> {entry.site}
+                          </p>
+                          <p className="text-[9px] font-medium text-muted-foreground/40 flex items-center gap-1">
+                            <Clock className="h-2 w-2" />
+                            {entry.date ? format(entry.date.toDate(), 'dd MMM yy, HH:mm') : '—'}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end shrink-0 gap-1.5 ml-4">
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                      {entry.isInherited ? (
+                        <span className="text-[7px] font-black text-amber-700 bg-amber-100 px-1 py-0.5 rounded-sm uppercase tracking-tighter border border-amber-200">Inherited</span>
+                      ) : entry.multiplier > 1 ? (
+                        <span className="text-[7px] font-black text-primary bg-primary/5 px-1 py-0.5 rounded-sm uppercase tracking-tighter border border-primary/10">x{entry.multiplier} Factor</span>
+                      ) : null}
                       <div className="flex items-center gap-1">
-                        <span className="text-xl font-black text-primary tabular-nums">+{entry.finalPoints.toFixed(2)}</span>
-                        <div className="bg-primary/5 p-1 rounded-full border border-primary/10">
-                          <Trophy className="h-3 w-3 text-primary" />
-                        </div>
-                      </div>
-                      <div className="flex gap-1">
-                        {entry.isInherited ? (
-                          <span className="text-[8px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-sm uppercase tracking-tighter border border-amber-200">Inherited</span>
-                        ) : entry.multiplier > 1 ? (
-                          <span className="text-[8px] font-black text-primary bg-primary/5 px-1.5 py-0.5 rounded-sm uppercase tracking-tighter border border-primary/10">x{entry.multiplier} Factor</span>
-                        ) : null}
+                        <span className="text-sm font-black text-primary tabular-nums">+{entry.finalPoints.toFixed(2)}</span>
+                        <Trophy className="h-2.5 w-2.5 text-primary/40" />
                       </div>
                     </div>
                   </div>
@@ -246,15 +240,15 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
               </div>
             </ScrollArea>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center py-32 text-center text-muted-foreground italic">
-              <History className="h-12 w-12 opacity-10 mb-4" />
-              <p className="text-sm font-bold uppercase tracking-widest">No activity found</p>
+            <div className="flex-1 flex flex-col items-center justify-center py-32 text-center text-muted-foreground/40">
+              <History className="h-10 w-10 opacity-10 mb-4" />
+              <p className="text-[10px] font-black uppercase tracking-widest">No activity found</p>
             </div>
           )}
         </div>
 
-        <div className="p-4 border-t bg-muted/5 flex justify-end">
-          <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold h-10 px-6">Close Audit</Button></DialogClose>
+        <div className="p-3 border-t bg-muted/5 flex justify-end">
+          <DialogClose asChild><Button variant="outline" size="sm" className="rounded-sm font-bold h-8 px-4 text-[10px] uppercase tracking-widest">Close Audit</Button></DialogClose>
         </div>
       </DialogContent>
     </Dialog>
