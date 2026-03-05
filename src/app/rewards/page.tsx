@@ -179,7 +179,7 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
         <DialogHeader className="p-4 px-6 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <History className="h-4 w-4 text-primary shrink-0" />
-            <DialogTitle className="text-sm font-bold truncate tracking-tight uppercase">Audit: {targetUser?.username}</DialogTitle>
+            <DialogTitle className="text-sm font-bold truncate tracking-tight uppercase">Earning History : {targetUser?.username}</DialogTitle>
           </div>
         </DialogHeader>
 
