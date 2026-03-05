@@ -13,14 +13,10 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      let superAdminEmails = [
-        'khalil@adityagreenenergy.com',
-        'prafulrana143@gmail.com'
-      ];
-      // Robust lookup for email in token to handle unverified or edge-case accounts
       let email = request.auth.token.get('email', '');
       return isSignedIn() && (
-        email in superAdminEmails || 
+        email == 'khalil@adityagreenenergy.com' || 
+        email == 'prafulrana143@gmail.com' || 
         getUserData().get('role', '') == 'Admin'
       );
     }
