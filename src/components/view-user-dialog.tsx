@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -20,7 +21,6 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -56,7 +56,6 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
   const [isMappingMode, setIsMappingMode] = React.useState(false);
   const [selectedManagerId, setSelectedManagerId] = React.useState<string | null>(null);
   const [managerSearchQuery, setManagerSearchQuery] = React.useState("");
-  const [isManagerPopoverOpen, setIsManagerPopoverOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
 
   const currentUserProfileRef = useMemoFirebase(() => authUser ? doc(firestore, 'users', authUser.uid) : null, [firestore, authUser]);
@@ -141,6 +140,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
       toast({ title: 'Mapping Updated', description: 'Reporting structure updated successfully.' });
       setIsMappingMode(false);
       setSelectedManagerId(null);
+      setManagerSearchQuery("");
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
@@ -163,7 +163,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
       <DialogContent className="sm:max-w-[950px] w-[95vw] rounded-sm max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl bg-background">
         <DialogHeader className="p-8 pb-6 shrink-0 text-left space-y-4">
           <div className="flex items-start justify-between gap-4">
-            <div className="space-y-4 min-w-0">
+            <div className="space-y-4 min-w-0 text-left">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <DialogTitle className="text-3xl font-black tracking-tighter text-foreground uppercase">
@@ -190,7 +190,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
               </div>
             </div>
             
-            <div className="flex items-center gap-8 pr-8">
+            <div className="flex items-center gap-8 pr-8 shrink-0">
               <div className="text-right space-y-0.5">
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Balance</p>
                 <p className="text-2xl font-black text-primary tabular-nums">{(user.totalPoints || 0).toFixed(2)}<span className="text-xs font-bold ml-1 text-muted-foreground/40">pts</span></p>
@@ -210,9 +210,9 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
           <div className="grid grid-cols-1 md:grid-cols-5 gap-0 h-full">
             <div className="md:col-span-2 border-r border-border/50 p-8 space-y-10">
               <div className="space-y-6">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 border-b pb-2">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 border-b pb-2 text-left">
                   {user.role === 'Site Manager' ? `Team (${mappedEngineers?.length || 0})` : 
-                   user.role === 'Site Engineer' ? 'Reporting Manager' : 'Hierarchy'}
+                   user.role === 'Site Engineer' ? 'Site Manager' : 'Hierarchy'}
                 </h3>
                 {user.role === 'Site Engineer' ? (
                   mappedManager ? (
@@ -227,57 +227,63 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                     </div>
                   ) : (
                     <div className="flex flex-col items-start gap-3 px-1">
-                      <div className="text-xs italic text-muted-foreground/60">No supervisor mapped to this engineer.</div>
+                      <div className="text-xs italic text-muted-foreground/60 text-left">No supervisor mapped to this engineer.</div>
                       {isViewerAdmin && (
                         !isMappingMode ? (
                           <Button variant="outline" size="sm" onClick={() => setIsMappingMode(true)} className="h-8 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5 px-4 text-[10px] uppercase tracking-wider">
                             <UserPlus className="h-3 w-3 mr-1.5" /> Add Reporting Manager
                           </Button>
                         ) : (
-                          <div className="w-full space-y-3 p-3 border rounded-sm bg-primary/5 border-primary/10 animate-in fade-in slide-in-from-top-2 duration-300">
-                            <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Select Supervisor</Label>
-                            <Popover open={isManagerPopoverOpen} onOpenChange={setIsManagerPopoverOpen}>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" className="w-full justify-between h-9 text-[11px] font-medium rounded-sm border-primary/20 bg-background">
-                                  {selectedManagerId ? potentialManagers.find(m => m.id === selectedManagerId)?.username : "Choose Personnel..."}
-                                  <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-[300px] p-0 shadow-2xl border-primary/10" align="start">
-                                <div className="flex items-center border-b px-3 bg-muted/50">
-                                  <Search className="mr-2 h-3.5 w-3.5 shrink-0 opacity-50 text-primary" />
-                                  <Input 
-                                    placeholder="Search managers..." 
-                                    className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs bg-transparent" 
-                                    value={managerSearchQuery} 
-                                    onChange={e => setManagerSearchQuery(e.target.value)}
-                                  />
+                          <div className="w-full space-y-4 p-4 border rounded-sm bg-primary/5 border-primary/10 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="space-y-3">
+                              <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Assign Supervisor</Label>
+                              <div className="relative">
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-primary opacity-50" />
+                                <Input 
+                                  placeholder="Search name or email..." 
+                                  className="pl-9 h-10 rounded-sm bg-background border-primary/20 text-sm"
+                                  value={managerSearchQuery}
+                                  onChange={(e) => setManagerSearchQuery(e.target.value)}
+                                  autoFocus
+                                />
+                              </div>
+                              
+                              {managerSearchQuery.length > 0 && (
+                                <div className="border rounded-sm bg-background shadow-md overflow-hidden">
+                                  <ScrollArea className="h-[180px]">
+                                    <div className="p-1">
+                                      {filteredManagers.length > 0 ? (
+                                        filteredManagers.map(m => (
+                                          <Button 
+                                            key={m.id} 
+                                            variant="ghost" 
+                                            className={cn(
+                                              "w-full justify-start h-11 text-xs rounded-sm font-medium border-b border-border/10 last:border-0",
+                                              selectedManagerId === m.id && "bg-primary/10 text-primary"
+                                            )} 
+                                            onClick={() => setSelectedManagerId(m.id)}
+                                          >
+                                            <Check className={cn("mr-2 h-3.5 w-3.5 text-primary shrink-0", selectedManagerId === m.id ? "opacity-100" : "opacity-0")} />
+                                            <div className="flex flex-col items-start overflow-hidden text-left min-w-0">
+                                              <span className="truncate font-bold text-foreground">{m.username}</span>
+                                              <span className="text-[9px] text-muted-foreground uppercase truncate w-full">{m.email}</span>
+                                            </div>
+                                          </Button>
+                                        ))
+                                      ) : (
+                                        <p className="p-4 text-center text-[10px] text-muted-foreground italic uppercase font-bold tracking-tighter">No matching supervisors</p>
+                                      )}
+                                    </div>
+                                  </ScrollArea>
                                 </div>
-                                <ScrollArea className="h-[200px]">
-                                  <div className="p-1">
-                                    {filteredManagers.map(m => (
-                                      <Button 
-                                        key={m.id} 
-                                        variant="ghost" 
-                                        className="w-full justify-start h-9 text-xs rounded-sm font-medium" 
-                                        onClick={() => { setSelectedManagerId(m.id); setIsManagerPopoverOpen(false); }}
-                                      >
-                                        <Check className={cn("mr-2 h-3 w-3 text-primary", selectedManagerId === m.id ? "opacity-100" : "opacity-0")} />
-                                        <div className="flex flex-col items-start overflow-hidden">
-                                          <span className="truncate">{m.username}</span>
-                                          <span className="text-[9px] text-muted-foreground uppercase">{m.role}</span>
-                                        </div>
-                                      </Button>
-                                    ))}
-                                  </div>
-                                </ScrollArea>
-                              </PopoverContent>
-                            </Popover>
+                              )}
+                            </div>
+                            
                             <div className="flex gap-2">
-                              <Button size="sm" className="h-8 text-[10px] font-black uppercase tracking-widest flex-1 shadow-md" onClick={handleSaveMapping} disabled={!selectedManagerId || isSaving}>
-                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <ShieldCheck className="h-3 w-3 mr-1.5" />} Confirm
+                              <Button size="sm" className="h-10 text-[10px] font-black uppercase tracking-widest flex-1 shadow-md" onClick={handleSaveMapping} disabled={!selectedManagerId || isSaving}>
+                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <ShieldCheck className="h-3 w-3 mr-1.5" />} Confirm Link
                               </Button>
-                              <Button size="sm" variant="ghost" className="h-8 text-[10px] font-bold uppercase tracking-widest" onClick={() => setIsMappingMode(false)} disabled={isSaving}>Cancel</Button>
+                              <Button size="sm" variant="ghost" className="h-10 text-[10px] font-bold uppercase tracking-widest" onClick={() => { setIsMappingMode(false); setManagerSearchQuery(""); setSelectedManagerId(null); }} disabled={isSaving}>Cancel</Button>
                             </div>
                           </div>
                         )
@@ -297,7 +303,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                     ))}
                     {!mappedEngineers?.length && (
                       <div className="p-8 text-center flex flex-col items-center gap-4 bg-muted/5">
-                        <div className="text-xs italic text-muted-foreground/60">No personnel currently report to this manager.</div>
+                        <div className="text-xs italic text-muted-foreground/60 text-left">No personnel currently report to this manager.</div>
                         {isViewerAdmin && (
                           <Button variant="outline" size="sm" asChild className="h-8 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5 px-4 text-[10px] uppercase tracking-wider">
                             <Link href="/settings/teams">
@@ -320,7 +326,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
             <div className="md:col-span-3 p-8 bg-muted/[0.02]">
               <div className="space-y-6">
                 <div className="border-b pb-2">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 text-left">
                     SITES ({assignedSites.length})
                   </h3>
                 </div>
@@ -334,7 +340,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
 
                       return (
                         <div key={site.id} className="flex items-center justify-between p-4 bg-background hover:bg-primary/[0.01] transition-colors group">
-                          <div className="flex flex-col gap-1 min-w-0">
+                          <div className="flex flex-col gap-1 min-w-0 text-left">
                             <span className="font-bold text-sm tracking-tight text-foreground group-hover:text-primary transition-colors">{site.name}</span>
                             {assignedEng && (
                               <div className="flex items-center gap-1.5 text-[9px] font-black text-muted-foreground uppercase">
