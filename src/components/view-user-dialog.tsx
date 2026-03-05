@@ -95,7 +95,6 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                 </DialogDescription>
               </div>
 
-              {/* Contact Information moved to Header */}
               <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Mail className="h-3.5 w-3.5" />
@@ -128,7 +127,10 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
           <div className="grid grid-cols-1 md:grid-cols-5 gap-0 h-full">
             <div className="md:col-span-2 border-r border-border/50 p-8 space-y-10">
               <div className="space-y-6">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 border-b pb-2">Hierarchy</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 border-b pb-2">
+                  {user.role === 'Site Manager' ? `Team (${mappedEngineers?.length || 0})` : 
+                   user.role === 'Site Engineer' ? 'Reporting Manager' : 'Hierarchy'}
+                </h3>
                 {user.role === 'Site Engineer' ? (
                   mappedManager ? (
                     <div className="flex items-center gap-3 p-3 rounded-sm border border-primary/10 bg-primary/[0.02]">
@@ -142,19 +144,14 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                     <div className="text-xs italic text-muted-foreground/60 px-1">No supervisor mapped to this engineer.</div>
                   )
                 ) : user.role === 'Site Manager' ? (
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-3 flex items-center gap-2">
-                      <HardHat className="h-3 w-3" /> Team ({mappedEngineers?.length || 0})
-                    </p>
-                    <div className="space-y-1">
-                      {mappedEngineers?.map(eng => (
-                        <div key={eng.id} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0 hover:bg-muted/20 px-1 transition-colors">
-                          <span className="text-xs font-bold truncate pr-4">{eng.username}</span>
-                          <Badge variant="outline" className="text-[8px] h-4 rounded-sm border-muted-foreground/20 text-muted-foreground font-black">ENG</Badge>
-                        </div>
-                      ))}
-                      {!mappedEngineers?.length && <div className="text-xs italic text-muted-foreground/60">No engineers reporting.</div>}
-                    </div>
+                  <div className="space-y-1">
+                    {mappedEngineers?.map(eng => (
+                      <div key={eng.id} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0 hover:bg-muted/20 px-1 transition-colors">
+                        <span className="text-xs font-bold truncate pr-4">{eng.username}</span>
+                        <Badge variant="outline" className="text-[8px] h-4 rounded-sm border-muted-foreground/20 text-muted-foreground font-black">ENG</Badge>
+                      </div>
+                    ))}
+                    {!mappedEngineers?.length && <div className="text-xs italic text-muted-foreground/60">No engineers reporting.</div>}
                   </div>
                 ) : (
                   <div className="text-xs font-bold text-muted-foreground/60 uppercase tracking-widest px-1">System Administration</div>
