@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check, MapPin, PlusCircle, Loader2 } from 'lucide-react';
+import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check, MapPin, PlusCircle, Loader2, Pencil, ShieldCheck, XCircle } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -74,7 +74,7 @@ export default function TeamMappingPage() {
   const managers = React.useMemo(() => {
     return allUsers?.filter(u => {
       const role = (u.role || '').trim().toLowerCase();
-      return role === 'site manager' || role === 'manager';
+      return role === 'site manager' || role === 'manager' || role === 'admin';
     }) || [];
   }, [allUsers]);
 
@@ -94,9 +94,11 @@ export default function TeamMappingPage() {
   const [selectedManagerId, setSelectedManagerId] = React.useState<string | null>(null);
   const [selectedEngineerId, setSelectedEngineerId] = React.useState<string | null>(null);
   const [siteManagementUser, setSiteManagementUser] = React.useState<User | null>(null);
+  const [editMappingUser, setEditMappingUser] = React.useState<User | null>(null);
   const [localAssignedSites, setLocalAssignedSites] = React.useState<string[]>([]);
   const [isSavingSites, setIsSavingSites] = React.useState(false);
   const [isMapping, setIsMapping] = React.useState(false);
+  const [isEditingMapping, setIsEditingMapping] = React.useState(false);
 
   // Popover & Search states
   const [isManagerPopoverOpen, setIsManagerPopoverOpen] = React.useState(false);
@@ -104,6 +106,8 @@ export default function TeamMappingPage() {
   const [isEngineerPopoverOpen, setIsEngineerPopoverOpen] = React.useState(false);
   const [engineerSearchQuery, setEngineerSearchQuery] = React.useState("");
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
+  const [editManagerSearchQuery, setEditManagerSearchQuery] = React.useState("");
+  const [selectedNewManagerId, setSelectedNewManagerId] = React.useState<string | null>(null);
 
   // Table filter states
   const [tableEngineerSearch, setTableEngineerSearch] = React.useState('');
@@ -152,6 +156,38 @@ export default function TeamMappingPage() {
     }
   };
 
+  const handleUpdateMapping = async () => {
+    if (!editMappingUser || !selectedNewManagerId) return;
+    setIsEditingMapping(true);
+
+    try {
+        const oldManagerId = editMappingUser.siteManagerId;
+        const engineerRef = doc(firestore, 'users', editMappingUser.id);
+        
+        updateDocumentNonBlocking(engineerRef, { 
+          siteManagerId: selectedNewManagerId 
+        });
+
+        await syncManagerSites(selectedNewManagerId);
+        if (oldManagerId) {
+            await syncManagerSites(oldManagerId);
+        }
+
+        toast({
+            title: 'Team Link Updated',
+            description: 'Reporting structure reassigned and sites synchronized.',
+        });
+        
+        setEditMappingUser(null);
+        setSelectedNewManagerId(null);
+        setEditManagerSearchQuery("");
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Update Error', description: e.message });
+    } finally {
+        setIsEditingMapping(false);
+    }
+  };
+
   const handleRemoveMapping = async (engineerId: string) => {
     const engineer = engineers?.find(e => e.id === engineerId);
     const oldManagerId = engineer?.siteManagerId;
@@ -176,6 +212,12 @@ export default function TeamMappingPage() {
     setSiteManagementUser(u);
     setLocalAssignedSites(u.assignedProjectIds || []);
     setSiteSearchQuery("");
+  };
+
+  const handleOpenEditMapping = (u: User) => {
+    setEditMappingUser(u);
+    setSelectedNewManagerId(u.siteManagerId || null);
+    setEditManagerSearchQuery("");
   };
 
   const handleRemoveSiteFromLocal = (siteId: string) => {
@@ -224,6 +266,13 @@ export default function TeamMappingPage() {
       (m.email || '').toLowerCase().includes(managerSearchQuery.toLowerCase())
     );
   }, [managers, managerSearchQuery]);
+
+  const filteredManagersForEdit = React.useMemo(() => {
+    return managers.filter(m => 
+      (m.username || '').toLowerCase().includes(editManagerSearchQuery.toLowerCase()) ||
+      (m.email || '').toLowerCase().includes(editManagerSearchQuery.toLowerCase())
+    );
+  }, [managers, editManagerSearchQuery]);
 
   const unmappedEngineers = React.useMemo(() => {
     if (!engineers) return [];
@@ -422,7 +471,7 @@ export default function TeamMappingPage() {
                                   e.id === selectedEngineerId ? "opacity-100" : "opacity-0"
                                 )}
                               />
-                              <div className="flex flex-col items-start overflow-hidden">
+                              <div className="flex flex-col items-start overflow-hidden text-left">
                                 <span className="truncate">{e.username}</span>
                                 {RESCUE_NAMES.includes((e.username || '').toLowerCase()) && (
                                   <Badge variant="outline" className="text-[8px] h-3 px-1 py-0 border-amber-500 text-amber-700 bg-amber-50 rounded-sm">Rescue Identified</Badge>
@@ -536,10 +585,21 @@ export default function TeamMappingPage() {
                                 <MapPin className="h-3.5 w-3.5 mr-1.5" /> Manage Sites
                             </Button>
                             {isAdmin && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleRemoveMapping(e.id)}>
-                                    <Trash2 className="h-4 w-4" />
-                                    <span className="sr-only">Remove Mapping</span>
-                                </Button>
+                                <>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-8 w-8 text-primary rounded-sm" 
+                                        onClick={() => handleOpenEditMapping(e)}
+                                        title="Edit Team Link"
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleRemoveMapping(e.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                        <span className="sr-only">Remove Mapping</span>
+                                    </Button>
+                                </>
                             )}
                           </div>
                         </TableCell>
@@ -561,6 +621,70 @@ export default function TeamMappingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Mapping Dialog */}
+      <Dialog open={!!editMappingUser} onOpenChange={(o) => !o && setEditMappingUser(null)}>
+        <DialogContent className="max-w-md rounded-sm">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <Pencil className="h-5 w-5 text-primary" /> Edit Team Link
+                </DialogTitle>
+                <DialogDescription>
+                    Reassign <strong>{editMappingUser?.username}</strong> to a different supervisor.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+                <div className="space-y-3">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Assign New Supervisor</Label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-primary opacity-50" />
+                        <Input 
+                            placeholder="Search name or email..." 
+                            className="pl-9 h-10 rounded-sm bg-background border-primary/20 text-sm"
+                            value={editManagerSearchQuery}
+                            onChange={(e) => setEditManagerSearchQuery(e.target.value)}
+                            autoComplete="off"
+                        />
+                    </div>
+                    
+                    <div className="border rounded-sm bg-background shadow-inner overflow-hidden">
+                        <ScrollArea className="h-[200px]">
+                            <div className="p-1">
+                                {filteredManagersForEdit.length > 0 ? (
+                                    filteredManagersForEdit.map(m => (
+                                        <Button 
+                                            key={m.id} 
+                                            variant="ghost" 
+                                            className={cn(
+                                                "w-full justify-start h-12 text-xs rounded-sm font-medium border-b border-border/10 last:border-0",
+                                                selectedNewManagerId === m.id && "bg-primary/10 text-primary"
+                                            )} 
+                                            onClick={() => setSelectedNewManagerId(m.id)}
+                                        >
+                                            <Check className={cn("mr-2 h-4 w-4 text-primary shrink-0", selectedNewManagerId === m.id ? "opacity-100" : "opacity-0")} />
+                                            <div className="flex flex-col items-start overflow-hidden text-left min-w-0">
+                                                <span className="truncate font-bold text-foreground">{m.username}</span>
+                                                <span className="text-[10px] text-muted-foreground uppercase truncate w-full">{m.email}</span>
+                                            </div>
+                                        </Button>
+                                    ))
+                                ) : (
+                                    <p className="p-8 text-center text-xs text-muted-foreground italic">No matching managers found</p>
+                                )}
+                            </div>
+                        </ScrollArea>
+                    </div>
+                </div>
+            </div>
+            <DialogFooter className="gap-2 border-t pt-4">
+                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Cancel</Button></DialogClose>
+                <Button onClick={handleUpdateMapping} disabled={!selectedNewManagerId || isEditingMapping} className="rounded-sm font-bold min-w-[140px]">
+                    {isEditingMapping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4 mr-1.5" />}
+                    Confirm Reassignment
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Site Management Dialog */}
       <Dialog open={!!siteManagementUser} onOpenChange={(o) => !o && setSiteManagementUser(null)}>
