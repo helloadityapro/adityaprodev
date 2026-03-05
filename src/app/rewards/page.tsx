@@ -175,8 +175,8 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[85vh] flex flex-col p-0 rounded-sm overflow-hidden border-none shadow-2xl">
-        <DialogHeader className="p-4 px-6 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0">
+      <DialogContent className="max-w-xl max-h-[85vh] h-[85vh] flex flex-col p-0 rounded-sm overflow-hidden border-none shadow-2xl">
+        <DialogHeader className="p-4 px-6 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <History className="h-4 w-4 text-primary shrink-0" />
             <DialogTitle className="text-sm font-bold truncate tracking-tight uppercase">Audit: {targetUser?.username}</DialogTitle>
@@ -184,14 +184,14 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
           <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-4 w-4" /></Button></DialogClose>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col bg-background">
+        <div className="flex-1 overflow-hidden flex flex-col bg-background min-h-0">
           {isLoading ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 py-20">
               <Loader2 className="h-8 w-8 animate-spin text-primary opacity-20" />
               <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">Synchronizing Logs</p>
             </div>
           ) : entries.length > 0 ? (
-            <ScrollArea className="flex-1">
+            <ScrollArea className="h-full w-full">
               <div className="divide-y divide-border/50">
                 {entries.map((entry) => (
                   <div key={entry.id} className="group flex items-center justify-between py-2 px-6 hover:bg-primary/[0.02] transition-colors">
@@ -243,7 +243,7 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
           )}
         </div>
 
-        <div className="p-3 border-t bg-muted/5 flex justify-end">
+        <div className="p-3 border-t bg-muted/5 flex justify-end shrink-0">
           <DialogClose asChild><Button variant="outline" size="sm" className="rounded-sm font-bold h-8 px-4 text-[10px] uppercase tracking-widest">Close Audit</Button></DialogClose>
         </div>
       </DialogContent>
