@@ -12,12 +12,14 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useDoc, useUser } from '@/firebase';
 import { collection, query, where, doc, orderBy } from 'firebase/firestore';
-import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight, X } from 'lucide-react';
+import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight, X, UserPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { isSuperAdmin } from '@/lib/auth-constants';
+import Link from 'next/link';
 
 type UserProfile = {
   id: string;
@@ -44,6 +46,12 @@ interface ViewUserDialogProps {
 
 export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps) {
   const firestore = useFirestore();
+  const { user: authUser } = useUser();
+
+  const currentUserProfileRef = useMemoFirebase(() => authUser ? doc(firestore, 'users', authUser.uid) : null, [firestore, authUser]);
+  const { data: currentUserProfile } = useDoc<UserProfile>(currentUserProfileRef);
+  
+  const isViewerAdmin = isSuperAdmin(authUser?.email) || currentUserProfile?.role === 'Admin';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -144,7 +152,16 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                       </div>
                     </div>
                   ) : (
-                    <div className="text-xs italic text-muted-foreground/60 px-1">No supervisor mapped to this engineer.</div>
+                    <div className="flex flex-col items-start gap-3 px-1">
+                      <div className="text-xs italic text-muted-foreground/60">No supervisor mapped to this engineer.</div>
+                      {isViewerAdmin && (
+                        <Button variant="outline" size="sm" asChild className="h-8 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5 px-4 text-[10px] uppercase tracking-wider">
+                          <Link href="/settings/teams">
+                            <UserPlus className="h-3 w-3 mr-1.5" /> Add Reporting Manager
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
                   )
                 ) : user.role === 'Site Manager' ? (
                   <div className="space-y-px bg-border/20 border border-border/20 rounded-sm overflow-hidden">
@@ -157,7 +174,18 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                         <Badge variant="outline" className="text-[8px] h-4 rounded-sm border-primary/20 text-primary font-black bg-primary/5 px-1.5 uppercase">Engineer</Badge>
                       </div>
                     ))}
-                    {!mappedEngineers?.length && <div className="p-8 text-center text-xs italic text-muted-foreground/60">No personnel currently report to this manager.</div>}
+                    {!mappedEngineers?.length && (
+                      <div className="p-8 text-center flex flex-col items-center gap-4 bg-muted/5">
+                        <div className="text-xs italic text-muted-foreground/60">No personnel currently report to this manager.</div>
+                        {isViewerAdmin && (
+                          <Button variant="outline" size="sm" asChild className="h-8 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5 px-4 text-[10px] uppercase tracking-wider">
+                            <Link href="/settings/teams">
+                              <UserPlus className="h-3 w-3 mr-1.5" /> Assign Team Members
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 px-1">
