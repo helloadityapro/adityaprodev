@@ -219,15 +219,20 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-4">
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
                       {entry.isInherited ? (
                         <span className="text-[7px] font-black text-amber-700 bg-amber-100 px-1 py-0.5 rounded-sm uppercase tracking-tighter">Inherited</span>
                       ) : entry.multiplier > 1 ? (
                         <span className="text-[7px] font-black text-primary bg-primary/5 px-1 py-0.5 rounded-sm uppercase tracking-tighter">x{entry.multiplier}</span>
                       ) : null}
-                      <div className="flex items-center gap-1 min-w-[45px] justify-end">
-                        <span className="text-xs font-black text-primary tabular-nums">+{entry.finalPoints.toFixed(2)}</span>
-                        <Trophy className="h-2.5 w-2.5 text-primary/30" />
+                      <div className="flex flex-col items-end min-w-[60px]">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs font-black text-primary tabular-nums">+{entry.finalPoints.toFixed(2)}</span>
+                          <Trophy className="h-2.5 w-2.5 text-primary/30" />
+                        </div>
+                        <span className="text-[9px] font-bold text-green-600 leading-none">
+                          ₹{(entry.finalPoints * (settings?.pointValueInRs || 1)).toFixed(2)}
+                        </span>
                       </div>
                     </div>
                   </div>
