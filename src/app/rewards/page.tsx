@@ -228,7 +228,6 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
                       <div className="flex flex-col items-end min-w-[60px]">
                         <div className="flex items-center gap-1">
                           <span className="text-xs font-black text-primary tabular-nums">+{entry.finalPoints.toFixed(2)}</span>
-                          <Trophy className="h-2.5 w-2.5 text-primary/30" />
                         </div>
                         <span className="text-[9px] font-bold text-green-600 leading-none">
                           ₹{(entry.finalPoints * (settings?.pointValueInRs || 1)).toFixed(2)}
