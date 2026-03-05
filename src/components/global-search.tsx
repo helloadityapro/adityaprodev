@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { ViewUserDialog } from './view-user-dialog';
 
 type SearchResult = {
   id: string;
@@ -36,6 +37,7 @@ type SearchResult = {
   title: string;
   subtitle: string;
   link: string;
+  userData?: any;
 };
 
 export function GlobalSearch() {
@@ -46,6 +48,7 @@ export function GlobalSearch() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [results, setResults] = React.useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
+  const [selectedUserForView, setSelectedUserForView] = React.useState<any>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc(userProfileRef);
@@ -75,7 +78,7 @@ export function GlobalSearch() {
     const searchResults: SearchResult[] = [];
 
     try {
-      // 1. Search Sites (Sites are few, easy to fetch and filter)
+      // 1. Search Sites
       const sitesSnap = await getDocs(collection(firestore, 'sites'));
       sitesSnap.docs.forEach(d => {
         const data = d.data();
@@ -90,7 +93,7 @@ export function GlobalSearch() {
         }
       });
 
-      // 2. Search Permits (By serial number prefix or site name)
+      // 2. Search Permits
       const permitsSnap = await getDocs(query(collection(firestore, 'permits_to_work'), limit(20)));
       permitsSnap.docs.forEach(d => {
         const data = d.data();
@@ -120,22 +123,21 @@ export function GlobalSearch() {
         }
       });
 
-      // 4. Search Users (Admin only)
-      if (isAdmin) {
-        const usersSnap = await getDocs(query(collection(firestore, 'users'), limit(20)));
-        usersSnap.docs.forEach(d => {
-          const data = d.data();
-          if (data.username?.toLowerCase().includes(term) || data.email?.toLowerCase().includes(term)) {
-            searchResults.push({
-              id: d.id,
-              type: 'User',
-              title: data.username || 'N/A',
-              subtitle: `${data.role} • ${data.email}`,
-              link: `/settings/users`
-            });
-          }
-        });
-      }
+      // 4. Search Users (Personnel search enabled for all logged in users)
+      const usersSnap = await getDocs(query(collection(firestore, 'users'), limit(20)));
+      usersSnap.docs.forEach(d => {
+        const data = d.data();
+        if (data.username?.toLowerCase().includes(term) || data.email?.toLowerCase().includes(term)) {
+          searchResults.push({
+            id: d.id,
+            type: 'User',
+            title: data.username || 'N/A',
+            subtitle: `${data.role} • ${data.email}`,
+            link: `/settings/users`,
+            userData: { id: d.id, ...data }
+          });
+        }
+      });
 
       setResults(searchResults.slice(0, 30));
     } catch (e) {
@@ -145,11 +147,16 @@ export function GlobalSearch() {
     }
   };
 
-  const navigateTo = (link: string) => {
+  const navigateTo = (result: SearchResult) => {
     setIsOpen(false);
     setSearchQuery('');
     setResults([]);
-    router.push(link);
+    
+    if (result.type === 'User') {
+      setSelectedUserForView(result.userData);
+    } else {
+      router.push(result.link);
+    }
   };
 
   const getTypeIcon = (type: SearchResult['type']) => {
@@ -207,7 +214,7 @@ export function GlobalSearch() {
           <ScrollArea className="max-h-[450px]">
             {results.length > 0 ? (
               <div className="p-2 space-y-4 pb-6">
-                {['Site', 'Permit', 'Task', 'User'].map((category) => {
+                {['Site', 'User', 'Permit', 'Task'].map((category) => {
                   const catResults = results.filter(r => r.type === category);
                   if (catResults.length === 0) return null;
 
@@ -221,7 +228,7 @@ export function GlobalSearch() {
                         {catResults.map((result) => (
                           <button
                             key={result.id}
-                            onClick={() => navigateTo(result.link)}
+                            onClick={() => navigateTo(result)}
                             className="w-full flex items-center gap-3 p-3 text-left rounded-sm hover:bg-primary/5 transition-colors group"
                           >
                             <div className="p-2 bg-muted rounded-sm group-hover:bg-primary/10 transition-colors">
@@ -262,6 +269,12 @@ export function GlobalSearch() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ViewUserDialog 
+        user={selectedUserForView} 
+        open={!!selectedUserForView} 
+        onOpenChange={(o) => !o && setSelectedUserForView(null)} 
+      />
     </>
   );
 }
