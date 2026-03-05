@@ -28,6 +28,7 @@ type UserProfile = {
   assignedProjectIds?: string[];
   siteManagerId?: string;
   totalPoints?: number;
+  pointsMultiplier?: number;
 };
 
 type Site = {
@@ -123,7 +124,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
 
         <Separator className="opacity-10" />
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar bg-background">
+        <div className="flex-1 overflow-y-auto bg-background custom-scrollbar">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-0 h-full">
             <div className="md:col-span-2 border-r border-border/50 p-8 space-y-10">
               <div className="space-y-6">
@@ -133,37 +134,46 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                 </h3>
                 {user.role === 'Site Engineer' ? (
                   mappedManager ? (
-                    <div className="flex items-center gap-3 p-3 rounded-sm border border-primary/10 bg-primary/[0.02]">
-                      <UserCog className="h-4 w-4 text-primary" />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold uppercase tracking-tight">{mappedManager.username}</span>
-                        <span className="text-[9px] text-muted-foreground font-black uppercase">Reporting Manager</span>
+                    <div className="flex items-center justify-between py-3 border-b border-border/30 px-1 hover:bg-primary/[0.02] transition-colors">
+                      <div className="flex items-center gap-3">
+                        <UserCog className="h-4 w-4 text-primary" />
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold uppercase tracking-tight">{mappedManager.username}</span>
+                          <span className="text-[9px] text-muted-foreground font-black uppercase">Direct Supervisor</span>
+                        </div>
                       </div>
                     </div>
                   ) : (
                     <div className="text-xs italic text-muted-foreground/60 px-1">No supervisor mapped to this engineer.</div>
                   )
                 ) : user.role === 'Site Manager' ? (
-                  <div className="space-y-1">
+                  <div className="space-y-px bg-border/20 border border-border/20 rounded-sm overflow-hidden">
                     {mappedEngineers?.map(eng => (
-                      <div key={eng.id} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0 hover:bg-muted/20 px-1 transition-colors">
-                        <span className="text-xs font-bold truncate pr-4">{eng.username}</span>
-                        <Badge variant="outline" className="text-[8px] h-4 rounded-sm border-muted-foreground/20 text-muted-foreground font-black">ENG</Badge>
+                      <div key={eng.id} className="flex items-center justify-between py-3 px-4 bg-background hover:bg-primary/[0.01] transition-colors">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-bold text-foreground truncate">{eng.username}</span>
+                          <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter">{eng.email}</span>
+                        </div>
+                        <Badge variant="outline" className="text-[8px] h-4 rounded-sm border-primary/20 text-primary font-black bg-primary/5 px-1.5 uppercase">Engineer</Badge>
                       </div>
                     ))}
-                    {!mappedEngineers?.length && <div className="text-xs italic text-muted-foreground/60">No engineers reporting.</div>}
+                    {!mappedEngineers?.length && <div className="p-8 text-center text-xs italic text-muted-foreground/60">No personnel currently report to this manager.</div>}
                   </div>
                 ) : (
-                  <div className="text-xs font-bold text-muted-foreground/60 uppercase tracking-widest px-1">System Administration</div>
+                  <div className="flex items-center gap-2 px-1">
+                    <ShieldCheck className="h-4 w-4 text-primary" />
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">System Administration Access</span>
+                  </div>
                 )}
               </div>
             </div>
 
             <div className="md:col-span-3 p-8 bg-muted/[0.02]">
               <div className="space-y-6">
-                <div className="flex items-center justify-between border-b pb-2">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">Authorized Assets</h3>
-                  <Badge variant="outline" className="h-5 rounded-full px-2 text-[9px] font-black border-primary/20 text-primary bg-primary/5">{assignedSites.length} LOCATIONS</Badge>
+                <div className="border-b pb-2">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
+                    SITES ({assignedSites.length})
+                  </h3>
                 </div>
                 
                 {assignedSites.length > 0 ? (
@@ -175,13 +185,13 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
 
                       return (
                         <div key={site.id} className="flex items-center justify-between p-4 bg-background hover:bg-primary/[0.01] transition-colors group">
-                          <div className="flex flex-col gap-1.5 min-w-0">
+                          <div className="flex flex-col gap-1 min-w-0">
                             <span className="font-bold text-sm tracking-tight text-foreground group-hover:text-primary transition-colors">{site.name}</span>
                             {assignedEng && (
                               <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground uppercase font-black">
-                                <User className="h-2.5 w-2.5 opacity-50" />
-                                <span className="opacity-60">Engineer:</span>
-                                <span className="text-foreground/80">{assignedEng.username}</span>
+                                <User className="h-2.5 w-2.5 opacity-50 text-primary" />
+                                <span className="opacity-60">Team Lead:</span>
+                                <span className="text-foreground/80 font-bold">{assignedEng.username}</span>
                               </div>
                             )}
                           </div>
