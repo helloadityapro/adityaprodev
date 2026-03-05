@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react";
@@ -13,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp } from "lucide-react"
+import { User, Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
@@ -283,7 +282,7 @@ export default function UsersPage() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Button variant="ghost" size="icon" onClick={() => setUserToView(u as any)}><Eye className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" size="icon" onClick={() => setUserToView(u as any)}><User className="h-4 w-4" /></Button>
                                                     <Button variant="ghost" size="icon" onClick={() => setUserToEdit(u as any)}><Pencil className="h-4 w-4" /></Button>
                                                     <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteClick(u)}><Trash2 className="h-4 w-4" /></Button>
                                                 </>
