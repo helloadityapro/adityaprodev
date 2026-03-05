@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check, MapPin, PlusCircle, Loader2, ShieldAlert } from 'lucide-react';
+import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check, MapPin, PlusCircle, Loader2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -82,7 +82,6 @@ export default function TeamMappingPage() {
     return allUsers?.filter(u => {
       const role = (u.role || '').trim().toLowerCase();
       const username = (u.username || '').trim().toLowerCase();
-      // Robust classification: Match role case-insensitively OR match the specific requested names
       const isEngineerRole = role === 'site engineer' || role === 'engineer';
       const isRescueTarget = RESCUE_NAMES.includes(username);
       return isEngineerRole || isRescueTarget;
@@ -114,7 +113,6 @@ export default function TeamMappingPage() {
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
 
   const syncManagerSites = async (managerId: string) => {
-    const batch = writeBatch(firestore);
     const q = query(collection(firestore, 'users'), where('siteManagerId', '==', managerId));
     const snap = await getDocs(q);
     
@@ -125,8 +123,7 @@ export default function TeamMappingPage() {
     });
 
     const managerRef = doc(firestore, 'users', managerId);
-    batch.update(managerRef, { assignedProjectIds: Array.from(allEngineerSites) });
-    await batch.commit();
+    updateDocumentNonBlocking(managerRef, { assignedProjectIds: Array.from(allEngineerSites) });
   };
 
   const handleAssign = async () => {
@@ -135,9 +132,9 @@ export default function TeamMappingPage() {
 
     try {
         const engineerRef = doc(firestore, 'users', selectedEngineerId);
-        await updateDocumentNonBlocking(engineerRef, { 
+        updateDocumentNonBlocking(engineerRef, { 
           siteManagerId: selectedManagerId,
-          role: 'Site Engineer' // Ensure the role is standardized on mapping
+          role: 'Site Engineer'
         });
 
         await syncManagerSites(selectedManagerId);
@@ -163,7 +160,7 @@ export default function TeamMappingPage() {
 
     try {
         const engineerRef = doc(firestore, 'users', engineerId);
-        await updateDocumentNonBlocking(engineerRef, { siteManagerId: null });
+        updateDocumentNonBlocking(engineerRef, { siteManagerId: null });
         await syncManagerSites(oldManagerId);
 
         toast({
@@ -191,7 +188,7 @@ export default function TeamMappingPage() {
 
     try {
         const userRef = doc(firestore, 'users', siteManagementUser.id);
-        await updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
+        updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
 
         if (siteManagementUser.role === 'Site Engineer' && siteManagementUser.siteManagerId) {
             await syncManagerSites(siteManagementUser.siteManagerId);
@@ -231,7 +228,6 @@ export default function TeamMappingPage() {
   const unmappedEngineers = React.useMemo(() => {
     if (!engineers) return [];
     return engineers.filter(e => {
-      // Logic: An engineer is "unmapped" if they don't have a valid manager ID
       const hasManager = e.siteManagerId && String(e.siteManagerId).trim() !== "" && String(e.siteManagerId) !== "null";
       return !hasManager;
     });
@@ -496,181 +492,182 @@ export default function TeamMappingPage() {
                           onChange={(e) => setTableEngineerSearch(e.target.value)}
                           className="h-8 pl-8 text-xs rounded-sm border-primary/10"
                           autoComplete="off"
-                          />
-                        </div>
+                        />
                       </div>
-                    </TableHead>
-                    <TableHead className="w-32 align-bottom pb-4 text-center" onClick={() => handleSort('sites')}>
-                      <div className="flex items-center justify-center cursor-pointer gap-1">
-                          <span className="text-xs font-bold uppercase tracking-tight">Sites</span>
-                          <SortIcon column="sites" />
-                      </div>
-                    </TableHead>
-                    <TableHead className="text-right align-bottom pb-4 px-6">
-                      <span className="text-xs font-bold uppercase tracking-tight">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMappings.length > 0 ? (
-                    filteredMappings.map(e => {
-                      const manager = managers?.find(m => m.id === e.siteManagerId);
-                      return (
-                        <TableRow key={e.id} className="hover:bg-muted/5 group">
-                          {isAdmin && <TableCell className="font-bold text-sm px-4">{manager?.username || 'System Admin'}</TableCell>}
-                          <TableCell className="px-4">
-                              <div className="flex flex-col">
-                                  <span className="font-semibold">{e.username}</span>
-                                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">{e.email}</span>
-                              </div>
-                          </TableCell>
-                          <TableCell className="text-center px-4">
-                              <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">
-                                  {e.assignedProjectIds?.length || 0}
-                              </Badge>
-                          </TableCell>
-                          <TableCell className="text-right px-6">
-                            <div className="flex justify-end gap-1">
-                              <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="h-8 text-xs font-bold rounded-sm border-primary/20 hover:bg-primary hover:text-white transition-all"
-                                  onClick={() => handleOpenSiteManagement(e)}
-                              >
-                                  <MapPin className="h-3.5 w-3.5 mr-1.5" /> Manage Sites
-                              </Button>
-                              {isAdmin && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleRemoveMapping(e.id)}>
-                                      <Trash2 className="h-4 w-4" />
-                                      <span className="sr-only">Remove Mapping</span>
-                                  </Button>
-                              )}
+                    </div>
+                  </TableHead>
+                  <TableHead className="w-32 align-bottom pb-4 text-center" onClick={() => handleSort('sites')}>
+                    <div className="flex items-center justify-center cursor-pointer gap-1">
+                        <span className="text-xs font-bold uppercase tracking-tight">Sites</span>
+                        <SortIcon column="sites" />
+                    </div>
+                  </TableHead>
+                  <TableHead className="text-right align-bottom pb-4 px-6">
+                    <span className="text-xs font-bold uppercase tracking-tight">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredMappings.length > 0 ? (
+                  filteredMappings.map(e => {
+                    const manager = managers?.find(m => m.id === e.siteManagerId);
+                    return (
+                      <TableRow key={e.id} className="hover:bg-muted/5 group">
+                        {isAdmin && <TableCell className="font-bold text-sm px-4">{manager?.username || 'System Admin'}</TableCell>}
+                        <TableCell className="px-4">
+                            <div className="flex flex-col">
+                                <span className="font-semibold">{e.username}</span>
+                                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">{e.email}</span>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-24 text-muted-foreground">
-                        <div className="flex flex-col items-center justify-center">
-                          <Users className="h-12 w-12 mb-4 opacity-20" />
-                          <p className="font-medium italic">No reporting engineers found matching your filters.</p>
-                        </div>
-                      </TableRow>
-                    )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-  
-        {/* Site Management Dialog */}
-        <Dialog open={!!siteManagementUser} onOpenChange={(o) => !o && setSiteManagementUser(null)}>
-          <DialogContent className="max-w-2xl rounded-sm">
-              <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5 text-primary" /> Manage Site Access
-                  </DialogTitle>
-                  <DialogDescription>
-                      Assign sites to <strong>{siteManagementUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
-                  </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-6 py-4">
-                  <div className="flex flex-col gap-3 p-4 bg-primary/5 border border-primary/10 rounded-sm">
-                      <Label className="text-[10px] font-bold uppercase text-muted-foreground">Select Site to Add</Label>
-                      <div className="relative">
-                          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                              placeholder="Search project sites..."
-                              className="pl-9 h-10 rounded-sm bg-background border-primary/20"
-                              value={siteSearchQuery}
-                              onChange={(e) => setSiteSearchQuery(e.target.value)}
-                              onKeyDown={(e) => e.stopPropagation()}
-                              autoComplete="off"
-                          />
-                      </div>
-                      
-                      {siteSearchQuery && (
-                          <div className="border rounded-sm bg-background shadow-sm overflow-hidden">
-                              <ScrollArea className="h-[150px]">
-                                  <div className="p-1">
-                                      {availableSitesToAssign.length > 0 ? (
-                                          availableSitesToAssign.map((site) => (
-                                              <Button
-                                                  key={site.id}
-                                                  variant="ghost"
-                                                  className="w-full justify-start font-normal h-9 text-sm"
-                                                  onClick={() => {
-                                                      setLocalAssignedSites(prev => [...prev, site.id]);
-                                                      setSiteSearchQuery("");
-                                                  }}
-                                              >
-                                                  <PlusCircle className="mr-2 h-4 w-4 text-primary" />
-                                                  {site.name}
-                                              </Button>
-                                          ))
-                                      ) : (
-                                          <p className="p-4 text-center text-xs text-muted-foreground italic">No matching sites found.</p>
-                                      )}
-                                  </div>
-                              </ScrollArea>
+                        </TableCell>
+                        <TableCell className="text-center px-4">
+                            <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">
+                                {e.assignedProjectIds?.length || 0}
+                            </Badge>
+                        </TableCell>
+                        <TableCell className="text-right px-6">
+                          <div className="flex justify-end gap-1">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 text-xs font-bold rounded-sm border-primary/20 hover:bg-primary hover:text-white transition-all"
+                                onClick={() => handleOpenSiteManagement(e)}
+                            >
+                                <MapPin className="h-3.5 w-3.5 mr-1.5" /> Manage Sites
+                            </Button>
+                            {isAdmin && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleRemoveMapping(e.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                    <span className="sr-only">Remove Mapping</span>
+                                </Button>
+                            )}
                           </div>
-                      )}
-                  </div>
-  
-                  <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase tracking-wider">Authorized Site Access</Label>
-                      <div className="rounded-sm border overflow-hidden">
-                          <ScrollArea className="h-[250px]">
-                              <Table>
-                                  <TableHeader className="bg-muted/30">
-                                      <TableRow>
-                                          <TableHead className="text-[10px] uppercase font-bold">Site Name</TableHead>
-                                          <TableHead className="text-[10px] uppercase font-bold">Company</TableHead>
-                                          <TableHead className="w-16 text-right px-4"></TableHead>
-                                      </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                      {localAssignedSites.length > 0 ? (
-                                          localAssignedSites.map(siteId => {
-                                              const site = allSites?.find(s => s.id === siteId);
-                                              return (
-                                                  <TableRow key={siteId} className="hover:bg-muted/5 group">
-                                                      <TableCell className="font-semibold text-sm">{site?.name || 'Unknown Site'}</TableCell>
-                                                      <TableCell className="text-xs text-muted-foreground">{site?.projectCompany || 'N/A'}</TableCell>
-                                                      <TableCell className="text-right px-4">
-                                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive rounded-sm" onClick={() => handleRemoveSiteFromLocal(siteId)}>
-                                                              <Trash2 className="h-3.5 w-3.5" />
-                                                          </Button>
-                                                      </TableCell>
-                                                  </TableRow>
-                                              );
-                                          })
-                                      ) : (
-                                          <TableRow>
-                                              <TableCell colSpan={3} className="h-32 text-center text-muted-foreground italic text-sm">
-                                                  No sites assigned.
-                                              </TableCell>
-                                          </TableRow>
-                                      )}
-                                  </TableBody>
-                              </Table>
-                          </ScrollArea>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-24 text-muted-foreground">
+                      <div className="flex flex-col items-center justify-center">
+                        <Users className="h-12 w-12 mb-4 opacity-20" />
+                        <p className="font-medium italic">No reporting engineers found matching your filters.</p>
                       </div>
-                  </div>
-              </div>
-  
-              <DialogFooter className="gap-2 border-t pt-4">
-                  <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Cancel</Button></DialogClose>
-                  <Button onClick={handleSaveSites} disabled={isSavingSites} className="rounded-sm font-bold min-w-[120px]">
-                      {isSavingSites ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                      Save Updates
-                  </Button>
-              </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-    );
-  }
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Site Management Dialog */}
+      <Dialog open={!!siteManagementUser} onOpenChange={(o) => !o && setSiteManagementUser(null)}>
+        <DialogContent className="max-w-2xl rounded-sm">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-primary" /> Manage Site Access
+                </DialogTitle>
+                <DialogDescription>
+                    Assign sites to <strong>{siteManagementUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
+                </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6 py-4">
+                <div className="flex flex-col gap-3 p-4 bg-primary/5 border border-primary/10 rounded-sm">
+                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Select Site to Add</Label>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search project sites..."
+                            className="pl-9 h-10 rounded-sm bg-background border-primary/20"
+                            value={siteSearchQuery}
+                            onChange={(e) => setSiteSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            autoComplete="off"
+                        />
+                    </div>
+                    
+                    {siteSearchQuery && (
+                        <div className="border rounded-sm bg-background shadow-sm overflow-hidden">
+                            <ScrollArea className="h-[150px]">
+                                <div className="p-1">
+                                    {availableSitesToAssign.length > 0 ? (
+                                        availableSitesToAssign.map((site) => (
+                                            <Button
+                                                key={site.id}
+                                                variant="ghost"
+                                                className="w-full justify-start font-normal h-9 text-sm"
+                                                onClick={() => {
+                                                    setLocalAssignedSites(prev => [...prev, site.id]);
+                                                    setSiteSearchQuery("");
+                                                }}
+                                            >
+                                                <PlusCircle className="mr-2 h-4 w-4 text-primary" />
+                                                {site.name}
+                                            </Button>
+                                        ))
+                                    ) : (
+                                        <p className="p-4 text-center text-xs text-muted-foreground italic">No matching sites found.</p>
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    )}
+                </div>
+
+                <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider">Authorized Site Access</Label>
+                    <div className="rounded-sm border overflow-hidden">
+                        <ScrollArea className="h-[250px]">
+                            <Table>
+                                <TableHeader className="bg-muted/30">
+                                    <TableRow>
+                                        <TableHead className="text-[10px] uppercase font-bold">Site Name</TableHead>
+                                        <TableHead className="text-[10px] uppercase font-bold">Company</TableHead>
+                                        <TableHead className="w-16 text-right px-4"></TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {localAssignedSites.length > 0 ? (
+                                        localAssignedSites.map(siteId => {
+                                            const site = allSites?.find(s => s.id === siteId);
+                                            return (
+                                                <TableRow key={siteId} className="hover:bg-muted/5 group">
+                                                    <TableCell className="font-semibold text-sm">{site?.name || 'Unknown Site'}</TableCell>
+                                                    <TableCell className="text-xs text-muted-foreground">{site?.projectCompany || 'N/A'}</TableCell>
+                                                    <TableCell className="text-right px-4">
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive rounded-sm" onClick={() => handleRemoveSiteFromLocal(siteId)}>
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={3} className="h-32 text-center text-muted-foreground italic text-sm">
+                                                No sites assigned.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    </div>
+                </div>
+            </div>
+
+            <DialogFooter className="gap-2 border-t pt-4">
+                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Cancel</Button></DialogClose>
+                <Button onClick={handleSaveSites} disabled={isSavingSites} className="rounded-sm font-bold min-w-[120px]">
+                    {isSavingSites ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Save Updates
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
