@@ -8,8 +8,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Direct UID check for super admins is the most reliable way to bootstrap
-      // Khalil's UID from error logs: dhHhKwUb4DNWllhoxgiFX0QeA6j1
+      // Direct UID check for super admins
       let superAdminUids = ['dhHhKwUb4DNWllhoxgiFX0QeA6j1'];
       let superAdminEmails = ['khalil@adityagreenenergy.com', 'prafulrana143@gmail.com'];
       
@@ -34,9 +33,17 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         request.auth.uid == userId || 
         isAdmin() || 
+        // Case 1: Site Manager updating their subordinate
         (isSiteManager() && 
-         exists(/databases/$(database)/documents/users/$(userId)) && 
-         get(/databases/$(database)/documents/users/$(userId)).data.get('siteManagerId', '') == request.auth.uid)
+         resource.data.get('siteManagerId', '') == request.auth.uid) ||
+        // Case 2: User updating ONLY totalPoints for their assigned manager (Reward points logic)
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints']) &&
+          (
+            // Target is the manager of the requester
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('siteManagerId', '') == userId
+          )
+        )
       );
       allow delete: if isAdmin();
     }
