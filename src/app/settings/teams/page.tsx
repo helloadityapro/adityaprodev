@@ -38,7 +38,8 @@ type Site = {
 
 type SortKey = 'engineer' | 'manager' | 'sites';
 
-const RESCUE_NAMES = [
+// Rescue lists ensure specific personnel are always categorized correctly regardless of database inconsistencies
+const RESCUE_ENGINEER_NAMES = [
   "Shayad Shaikh",
   "Shahabaj Shaikh",
   "Omkar Puri",
@@ -48,6 +49,12 @@ const RESCUE_NAMES = [
   "Dipak Kshirsagar",
   "Santosh Gulabrao Maghade",
   "Vaibhav Samshette"
+].map(n => n.toLowerCase());
+
+const RESCUE_MANAGER_NAMES = [
+  "Praful Upadhaye",
+  "Shoukat Shaikh",
+  "Dnyaneshwar Palmate"
 ].map(n => n.toLowerCase());
 
 export default function TeamMappingPage() {
@@ -74,7 +81,10 @@ export default function TeamMappingPage() {
   const managers = React.useMemo(() => {
     return allUsers?.filter(u => {
       const role = (u.role || '').trim().toLowerCase();
-      return role === 'site manager' || role === 'manager' || role === 'admin';
+      const username = (u.username || '').trim().toLowerCase();
+      const isManagerRole = role === 'site manager' || role === 'manager' || role === 'admin';
+      const isRescueTarget = RESCUE_MANAGER_NAMES.includes(username);
+      return isManagerRole || isRescueTarget;
     }) || [];
   }, [allUsers]);
 
@@ -83,7 +93,7 @@ export default function TeamMappingPage() {
       const role = (u.role || '').trim().toLowerCase();
       const username = (u.username || '').trim().toLowerCase();
       const isEngineerRole = role === 'site engineer' || role === 'engineer';
-      const isRescueTarget = RESCUE_NAMES.includes(username);
+      const isRescueTarget = RESCUE_ENGINEER_NAMES.includes(username);
       return isEngineerRole || isRescueTarget;
     }) || [];
   }, [allUsers]);
@@ -473,7 +483,7 @@ export default function TeamMappingPage() {
                               />
                               <div className="flex flex-col items-start overflow-hidden text-left">
                                 <span className="truncate">{e.username}</span>
-                                {RESCUE_NAMES.includes((e.username || '').toLowerCase()) && (
+                                {RESCUE_ENGINEER_NAMES.includes((e.username || '').toLowerCase()) && (
                                   <Badge variant="outline" className="text-[8px] h-3 px-1 py-0 border-amber-500 text-amber-700 bg-amber-50 rounded-sm">Rescue Identified</Badge>
                                 )}
                               </div>

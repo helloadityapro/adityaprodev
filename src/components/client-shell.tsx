@@ -89,7 +89,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (user && !isProfileLoading) {
       if (!isSuperAdmin(user.email)) return;
 
-      const needsBootstrap = !userProfile || userProfile.role !== 'Admin' || userProfile.registrationRequest === true || (user.email === 'khalil@adityagreenenergy.com' && userProfile.username !== 'Khalil Choudhary');
+      // Bootstrap logic for Super Admins to ensure they have the Admin role and correct name
+      const needsBootstrap = !userProfile || 
+                             userProfile.role !== 'Admin' || 
+                             userProfile.registrationRequest === true || 
+                             (user.email === 'khalil@adityagreenenergy.com' && userProfile.username !== 'Khalil Choudhary') ||
+                             (user.email === 'prafulrana143@gmail.com' && userProfile.username !== 'Praful Upadhaye');
       
       if (needsBootstrap) {
         const updateData: any = {
@@ -104,11 +109,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
         if (user.email === 'khalil@adityagreenenergy.com') {
           updateData.username = 'Khalil Choudhary';
+        } else if (user.email === 'prafulrana143@gmail.com') {
+          updateData.username = 'Praful Upadhaye';
         }
 
         if (!userProfile) {
           updateData.createdAt = serverTimestamp();
-          if (user.email !== 'khalil@adityagreenenergy.com') {
+          if (!updateData.username) {
             updateData.username = user.displayName || user.email?.split('@')[0] || 'Admin';
           }
           updateData.mobile = user.phoneNumber || 'N/A';
