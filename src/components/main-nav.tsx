@@ -32,7 +32,8 @@ import {
   LogOut,
   UserCheck,
   ChevronDown,
-  CalendarDays
+  CalendarDays,
+  FileBarChart
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -280,6 +281,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Administration</SidebarGroupLabel>
           <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Attendance Summary" isActive={pathname === '/admin/attendance-summary'} className="rounded-sm">
+                <Link href="/admin/attendance-summary">
+                  <FileBarChart className="h-4 w-4 text-emerald-600" />
+                  <span className="font-bold text-emerald-700">Attendance Summary</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Day Report" isActive={pathname === '/admin/day-report'} className="rounded-sm">
                 <Link href="/admin/day-report">
