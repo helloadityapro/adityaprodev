@@ -7,22 +7,19 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function getUserData() {
-      let path = /databases/$(database)/documents/users/$(request.auth.uid);
-      return exists(path) ? get(path).data : {};
-    }
-
     function isAdmin() {
-      let email = request.auth.token.get('email', '');
       return isSignedIn() && (
-        email == 'khalil@adityagreenenergy.com' || 
-        email == 'prafulrana143@gmail.com' || 
-        getUserData().get('role', '') == 'Admin'
+        request.auth.token.email == 'khalil@adityagreenenergy.com' || 
+        request.auth.token.email == 'prafulrana143@gmail.com' || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'Admin')
       );
     }
 
     function isSiteManager() {
-      return isSignedIn() && getUserData().get('role', '') == 'Site Manager';
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'Site Manager';
     }
 
     match /users/{userId} {
@@ -31,7 +28,9 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         request.auth.uid == userId || 
         isAdmin() || 
-        (isSiteManager() && get(/databases/$(database)/documents/users/$(userId)).data.get('siteManagerId', '') == request.auth.uid)
+        (isSiteManager() && 
+         exists(/databases/$(database)/documents/users/$(userId)) && 
+         get(/databases/$(database)/documents/users/$(userId)).data.get('siteManagerId', '') == request.auth.uid)
       );
       allow delete: if isAdmin();
     }
@@ -139,7 +138,7 @@ service cloud.firestore {
         isAdmin() || 
         resource.data.assignedToId == request.auth.uid || 
         resource.data.assignedById == request.auth.uid ||
-        (isSiteManager() && get(/databases/$(database)/documents/users/$(resource.data.assignedToId)).data.get('siteManagerId', '') == request.auth.uid)
+        (isSiteManager() && exists(/databases/$(database)/documents/users/$(resource.data.assignedToId)) && get(/databases/$(database)/documents/users/$(resource.data.assignedToId)).data.get('siteManagerId', '') == request.auth.uid)
       );
       allow create: if isSignedIn();
       allow update: if isSignedIn() && (
