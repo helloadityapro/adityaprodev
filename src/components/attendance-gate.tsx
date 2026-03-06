@@ -1,0 +1,142 @@
+'use client';
+
+import * as React from 'react';
+import { useUser, useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { collection, query, where, doc, serverTimestamp, limit } from 'firebase/firestore';
+import { format, isAfter, setHours, setMinutes } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { useRouter, usePathname } from 'next/navigation';
+import { Clock, LogIn, ShieldAlert } from 'lucide-react';
+
+/**
+ * Global component to manage attendance compliance.
+ * Handles:
+ * 1. Forced check-in redirect if no session exists for today.
+ * 2. Check-out reminders after 6:00 PM.
+ * 3. Daily 12 AM system reset for stale sessions.
+ */
+export function AttendanceGate() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const router = useRouter();
+  const pathname = usePathname();
+  
+  const [showCheckIn, setShowCheckIn] = React.useState(false);
+  const [showCheckOut, setShowCheckOut] = React.useState(false);
+
+  // Today's date reference
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+  // Query for ANY ongoing session for this user
+  const activeQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(
+      collection(firestore, 'attendance'),
+      where('userId', '==', user.uid),
+      where('status', '==', 'ongoing'),
+      limit(1)
+    );
+  }, [user, firestore]);
+
+  const { data: activeSessions, isLoading: isActiveLoading } = useCollection(activeQuery);
+
+  // Query to check if user has already completed a session today
+  const todayFinishedQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(
+      collection(firestore, 'attendance'),
+      where('userId', '==', user.uid),
+      where('date', '==', todayStr),
+      where('status', '==', 'completed'),
+      limit(1)
+    );
+  }, [user, firestore, todayStr]);
+
+  const { data: todayFinished, isLoading: isFinishedLoading } = useCollection(todayFinishedQuery);
+
+  React.useEffect(() => {
+    if (isActiveLoading || isFinishedLoading || !user) return;
+
+    // Do not show prompts if already on attendance pages
+    if (pathname.startsWith('/attendance')) return;
+
+    const now = new Date();
+    const sixPm = setMinutes(setHours(new Date(), 18), 0);
+    const isAfterSix = isAfter(now, sixPm);
+
+    const activeSession = activeSessions?.[0];
+    const hasCompletedToday = todayFinished && todayFinished.length > 0;
+
+    // 1. CYCLE RESET (12 AM Logic)
+    // If we find an "ongoing" session where the date is NOT today, it means it's a leftover from yesterday.
+    if (activeSession && activeSession.date !== todayStr) {
+      const ref = doc(firestore, 'attendance', activeSession.id);
+      updateDocumentNonBlocking(ref, {
+        status: 'completed',
+        checkOutTime: serverTimestamp(),
+        checkOutLat: activeSession.checkInLat, // Best effort fallback
+        checkOutLng: activeSession.checkInLng,
+        checkOutType: 'system',
+        remarks: 'Automatic system check-out due to 12 AM cycle reset.'
+      });
+      return;
+    }
+
+    // 2. CHECK-IN GATE
+    // Prompt if not checked in at all today AND it's before 6 PM
+    if (!activeSession && !hasCompletedToday && !isAfterSix) {
+      setShowCheckIn(true);
+    }
+
+    // 3. CHECK-OUT PROMPT
+    // Prompt if session is ongoing AND it's after 6 PM
+    if (activeSession && activeSession.date === todayStr && isAfterSix) {
+      setShowCheckOut(true);
+    }
+  }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, user, todayStr, pathname, firestore]);
+
+  return (
+    <>
+      {/* Check-in Gateway */}
+      <Dialog open={showCheckIn} onOpenChange={setShowCheckIn}>
+        <DialogContent className="sm:max-w-md rounded-sm border-primary/20 shadow-2xl">
+          <DialogHeader className="pt-4">
+            <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
+              <LogIn className="h-8 w-8 text-primary" />
+            </div>
+            <DialogTitle className="text-center text-2xl font-black uppercase tracking-tight">Workday Check-in</DialogTitle>
+            <DialogDescription className="text-center text-base leading-relaxed">
+              Your session has started. Please complete your mandatory <strong>GPS & Profile verification</strong> to continue with site operations.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center pb-4">
+            <Button onClick={() => { setShowCheckIn(false); router.push('/attendance/check-in'); }} className="w-full h-14 text-lg font-black rounded-sm shadow-xl">
+              Proceed to Check-in
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* End-of-Day Gateway */}
+      <Dialog open={showCheckOut} onOpenChange={setShowCheckOut}>
+        <DialogContent className="sm:max-w-md rounded-sm border-amber-200 shadow-2xl bg-amber-50/50">
+          <DialogHeader className="pt-4">
+            <div className="mx-auto bg-amber-500/10 p-4 rounded-full w-fit mb-4">
+              <Clock className="h-8 w-8 text-amber-600" />
+            </div>
+            <DialogTitle className="text-center text-2xl font-black uppercase tracking-tight text-amber-900">Pending Check-out</DialogTitle>
+            <DialogDescription className="text-center text-base leading-relaxed text-amber-800">
+              It is past <strong>6:00 PM</strong>. Organizational policy requires a final site verification before concluding your workday.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center pb-4">
+            <Button onClick={() => { setShowCheckOut(false); router.push('/attendance/check-out'); }} className="w-full h-14 text-lg font-black rounded-sm shadow-xl bg-slate-900 hover:bg-black">
+              Check-out Now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

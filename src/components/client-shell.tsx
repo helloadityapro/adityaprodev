@@ -19,7 +19,8 @@ import { useToast } from "@/hooks/use-toast";
 import { UserNotifications } from "@/components/user-notifications";
 import { QuickActions } from "@/components/quick-actions";
 import { GlobalSearch } from "@/components/global-search";
-import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, AlertCircle, RefreshCw } from "lucide-react";
+import { AttendanceGate } from "@/components/attendance-gate";
+import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
@@ -164,7 +165,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (!user) return null;
     return query(collection(firestore, 'notifications'), where('userId', '==', user.uid));
   }, [user, firestore]);
-  const { data: unsortedNotifications } = useCollection<Notification>(notificationsQuery);
+  const { data: unsortedNotifications } = useCollection(notificationsQuery);
 
   const notifications = React.useMemo(() => {
     if (!unsortedNotifications) return null;
@@ -274,6 +275,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         </header>
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/40">
           <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6 min-h-full">
+            <AttendanceGate />
             {children}
           </div>
         </div>
