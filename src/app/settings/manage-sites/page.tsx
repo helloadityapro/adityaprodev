@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers';
+import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
@@ -89,7 +89,7 @@ export default function ManageSitesPage() {
 
   React.useEffect(() => {
     if (!isUserLoading && !isProfileLoading && !isAdmin) {
-      router.replace('/dashboard');
+      router.replace('/reports');
     }
   }, [isUserLoading, isProfileLoading, isAdmin, router]);
 
@@ -403,7 +403,7 @@ export default function ManageSitesPage() {
             <div className="bg-primary/5 border-b p-3 flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center gap-2">
                 <Badge className="bg-primary h-5 text-[10px] uppercase font-black">{selectedIds.length} Selected</Badge>
-                <span className="text-xs font-medium text-muted-foreground">Perform bulk action on selected records</span>
+                <span className="text-xs font-medium text-muted-foreground">Perform action on selected records</span>
               </div>
               <Button 
                 variant="destructive" 
@@ -477,7 +477,7 @@ export default function ManageSitesPage() {
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
               Confirm Bulk Deletion
-            </AlertCircle>
+            </AlertDialogTitle>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               You are about to permanently remove <strong>{selectedIds.length} project sites</strong> from the organization registry. 
