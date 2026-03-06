@@ -30,8 +30,13 @@ type Site = {
   id: string;
   name: string;
   projectCompany: string;
-  acCapacity: string;
-  dcCapacity: string;
+  acCapacity: any;
+  dcCapacity: any;
+};
+
+const formatCapacity = (val: any) => {
+  const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
+  return isNaN(num) ? "0.000" : num.toFixed(3);
 };
 
 export default function SiteAssignmentPage() {
@@ -116,10 +121,6 @@ export default function SiteAssignmentPage() {
     setLocalAssignedSites(prev => prev.filter(id => id !== siteId));
   };
 
-  /**
-   * Recalculates and updates a Manager's assignedProjectIds based on all reporting engineers.
-   * Ensures the manager "inherits" all sites assigned to their team.
-   */
   const syncManagerSites = async (managerId: string, updatedEngineerId: string, updatedEngineerSites: string[]) => {
     try {
       const q = query(collection(firestore, 'users'), where('siteManagerId', '==', managerId));
@@ -146,7 +147,6 @@ export default function SiteAssignmentPage() {
     const userRef = doc(firestore, 'users', selectedUserId);
     updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
 
-    // If an engineer's sites are updated, sync them to their manager
     if (selectedUser.role === 'Site Engineer' && selectedUser.siteManagerId) {
       await syncManagerSites(selectedUser.siteManagerId, selectedUserId, localAssignedSites);
     }
@@ -194,7 +194,7 @@ export default function SiteAssignmentPage() {
                   variant="outline"
                   role="combobox"
                   className={cn(
-                    "w-full justify-between font-normal",
+                    "w-full justify-between font-normal rounded-sm",
                     !selectedUserId && "text-muted-foreground"
                   )}
                 >
@@ -332,8 +332,8 @@ export default function SiteAssignmentPage() {
                     <TableRow>
                       <TableHead>Site Name</TableHead>
                       <TableHead>Company</TableHead>
-                      <TableHead>AC Capacity</TableHead>
-                      <TableHead>DC Capacity</TableHead>
+                      <TableHead className="text-center">AC (MW)</TableHead>
+                      <TableHead className="text-center">DC (MWp)</TableHead>
                       <TableHead className="w-[100px] text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -345,8 +345,8 @@ export default function SiteAssignmentPage() {
                           <TableRow key={siteId}>
                             <TableCell className="font-medium">{site?.name || 'Unknown Site'}</TableCell>
                             <TableCell>{site?.projectCompany || 'N/A'}</TableCell>
-                            <TableCell>{site?.acCapacity || 'N/A'}</TableCell>
-                            <TableCell>{site?.dcCapacity || 'N/A'}</TableCell>
+                            <TableCell className="text-center font-mono text-xs">{formatCapacity(site?.acCapacity)}</TableCell>
+                            <TableCell className="text-center font-mono text-xs">{formatCapacity(site?.dcCapacity)}</TableCell>
                             <TableCell className="text-right">
                               <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10" onClick={() => handleRemoveSite(siteId)}>
                                 <Trash2 className="h-4 w-4" />

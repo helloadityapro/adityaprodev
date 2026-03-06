@@ -46,8 +46,13 @@ type Site = {
   id: string;
   name: string;
   projectCompany: string;
-  acCapacity: string;
-  dcCapacity: string;
+  acCapacity: any;
+  dcCapacity: any;
+};
+
+const formatCapacity = (val: any) => {
+  const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
+  return isNaN(num) ? "0.000" : num.toFixed(3);
 };
 
 const FILE_INPUT_STYLES = "cursor-pointer h-auto py-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 transition-all";
@@ -79,8 +84,7 @@ export default function RaisePtwPage() {
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
   const isAdmin = React.useMemo(() => isSuperAdmin(user?.email) || userProfile?.role === 'Admin', [user, userProfile]);
-  const isManager = React.useMemo(() => userProfile?.role === 'Site Manager', [userProfile]);
-
+  
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
     if (isAdmin) {
@@ -188,7 +192,6 @@ export default function RaisePtwPage() {
     }
 
     try {
-      // 1. Determine Serial Number using Transaction if not correction mode
       let serialNumber = "";
       if (isCorrectionMode && permitToCorrect) {
         serialNumber = permitToCorrect.serialNumber;
@@ -250,7 +253,6 @@ export default function RaisePtwPage() {
       }));
 
       const newAttachments = await Promise.all(processedFiles.map(file => {
-        // Ensure path uses explicit slash separators to avoid permission errors
         const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const filePath = `uploads/${user.uid}/${timestamp}-${safeName}`;
         return uploadFile(file, filePath);
@@ -303,7 +305,6 @@ export default function RaisePtwPage() {
         }
       }
 
-      // Notify Admins
       const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
       getDocs(adminsQuery).then(snapshot => {
         snapshot.forEach(adminDoc => {
@@ -519,8 +520,8 @@ export default function RaisePtwPage() {
               {selectedSite && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg border text-sm">
                   <div><p className="text-muted-foreground mb-1 uppercase text-[10px] font-bold">Company</p><p className="font-semibold">{selectedSite.projectCompany}</p></div>
-                  <div><p className="text-muted-foreground mb-1 uppercase text-[10px] font-bold">AC Capacity</p><p className="font-semibold">{selectedSite.acCapacity}</p></div>
-                  <div><p className="text-muted-foreground mb-1 uppercase text-[10px] font-bold">DC Capacity</p><p className="font-semibold">{selectedSite.dcCapacity}</p></div>
+                  <div><p className="text-muted-foreground mb-1 uppercase text-[10px] font-bold">AC Capacity (MW)</p><p className="font-semibold">{formatCapacity(selectedSite.acCapacity)}</p></div>
+                  <div><p className="text-muted-foreground mb-1 uppercase text-[10px] font-bold">DC Capacity (MWp)</p><p className="font-semibold">{formatCapacity(selectedSite.dcCapacity)}</p></div>
                 </div>
               )}
 

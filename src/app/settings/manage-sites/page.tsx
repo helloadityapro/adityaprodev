@@ -60,11 +60,16 @@ import { format } from 'date-fns';
 const siteSchema = z.object({
   name: z.string().min(1, 'Site name is required.'),
   projectCompany: z.string().min(1, 'Project company is required.'),
-  acCapacity: z.string().min(1, 'AC capacity is required.'),
-  dcCapacity: z.string().min(1, 'DC capacity is required.'),
+  acCapacity: z.coerce.number({ invalid_type_error: "Must be a valid number" }).min(0, "Capacity cannot be negative"),
+  dcCapacity: z.coerce.number({ invalid_type_error: "Must be a valid number" }).min(0, "Capacity cannot be negative"),
 });
 
 type SortOrder = 'name' | 'newest' | 'oldest';
+
+const formatCapacity = (val: any) => {
+  const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
+  return isNaN(num) ? "0.000" : num.toFixed(3);
+};
 
 export default function ManageSitesPage() {
   const firestore = useFirestore();
@@ -98,7 +103,7 @@ export default function ManageSitesPage() {
 
   const siteForm = useForm<z.infer<typeof siteSchema>>({
     resolver: zodResolver(siteSchema),
-    defaultValues: { name: '', projectCompany: '', acCapacity: '', dcCapacity: '' },
+    defaultValues: { name: '', projectCompany: '', acCapacity: 0, dcCapacity: 0 },
   });
 
   const onSiteSubmit = (values: z.infer<typeof siteSchema>) => {
@@ -147,7 +152,7 @@ export default function ManageSitesPage() {
 
   const handleDownloadTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([
-      { 'Site Name': 'Sample Site A', 'Project Company': 'ABC Energies', 'AC Capacity': '5.000', 'DC Capacity': '6.250' }
+      { 'Site Name': 'Sample Site A', 'Project Company': 'ABC Energies', 'AC Capacity': 5.000, 'DC Capacity': 6.250 }
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
@@ -191,8 +196,8 @@ export default function ManageSitesPage() {
               batch.set(newDocRef, {
                 name: String(name),
                 projectCompany: String(company),
-                acCapacity: String(ac || "0"),
-                dcCapacity: String(dc || "0"),
+                acCapacity: parseFloat(String(ac || "0")),
+                dcCapacity: parseFloat(String(dc || "0")),
                 createdAt: serverTimestamp(),
               });
               count++;
@@ -219,8 +224,8 @@ export default function ManageSitesPage() {
     const worksheet = XLSX.utils.json_to_sheet(sites.map(s => ({
       'Site Name': s.name,
       'Project Company': s.projectCompany,
-      'AC Capacity': s.acCapacity,
-      'DC Capacity': s.dcCapacity,
+      'AC Capacity': formatCapacity(s.acCapacity),
+      'DC Capacity': formatCapacity(s.dcCapacity),
       'Date Added': s.createdAt ? format(s.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : 'N/A'
     })));
     
@@ -349,10 +354,10 @@ export default function ManageSitesPage() {
                   )} />
                   <div className="grid grid-cols-2 gap-4">
                     <FormField control={siteForm.control} name="acCapacity" render={({ field }) => (
-                      <FormItem><FormLabel>AC Capacity</FormLabel><FormControl><Input placeholder="4.000" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel>AC Capacity (MW)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="4.000" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={siteForm.control} name="dcCapacity" render={({ field }) => (
-                      <FormItem><FormLabel>DC Capacity</FormLabel><FormControl><Input placeholder="5.174" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel>DC Capacity (MWp)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="5.174" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                     )} />
                   </div>
                   <DialogFooter className="pt-4 gap-2">
@@ -446,10 +451,10 @@ export default function ManageSitesPage() {
                       <TableCell className="font-bold text-sm">{site.name}</TableCell>
                       <TableCell className="text-xs text-muted-foreground font-medium">{site.projectCompany}</TableCell>
                       <TableCell className="text-center font-mono text-[10px] font-bold text-blue-600">
-                        {site.acCapacity}
+                        {formatCapacity(site.acCapacity)}
                       </TableCell>
                       <TableCell className="text-center font-mono text-[10px] font-bold text-amber-600">
-                        {site.dcCapacity}
+                        {formatCapacity(site.dcCapacity)}
                       </TableCell>
                       <TableCell className="text-right px-6">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteSite(site.id)}>
@@ -478,7 +483,6 @@ export default function ManageSitesPage() {
               <AlertCircle className="h-5 w-5 text-destructive" />
               Confirm Bulk Deletion
             </AlertDialogTitle>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               You are about to permanently remove <strong>{selectedIds.length} project sites</strong> from the organization registry. 
               This action will remove them from all dropdowns across the platform and cannot be undone.

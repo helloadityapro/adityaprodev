@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -45,8 +44,8 @@ type Site = {
   id: string;
   name: string;
   projectCompany: string;
-  acCapacity: string;
-  dcCapacity: string;
+  acCapacity: any;
+  dcCapacity: any;
 };
 
 type Supplier = {
@@ -70,6 +69,11 @@ type UserProfile = {
 
 type RewardSettings = {
   movementEngineer?: number;
+};
+
+const formatCapacity = (val: any) => {
+  const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
+  return isNaN(num) ? "0.000" : num.toFixed(3);
 };
 
 export default function RecordMovementPage() {
@@ -214,17 +218,14 @@ export default function RecordMovementPage() {
 
       await Promise.all(promises);
 
-      // Reward Points Logic
       const rateEngineer = rewardSettings?.movementEngineer ?? 0.1;
       const multiplier = userProfile.pointsMultiplier || 1;
       
-      // 1. Award Engineer
       const engineerPoints = rateEngineer * values.items.length * multiplier;
       updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
         totalPoints: increment(engineerPoints)
       });
 
-      // 2. Award Manager (50% of base points as per user request)
       if (userProfile.siteManagerId) {
         const managerPoints = (rateEngineer * 0.5) * values.items.length;
         updateDocumentNonBlocking(doc(firestore, 'users', userProfile.siteManagerId), {
@@ -526,9 +527,7 @@ export default function RecordMovementPage() {
                 </div>
               </div>
 
-              {/* Detail Cards Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Current Site Details */}
                 <div className="space-y-2">
                   {selectedSite ? (
                     <div className="p-4 bg-primary/5 rounded-sm border border-primary/10 text-xs animate-in fade-in duration-300 h-full">
@@ -545,12 +544,12 @@ export default function RecordMovementPage() {
                           <p className="font-mono">{selectedSite.id.slice(0, 8)}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">AC Capacity</p>
-                          <p className="font-bold">{selectedSite.acCapacity}</p>
+                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">AC Capacity (MW)</p>
+                          <p className="font-bold">{formatCapacity(selectedSite.acCapacity)}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">DC Capacity</p>
-                          <p className="font-bold">{selectedSite.dcCapacity}</p>
+                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">DC Capacity (MWp)</p>
+                          <p className="font-bold">{formatCapacity(selectedSite.dcCapacity)}</p>
                         </div>
                       </div>
                     </div>
@@ -561,7 +560,6 @@ export default function RecordMovementPage() {
                   )}
                 </div>
 
-                {/* Source/Destination Details */}
                 <div className="space-y-2">
                   {selectedTarget ? (
                     <div className="p-4 bg-amber-500/5 rounded-sm border border-amber-500/10 text-xs animate-in fade-in duration-300 h-full">
@@ -597,12 +595,12 @@ export default function RecordMovementPage() {
                             <p className="font-mono">{(selectedTarget as Site).id.slice(0, 8)}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">AC Capacity</p>
-                            <p className="font-bold">{(selectedTarget as Site).acCapacity}</p>
+                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">AC Capacity (MW)</p>
+                            <p className="font-bold">{formatCapacity((selectedTarget as Site).acCapacity)}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">DC Capacity</p>
-                            <p className="font-bold">{(selectedTarget as Site).dcCapacity}</p>
+                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">DC Capacity (MWp)</p>
+                            <p className="font-bold">{formatCapacity((selectedTarget as Site).dcCapacity)}</p>
                           </div>
                         </div>
                       )}
@@ -623,7 +621,7 @@ export default function RecordMovementPage() {
                 </Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="relative">
-                    <Input 
+                    <input 
                       type="file" 
                       multiple 
                       accept="image/*,application/pdf"
