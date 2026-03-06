@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, doc, query, where, orderBy, or } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -24,7 +24,8 @@ import {
   Building2,
   Zap,
   Activity,
-  FolderOpen
+  FolderOpen,
+  UserCog
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -44,8 +45,10 @@ type UserProfile = {
   id: string;
   username: string;
   email: string;
-  role: string;
+  role: 'Admin' | 'Site Manager' | 'Site Engineer';
   assignedProjectIds?: string[];
+  siteManagerId?: string;
+  mobile?: string;
 };
 
 const formatTimestamp = (ts: any) => {
@@ -68,14 +71,40 @@ export default function SiteActivitiesPage() {
   const siteRef = useMemoFirebase(() => doc(firestore, 'sites', siteId), [firestore, siteId]);
   const { data: site, isLoading: siteLoading } = useDoc<Site>(siteRef);
 
-  // 2. Fetch Team (Users assigned to this site)
-  const teamQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'users'), where('assignedProjectIds', 'array-contains', siteId)),
-    [firestore, siteId]
-  );
-  const { data: team, isLoading: teamLoading } = useCollection<UserProfile>(teamQuery);
+  // 2. Fetch All Users to compute the full hierarchy-aware team
+  const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: allUsers, isLoading: teamLoading } = useCollection<UserProfile>(usersQuery);
 
-  // 3. Fetch Site Specific Data (using site name for most entities as per current schema)
+  const siteTeam = React.useMemo(() => {
+    if (!allUsers) return [];
+    
+    // Find users directly assigned to this site
+    const directTeam = allUsers.filter(u => u.assignedProjectIds?.includes(siteId));
+    
+    // Identify managers of engineers assigned to this site to ensure they are listed
+    const managerIds = new Set<string>();
+    directTeam.forEach(u => {
+      if (u.siteManagerId) managerIds.add(u.siteManagerId);
+    });
+    
+    const linkedManagers = allUsers.filter(u => managerIds.has(u.id));
+    
+    // Merge lists and deduplicate
+    const combined = [...directTeam];
+    linkedManagers.forEach(m => {
+      if (!combined.find(u => u.id === m.id)) {
+        combined.push(m);
+      }
+    });
+    
+    // Sort by role hierarchy: Admin -> Site Manager -> Site Engineer
+    return combined.sort((a, b) => {
+      const hierarchy = { 'Admin': 0, 'Site Manager': 1, 'Site Engineer': 2 };
+      return (hierarchy[a.role] ?? 3) - (hierarchy[b.role] ?? 3);
+    });
+  }, [allUsers, siteId]);
+
+  // 3. Fetch Site Specific Data
   const siteName = site?.name || "";
 
   const ptwQuery = useMemoFirebase(() => 
@@ -173,9 +202,9 @@ export default function SiteActivitiesPage() {
         </Card>
         <Card className="rounded-sm border-primary/10 shadow-sm">
           <CardContent className="pt-6">
-            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Personnel Assigned</p>
+            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Total Team</p>
             <div className="flex items-end gap-2">
-              <span className="text-2xl font-black text-foreground">{team?.length || 0}</span>
+              <span className="text-2xl font-black text-foreground">{siteTeam.length}</span>
               <Users className="h-4 w-4 text-primary mb-1.5" />
             </div>
           </CardContent>
@@ -214,7 +243,7 @@ export default function SiteActivitiesPage() {
               <CardContent className="p-0">
                 {teamLoading ? (
                   <div className="p-8 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
-                ) : team && team.length > 0 ? (
+                ) : siteTeam.length > 0 ? (
                   <Table>
                     <TableHeader className="bg-muted/30">
                       <TableRow>
@@ -224,7 +253,7 @@ export default function SiteActivitiesPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {team.map(member => (
+                      {siteTeam.map(member => (
                         <TableRow key={member.id} className="hover:bg-muted/5">
                           <TableCell className="px-6 py-4">
                             <div className="flex flex-col">
@@ -233,7 +262,11 @@ export default function SiteActivitiesPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="rounded-sm text-[9px] font-black uppercase border-primary/20 text-primary">
+                            <Badge variant="outline" className={cn(
+                              "rounded-sm text-[9px] font-black uppercase border-primary/20",
+                              member.role === 'Site Manager' ? "bg-primary text-white border-none" : "text-primary bg-primary/5"
+                            )}>
+                              {member.role === 'Site Manager' && <UserCog className="h-2.5 w-2.5 mr-1" />}
                               {member.role}
                             </Badge>
                           </TableCell>
