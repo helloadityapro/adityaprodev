@@ -83,7 +83,7 @@ export function QuickActions() {
       <DropdownMenuContent align="end" className="w-56 rounded-sm shadow-xl border-primary/10">
         <DropdownMenuLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
           <Zap className="h-3 w-3 fill-amber-500 text-amber-500" /> 
-          Quick Operations
+          QUICKLY
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {actions.map((action) => (
