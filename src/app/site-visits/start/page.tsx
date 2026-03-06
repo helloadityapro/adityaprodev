@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Check, ChevronsUpDown, Loader2, Navigation, MapPin, AlertCircle } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, Navigation, MapPin, AlertCircle, UserCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -98,6 +99,7 @@ export default function StartSiteVisitPage() {
         siteName: selectedSite.name,
         managerId: user.uid,
         managerName: userProfile.username || user.email,
+        siteManagerId: userProfile.siteManagerId || null,
         startTime: serverTimestamp(),
         startLat: location.lat,
         startLng: location.lng,
@@ -113,18 +115,6 @@ export default function StartSiteVisitPage() {
       setIsStarting(false);
     }
   };
-
-  if (userProfile && userProfile.role !== 'Site Manager') {
-    return (
-      <div className="p-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Access Restricted</AlertTitle>
-          <AlertDescription>Site Visit reports are only available for Site Managers.</AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8 max-w-2xl mx-auto">

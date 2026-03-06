@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, where, limit, doc } from "firebase/firestore";
+import { collection, query, where, limit, doc, or } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
@@ -21,6 +21,7 @@ type SiteVisit = {
   siteName: string;
   managerName: string;
   managerId: string;
+  siteManagerId?: string;
   startTime: any;
   endTime?: any;
   purpose?: string;
@@ -53,6 +54,7 @@ export default function SiteVisitsHistoryPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const historyQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
@@ -60,13 +62,21 @@ export default function SiteVisitsHistoryPage() {
     
     // Removing orderBy to bypass index requirements
     if (isAdmin) return query(colRef, limit(100));
+
+    if (isManager) {
+        return query(
+            colRef,
+            or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid)),
+            limit(100)
+        );
+    }
     
     return query(
       colRef,
       where('managerId', '==', user.uid),
       limit(50)
     );
-  }, [firestore, user, isAdmin, isProfileLoading]);
+  }, [firestore, user, isAdmin, isManager, isProfileLoading]);
 
   const { data: visits, isLoading } = useCollection<SiteVisit>(historyQuery);
 
@@ -89,19 +99,21 @@ export default function SiteVisitsHistoryPage() {
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-48" /><Skeleton className="h-[500px] w-full" /></div>;
 
+  const headerTitle = isAdmin ? "Organization Visit Logs" : (isManager ? "Team Visit Logs" : "My Site Visit Logs");
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <History className="h-8 w-8" /> {isAdmin ? "Organization Visit Logs" : "My Site Visit Logs"}
+            <History className="h-8 w-8" /> {headerTitle}
           </h1>
           <p className="text-muted-foreground">Historical records of site presence and audit reports.</p>
         </div>
         <div className="relative w-full md:w-72">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search by site, manager, or purpose..." 
+            placeholder="Search by site, name, or purpose..." 
             className="pl-8 rounded-sm h-10 border-primary/20"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -117,7 +129,7 @@ export default function SiteVisitsHistoryPage() {
                 <TableRow>
                   <TableHead>Start Date & Time</TableHead>
                   <TableHead>Project Site</TableHead>
-                  {isAdmin && <TableHead>Site Manager</TableHead>}
+                  {(isAdmin || isManager) && <TableHead>Personnel</TableHead>}
                   <TableHead>Purpose</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Status</TableHead>
@@ -131,7 +143,7 @@ export default function SiteVisitsHistoryPage() {
                       {formatTimestamp(visit.startTime)}
                     </TableCell>
                     <TableCell className="font-black text-sm">{visit.siteName}</TableCell>
-                    {isAdmin && (
+                    {(isAdmin || isManager) && (
                       <TableCell>
                         <div className="flex items-center gap-2 text-xs font-bold">
                           <User className="h-3 w-3 text-primary" />
@@ -167,7 +179,7 @@ export default function SiteVisitsHistoryPage() {
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 7 : 6} className="h-32 text-center text-muted-foreground italic">
+                    <TableCell colSpan={isAdmin || isManager ? 7 : 6} className="h-32 text-center text-muted-foreground italic">
                       No visit records found.
                     </TableCell>
                   </TableRow>

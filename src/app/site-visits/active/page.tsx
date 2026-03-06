@@ -1,8 +1,9 @@
+
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, doc, query, where, orderBy } from "firebase/firestore";
+import { collection, doc, query, where, orderBy, or } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, AlertCircle, User } from "lucide-react";
@@ -17,6 +18,7 @@ type SiteVisit = {
   siteName: string;
   managerName: string;
   managerId: string;
+  siteManagerId?: string;
   startTime: any;
   startLat: number;
   startLng: number;
@@ -31,6 +33,7 @@ export default function ActiveSiteVisitsPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const visitsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
@@ -39,13 +42,21 @@ export default function ActiveSiteVisitsPage() {
     if (isAdmin) {
       return query(colRef, where('status', '==', 'ongoing'));
     }
+
+    if (isManager) {
+        return query(
+            colRef,
+            where('status', '==', 'ongoing'),
+            or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid))
+        );
+    }
     
     return query(
       colRef,
       where('managerId', '==', user.uid),
       where('status', '==', 'ongoing')
     );
-  }, [firestore, user, isAdmin, isProfileLoading]);
+  }, [firestore, user, isAdmin, isManager, isProfileLoading]);
 
   const { data: visits, isLoading } = useCollection<SiteVisit>(visitsQuery);
 
@@ -62,10 +73,10 @@ export default function ActiveSiteVisitsPage() {
     <div className="space-y-8 max-w-4xl mx-auto">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-          <Navigation className="h-8 w-8" /> {isAdmin ? "Global Active Presence" : "My Active Site Presence"}
+          <Navigation className="h-8 w-8" /> {isAdmin ? "Global Active Presence" : (isManager ? "Team Active Presence" : "My Active Site Presence")}
         </h1>
         <p className="text-muted-foreground">
-          {isAdmin ? "Monitoring all ongoing site visits across the organization." : "Manage your current ongoing site visits."}
+          {isAdmin ? "Monitoring all ongoing site visits across the organization." : (isManager ? "Ongoing site activities for you and your assigned engineering team." : "Manage your current ongoing site visit.")}
         </p>
       </div>
 
@@ -115,7 +126,7 @@ export default function ActiveSiteVisitsPage() {
                     <p className="text-xs text-muted-foreground italic font-medium leading-relaxed">
                       {visit.managerId === user?.uid 
                         ? "Please finish the visit report before leaving the site premises to capture end coordinates correctly."
-                        : `Manager is currently performing site activities at ${visit.siteName}.`}
+                        : `Personnel is currently performing site activities at ${visit.siteName}.`}
                     </p>
                   </div>
                 </div>
@@ -139,14 +150,12 @@ export default function ActiveSiteVisitsPage() {
           <h3 className="text-xl font-bold">No Active Visits</h3>
           <p className="text-muted-foreground max-w-sm mx-auto mt-2">
             {isAdmin 
-              ? "There are currently no managers logged in at any project site." 
+              ? "There are currently no personnel logged in at any project site." 
               : "You are not currently logged in at any site. Click 'Start Visit' when you arrive at a project location."}
           </p>
-          {!isAdmin && (
-            <Button onClick={() => router.push('/site-visits/start')} className="mt-6 font-bold h-11 px-8 rounded-sm">
-              Check-in to Site
-            </Button>
-          )}
+          <Button onClick={() => router.push('/site-visits/start')} className="mt-6 font-bold h-11 px-8 rounded-sm">
+            Check-in to Site
+          </Button>
         </div>
       )}
     </div>

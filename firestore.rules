@@ -66,9 +66,10 @@ service cloud.firestore {
     match /site_visits/{visitId} {
       allow read: if isSignedIn() && (
         isAdmin() || 
-        resource.data.managerId == request.auth.uid
+        resource.data.managerId == request.auth.uid ||
+        resource.data.get('siteManagerId', '') == request.auth.uid
       );
-      allow create: if isSignedIn() && (isSiteManager() || isAdmin());
+      allow create: if isSignedIn();
       allow update: if isSignedIn() && (
         isAdmin() || 
         resource.data.managerId == request.auth.uid

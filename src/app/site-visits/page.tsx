@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { isSuperAdmin } from '@/lib/auth-constants';
 
 export default function SiteVisitsBasePage() {
   const router = useRouter();
@@ -17,14 +16,10 @@ export default function SiteVisitsBasePage() {
 
   useEffect(() => {
     if (userProfile) {
-      const isAdmin = isSuperAdmin(user?.email) || userProfile.role === 'Admin';
-      if (userProfile.role === 'Site Manager' || isAdmin) {
-        router.replace('/site-visits/active');
-      } else {
-        router.replace('/dashboard');
-      }
+      // Site visits are now available for all roles
+      router.replace('/site-visits/active');
     }
-  }, [userProfile, user, router]);
+  }, [userProfile, router]);
 
   return null;
 }
