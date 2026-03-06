@@ -20,6 +20,7 @@ import {
   DialogClose,
   DialogFooter
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -349,7 +350,7 @@ export default function RewardsPage() {
           <p className="text-muted-foreground">Track your earned rewards and professional performance ranking.</p>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           {userProfile && (
             <Button 
               onClick={() => setSelectedHistoryUser(userProfile)} 
@@ -360,32 +361,39 @@ export default function RewardsPage() {
               View My History
             </Button>
           )}
-          <Button 
-            onClick={() => setIsRedeemDialogOpen(true)}
-            className="rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-6 shadow-md"
-            disabled={!canRedeem}
-          >
-            <CreditCard className="mr-2 h-4 w-4" />
-            Redeem Points
-          </Button>
-        </div>
-      </div>
-
-      {!canRedeem && userPoints > 0 && (
-        <AlertCircle className="h-4 w-4 inline mr-2 text-amber-600" />
-      )}
-      {!canRedeem && (
-        <div className="p-4 bg-amber-50 border border-amber-100 rounded-sm flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-bold text-amber-800">Redemption Threshold Notice</p>
-            <p className="text-xs text-amber-700 leading-relaxed">
-              Redemption is available once your account balance reaches <strong>₹{MIN_REDEEM_VALUE_RS}.00</strong>. 
-              Currently, your balance is <strong>₹{monetaryValue.toFixed(2)}</strong>. You need <strong>₹{(MIN_REDEEM_VALUE_RS - monetaryValue).toFixed(2)}</strong> more to initiate a request.
-            </p>
+          
+          <div className="flex items-center gap-2">
+            {!canRedeem && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-11 w-11 rounded-sm text-amber-600 hover:bg-amber-50 border border-amber-200 shadow-sm animate-in fade-in zoom-in-95">
+                    <Info className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-80 rounded-sm border-amber-200 bg-amber-50 shadow-xl">
+                  <div className="space-y-2">
+                    <p className="text-sm font-bold text-amber-800 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" /> Redemption Threshold
+                    </p>
+                    <p className="text-xs text-amber-700 leading-relaxed font-medium">
+                      Redemption is available once your account balance reaches <strong>₹{MIN_REDEEM_VALUE_RS}.00</strong>. 
+                      Currently, you have <strong>₹{monetaryValue.toFixed(2)}</strong>. You need <strong>₹{(MIN_REDEEM_VALUE_RS - monetaryValue).toFixed(2)}</strong> more to initiate a request.
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+            <Button 
+              onClick={() => setIsRedeemDialogOpen(true)}
+              className="rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-6 shadow-md"
+              disabled={!canRedeem}
+            >
+              <CreditCard className="mr-2 h-4 w-4" />
+              Redeem Points
+            </Button>
           </div>
         </div>
-      )}
+      </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-amber-500/5 border-amber-500/20 rounded-sm">
