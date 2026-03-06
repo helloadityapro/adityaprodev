@@ -363,10 +363,18 @@ export default function RewardsPage() {
           )}
           
           <div className="flex items-center gap-2">
+            <Button 
+              onClick={() => setIsRedeemDialogOpen(true)}
+              className="rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-6 shadow-md"
+              disabled={!canRedeem}
+            >
+              <CreditCard className="mr-2 h-4 w-4" />
+              Redeem Points
+            </Button>
             {!canRedeem && (
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-11 w-11 rounded-sm text-amber-600 hover:bg-amber-50 border border-amber-200 shadow-sm animate-in fade-in zoom-in-95">
+                  <Button variant="ghost" size="icon" className="h-11 w-8 rounded-sm text-amber-600 hover:text-amber-700 animate-in fade-in zoom-in-95">
                     <Info className="h-5 w-5" />
                   </Button>
                 </PopoverTrigger>
@@ -383,14 +391,6 @@ export default function RewardsPage() {
                 </PopoverContent>
               </Popover>
             )}
-            <Button 
-              onClick={() => setIsRedeemDialogOpen(true)}
-              className="rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-6 shadow-md"
-              disabled={!canRedeem}
-            >
-              <CreditCard className="mr-2 h-4 w-4" />
-              Redeem Points
-            </Button>
           </div>
         </div>
       </div>
