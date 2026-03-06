@@ -47,15 +47,17 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
 
   React.useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    const isDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-      setTheme('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      setTheme('light');
-    }
+    const syncThemeState = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setTheme(isDark ? 'dark' : 'light');
+    };
+
+    // Initial sync
+    syncThemeState();
+
+    // Listen for theme changes from other components (like Settings page)
+    window.addEventListener('theme-change', syncThemeState);
+    return () => window.removeEventListener('theme-change', syncThemeState);
   }, []);
 
   const toggleTheme = () => {
@@ -66,8 +68,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       localStorage.setItem('theme', 'dark');
     } else {
       document.documentElement.classList.remove('dark');
-      setTheme('light');
+      localStorage.setItem('theme', 'light');
     }
+    // Notify other components
+    window.dispatchEvent(new Event('theme-change'));
   };
 
   const userProfileRef = useMemoFirebase(() => {

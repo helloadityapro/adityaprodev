@@ -11,8 +11,14 @@ export default function SettingsPage() {
   const [isDarkMode, setIsDarkMode] = React.useState(false);
 
   React.useEffect(() => {
-    const isDark = document.documentElement.classList.contains('dark');
-    setIsDarkMode(isDark);
+    const syncState = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setIsDarkMode(isDark);
+    };
+
+    syncState();
+    window.addEventListener('theme-change', syncState);
+    return () => window.removeEventListener('theme-change', syncState);
   }, []);
 
   const handleThemeChange = (checked: boolean) => {
@@ -24,6 +30,8 @@ export default function SettingsPage() {
       document.documentElement.classList.remove('dark');
       localStorage.setItem('theme', 'light');
     }
+    // Notify other components (like ClientShell)
+    window.dispatchEvent(new Event('theme-change'));
   };
 
   return (
