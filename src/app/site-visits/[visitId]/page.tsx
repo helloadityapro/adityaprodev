@@ -298,10 +298,6 @@ export default function SiteVisitDetailPage() {
               <RotateCcw className="h-5 w-5" />
             </Button>
           </div>
-
-          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 bg-black/20 hover:bg-black/40 rounded-full shadow-sm" onClick={() => { setZoom(1); setEnlargedImage(null); }}>
-            <X className="h-6 w-6" />
-          </Button>
           
           <div className="relative w-full h-full flex overflow-auto p-4">
             <div 

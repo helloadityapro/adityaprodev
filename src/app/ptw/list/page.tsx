@@ -848,10 +848,6 @@ export default function PtwListPage() {
             </Badge>
           </div>
 
-          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 bg-black/20 hover:bg-black/40 rounded-full shadow-sm" onClick={() => { setZoom(1); setViewerImages(null); }}>
-            <X className="h-6 w-6" />
-          </Button>
-          
           {viewerImages && (
             <div className="w-full h-full">
               <Carousel className="w-full h-full" opts={{ startIndex: viewerImages.initialIndex }}>

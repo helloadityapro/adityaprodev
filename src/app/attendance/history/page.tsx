@@ -234,7 +234,6 @@ export default function AttendanceHistoryPage() {
             >
               {viewImage && <img src={viewImage} className="max-w-full max-h-[80vh] object-contain shadow-2xl" alt="Verification" />}
             </div>
-            <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white bg-black/20 rounded-full z-50 hover:bg-black/40" onClick={() => { setZoom(1); setViewImage(null); }}><X className="h-6 w-6" /></Button>
           </div>
         </DialogContent>
       </Dialog>
