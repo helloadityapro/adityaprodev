@@ -12,11 +12,13 @@ import {
   Loader2, 
   Command as CommandIcon,
   X,
-  FileCheck
+  FileCheck,
+  Table as TableIcon,
+  TrendingUp
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, where, getDocs, limit, or, orderBy, startAt, endAt, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
@@ -27,7 +29,6 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Button } from './ui/button';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { ViewUserDialog } from './view-user-dialog';
 
@@ -74,57 +75,106 @@ export function GlobalSearch() {
     }
 
     setIsSearching(true);
-    const term = val.toLowerCase();
+    const term = val.toLowerCase().trim();
     const searchResults: SearchResult[] = [];
 
     try {
-      // 1. Search Sites
+      // 1. Search Sites (Exhaustive Search)
       const sitesSnap = await getDocs(collection(firestore, 'sites'));
       sitesSnap.docs.forEach(d => {
         const data = d.data();
-        if (data.name?.toLowerCase().includes(term) || data.projectCompany?.toLowerCase().includes(term)) {
+        if (
+          data.name?.toLowerCase().includes(term) || 
+          data.projectCompany?.toLowerCase().includes(term) ||
+          d.id.toLowerCase().includes(term)
+        ) {
           searchResults.push({
             id: d.id,
             type: 'Site',
             title: data.name,
-            subtitle: data.projectCompany,
+            subtitle: `${data.projectCompany} • ID: ${d.id.slice(0, 8)}`,
             link: `/documents/${d.id}`
           });
         }
       });
 
-      // 2. Search Permits (Increased limit for better discovery)
-      const permitsSnap = await getDocs(query(collection(firestore, 'permits_to_work'), limit(100)));
+      // 2. Search Permits (Increased limit for broader discovery)
+      const permitsSnap = await getDocs(query(collection(firestore, 'permits_to_work'), limit(200)));
       permitsSnap.docs.forEach(d => {
         const data = d.data();
-        if (data.serialNumber?.toLowerCase().includes(term) || data.siteName?.toLowerCase().includes(term)) {
+        if (
+          data.serialNumber?.toLowerCase().includes(term) || 
+          data.siteName?.toLowerCase().includes(term) ||
+          data.ptwType?.toLowerCase().includes(term)
+        ) {
           searchResults.push({
             id: d.id,
             type: 'Permit',
             title: data.serialNumber || `Permit ${d.id.slice(0, 8)}`,
-            subtitle: `${data.siteName} • ${data.ptwType}`,
+            subtitle: `${data.siteName} • ${data.ptwType} • ${data.status}`,
             link: `/ptw/list?view=${d.id}`
           });
         }
       });
 
-      // 3. Search Tasks (Increased limit for better discovery)
-      const tasksSnap = await getDocs(query(collection(firestore, 'tasks'), limit(100)));
+      // 3. Search Tasks
+      const tasksSnap = await getDocs(query(collection(firestore, 'tasks'), limit(150)));
       tasksSnap.docs.forEach(d => {
         const data = d.data();
-        if (data.title?.toLowerCase().includes(term) || data.siteName?.toLowerCase().includes(term)) {
+        if (
+          data.title?.toLowerCase().includes(term) || 
+          data.siteName?.toLowerCase().includes(term) ||
+          data.assignedToName?.toLowerCase().includes(term)
+        ) {
           searchResults.push({
             id: d.id,
             type: 'Task',
             title: data.title,
-            subtitle: `Task at ${data.siteName} • ${data.status}`,
+            subtitle: `Site: ${data.siteName} • Assignee: ${data.assignedToName} • Status: ${data.status}`,
             link: `/tasks/list`
           });
         }
       });
 
-      // 4. Search Users (Personnel search enabled for all logged in users)
-      // Increased limit to 500 to ensure almost all personnel are searchable in memory
+      // 4. Search DPRs
+      const dprsSnap = await getDocs(query(collection(firestore, 'dprs'), limit(100)));
+      dprsSnap.docs.forEach(d => {
+        const data = d.data();
+        if (
+          data.siteName?.toLowerCase().includes(term) || 
+          data.description?.toLowerCase().includes(term) ||
+          data.userName?.toLowerCase().includes(term)
+        ) {
+          searchResults.push({
+            id: d.id,
+            type: 'DPR',
+            title: `DPR: ${data.siteName}`,
+            subtitle: `By: ${data.userName} • Date: ${data.reportDate || 'N/A'}`,
+            link: `/dpr/list`
+          });
+        }
+      });
+
+      // 5. Search Material Movements
+      const movsSnap = await getDocs(query(collection(firestore, 'material_movements'), limit(100)));
+      movsSnap.docs.forEach(d => {
+        const data = d.data();
+        if (
+          data.itemName?.toLowerCase().includes(term) || 
+          data.siteName?.toLowerCase().includes(term) ||
+          data.sourceOrDestination?.toLowerCase().includes(term)
+        ) {
+          searchResults.push({
+            id: d.id,
+            type: 'Movement',
+            title: data.itemName,
+            subtitle: `${data.movementType} at ${data.siteName} • ${data.quantity} ${data.unit}`,
+            link: `/movements/list`
+          });
+        }
+      });
+
+      // 6. Search Users
       const usersSnap = await getDocs(query(collection(firestore, 'users'), limit(500)));
       usersSnap.docs.forEach(d => {
         const data = d.data();
@@ -140,7 +190,7 @@ export function GlobalSearch() {
         }
       });
 
-      setResults(searchResults.slice(0, 50));
+      setResults(searchResults.slice(0, 100));
     } catch (e) {
       console.error("Search failed", e);
     } finally {
@@ -166,6 +216,8 @@ export function GlobalSearch() {
       case 'Task': return <CheckSquare className="h-4 w-4 text-slate-500" />;
       case 'Site': return <MapPin className="h-4 w-4 text-primary" />;
       case 'User': return <User className="h-4 w-4 text-purple-500" />;
+      case 'DPR': return <TableIcon className="h-4 w-4 text-amber-500" />;
+      case 'Movement': return <ArrowLeftRight className="h-4 w-4 text-emerald-500" />;
       default: return <FileText className="h-4 w-4 text-muted-foreground" />;
     }
   };
@@ -178,7 +230,7 @@ export function GlobalSearch() {
       >
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
         <div className="flex h-9 w-full rounded-sm border border-input bg-muted/50 px-9 py-2 text-xs text-muted-foreground transition-all group-hover:bg-accent group-hover:border-primary/20 items-center justify-between">
-          <span>Search everything...</span>
+          <span>Search sites, permits, tasks...</span>
           <kbd className="pointer-none hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
             <span className="text-xs">⌘</span>K
           </kbd>
@@ -215,7 +267,7 @@ export function GlobalSearch() {
           <ScrollArea className="max-h-[450px]">
             {results.length > 0 ? (
               <div className="p-2 space-y-4 pb-6">
-                {['Site', 'User', 'Permit', 'Task'].map((category) => {
+                {['Site', 'User', 'Permit', 'Task', 'DPR', 'Movement'].map((category) => {
                   const catResults = results.filter(r => r.type === category);
                   if (catResults.length === 0) return null;
 
