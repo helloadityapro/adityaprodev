@@ -140,10 +140,10 @@ export default function RegisterPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-headline">Create an account</CardTitle>
-          <CardDescription>
-            {user ? "Your profile was missing. Please complete registration to gain access." : "Enter your information to create an account. Admin approval is required."}
+        <CardHeader className="text-center pb-8 pt-10">
+          <CardTitle className="text-3xl font-bold tracking-tight text-primary">Aditya Pro</CardTitle>
+          <CardDescription className="mt-2">
+            {user ? "Complete your profile registration" : "Create your professional account"}
           </CardDescription>
         </CardHeader>
         <CardContent>
