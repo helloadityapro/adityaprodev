@@ -19,13 +19,20 @@ import {
   Package,
   CheckSquare,
   Plus,
+  Navigation,
 } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function QuickActions() {
   const router = useRouter();
 
   const actions = [
+    {
+      label: 'Start Site Visit',
+      icon: <Navigation className="mr-2 h-4 w-4 text-indigo-500" />,
+      href: '/site-visits/start',
+      description: 'Check-in to a project site',
+    },
     {
       label: 'Raise PtW',
       icon: <FilePlus className="mr-2 h-4 w-4 text-blue-500" />,
@@ -60,17 +67,19 @@ export function QuickActions() {
 
   return (
     <DropdownMenu>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full bg-primary/5 hover:bg-primary/10 text-primary">
-              <Plus className="h-5 w-5" />
-              <span className="sr-only">Quick Actions</span>
-            </Button>
-          </DropdownMenuTrigger>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">Quick Actions</TooltipContent>
-      </Tooltip>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full bg-primary/5 hover:bg-primary/10 text-primary">
+                <Plus className="h-5 w-5" />
+                <span className="sr-only">Quick Actions</span>
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Quick Actions</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <DropdownMenuContent align="end" className="w-56 rounded-sm shadow-xl border-primary/10">
         <DropdownMenuLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
           <Zap className="h-3 w-3 fill-amber-500 text-amber-500" /> 
