@@ -2,9 +2,10 @@
 
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { zodResolver } from '@hookform/resolvers';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { Trash2, Search, MapPin, Plus, ArrowUpDown, Clock, Check, ListFilter, AlertCircle, Loader2, X } from 'lucide-react';
+import { Trash2, Search, MapPin, Plus, FileDown, FileUp, Download, Check, ListFilter, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -47,7 +48,14 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 const siteSchema = z.object({
   name: z.string().min(1, 'Site name is required.'),
@@ -70,6 +78,9 @@ export default function ManageSitesPage() {
   const [isDeletingBulk, setIsDeletingBulk] = React.useState(false);
   const [isBulkDialogOpen, setIsBulkDialogOpen] = React.useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
+  const [isImporting, setIsImporting] = React.useState(false);
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
@@ -111,11 +122,15 @@ export default function ManageSitesPage() {
     setIsDeletingBulk(true);
     
     try {
-      const batch = writeBatch(firestore);
-      selectedIds.forEach(id => {
-        batch.delete(doc(firestore, 'sites', id));
-      });
-      await batch.commit();
+      const batchSize = 400;
+      for (let i = 0; i < selectedIds.length; i += batchSize) {
+        const batch = writeBatch(firestore);
+        const chunk = selectedIds.slice(i, i + batchSize);
+        chunk.forEach(id => {
+          batch.delete(doc(firestore, 'sites', id));
+        });
+        await batch.commit();
+      }
       
       toast({ 
         title: 'Bulk Action Complete', 
@@ -128,6 +143,90 @@ export default function ManageSitesPage() {
       setIsDeletingBulk(false);
       setIsBulkDialogOpen(false);
     }
+  };
+
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      { 'Site Name': 'Sample Site A', 'Project Company': 'ABC Energies', 'AC Capacity': '5.000', 'DC Capacity': '6.250' }
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "AdityaPro_Site_Import_Template.xlsx");
+  };
+
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        if (json.length === 0) {
+          toast({ variant: 'destructive', title: 'Import Failed', description: 'The file is empty.' });
+          return;
+        }
+
+        let count = 0;
+        const batchSize = 400;
+        
+        for (let i = 0; i < json.length; i += batchSize) {
+          const batch = writeBatch(firestore);
+          const chunk = json.slice(i, i + batchSize);
+          
+          chunk.forEach((row) => {
+            const name = row['Site Name'] || row['name'] || row['Name'];
+            const company = row['Project Company'] || row['projectCompany'] || row['Company'];
+            const ac = row['AC Capacity'] || row['acCapacity'] || row['AC'];
+            const dc = row['DC Capacity'] || row['dcCapacity'] || row['DC'];
+
+            if (name && company) {
+              const newDocRef = doc(collection(firestore, 'sites'));
+              batch.set(newDocRef, {
+                name: String(name),
+                projectCompany: String(company),
+                acCapacity: String(ac || "0"),
+                dcCapacity: String(dc || "0"),
+                createdAt: serverTimestamp(),
+              });
+              count++;
+            }
+          });
+          
+          await batch.commit();
+        }
+
+        toast({ variant: 'success', title: 'Import Successful', description: `Successfully imported ${count} sites.` });
+      } catch (err: any) {
+        toast({ variant: 'destructive', title: 'Import Error', description: err.message });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleExportRegistry = () => {
+    if (!sites || sites.length === 0) return;
+    
+    const worksheet = XLSX.utils.json_to_sheet(sites.map(s => ({
+      'Site Name': s.name,
+      'Project Company': s.projectCompany,
+      'AC Capacity': s.acCapacity,
+      'DC Capacity': s.dcCapacity,
+      'Date Added': s.createdAt ? format(s.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : 'N/A'
+    })));
+    
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sites");
+    XLSX.writeFile(workbook, "AdityaPro_SiteRegistry.xlsx");
   };
 
   const filteredSitesList = React.useMemo(() => {
@@ -192,41 +291,79 @@ export default function ManageSitesPage() {
           <p className="text-muted-foreground">Define and organize project locations for organizational operations.</p>
         </div>
         
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="rounded-sm font-bold h-11 shadow-md">
-              <Plus className="h-4 w-4 mr-2" /> Add New Site
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md rounded-sm">
-            <DialogHeader>
-              <DialogTitle>Register New Site</DialogTitle>
-              <DialogDescription>Add a specific project location to the registry.</DialogDescription>
-            </DialogHeader>
-            <Form {...siteForm}>
-              <form onSubmit={siteForm.handleSubmit(onSiteSubmit)} className="space-y-4 py-4">
-                <FormField control={siteForm.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Site Name</FormLabel><FormControl><Input placeholder="e.g., Shahapur - 194082" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={siteForm.control} name="projectCompany" render={({ field }) => (
-                  <FormItem><FormLabel>Project Company</FormLabel><FormControl><Input placeholder="e.g., HTI Energies" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                )} />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={siteForm.control} name="acCapacity" render={({ field }) => (
-                    <FormItem><FormLabel>AC Capacity</FormLabel><FormControl><Input placeholder="4.000" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={siteForm.control} name="dcCapacity" render={({ field }) => (
-                    <FormItem><FormLabel>DC Capacity</FormLabel><FormControl><Input placeholder="5.174" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                  )} />
+        <div className="flex flex-wrap items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" onClick={handleDownloadTemplate} className="rounded-sm border-primary/20 text-primary">
+                  <FileDown className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Download Import Template</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="relative">
+                  <input type="file" accept=".xlsx,.xls,.csv" className="hidden" ref={fileInputRef} onChange={handleBulkImport} />
+                  <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="rounded-sm border-primary/20 text-primary">
+                    {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                  </Button>
                 </div>
-                <DialogFooter className="pt-4 gap-2">
-                  <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
-                  <Button type="submit" className="rounded-sm font-bold">Add Project Site</Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+              </TooltipTrigger>
+              <TooltipContent>Bulk Import Sites (Excel/CSV)</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" onClick={handleExportRegistry} className="rounded-sm border-primary/20 text-primary">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export Site Registry to Excel</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="rounded-sm font-bold h-11 shadow-md ml-2">
+                <Plus className="h-4 w-4 mr-2" /> Add New Site
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md rounded-sm">
+              <DialogHeader>
+                <DialogTitle>Register New Site</DialogTitle>
+                <DialogDescription>Add a specific project location to the registry.</DialogDescription>
+              </DialogHeader>
+              <Form {...siteForm}>
+                <form onSubmit={siteForm.handleSubmit(onSiteSubmit)} className="space-y-4 py-4">
+                  <FormField control={siteForm.control} name="name" render={({ field }) => (
+                    <FormItem><FormLabel>Site Name</FormLabel><FormControl><Input placeholder="e.g., Shahapur - 194082" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={siteForm.control} name="projectCompany" render={({ field }) => (
+                    <FormItem><FormLabel>Project Company</FormLabel><FormControl><Input placeholder="e.g., HTI Energies" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={siteForm.control} name="acCapacity" render={({ field }) => (
+                      <FormItem><FormLabel>AC Capacity</FormLabel><FormControl><Input placeholder="4.000" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={siteForm.control} name="dcCapacity" render={({ field }) => (
+                      <FormItem><FormLabel>DC Capacity</FormLabel><FormControl><Input placeholder="5.174" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  </div>
+                  <DialogFooter className="pt-4 gap-2">
+                    <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
+                    <Button type="submit" className="rounded-sm font-bold">Add Project Site</Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
@@ -340,7 +477,8 @@ export default function ManageSitesPage() {
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
               Confirm Bulk Deletion
-            </AlertDialogTitle>
+            </AlertCircle>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               You are about to permanently remove <strong>{selectedIds.length} project sites</strong> from the organization registry. 
               This action will remove them from all dropdowns across the platform and cannot be undone.
