@@ -93,8 +93,8 @@ export function GlobalSearch() {
         }
       });
 
-      // 2. Search Permits
-      const permitsSnap = await getDocs(query(collection(firestore, 'permits_to_work'), limit(20)));
+      // 2. Search Permits (Increased limit for better discovery)
+      const permitsSnap = await getDocs(query(collection(firestore, 'permits_to_work'), limit(100)));
       permitsSnap.docs.forEach(d => {
         const data = d.data();
         if (data.serialNumber?.toLowerCase().includes(term) || data.siteName?.toLowerCase().includes(term)) {
@@ -108,8 +108,8 @@ export function GlobalSearch() {
         }
       });
 
-      // 3. Search Tasks
-      const tasksSnap = await getDocs(query(collection(firestore, 'tasks'), limit(20)));
+      // 3. Search Tasks (Increased limit for better discovery)
+      const tasksSnap = await getDocs(query(collection(firestore, 'tasks'), limit(100)));
       tasksSnap.docs.forEach(d => {
         const data = d.data();
         if (data.title?.toLowerCase().includes(term) || data.siteName?.toLowerCase().includes(term)) {
@@ -124,7 +124,8 @@ export function GlobalSearch() {
       });
 
       // 4. Search Users (Personnel search enabled for all logged in users)
-      const usersSnap = await getDocs(query(collection(firestore, 'users'), limit(20)));
+      // Increased limit to 500 to ensure almost all personnel are searchable in memory
+      const usersSnap = await getDocs(query(collection(firestore, 'users'), limit(500)));
       usersSnap.docs.forEach(d => {
         const data = d.data();
         if (data.username?.toLowerCase().includes(term) || data.email?.toLowerCase().includes(term)) {
@@ -139,7 +140,7 @@ export function GlobalSearch() {
         }
       });
 
-      setResults(searchResults.slice(0, 30));
+      setResults(searchResults.slice(0, 50));
     } catch (e) {
       console.error("Search failed", e);
     } finally {
