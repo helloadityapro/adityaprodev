@@ -192,12 +192,12 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <List className="h-4 w-4" />
                 <span className="font-medium">List of PtW</span>
               </Link>
-              {(userRole === 'Admin' || userRole === 'Site Manager') && pendingPtwCount > 0 && (
-                <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
-                    {pendingPtwCount}
-                </SidebarMenuBadge>
-              )}
             </SidebarMenuButton>
+            {(userRole === 'Admin' || userRole === 'Site Manager') && pendingPtwCount > 0 && (
+              <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
+                  {pendingPtwCount}
+              </SidebarMenuBadge>
+            )}
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Activities" isActive={pathname === '/ptw/activities'} className="rounded-sm">
