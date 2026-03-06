@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { Trash2, Search, MapPin, Plus, ArrowUpDown, Clock, Check, ListFilter, AlertCircle, Loader2 } from 'lucide-react';
+import { Trash2, Search, MapPin, Plus, ArrowUpDown, Clock, Check, ListFilter, AlertCircle, Loader2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -37,6 +37,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
 
 const siteSchema = z.object({
@@ -59,6 +69,7 @@ export default function ManageSitesPage() {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const [isDeletingBulk, setIsDeletingBulk] = React.useState(false);
   const [isBulkDialogOpen, setIsBulkDialogOpen] = React.useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
@@ -86,6 +97,7 @@ export default function ManageSitesPage() {
     });
     toast({ title: 'Success', description: 'New Site added.' });
     siteForm.reset();
+    setIsAddDialogOpen(false);
   };
 
   const deleteSite = (id: string) => {
@@ -179,17 +191,20 @@ export default function ManageSitesPage() {
           </h1>
           <p className="text-muted-foreground">Define and organize project locations for organizational operations.</p>
         </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="rounded-sm h-fit lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Register New Site</CardTitle>
-            <CardDescription>Add a specific project location to the registry.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="rounded-sm font-bold h-11 shadow-md">
+              <Plus className="h-4 w-4 mr-2" /> Add New Site
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md rounded-sm">
+            <DialogHeader>
+              <DialogTitle>Register New Site</DialogTitle>
+              <DialogDescription>Add a specific project location to the registry.</DialogDescription>
+            </DialogHeader>
             <Form {...siteForm}>
-              <form onSubmit={siteForm.handleSubmit(onSiteSubmit)} className="space-y-4">
+              <form onSubmit={siteForm.handleSubmit(onSiteSubmit)} className="space-y-4 py-4">
                 <FormField control={siteForm.control} name="name" render={({ field }) => (
                   <FormItem><FormLabel>Site Name</FormLabel><FormControl><Input placeholder="e.g., Shahapur - 194082" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -204,115 +219,120 @@ export default function ManageSitesPage() {
                     <FormItem><FormLabel>DC Capacity</FormLabel><FormControl><Input placeholder="5.174" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
-                <Button type="submit" className="w-full rounded-sm font-bold h-11">
-                  <Plus className="h-4 w-4 mr-2" /> Add Project Site
-                </Button>
+                <DialogFooter className="pt-4 gap-2">
+                  <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
+                  <Button type="submit" className="rounded-sm font-bold">Add Project Site</Button>
+                </DialogFooter>
               </form>
             </Form>
-          </CardContent>
-        </Card>
+          </DialogContent>
+        </Dialog>
+      </div>
 
-        <Card className="rounded-sm overflow-hidden lg:col-span-2 border-primary/10 shadow-md">
-          <CardHeader className="bg-muted/5 border-b py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest">Site Registry</CardTitle>
-              <CardDescription className="text-xs uppercase font-black text-primary">{sites?.length || 0} Locations Active</CardDescription>
+      <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+        <CardHeader className="bg-muted/5 border-b py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest">Site Registry</CardTitle>
+            <CardDescription className="text-xs uppercase font-black text-primary">{sites?.length || 0} Locations Active</CardDescription>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search registry..." 
+                className="pl-8 rounded-sm h-9 border-primary/20 text-xs" 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+              />
             </div>
             
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative w-48">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search registry..." 
-                  className="pl-8 rounded-sm h-9 border-primary/20 text-xs" 
-                  value={searchTerm} 
-                  onChange={(e) => setSearchTerm(e.target.value)} 
-                />
+            <Select value={sortOrder} onValueChange={(val: SortOrder) => setSortOrder(val)}>
+              <SelectTrigger className="w-40 h-9 text-xs rounded-sm border-primary/20">
+                <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name" className="text-xs">Alphabetical</SelectItem>
+                <SelectItem value="newest" className="text-xs">Recently Added</SelectItem>
+                <SelectItem value="oldest" className="text-xs">Oldest Added</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        
+        <CardContent className="p-0">
+          {selectedIds.length > 0 && (
+            <div className="bg-primary/5 border-b p-3 flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center gap-2">
+                <Badge className="bg-primary h-5 text-[10px] uppercase font-black">{selectedIds.length} Selected</Badge>
+                <span className="text-xs font-medium text-muted-foreground">Perform bulk action on selected records</span>
               </div>
-              
-              <Select value={sortOrder} onValueChange={(val: SortOrder) => setSortOrder(val)}>
-                <SelectTrigger className="w-36 h-9 text-xs rounded-sm border-primary/20">
-                  <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Alphabetical</SelectItem>
-                  <SelectItem value="newest">Recently Added</SelectItem>
-                  <SelectItem value="oldest">Oldest Added</SelectItem>
-                </SelectContent>
-              </Select>
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                className="h-8 rounded-sm font-bold text-[10px] uppercase"
+                onClick={() => setIsBulkDialogOpen(true)}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete Selected
+              </Button>
             </div>
-          </CardHeader>
-          
-          <CardContent className="p-0">
-            {selectedIds.length > 0 && (
-              <div className="bg-primary/5 border-b p-3 flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-primary h-5 text-[10px] uppercase font-black">{selectedIds.length} Selected</Badge>
-                  <span className="text-xs font-medium text-muted-foreground">Perform action on selected records</span>
-                </div>
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
-                  className="h-8 rounded-sm font-bold text-[10px] uppercase"
-                  onClick={() => setIsBulkDialogOpen(true)}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete Selected
-                </Button>
-              </div>
-            )}
+          )}
 
-            <div className="max-h-[600px] overflow-auto custom-scrollbar">
-              <Table>
-                <TableHeader className="bg-muted/30 sticky top-0 z-10">
-                  <TableRow>
-                    <TableHead className="w-12 text-center">
-                      <Checkbox 
-                        checked={selectedIds.length === filteredSitesList.length && filteredSitesList.length > 0} 
-                        onCheckedChange={toggleSelectAll}
-                      />
-                    </TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold">Site Name</TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold">Company</TableHead>
-                    <TableHead className="text-[10px] uppercase font-bold text-center">AC / DC</TableHead>
-                    <TableHead className="text-right px-6"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSitesList.length > 0 ? (
-                    filteredSitesList.map((site) => (
-                      <TableRow key={site.id} className={cn("hover:bg-muted/5 group", selectedIds.includes(site.id) && "bg-primary/[0.02]")}>
-                        <TableCell className="text-center">
-                          <Checkbox 
-                            checked={selectedIds.includes(site.id)} 
-                            onCheckedChange={() => toggleSelectOne(site.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-bold text-sm">{site.name}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground font-medium">{site.projectCompany}</TableCell>
-                        <TableCell className="text-center font-mono text-[10px] font-bold">
-                          <span className="text-blue-600">{site.acCapacity}</span> / <span className="text-amber-600">{site.dcCapacity}</span>
-                        </TableCell>
-                        <TableCell className="text-right px-6">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteSite(site.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">
-                        {searchTerm ? `No sites found matching "${searchTerm}"` : "Registry empty. Add sites to start."}
+          <div className="max-h-[600px] overflow-auto custom-scrollbar">
+            <Table>
+              <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                <TableRow>
+                  <TableHead className="w-12 text-center">
+                    <Checkbox 
+                      checked={selectedIds.length === filteredSitesList.length && filteredSitesList.length > 0} 
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold">Site Name</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold">Company</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold text-center">AC Capacity</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold text-center">DC Capacity</TableHead>
+                  <TableHead className="text-right px-6"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSitesList.length > 0 ? (
+                  filteredSitesList.map((site) => (
+                    <TableRow key={site.id} className={cn("hover:bg-muted/5 group", selectedIds.includes(site.id) && "bg-primary/[0.02]")}>
+                      <TableCell className="text-center">
+                        <Checkbox 
+                          checked={selectedIds.includes(site.id)} 
+                          onCheckedChange={() => toggleSelectOne(site.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-bold text-sm">{site.name}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-medium">{site.projectCompany}</TableCell>
+                      <TableCell className="text-center font-mono text-[10px] font-bold text-blue-600">
+                        {site.acCapacity}
+                      </TableCell>
+                      <TableCell className="text-center font-mono text-[10px] font-bold text-amber-600">
+                        {site.dcCapacity}
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteSite(site.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">
+                      {searchTerm ? `No sites found matching "${searchTerm}"` : "Registry empty. Add sites to start."}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       <AlertDialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
         <AlertDialogContent className="rounded-sm">
