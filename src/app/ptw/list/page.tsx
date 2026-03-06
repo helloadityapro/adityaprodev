@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -137,7 +136,7 @@ function WhatsAppUpdateEngineer({ permit }: { permit: Permit }) {
             size="icon" 
             className="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-sm" 
             title="Update Engineer via WhatsApp"
-            onClick={triggerWhatsApp}
+            onClick={(e) => { e.stopPropagation(); triggerWhatsApp(); }}
         >
             <MessageCircle className="h-4 w-4" />
         </Button>
@@ -165,7 +164,7 @@ function WhatsAppReminder({ userId, permit }: { userId: string | undefined, perm
             size="icon" 
             className="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-sm" 
             title="Send WhatsApp Reminder"
-            onClick={triggerWhatsApp}
+            onClick={(e) => { e.stopPropagation(); triggerWhatsApp(); }}
         >
             <MessageCircle className="h-4 w-4" />
         </Button>
@@ -495,7 +494,11 @@ export default function PtwListPage() {
                 const requestedBy = permit.siteEngineerName || permit.timeline?.find(t => t.action === 'Created')?.userName || '—';
 
                 return (
-                  <TableRow key={permit.id}>
+                  <TableRow 
+                    key={permit.id} 
+                    className="cursor-pointer hover:bg-muted/50 transition-colors group"
+                    onClick={() => setDetailsPermit(permit)}
+                  >
                     <TableCell className="font-mono text-xs">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
                     <TableCell className="font-medium">{permit.ptwType}</TableCell>
                     <TableCell>
@@ -508,7 +511,7 @@ export default function PtwListPage() {
                     <TableCell><StatusBadge permit={permit} /></TableCell>
                     <TableCell>{formatTimestamp(permit.requestDate)}</TableCell>
                     <TableCell className="text-right px-6">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" className="rounded-sm" title="View Details" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
 
                         {userProfile?.role === 'Site Engineer' && (permit.status === 'Pending' || permit.status === 'ManagerApproved') && (
