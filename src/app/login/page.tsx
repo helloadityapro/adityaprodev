@@ -81,7 +81,7 @@ export default function LoginPage() {
         <CardHeader className="text-center pb-8 pt-10">
           <CardTitle className="text-3xl font-bold tracking-tight text-primary">Aditya Pro</CardTitle>
           <CardDescription className="mt-2">
-            Sign in to your professional account
+            Sign in to your Aditya Pro account
           </CardDescription>
         </CardHeader>
         <CardContent>
