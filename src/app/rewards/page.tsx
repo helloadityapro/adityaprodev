@@ -6,7 +6,7 @@ import { collection, doc, query, orderBy, limit, where, or, and, getDocs, server
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send, MapPin, Clock } from "lucide-react";
+import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send, MapPin, Clock, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,8 @@ import { Label } from "@/components/ui/label";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+
+const MIN_REDEEM_VALUE_RS = 500;
 
 type UserProfile = {
   id: string;
@@ -283,8 +285,15 @@ export default function RewardsPage() {
   const pointValue = settings?.pointValueInRs || 1;
   const userPoints = userProfile?.totalPoints || 0;
   const monetaryValue = userPoints * pointValue;
+  
+  const canRedeem = monetaryValue >= MIN_REDEEM_VALUE_RS;
 
   const handleInitiateRedemption = async () => {
+    if (!canRedeem) {
+      toast({ variant: 'destructive', title: 'Threshold Not Met', description: `A minimum balance of ₹${MIN_REDEEM_VALUE_RS} is required to redeem.` });
+      return;
+    }
+
     const pts = parseFloat(redeemPoints);
     if (isNaN(pts) || pts <= 0) {
       toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Enter a valid point amount.' });
@@ -354,13 +363,29 @@ export default function RewardsPage() {
           <Button 
             onClick={() => setIsRedeemDialogOpen(true)}
             className="rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-6 shadow-md"
-            disabled={userPoints <= 0}
+            disabled={!canRedeem}
           >
             <CreditCard className="mr-2 h-4 w-4" />
             Redeem Points
           </Button>
         </div>
       </div>
+
+      {!canRedeem && userPoints > 0 && (
+        <AlertCircle className="h-4 w-4 inline mr-2 text-amber-600" />
+      )}
+      {!canRedeem && (
+        <div className="p-4 bg-amber-50 border border-amber-100 rounded-sm flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex flex-col gap-1">
+            <p className="text-sm font-bold text-amber-800">Redemption Threshold Notice</p>
+            <p className="text-xs text-amber-700 leading-relaxed">
+              Redemption is available once your account balance reaches <strong>₹{MIN_REDEEM_VALUE_RS}.00</strong>. 
+              Currently, your balance is <strong>₹{monetaryValue.toFixed(2)}</strong>. You need <strong>₹{(MIN_REDEEM_VALUE_RS - monetaryValue).toFixed(2)}</strong> more to initiate a request.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-amber-500/5 border-amber-500/20 rounded-sm">
@@ -552,7 +577,7 @@ export default function RewardsPage() {
               Redeem Reward Points
             </DialogTitle>
             <DialogDescription>
-              Submit a request to convert your points into rewards. Each point is currently valued at ₹{pointValue.toFixed(2)}.
+              Submit a request to convert your points into rewards. A minimum balance value of ₹{MIN_REDEEM_VALUE_RS} is required.
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-6">
@@ -561,9 +586,9 @@ export default function RewardsPage() {
                 <p className="text-[10px] font-bold uppercase text-muted-foreground">Available Points</p>
                 <p className="text-2xl font-black text-primary font-mono">{userPoints.toFixed(2)}</p>
               </div>
-              <div className="p-4 bg-green-50 rounded-sm border border-green-100 space-y-1">
-                <p className="text-[10px] font-bold uppercase text-green-700">Max Wallet Value</p>
-                <p className="text-2xl font-black text-green-700 font-mono">₹{monetaryValue.toFixed(2)}</p>
+              <div className={cn("p-4 rounded-sm border space-y-1", canRedeem ? "bg-green-50 border-green-100" : "bg-amber-50 border-amber-100")}>
+                <p className={cn("text-[10px] font-bold uppercase", canRedeem ? "text-green-700" : "text-amber-700")}>Current Value</p>
+                <p className={cn("text-2xl font-black font-mono", canRedeem ? "text-green-700" : "text-amber-700")}>₹{monetaryValue.toFixed(2)}</p>
               </div>
             </div>
 
@@ -576,6 +601,7 @@ export default function RewardsPage() {
                   value={redeemPoints} 
                   onChange={(e) => setRedeemPoints(e.target.value)}
                   className="rounded-sm font-mono h-12 text-lg pr-12"
+                  disabled={!canRedeem}
                 />
                 <div className="absolute right-3 top-3 text-xs font-bold text-muted-foreground uppercase">Pts</div>
               </div>
@@ -586,6 +612,15 @@ export default function RewardsPage() {
                 </div>
               )}
             </div>
+
+            {!canRedeem && (
+              <div className="p-3 bg-red-50 border border-red-100 rounded-sm flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                <p className="text-[10px] text-red-800 font-bold uppercase leading-tight">
+                  INSUFFICIENT BALANCE VALUE: Minimum ₹{MIN_REDEEM_VALUE_RS}.00 required. You need ₹{(MIN_REDEEM_VALUE_RS - monetaryValue).toFixed(2)} more.
+                </p>
+              </div>
+            )}
 
             <div className="bg-amber-50 p-3 rounded-sm border border-amber-100 flex items-start gap-2">
               <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
@@ -598,7 +633,7 @@ export default function RewardsPage() {
             <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
             <Button 
               onClick={handleInitiateRedemption} 
-              disabled={isRedeeming || !redeemPoints || parseFloat(redeemPoints) <= 0 || parseFloat(redeemPoints) > userPoints}
+              disabled={isRedeeming || !redeemPoints || parseFloat(redeemPoints) <= 0 || parseFloat(redeemPoints) > userPoints || !canRedeem}
               className="rounded-sm font-black bg-green-600 hover:bg-green-700 min-w-[120px]"
             >
               {isRedeeming ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
