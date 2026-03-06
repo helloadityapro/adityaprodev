@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -304,10 +303,13 @@ export default function SiteVisitDetailPage() {
             <X className="h-6 w-6" />
           </Button>
           
-          <div className="relative w-full h-full flex items-center justify-center overflow-auto p-4">
-            <div className="transition-transform duration-200 ease-out flex items-center justify-center" style={{ transform: `scale(${zoom})` }}>
+          <div className="relative w-full h-full flex overflow-auto p-4">
+            <div 
+              className="m-auto transition-transform duration-200 ease-out flex items-center justify-center" 
+              style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
+            >
               {enlargedImage && (
-                <img src={enlargedImage} className="max-w-full max-h-full object-contain shadow-2xl" alt="Audit Evidence" />
+                <img src={enlargedImage} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Audit Evidence" />
               )}
             </div>
           </div>

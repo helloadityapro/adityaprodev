@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -228,9 +227,12 @@ export default function AttendanceHistoryPage() {
             </Button>
           </div>
 
-          <div className="relative w-full h-full flex items-center justify-center overflow-auto">
-            <div className="transition-transform duration-200 ease-out" style={{ transform: `scale(${zoom})` }}>
-              {viewImage && <img src={viewImage} className="max-w-full max-h-full object-contain shadow-2xl" alt="Verification" />}
+          <div className="relative w-full h-full flex overflow-auto p-4">
+            <div 
+              className="m-auto transition-transform duration-200 ease-out flex items-center justify-center" 
+              style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
+            >
+              {viewImage && <img src={viewImage} className="max-w-full max-h-[80vh] object-contain shadow-2xl" alt="Verification" />}
             </div>
             <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white bg-black/20 rounded-full z-50 hover:bg-black/40" onClick={() => { setZoom(1); setViewImage(null); }}><X className="h-6 w-6" /></Button>
           </div>

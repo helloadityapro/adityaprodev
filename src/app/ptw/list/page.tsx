@@ -827,7 +827,7 @@ export default function PtwListPage() {
       </Dialog>
 
       <Dialog open={!!viewerImages} onOpenChange={(o) => { if(!o) setZoom(1); setViewerImages(null); }}>
-        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm">
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>Full Screen Document Viewer</DialogTitle>
             <DialogDescription>Viewing images from submission in full size.</DialogDescription>
@@ -853,19 +853,26 @@ export default function PtwListPage() {
           </Button>
           
           {viewerImages && (
-            <Carousel className="w-full h-full flex items-center justify-center" opts={{ startIndex: viewerImages.initialIndex }}>
-              <CarouselContent className="h-full">
-                {viewerImages.images.map((img, idx) => (
-                  <CarouselItem key={idx} className="flex items-center justify-center h-full w-full overflow-auto">
-                    <div className="transition-transform duration-200 ease-out flex items-center justify-center" style={{ transform: `scale(${zoom})` }}>
-                      <img src={img.url} alt={img.name} className="max-w-full max-h-full object-contain shadow-2xl" />
-                    </div>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="left-8 h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl border-none rounded-full transition-all flex items-center justify-center" />
-              <CarouselNext className="right-8 h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl border-none rounded-full transition-all flex items-center justify-center" />
-            </Carousel>
+            <div className="w-full h-full">
+              <Carousel className="w-full h-full" opts={{ startIndex: viewerImages.initialIndex }}>
+                <CarouselContent className="h-full">
+                  {viewerImages.images.map((img, idx) => (
+                    <CarouselItem key={idx} className="h-full w-full">
+                      <div className="h-full w-full overflow-auto flex">
+                        <div 
+                          className="m-auto transition-transform duration-200 ease-out flex items-center justify-center" 
+                          style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
+                        >
+                          <img src={img.url} alt={img.name} className="max-w-[90vw] max-h-[85vh] object-contain shadow-2xl" />
+                        </div>
+                      </div>
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <CarouselPrevious className="left-8 h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl border-none rounded-full transition-all flex items-center justify-center" />
+                <CarouselNext className="right-8 h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl border-none rounded-full transition-all flex items-center justify-center" />
+              </Carousel>
+            </div>
           )}
         </DialogContent>
       </Dialog>
