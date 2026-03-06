@@ -143,7 +143,7 @@ export default function RegisterPage() {
         <CardHeader className="text-center pb-8 pt-10">
           <CardTitle className="text-3xl font-bold tracking-tight text-primary">Aditya Pro</CardTitle>
           <CardDescription className="mt-2">
-            {user ? "Complete your profile registration" : "Create your professional account"}
+            {user ? "Complete your profile registration" : "Create your Aditya Pro account"}
           </CardDescription>
         </CardHeader>
         <CardContent>
