@@ -271,7 +271,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <TableIcon className="h-4 w-4" />
                 <span className="font-medium">Movement Data</span>
               </Link>
-            </SidebarMenuItem>
+            </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroup>
