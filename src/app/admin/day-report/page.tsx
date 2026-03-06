@@ -27,7 +27,9 @@ import {
   CheckCircle2,
   AlertCircle,
   FileCheck,
-  Loader2
+  Loader2,
+  Users,
+  Briefcase
 } from 'lucide-react';
 import { format, startOfDay, endOfDay, parseISO, differenceInMinutes } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -36,6 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 type UserProfile = {
   id: string;
@@ -87,9 +90,10 @@ export default function AdminDayReportPage() {
 
     const start = startOfDay(parseISO(selectedDate));
     const end = endOfDay(parseISO(selectedDate));
+    const isManager = selectedUserObj?.role === 'Site Manager';
 
     try {
-      // 1. Attendance
+      // 1. Primary User Data
       const attQuery = query(
         collection(firestore, 'attendance'),
         where('userId', '==', selectedUserId),
@@ -98,7 +102,6 @@ export default function AdminDayReportPage() {
       const attSnap = await getDocs(attQuery);
       const attendance = attSnap.docs.map(d => ({ id: d.id, ...d.data() }))[0];
 
-      // 2. Site Visits
       const visitsQuery = query(
         collection(firestore, 'site_visits'),
         where('managerId', '==', selectedUserId)
@@ -111,7 +114,6 @@ export default function AdminDayReportPage() {
           return d && d >= start && d <= end;
         });
 
-      // 3. DPRs
       const dprsQuery = query(
         collection(firestore, 'dprs'),
         where('userId', '==', selectedUserId),
@@ -120,7 +122,6 @@ export default function AdminDayReportPage() {
       const dprsSnap = await getDocs(dprsQuery);
       const dprs = dprsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // 4. Material Movements
       const movsQuery = query(
         collection(firestore, 'material_movements'),
         where('userId', '==', selectedUserId),
@@ -129,7 +130,6 @@ export default function AdminDayReportPage() {
       const movsSnap = await getDocs(movsQuery);
       const movements = movsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // 5. Permits
       const ptwQuery = query(
         collection(firestore, 'permits_to_work'),
         where('siteEngineerId', '==', selectedUserId)
@@ -142,12 +142,78 @@ export default function AdminDayReportPage() {
           return d && d >= start && d <= end;
         });
 
+      // 2. Team Data (if user is a Manager)
+      let teamData = null;
+      if (isManager) {
+        const teamAttQuery = query(
+          collection(firestore, 'attendance'),
+          where('siteManagerId', '==', selectedUserId),
+          where('date', '==', selectedDate)
+        );
+        const teamAttSnap = await getDocs(teamAttQuery);
+        const teamAttendance = teamAttSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const teamVisitsQuery = query(
+          collection(firestore, 'site_visits'),
+          where('siteManagerId', '==', selectedUserId)
+        );
+        const teamVisitsSnap = await getDocs(teamVisitsQuery);
+        const teamVisits = teamVisitsSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter((v: any) => {
+            const d = v.startTime?.toDate();
+            // Only include team members, exclude the manager themselves (already in 'visits')
+            return d && d >= start && d <= end && v.managerId !== selectedUserId;
+          });
+
+        const teamDprsQuery = query(
+          collection(firestore, 'dprs'),
+          where('siteManagerId', '==', selectedUserId),
+          where('reportDate', '==', selectedDate)
+        );
+        const teamDprsSnap = await getDocs(teamDprsQuery);
+        const teamDprs = teamDprsSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter((d: any) => d.userId !== selectedUserId);
+
+        const teamMovsQuery = query(
+          collection(firestore, 'material_movements'),
+          where('siteManagerId', '==', selectedUserId),
+          where('movementDate', '==', selectedDate)
+        );
+        const teamMovsSnap = await getDocs(teamMovsQuery);
+        const teamMovements = teamMovsSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter((m: any) => m.userId !== selectedUserId);
+
+        const teamPtwQuery = query(
+          collection(firestore, 'permits_to_work'),
+          where('siteManagerId', '==', selectedUserId)
+        );
+        const teamPtwSnap = await getDocs(teamPtwQuery);
+        const teamPermits = teamPtwSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter((p: any) => {
+            const d = p.requestDate?.toDate();
+            return d && d >= start && d <= end && p.siteEngineerId !== selectedUserId;
+          });
+
+        teamData = {
+          attendance: teamAttendance,
+          visits: teamVisits,
+          dprs: teamDprs,
+          movements: teamMovements,
+          permits: teamPermits
+        };
+      }
+
       setReportData({
         attendance,
         visits,
         dprs,
         movements,
-        permits
+        permits,
+        team: teamData
       });
     } catch (error) {
       console.error("Report generation failed", error);
@@ -267,7 +333,7 @@ export default function AdminDayReportPage() {
             </CardHeader>
 
             <CardContent className="p-8 space-y-12">
-              {/* Attendance Log Section */}
+              {/* Primary User Attendance Log Section */}
               <section className="space-y-6">
                 <div className="flex items-center gap-3 border-b-2 border-primary/10 pb-2">
                   <Clock className="h-5 w-5 text-primary" />
@@ -411,13 +477,166 @@ export default function AdminDayReportPage() {
                 )}
               </section>
 
+              {/* TEAM ACTIVITY SECTION - Shown only for Managers */}
+              {reportData.team && (
+                <>
+                  <Separator className="bg-primary/5 h-1" />
+                  <section className="space-y-8 py-4">
+                    <div className="flex items-center gap-3 border-b-2 border-amber-500/20 pb-2">
+                      <Users className="h-6 w-6 text-amber-600" />
+                      <div className="flex flex-col">
+                        <h3 className="text-2xl font-black uppercase tracking-tight text-amber-900 leading-tight">Reporting Team Activity Overview</h3>
+                        <p className="text-xs font-bold text-amber-700 uppercase tracking-widest">Aggregated data for all Site Engineers reporting to {selectedUserObj?.username}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-8">
+                      {/* Team Presence Summary Table */}
+                      <Card className="rounded-sm border-amber-500/10 shadow-sm overflow-hidden">
+                        <CardHeader className="bg-amber-500/5 py-3 flex flex-row items-center gap-2">
+                          <Clock className="h-4 w-4 text-amber-700" />
+                          <CardTitle className="text-xs font-black uppercase tracking-widest text-amber-900">Personnel Presence Snapshot</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <Table>
+                            <TableHeader className="bg-muted/30">
+                              <TableRow>
+                                <TableHead className="px-6 text-[10px] font-black uppercase">Engineer</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase">Check-in</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase">Check-out</TableHead>
+                                <TableHead className="text-[10px] font-black uppercase">Status</TableHead>
+                                <TableHead className="text-right px-6 text-[10px] font-black uppercase">Verification</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {reportData.team.attendance.length > 0 ? reportData.team.attendance.map((att: any) => (
+                                <TableRow key={att.id}>
+                                  <TableCell className="px-6 font-bold text-xs">{att.userName}</TableCell>
+                                  <TableCell className="text-xs font-mono font-bold text-primary">{att.checkInTime ? format(att.checkInTime.toDate(), 'HH:mm') : '—'}</TableCell>
+                                  <TableCell className="text-xs font-mono font-bold text-primary">{att.checkOutTime ? format(att.checkOutTime.toDate(), 'HH:mm') : 'Active'}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={cn("text-[8px] font-black uppercase rounded-sm px-1.5 h-4", att.status === 'ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-green-50 text-green-700 border-green-200")}>
+                                      {att.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right px-6">
+                                    <div className="flex justify-end gap-1.5">
+                                      {att.checkInSelfieUrl && (
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-amber-600"><Camera className="h-3.5 w-3.5" /></Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-64 p-0">
+                                            <img src={att.checkInSelfieUrl} className="w-full aspect-video object-cover" alt="Entry Verification" />
+                                          </PopoverContent>
+                                        </Popover>
+                                      )}
+                                      {att.checkInLat && (
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm text-primary" asChild>
+                                          <a href={`https://www.google.com/maps/search/?api=1&query=${att.checkInLat},${att.checkInLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3.5 w-3.5" /></a>
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )) : (
+                                <TableRow>
+                                  <TableCell colSpan={5} className="h-20 text-center text-xs italic text-muted-foreground uppercase font-bold">No team presence logged today.</TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Team Progress Reports */}
+                        <div className="space-y-4">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-amber-800 flex items-center gap-2 px-1">
+                            <FileText className="h-4 w-4" /> Team Progress logs (DPR)
+                          </Label>
+                          <div className="space-y-3">
+                            {reportData.team.dprs.length > 0 ? reportData.team.dprs.map((dpr: any) => (
+                              <div key={dpr.id} className="p-4 bg-amber-50/50 border border-amber-100 rounded-sm">
+                                <div className="flex justify-between items-start mb-2">
+                                  <p className="text-xs font-black uppercase text-amber-900">{dpr.userName}</p>
+                                  <Badge variant="outline" className="text-[8px] h-4 rounded-sm border-amber-200">{dpr.siteName}</Badge>
+                                </div>
+                                <p className="text-xs leading-relaxed italic text-muted-foreground">"{dpr.description}"</p>
+                              </div>
+                            )) : <p className="text-[10px] font-bold text-muted-foreground uppercase italic px-1 opacity-50">No team progress logs recorded.</p>}
+                          </div>
+                        </div>
+
+                        {/* Team Site Visits */}
+                        <div className="space-y-4">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-amber-800 flex items-center gap-2 px-1">
+                            <Navigation className="h-4 w-4" /> Team Site Activity (Visits)
+                          </Label>
+                          <div className="space-y-3">
+                            {reportData.team.visits.length > 0 ? reportData.team.visits.map((visit: any) => (
+                              <div key={visit.id} className="p-4 bg-amber-50/50 border border-amber-100 rounded-sm flex items-center justify-between">
+                                <div className="space-y-1">
+                                  <p className="text-xs font-black uppercase text-amber-900">{visit.managerName}</p>
+                                  <p className="text-[10px] font-bold text-muted-foreground">{visit.siteName} • {visit.purpose}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xs font-mono font-black text-amber-700">{format(visit.startTime.toDate(), 'HH:mm')}</p>
+                                  <p className="text-[8px] font-black uppercase text-muted-foreground">{visit.status}</p>
+                                </div>
+                              </div>
+                            )) : <p className="text-[10px] font-bold text-muted-foreground uppercase italic px-1 opacity-50">No team site visits recorded.</p>}
+                          </div>
+                        </div>
+
+                        {/* Team Logistics & Permits */}
+                        <div className="space-y-4 lg:col-span-2">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-amber-800 flex items-center gap-2 px-1">
+                            <Briefcase className="h-4 w-4" /> Combined Team Operations (Logistics & Permits)
+                          </Label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Team Movements */}
+                            <div className="space-y-2">
+                              {reportData.team.movements.length > 0 ? reportData.team.movements.map((mov: any) => (
+                                <div key={mov.id} className="p-3 border rounded-sm bg-white flex items-center justify-between text-[11px]">
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-amber-900">{mov.userName} recorded {mov.movementType}</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase">{mov.itemName} ({mov.siteName})</span>
+                                  </div>
+                                  <Badge className="h-4 text-[8px] font-black rounded-sm">{mov.quantity} {mov.unit}</Badge>
+                                </div>
+                              )) : null}
+                            </div>
+                            {/* Team Permits */}
+                            <div className="space-y-2">
+                              {reportData.team.permits.length > 0 ? reportData.team.permits.map((p: any) => (
+                                <div key={p.id} className="p-3 border rounded-sm bg-white flex items-center justify-between text-[11px]">
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-amber-900">{p.siteEngineerName} raised permit</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase">{p.serialNumber} ({p.siteName})</span>
+                                  </div>
+                                  <Badge variant="outline" className="h-4 text-[8px] font-black rounded-sm border-amber-200">{p.status}</Badge>
+                                </div>
+                              )) : null}
+                            </div>
+                            {reportData.team.movements.length === 0 && reportData.team.permits.length === 0 && (
+                              <div className="col-span-2 py-8 text-center text-[10px] font-bold text-muted-foreground uppercase italic opacity-50">No team logistics or permit activities.</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </>
+              )}
+
               <Separator className="bg-primary/5" />
 
-              {/* Documentation Section */}
+              {/* Documentation Section (Primary User) */}
               <section className="space-y-6">
                 <div className="flex items-center gap-3 border-b-2 border-primary/10 pb-2">
                   <FileText className="h-5 w-5 text-primary" />
-                  <h3 className="text-xl font-black uppercase tracking-tight">Documentation Activity (DPR / Materials / Permits)</h3>
+                  <h3 className="text-xl font-black uppercase tracking-tight">Personal Documentation Audit (DPR / Materials / Permits)</h3>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
