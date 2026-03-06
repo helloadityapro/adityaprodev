@@ -41,14 +41,6 @@ type PtwType = {
   allowedApproverIds?: string[];
 };
 
-type Site = {
-  id: string;
-  name: string;
-  projectCompany: string;
-  acCapacity: string;
-  dcCapacity: string;
-};
-
 type UserProfile = {
     id: string;
     username: string;
@@ -81,13 +73,6 @@ type CleanupRequest = {
 
 const ptwTypeSchema = z.object({
   name: z.string().min(1, 'PTW Type name is required.'),
-});
-
-const siteSchema = z.object({
-  name: z.string().min(1, 'Site name is required.'),
-  projectCompany: z.string().min(1, 'Project company is required.'),
-  acCapacity: z.string().min(1, 'AC capacity is required.'),
-  dcCapacity: z.string().min(1, 'DC capacity is required.'),
 });
 
 export default function AdminSettingsPage() {
@@ -123,9 +108,6 @@ export default function AdminSettingsPage() {
   const ptwTypesQuery = useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]);
   const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection<PtwType>(ptwTypesQuery);
 
-  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
-  const { data: sites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
-
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers } = useCollection<UserProfile>(usersQuery);
 
@@ -158,31 +140,15 @@ export default function AdminSettingsPage() {
     defaultValues: { name: '' },
   });
 
-  const siteForm = useForm<z.infer<typeof siteSchema>>({
-    resolver: zodResolver(siteSchema),
-    defaultValues: { name: '', projectCompany: '', acCapacity: '', dcCapacity: '' },
-  });
-
   const onPtwTypeSubmit = (values: z.infer<typeof ptwTypeSchema>) => {
     addDocumentNonBlocking(collection(firestore, 'ptw_types'), values);
     toast({ title: 'Success', description: 'New PTW Type added.' });
     ptwTypeForm.reset();
   };
 
-  const onSiteSubmit = (values: z.infer<typeof siteSchema>) => {
-    addDocumentNonBlocking(collection(firestore, 'sites'), values);
-    toast({ title: 'Success', description: 'New Site added.' });
-    siteForm.reset();
-  };
-
   const deletePtwType = (id: string) => {
     deleteDocumentNonBlocking(doc(firestore, 'ptw_types', id));
     toast({ title: 'Success', description: 'PTW Type deleted.' });
-  };
-
-  const deleteSite = (id: string) => {
-    deleteDocumentNonBlocking(doc(firestore, 'sites', id));
-    toast({ title: 'Success', description: 'Site deleted.' });
   };
 
   const toggleApprover = (userId: string) => {
@@ -239,37 +205,7 @@ export default function AdminSettingsPage() {
         updateDocumentNonBlocking(doc(firestore, 'system_settings', 'counters'), { lastPtwNumber: 0 });
       }
 
-      // 1. Revert Points for all Approved permits in the deletion list
-      for (const id of idsToDelete) {
-          const pRef = doc(firestore, 'permits_to_work', id);
-          const pSnap = await getDoc(pRef);
-          if (pSnap.exists()) {
-              const pData = pSnap.data();
-              if (pData.status === 'Approved') {
-                  const hasRejection = (pData.timeline || []).some((t: any) => t.status === 'Rejected');
-                  const basePoints = hasRejection ? 0.5 : 1.0;
-                  
-                  // Revert Engineer points
-                  const engRef = doc(firestore, 'users', pData.siteEngineerId);
-                  const engSnap = await getDoc(engRef);
-                  if (engSnap.exists()) {
-                      const m = engSnap.data()?.pointsMultiplier || 1;
-                      updateDocumentNonBlocking(engRef, {
-                          totalPoints: increment(-(basePoints * m))
-                      });
-                  }
-
-                  // Revert Manager points (50% inheritance)
-                  if (pData.siteManagerId) {
-                      updateDocumentNonBlocking(doc(firestore, 'users', pData.siteManagerId), {
-                          totalPoints: increment(-(basePoints * 0.5))
-                      });
-                  }
-              }
-          }
-      }
-
-      // 2. Perform Batch Deletion
+      // Perform Batch Deletion
       const batchSize = 500;
       for (let i = 0; i < idsToDelete.length; i += batchSize) {
         const batch = writeBatch(firestore);
@@ -280,7 +216,7 @@ export default function AdminSettingsPage() {
         await batch.commit();
       }
 
-      toast({ title: "Permanently Deleted", description: deleteDialog.isAll ? "All records deleted, counter reset, and points reversed." : "Selected requests deleted and points reversed." });
+      toast({ title: "Permanently Deleted", description: deleteDialog.isAll ? "All records deleted and counter reset." : "Selected requests deleted." });
       setSelectedPermitIds([]);
       setDeleteDialog({ open: false, targets: [], isAll: false });
     } catch (e) {
@@ -360,7 +296,7 @@ export default function AdminSettingsPage() {
         }
       }
 
-      // DO NOT DELETE the user profile. Instead, reset points.
+      // Reset points.
       updateDocumentNonBlocking(doc(firestore, 'users', userId), { 
         totalPoints: 0,
         lastPurgeAt: serverTimestamp() 
@@ -368,7 +304,7 @@ export default function AdminSettingsPage() {
 
       updateDocumentNonBlocking(doc(firestore, 'cleanup_requests', req.id), { status: 'approved' });
 
-      toast({ variant: 'success', title: 'Entries Purged', description: `Deleted ${totalDeleted} activity records. User profile and account access preserved.` });
+      toast({ variant: 'success', title: 'Entries Purged', description: `Deleted ${totalDeleted} activity records.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
     } finally {
@@ -384,7 +320,7 @@ export default function AdminSettingsPage() {
     }) || [];
   }, [cleanupRequests]);
 
-  if (isUserLoading || isProfileLoading || ptwTypesLoading || sitesLoading || permitsLoading || cleanupRequestsLoading) {
+  if (isUserLoading || isProfileLoading || ptwTypesLoading || permitsLoading || cleanupRequestsLoading) {
     return (
         <div className="space-y-6 animate-pulse">
             <Skeleton className="h-9 w-64" />
@@ -398,19 +334,19 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-3xl font-bold tracking-tight">System Settings</h1>
         <p className="text-muted-foreground">Global configuration and permit record management.</p>
       </div>
 
       <Tabs defaultValue="configuration" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-8 rounded-sm max-w-xl">
-          <TabsTrigger value="configuration" className="flex items-center gap-2 rounded-sm"><SlidersHorizontal className="h-4 w-4" /> Manage</TabsTrigger>
-          <TabsTrigger value="permits" className="flex items-center gap-2 rounded-sm"><ClipboardList className="h-4 w-4" /> Delete Permits</TabsTrigger>
+          <TabsTrigger value="configuration" className="flex items-center gap-2 rounded-sm"><SlidersHorizontal className="h-4 w-4" /> Manage Types</TabsTrigger>
+          <TabsTrigger value="permits" className="flex items-center gap-2 rounded-sm"><ClipboardList className="h-4 w-4" /> Delete Records</TabsTrigger>
           <TabsTrigger value="cleanup" className="flex items-center gap-2 rounded-sm"><Eraser className="h-4 w-4" /> Data Cleanup</TabsTrigger>
         </TabsList>
 
         <TabsContent value="configuration" className="space-y-6 animate-in fade-in-50 duration-300">
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-1">
             <Card className="rounded-sm">
               <CardHeader>
                 <CardTitle>Manage PTW Types</CardTitle>
@@ -461,58 +397,6 @@ export default function AdminSettingsPage() {
                 </div>
               </CardContent>
             </Card>
-
-            <Card className="rounded-sm">
-              <CardHeader>
-                <CardTitle>Manage Sites</CardTitle>
-                <CardDescription>Add project locations for selection in PtW requests.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...siteForm}>
-                  <form onSubmit={siteForm.handleSubmit(onSiteSubmit)} className="space-y-4 mb-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <FormField control={siteForm.control} name="name" render={({ field }) => (
-                            <FormItem><FormLabel>Site Name</FormLabel><FormControl><Input placeholder="Project Site Name" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={siteForm.control} name="projectCompany" render={({ field }) => (
-                            <FormItem><FormLabel>Project Company</FormLabel><FormControl><Input placeholder="Company Name" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={siteForm.control} name="acCapacity" render={({ field }) => (
-                            <FormItem><FormLabel>AC Capacity</FormLabel><FormControl><Input placeholder="e.g., 100 MW" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={siteForm.control} name="dcCapacity" render={({ field }) => (
-                            <FormItem><FormLabel>DC Capacity</FormLabel><FormControl><Input placeholder="e.g., 120 MWp" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                        )} />
-                    </div>
-                    <Button type="submit" className="w-full rounded-sm">Add New Site</Button>
-                  </form>
-                </Form>
-                 <div className="rounded-sm border max-h-96 overflow-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Site Name</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead className="text-right"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sites?.map((site) => (
-                        <TableRow key={site.id}>
-                          <TableCell className="font-medium">{site.name}</TableCell>
-                          <TableCell>{site.projectCompany}</TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" className="rounded-sm" onClick={() => deleteSite(site.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </TabsContent>
 
@@ -520,8 +404,8 @@ export default function AdminSettingsPage() {
           <Card className="rounded-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Delete Permit Records</CardTitle>
-                <CardDescription>Cleanup requests and manage administrative visibility across the entire platform. Reward points are reversed on deletion.</CardDescription>
+                <CardTitle>Delete Operational Records</CardTitle>
+                <CardDescription>Manage administrative visibility across the entire platform. Records deleted for everyone are permanently removed.</CardDescription>
               </div>
               <Button 
                 variant="destructive" 
@@ -529,7 +413,7 @@ export default function AdminSettingsPage() {
                 onClick={() => setDeleteDialog({ open: true, targets: [], isAll: true })}
                 className="rounded-sm bg-red-700 hover:bg-red-800"
               >
-                <RefreshCw className="h-4 w-4 mr-2" /> Delete All Records
+                <RefreshCw className="h-4 w-4 mr-2" /> Delete All Permit Records
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -561,8 +445,6 @@ export default function AdminSettingsPage() {
                       <TableHead>Serial No</TableHead>
                       <TableHead>Site Name</TableHead>
                       <TableHead>Type</TableHead>
-                      <TableHead>Engineer</TableHead>
-                      <TableHead>Manager</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead className="text-right px-6">Action</TableHead>
@@ -581,18 +463,6 @@ export default function AdminSettingsPage() {
                           <TableCell className="font-mono text-xs">{p.serialNumber || p.id.slice(0,8)}</TableCell>
                           <TableCell className="font-medium">{p.siteName}</TableCell>
                           <TableCell>{p.ptwType}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5">
-                                <User className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-xs">{p.siteEngineerName || '—'}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5">
-                                <UserCog className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-xs">{allUsers?.find(u => u.id === p.siteManagerId)?.username || '—'}</span>
-                            </div>
-                          </TableCell>
                           <TableCell>
                               <Badge variant="outline" className="rounded-sm text-[10px] font-bold uppercase">{p.status}</Badge>
                           </TableCell>
@@ -613,8 +483,8 @@ export default function AdminSettingsPage() {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center py-12 text-muted-foreground italic">
-                          No permit requests found matching your current view.
+                        <TableCell colSpan={7} className="text-center py-12 text-muted-foreground italic">
+                          No permit requests found.
                         </TableCell>
                       </TableRow>
                     )}
@@ -642,17 +512,11 @@ export default function AdminSettingsPage() {
               <CardContent className="pt-6 space-y-6">
                 <div className="flex flex-col gap-4 p-4 bg-amber-50 border border-amber-100 rounded-sm">
                   <div className="flex items-start gap-3">
-                    <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                    <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                     <div className="text-xs text-amber-800 leading-relaxed space-y-2">
                       <p className="font-bold uppercase">Cleanup Workflow Information</p>
-                      <p>This action will permanently delete the following data for the target user:</p>
-                      <ul className="list-disc pl-4 space-y-1">
-                        <li>All <strong>Permits to Work</strong> raised.</li>
-                        <li>All <strong>Daily Progress Reports (DPRs)</strong> and <strong>Material Logs</strong>.</li>
-                        <li>All <strong>Tasks</strong> and <strong>Requirements</strong>.</li>
-                        <li><strong>Reward Points:</strong> The user's points balance will be reset to zero.</li>
-                      </ul>
-                      <p className="font-bold">NOTE: The user's profile, role, and platform access will NOT be affected.</p>
+                      <p>This action will permanently delete all activity logs (Permits, Tasks, Reports) for the target user. Reward points will be reset to zero.</p>
+                      <p className="font-bold">User profile and platform access will NOT be affected.</p>
                     </div>
                   </div>
                 </div>
@@ -797,8 +661,8 @@ export default function AdminSettingsPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
                 {deleteDialog.isAll 
-                  ? 'This will permanently remove EVERY Permit to Work from the database. The global sequence count will reset to 1. Reward points will be reversed. Are you absolutely sure?'
-                  : 'Choose how you want to handle the deletion of these records. Points will be reversed if deleted for everyone.'
+                  ? 'This will permanently remove EVERY Permit to Work from the database. The global sequence count will reset to 1. Are you absolutely sure?'
+                  : 'Choose how you want to handle the deletion of these records.'
                 }
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -806,7 +670,7 @@ export default function AdminSettingsPage() {
             {!deleteDialog.isAll && (
               <div className="flex flex-col gap-1 p-3 border rounded-sm bg-accent/30">
                   <p className="text-sm font-bold">Delete for me</p>
-                  <p className="text-xs text-muted-foreground">Only hides these requests from your administration dashboard. Engineers and Managers can still see them.</p>
+                  <p className="text-xs text-muted-foreground">Only hides these requests from your administration dashboard.</p>
                   <Button variant="outline" className="mt-2 w-full rounded-sm" onClick={handleDeleteForMe} disabled={isDeleting}>
                       {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete for me"}
                   </Button>
@@ -817,7 +681,7 @@ export default function AdminSettingsPage() {
                 <p className="text-xs text-muted-foreground">
                   {deleteDialog.isAll 
                     ? 'WIPE ALL DATA: This cannot be undone.' 
-                    : 'Permanently removes these records and reverses points from the database for all users.'}
+                    : 'Permanently removes these records from the database for all users.'}
                 </p>
                 <Button variant="destructive" className="mt-2 w-full rounded-sm" onClick={handleDeleteForEveryone} disabled={isDeleting}>
                     {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : deleteDialog.isAll ? "Wipe All Data" : "Delete for everyone"}

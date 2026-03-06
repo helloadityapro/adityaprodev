@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -193,12 +192,12 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <List className="h-4 w-4" />
                 <span className="font-medium">List of PtW</span>
               </Link>
+              {(userRole === 'Admin' || userRole === 'Site Manager') && pendingPtwCount > 0 && (
+                <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
+                    {pendingPtwCount}
+                </SidebarMenuBadge>
+              )}
             </SidebarMenuButton>
-            {(userRole === 'Admin' || userRole === 'Site Manager') && pendingPtwCount > 0 && (
-              <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
-                  {pendingPtwCount}
-              </SidebarMenuBadge>
-            )}
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Activities" isActive={pathname === '/ptw/activities'} className="rounded-sm">
@@ -272,7 +271,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <TableIcon className="h-4 w-4" />
                 <span className="font-medium">Movement Data</span>
               </Link>
-            </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroup>
@@ -302,6 +301,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <Link href="/admin/dashboard">
                   <LayoutDashboard className="h-4 w-4" />
                   <span className="font-medium">Dashboard</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Manage Sites" isActive={pathname === '/settings/manage-sites'} className="rounded-sm">
+                <Link href="/settings/manage-sites">
+                  <MapPin className="h-4 w-4" />
+                  <span className="font-medium">Manage Sites</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
