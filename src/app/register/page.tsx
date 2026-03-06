@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import AppLogo from "@/components/app-logo"
 import { useAuth, useFirestore, setDocumentNonBlocking, useUser, useDoc, useMemoFirebase } from "@/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { createUserWithEmailAndPassword } from "firebase/auth"
@@ -142,9 +141,6 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="text-center">
-            <div className="mb-4 flex justify-center">
-                <AppLogo />
-            </div>
           <CardTitle className="text-2xl font-headline">Create an account</CardTitle>
           <CardDescription>
             {user ? "Your profile was missing. Please complete registration to gain access." : "Enter your information to create an account. Admin approval is required."}
