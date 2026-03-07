@@ -11,7 +11,7 @@
         "username": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "mobile": { "type": "string" },
-        "role": { "type": "string", "enum": ["Admin", "Site Manager", "Site Engineer"] },
+        "role": { "type": "string", "enum": ["Admin", "Site Manager", "Site Engineer", "Driver"] },
         "department": { "type": "string", "enum": ["Projects", "O&M"] },
         "registrationRequest": { "type": "boolean" },
         "siteManagerId": { "type": "string" },
@@ -22,87 +22,40 @@
       },
       "required": ["id", "username", "email", "mobile", "role"]
     },
-    "Attendance": {
-      "title": "Workday Attendance",
+    "Vehicle": {
+      "title": "Vehicle",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "make": { "type": "string" },
+        "model": { "type": "string" },
+        "plateNumber": { "type": "string" },
+        "ownership": { "type": "string", "enum": ["Owned", "Rented"] },
+        "currentReading": { "type": "number" },
+        "status": { "type": "string", "enum": ["Available", "Assigned", "Maintenance"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "VehicleAssignment": {
+      "title": "Vehicle Assignment / Trip",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "userId": { "type": "string" },
         "userName": { "type": "string" },
-        "checkInTime": { "type": "string", "format": "date-time" },
-        "checkInLat": { "type": "number" },
-        "checkInLng": { "type": "number" },
-        "checkInSelfieUrl": { "type": "string", "description": "Verification selfie showing front profile, face and upper body." },
-        "checkOutTime": { "type": "string", "format": "date-time" },
-        "checkOutLat": { "type": "number" },
-        "checkOutLng": { "type": "number" },
-        "checkOutSelfieUrl": { "type": "string", "description": "Verification selfie showing front profile, face and upper body." },
-        "status": { "type": "string", "enum": ["ongoing", "completed"] },
-        "date": { "type": "string", "description": "YYYY-MM-DD format" }
-      }
-    },
-    "Supplier": {
-      "title": "Supplier",
-      "type": "object",
-      "description": "Information about material suppliers.",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "gstin": { "type": "string" },
-        "address": { "type": "string" },
-        "mobile": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["name", "gstin", "mobile"]
-    },
-    "SiteVisit": {
-      "title": "Site Visit Report",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "siteId": { "type": "string" },
-        "siteName": { "type": "string" },
-        "managerId": { "type": "string" },
-        "managerName": { "type": "string" },
+        "vehicleId": { "type": "string" },
+        "vehicleDetails": { "type": "string" },
+        "driverId": { "type": "string" },
+        "driverName": { "type": "string" },
+        "purpose": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Ongoing", "Completed", "Rejected"] },
+        "requestDate": { "type": "string", "format": "date-time" },
         "startTime": { "type": "string", "format": "date-time" },
-        "startLat": { "type": "number" },
-        "startLng": { "type": "number" },
+        "startReading": { "type": "number" },
+        "startReadingPhoto": { "type": "string" },
         "endTime": { "type": "string", "format": "date-time" },
-        "endLat": { "type": "number" },
-        "endLng": { "type": "number" },
-        "selfieUrl": { "type": "string", "description": "Verification selfie showing front profile, face and upper body." },
-        "purpose": { "type": "string", "enum": ["Kick-off visit", "Regular visit", "Site team meetup", "Vendor meetup"] },
-        "details": { "type": "string" },
-        "tasks": { 
-          "type": "array", 
-          "items": { 
-            "type": "object",
-            "properties": {
-              "text": { "type": "string" },
-              "photoUrl": { "type": "string" }
-            }
-          } 
-        },
-        "customerAvailable": { "type": "boolean" },
-        "customerNames": { "type": "string" },
-        "status": { "type": "string", "enum": ["ongoing", "completed"] },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["siteId", "siteName", "managerId", "startTime", "startLat", "startLng", "status"]
-    },
-    "PermitToWork": {
-      "title": "PermitToWork",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "serialNumber": { "type": "string" },
-        "siteName": { "type": "string" },
-        "ptwType": { "type": "string" },
-        "descriptionOfWork": { "type": "string" },
-        "status": { "type": "string" },
-        "siteEngineerId": { "type": "string" },
-        "requestDate": { "type": "string", "format": "date-time" }
+        "endReading": { "type": "number" },
+        "endReadingPhoto": { "type": "string" }
       }
     }
   },
@@ -114,49 +67,17 @@
       "schema": { "$ref": "#/backend/entities/User" },
       "description": "User profiles and roles."
     },
+    "/vehicles/{vehicleId}": {
+      "schema": { "$ref": "#/backend/entities/Vehicle" },
+      "description": "Organizational vehicle registry."
+    },
+    "/vehicle_assignments/{assignmentId}": {
+      "schema": { "$ref": "#/backend/entities/VehicleAssignment" },
+      "description": "Trip requests and execution logs."
+    },
     "/attendance/{attendanceId}": {
       "schema": { "$ref": "#/backend/entities/Attendance" },
       "description": "Daily check-in and check-out logs."
-    },
-    "/site_visits/{visitId}": {
-      "schema": { "$ref": "#/backend/entities/SiteVisit" },
-      "description": "Managers site presence and activity logs."
-    },
-    "/permits_to_work/{permitId}": {
-      "schema": { "$ref": "#/backend/entities/PermitToWork" },
-      "description": "Site safety permits."
-    },
-    "/suppliers/{supplierId}": {
-      "schema": { "$ref": "#/backend/entities/Supplier" },
-      "description": "Registered material suppliers."
-    },
-    "/sites/{siteId}": {
-      "schema": "object",
-      "description": "Project site locations."
-    },
-    "/tasks/{taskId}": {
-      "schema": "object",
-      "description": "Assigned site tasks."
-    },
-    "/requirements/{reqId}": {
-      "schema": "object",
-      "description": "Site material requirements."
-    },
-    "/dprs/{dprId}": {
-      "schema": "object",
-      "description": "Daily progress reports."
-    },
-    "/material_movements/{movementId}": {
-      "schema": "object",
-      "description": "Material inward/outward logs."
-    },
-    "/notifications/{notifId}": {
-      "schema": "object",
-      "description": "User activity and system notifications."
-    },
-    "/site_documents/{docId}": {
-      "schema": "object",
-      "description": "General site documentation files."
     }
   }
 }

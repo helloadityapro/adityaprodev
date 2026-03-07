@@ -22,7 +22,7 @@ const registerSchema = z.object({
   username: z.string().min(1, { message: "Username is required." }),
   email: z.string().email({ message: "Invalid email address." }),
   mobile: z.string().min(1, { message: "Mobile number is required." }),
-  role: z.enum(['Site Engineer', 'Site Manager'], { required_error: "Please select a role." }),
+  role: z.enum(['Site Engineer', 'Site Manager', 'Driver'], { required_error: "Please select a role." }),
   department: z.enum(['Projects', 'O&M'], { required_error: "Please select a department." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string()
@@ -208,6 +208,7 @@ export default function RegisterPage() {
                           <SelectContent>
                               <SelectItem value="Site Engineer">Site Engineer</SelectItem>
                               <SelectItem value="Site Manager">Site Manager</SelectItem>
+                              <SelectItem value="Driver">Driver</SelectItem>
                           </SelectContent>
                       </Select>
                       <FormMessage />
