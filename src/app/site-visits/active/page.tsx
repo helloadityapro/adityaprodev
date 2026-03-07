@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, doc, query, where, orderBy, or } from "firebase/firestore";
+import { collection, doc, query, where, orderBy, or, and } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, AlertCircle, User } from "lucide-react";
@@ -46,8 +46,10 @@ export default function ActiveSiteVisitsPage() {
     if (isManager) {
         return query(
             colRef,
-            where('status', '==', 'ongoing'),
-            or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid))
+            and(
+                where('status', '==', 'ongoing'),
+                or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid))
+            )
         );
     }
     
