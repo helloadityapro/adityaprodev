@@ -1,12 +1,11 @@
-
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, doc, query, where, orderBy, or, and } from "firebase/firestore";
+import { collection, doc, query, where, or } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, AlertCircle, User } from "lucide-react";
+import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, User } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,6 +31,7 @@ export default function ActiveSiteVisitsPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
@@ -39,20 +39,21 @@ export default function ActiveSiteVisitsPage() {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'site_visits');
     
+    // Admins monitor all ongoing visits
     if (isAdmin) {
       return query(colRef, where('status', '==', 'ongoing'));
     }
 
+    // Managers see their own and their team's ongoing visits
     if (isManager) {
         return query(
             colRef,
-            and(
-                where('status', '==', 'ongoing'),
-                or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid))
-            )
+            where('status', '==', 'ongoing'),
+            or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid))
         );
     }
     
+    // Engineers only see their own ongoing visit
     return query(
       colRef,
       where('managerId', '==', user.uid),
