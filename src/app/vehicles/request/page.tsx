@@ -1,8 +1,7 @@
-
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
@@ -13,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, useCollection } from '@/firebase';
 import { collection, doc, serverTimestamp, query, where } from 'firebase/firestore';
-import { Fuel, Loader2, Send, CheckCircle2, Building2, Globe, Search, ChevronsUpDown, Check, ArrowRight, Users, UserPlus, X, Trash2 } from 'lucide-react';
+import { Fuel, Loader2, Send, CheckCircle2, Building2, Globe, Search, ChevronsUpDown, Check, ArrowRight, Users, UserPlus, X, Trash2, Plus, MapPinned } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -22,12 +21,17 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+const destinationSchema = z.object({
+  type: z.enum(['Site', 'Other'], { required_error: 'Please select a destination type.' }),
+  location: z.string().min(1, 'Destination location is required.'),
+});
 
 const requestSchema = z.object({
   pickupType: z.enum(['Site', 'Other'], { required_error: 'Please select a pickup type.' }),
   pickupLocation: z.string().min(1, 'Pickup location is required.'),
-  destinationType: z.enum(['Site', 'Other'], { required_error: 'Please select a destination type.' }),
-  destination: z.string().min(1, 'Destination is required.'),
+  destinations: z.array(destinationSchema).min(1, 'Add at least one destination.'),
   purpose: z.string().min(5, 'Purpose must be detailed (min 5 chars).'),
   coPassengers: z.array(z.object({
     id: z.string(),
@@ -100,7 +104,7 @@ export default function RequestVehiclePage() {
   const [isPickupPopoverOpen, setIsPickupPopoverOpen] = React.useState(false);
   const [pickupSearchQuery, setPickupSearchQuery] = React.useState("");
   
-  const [isDestPopoverOpen, setIsDestPopoverOpen] = React.useState(false);
+  const [openDestPopoverIndex, setOpenDestPopoverIndex] = React.useState<number | null>(null);
   const [destSearchQuery, setDestSearchQuery] = React.useState("");
 
   const [isPassengerPopoverOpen, setIsPassengerPopoverOpen] = React.useState(false);
@@ -111,15 +115,18 @@ export default function RequestVehiclePage() {
     defaultValues: { 
       pickupType: 'Site',
       pickupLocation: '',
-      destinationType: 'Site',
-      destination: '',
+      destinations: [{ type: 'Site', location: '' }],
       purpose: '',
       coPassengers: []
     },
   });
 
+  const { fields: destFields, append: appendDest, remove: removeDest } = useFieldArray({
+    control: form.control,
+    name: "destinations"
+  });
+
   const pickupType = form.watch('pickupType');
-  const destinationType = form.watch('destinationType');
   const coPassengers = form.watch('coPassengers');
 
   const onSubmit = async (values: z.infer<typeof requestSchema>) => {
@@ -131,8 +138,7 @@ export default function RequestVehiclePage() {
         userName: userProfile.username || user.email,
         pickupLocation: values.pickupLocation,
         pickupType: values.pickupType,
-        destination: values.destination,
-        destinationType: values.destinationType,
+        destinations: values.destinations,
         purpose: values.purpose,
         coPassengers: values.coPassengers,
         status: 'Pending',
@@ -336,114 +342,149 @@ export default function RequestVehiclePage() {
                 />
               </div>
 
-              {/* Destination Section */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">2</div>
-                  <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Destination To</h3>
+              {/* Destinations Section */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">2</div>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Destinations</h3>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => appendDest({ type: 'Site', location: '' })}
+                    className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Stop
+                  </Button>
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="destinationType"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={(val) => {
-                            field.onChange(val);
-                            form.setValue('destination', '');
-                          }}
-                          defaultValue={field.value}
-                          className="flex gap-6"
-                        >
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl><RadioGroupItem value="Site" /></FormControl>
-                            <FormLabel className="font-bold cursor-pointer flex items-center gap-1.5 text-xs">
-                              <Building2 className="h-3.5 w-3.5 text-primary" /> Project Site
-                            </FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl><RadioGroupItem value="Other" /></FormControl>
-                            <FormLabel className="font-bold cursor-pointer flex items-center gap-1.5 text-xs">
-                              <Globe className="h-3.5 w-3.5 text-primary" /> Other
-                            </FormLabel>
-                          </FormItem>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-4">
+                  {destFields.map((field, index) => (
+                    <div key={field.id} className="p-4 border rounded-sm bg-muted/5 space-y-4 relative animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="text-[9px] font-bold uppercase rounded-sm border-primary/20 text-primary">Stop #{index + 1}</Badge>
+                        {destFields.length > 1 && (
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 text-destructive hover:bg-destructive/10 rounded-sm"
+                            onClick={() => removeDest(index)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
 
-                <FormField
-                  control={form.control}
-                  name="destination"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      {destinationType === 'Site' ? (
-                        <Popover open={isDestPopoverOpen} onOpenChange={setIsDestPopoverOpen}>
-                          <PopoverTrigger asChild>
+                      <FormField
+                        control={form.control}
+                        name={`destinations.${index}.type`}
+                        render={({ field }) => (
+                          <FormItem className="space-y-3">
                             <FormControl>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                className={cn(
-                                  "w-full justify-between font-normal rounded-sm h-11",
-                                  !field.value && "text-muted-foreground"
-                                )}
+                              <RadioGroup
+                                onValueChange={(val) => {
+                                  field.onChange(val);
+                                  form.setValue(`destinations.${index}.location`, '');
+                                }}
+                                defaultValue={field.value}
+                                className="flex gap-6"
                               >
-                                {field.value || "Select destination site..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                  <FormControl><RadioGroupItem value="Site" /></FormControl>
+                                  <FormLabel className="font-bold cursor-pointer flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Building2 className="h-3.5 w-3.5" /> Project Site
+                                  </FormLabel>
+                                </FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0">
+                                  <FormControl><RadioGroupItem value="Other" /></FormControl>
+                                  <FormLabel className="font-bold cursor-pointer flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Globe className="h-3.5 w-3.5" /> Other
+                                  </FormLabel>
+                                </FormItem>
+                              </RadioGroup>
                             </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                            <div className="flex items-center border-b px-3">
-                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                              <Input
-                                placeholder="Search sites..."
-                                className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
-                                value={destSearchQuery}
-                                onChange={(e) => setDestSearchQuery(e.target.value)}
-                                onKeyDown={(e) => e.stopPropagation()}
-                              />
-                            </div>
-                            <ScrollArea className="h-[200px]">
-                              <div className="p-1">
-                                {filteredDestSites.length > 0 ? (
-                                  filteredDestSites.map((site) => (
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name={`destinations.${index}.location`}
+                        render={({ field: locationField }) => (
+                          <FormItem className="flex flex-col">
+                            {form.watch(`destinations.${index}.type`) === 'Site' ? (
+                              <Popover 
+                                open={openDestPopoverIndex === index} 
+                                onOpenChange={(open) => setOpenDestPopoverIndex(open ? index : null)}
+                              >
+                                <PopoverTrigger asChild>
+                                  <FormControl>
                                     <Button
-                                      key={site.id}
-                                      type="button"
-                                      variant="ghost"
-                                      className="w-full justify-start font-normal h-10 text-sm"
-                                      onClick={() => {
-                                        field.onChange(site.name);
-                                        setIsDestPopoverOpen(false);
-                                        setDestSearchQuery("");
-                                      }}
+                                      variant="outline"
+                                      role="combobox"
+                                      className={cn(
+                                        "w-full justify-between font-normal rounded-sm h-10 bg-background",
+                                        !locationField.value && "text-muted-foreground"
+                                      )}
                                     >
-                                      <Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />
-                                      {site.name}
+                                      {locationField.value || "Select destination site..."}
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                     </Button>
-                                  ))
-                                ) : (
-                                  <p className="p-4 text-center text-xs text-muted-foreground italic">No matching sites found.</p>
-                                )}
-                              </div>
-                            </ScrollArea>
-                          </PopoverContent>
-                        </Popover>
-                      ) : (
-                        <FormControl>
-                          <Input placeholder="Enter destination address..." {...field} className="h-11 rounded-sm" />
-                        </FormControl>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                  <div className="flex items-center border-b px-3">
+                                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                    <Input
+                                      placeholder="Search sites..."
+                                      className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
+                                      value={destSearchQuery}
+                                      onChange={(e) => setDestSearchQuery(e.target.value)}
+                                      onKeyDown={(e) => e.stopPropagation()}
+                                    />
+                                  </div>
+                                  <ScrollArea className="h-[200px]">
+                                    <div className="p-1">
+                                      {filteredDestSites.length > 0 ? (
+                                        filteredDestSites.map((site) => (
+                                          <Button
+                                            key={site.id}
+                                            type="button"
+                                            variant="ghost"
+                                            className="w-full justify-start font-normal h-10 text-sm"
+                                            onClick={() => {
+                                              locationField.onChange(site.name);
+                                              setOpenDestPopoverIndex(null);
+                                              setDestSearchQuery("");
+                                            }}
+                                          >
+                                            <Check className={cn("mr-2 h-4 w-4 text-primary", site.name === locationField.value ? "opacity-100" : "opacity-0")} />
+                                            {site.name}
+                                          </Button>
+                                        ))
+                                      ) : (
+                                        <p className="p-4 text-center text-xs text-muted-foreground italic">No matching sites found.</p>
+                                      )}
+                                    </div>
+                                  </ScrollArea>
+                                </PopoverContent>
+                              </Popover>
+                            ) : (
+                              <FormControl>
+                                <Input placeholder="Enter destination address..." {...locationField} className="h-10 rounded-sm bg-background" />
+                              </FormControl>
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Co-passengers Section */}

@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -25,7 +24,7 @@ type Assignment = {
   vehicleDetails?: string;
   purpose: string;
   pickupLocation: string;
-  destination: string;
+  destinations: { type: string, location: string }[];
   status: 'Pending' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected';
   requestDate: any;
   startTime?: any;
@@ -91,12 +90,23 @@ export default function AssignedVehiclesPage() {
                     REQ: {trip.requestDate ? format(trip.requestDate.toDate(), 'dd MMM, HH:mm') : '—'}
                   </span>
                 </div>
-                <CardTitle className="text-xl font-black text-foreground flex items-center gap-3">
-                  <span className="text-primary">{trip.pickupLocation || 'Source'}</span>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span>{trip.destination}</span>
-                </CardTitle>
-                <p className="text-sm font-bold text-muted-foreground italic leading-relaxed">"{trip.purpose}"</p>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center flex-wrap gap-2 text-xl font-black text-foreground">
+                    <span className="text-primary">{trip.pickupLocation || 'Source'}</span>
+                    {trip.destinations?.map((dest, idx) => (
+                      <React.Fragment key={idx}>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span>{dest.location}</span>
+                      </React.Fragment>
+                    )) || (
+                      <>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground italic">No destination set</span>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-sm font-bold text-muted-foreground italic leading-relaxed">"{trip.purpose}"</p>
+                </div>
               </CardHeader>
               
               <CardContent className="space-y-6 border-t pt-6">

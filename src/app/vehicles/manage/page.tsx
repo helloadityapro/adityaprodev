@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -36,7 +35,7 @@ type Assignment = {
   userName: string;
   purpose: string;
   pickupLocation: string;
-  destination: string;
+  destinations: { type: string, location: string }[];
   status: 'Pending' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected';
   requestDate: any;
   vehicleId?: string;
@@ -175,7 +174,7 @@ export default function ManageVehiclesPage() {
           </CardHeader>
           <CardContent className="p-0">
             <Table>
-              <TableHeader className="bg-muted/30">
+              <TableHeader>
                 <TableRow>
                   <TableHead className="px-6">Personnel & Passengers</TableHead>
                   <TableHead>Route</TableHead>
@@ -205,8 +204,13 @@ export default function ManageVehiclesPage() {
                         <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
                           <MapPin className="h-3 w-3" /> {req.pickupLocation || 'Source'}
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground ml-4">
-                          <ArrowRight className="h-2.5 w-2.5" /> {req.destination}
+                        <div className="flex flex-col ml-4 border-l-2 border-primary/10 pl-2">
+                          {req.destinations?.map((dest, idx) => (
+                            <div key={idx} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                              <ArrowRight className="h-2.5 w-2.5 shrink-0" /> 
+                              <span className="truncate max-w-[120px]">{dest.location}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </TableCell>
@@ -252,9 +256,14 @@ export default function ManageVehiclesPage() {
             <div className="space-y-2">
               <Label className="text-[10px] font-bold uppercase text-muted-foreground">Route & Capacity Requirements</Label>
               <div className="p-3 bg-muted/20 border rounded-sm">
-                <p className="text-xs font-bold text-primary flex items-center gap-2">
-                  {approvalTarget?.assignment.pickupLocation} <ArrowRight className="h-3 w-3" /> {approvalTarget?.assignment.destination}
-                </p>
+                <div className="flex items-center flex-wrap gap-2 text-xs font-bold text-primary">
+                  {approvalTarget?.assignment.pickupLocation} 
+                  {approvalTarget?.assignment.destinations.map((d, i) => (
+                    <React.Fragment key={i}>
+                      <ArrowRight className="h-3 w-3" /> {d.location}
+                    </React.Fragment>
+                  ))}
+                </div>
                 <div className="flex items-center gap-4 mt-2">
                   <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase">
                     <User className="h-3 w-3" /> 1 Requester
