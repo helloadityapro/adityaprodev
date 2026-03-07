@@ -10,10 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
-import { CalendarDays, Search, FileDown, User, Clock, MapPin, CheckCircle2, XCircle, Timer, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { CalendarDays, Search, FileDown, User, Clock, MapPin, CheckCircle2, XCircle, Timer, Loader2, ArrowUpDown, ArrowUp, ArrowDown, FilterX, Users } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 
@@ -47,6 +48,8 @@ export default function AttendanceSummaryPage() {
 
   const [selectedDate, setSelectedDate] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
+  const [roleFilter, setRoleFilter] = React.useState<string>("all");
   const [isExporting, setIsExporting] = React.useState(false);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'personnel', direction: 'asc' });
 
@@ -82,10 +85,14 @@ export default function AttendanceSummaryPage() {
           status: record ? record.status : 'absent'
         };
       })
-      .filter(item => 
-        item.user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      .filter(item => {
+        const matchesSearch = item.user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             item.user.email?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
+        const matchesRole = roleFilter === 'all' || item.user.role === roleFilter;
+        
+        return matchesSearch && matchesStatus && matchesRole;
+      });
 
     return data.sort((a, b) => {
       const { key, direction } = sortConfig;
@@ -110,7 +117,7 @@ export default function AttendanceSummaryPage() {
       if (valA > valB) return direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [allUsers, attendanceRecords, searchTerm, sortConfig]);
+  }, [allUsers, attendanceRecords, searchTerm, statusFilter, roleFilter, sortConfig]);
 
   const stats = React.useMemo(() => {
     const total = summaryData.length;
@@ -125,6 +132,12 @@ export default function AttendanceSummaryPage() {
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setRoleFilter("all");
   };
 
   const SortIcon = ({ column }: { column: SortKey }) => {
@@ -239,18 +252,64 @@ export default function AttendanceSummaryPage() {
       </div>
 
       <Card className="rounded-sm border-primary/10 shadow-lg overflow-hidden">
-        <CardHeader className="bg-muted/5 border-b py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-            Presence Log for {format(parseISO(selectedDate), 'dd MMMM yyyy')}
-          </CardTitle>
-          <div className="relative w-full md:w-72">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search personnel..." 
-              className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
-            />
+        <CardHeader className="bg-muted/5 border-b py-4">
+          <div className="flex flex-col gap-4">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              Presence Log for {format(parseISO(selectedDate), 'dd MMMM yyyy')}
+            </CardTitle>
+            
+            <div className="flex flex-col md:flex-row md:items-end gap-4">
+              <div className="relative flex-1">
+                <Label className="text-[9px] font-black uppercase text-muted-foreground mb-1 block">Search Personnel</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Name or email..." 
+                    className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              <div className="w-full md:w-48">
+                <Label className="text-[9px] font-black uppercase text-muted-foreground mb-1 block">Filter By Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-9 rounded-sm border-primary/20 text-xs font-bold uppercase tracking-tight">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
+                    <SelectItem value="absent" className="text-xs font-bold uppercase text-red-600">Absent</SelectItem>
+                    <SelectItem value="ongoing" className="text-xs font-bold uppercase text-blue-600">In Session</SelectItem>
+                    <SelectItem value="completed" className="text-xs font-bold uppercase text-emerald-600">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="w-full md:w-48">
+                <Label className="text-[9px] font-black uppercase text-muted-foreground mb-1 block">Filter By Role</Label>
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="h-9 rounded-sm border-primary/20 text-xs font-bold uppercase tracking-tight">
+                    <SelectValue placeholder="All Roles" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs font-bold uppercase">All Roles</SelectItem>
+                    <SelectItem value="Site Manager" className="text-xs font-bold uppercase">Site Manager</SelectItem>
+                    <SelectItem value="Site Engineer" className="text-xs font-bold uppercase">Site Engineer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={clearFilters} 
+                className="h-9 px-3 text-muted-foreground hover:text-primary rounded-sm font-bold text-[10px] uppercase tracking-widest"
+              >
+                <FilterX className="h-3.5 w-3.5 mr-1.5" /> Clear
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
@@ -345,7 +404,7 @@ export default function AttendanceSummaryPage() {
               )) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">
-                    No personnel records found matching filters.
+                    No personnel records found matching current filters.
                   </TableCell>
                 </TableRow>
               )}
