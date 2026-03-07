@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -7,11 +6,13 @@ import { collection, query, orderBy, doc, where, or } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CarFront, Clock, MapPin, User, ArrowRight, CheckCircle2, Navigation, Stepper } from 'lucide-react';
+import { CarFront, Clock, MapPin, User, ArrowRight, CheckCircle2, Navigation } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 type Assignment = {
   id: string;
