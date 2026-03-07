@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, useCollection } from '@/firebase';
 import { collection, doc, serverTimestamp, query, where } from 'firebase/firestore';
-import { Fuel, Loader2, Send, CheckCircle2, Building2, Globe, Search, ChevronsUpDown, Check, ArrowRight, Users, UserPlus, X, Trash2, Plus, MapPinned } from 'lucide-react';
+import { Fuel, Loader2, Send, CheckCircle2, Building2, Globe, Search, ChevronsUpDown, Check, ArrowRight, Users, UserPlus, X, Trash2, Plus, MapPinned, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -163,6 +163,19 @@ export default function RequestVehiclePage() {
       return;
     }
     form.setValue('coPassengers', [...coPassengers, { id: u.id, name: u.username || u.email }]);
+    setIsPassengerPopoverOpen(false);
+    setPassengerSearchQuery("");
+  };
+
+  const addExternalPassenger = () => {
+    const name = passengerSearchQuery.trim();
+    if (!name) return;
+    if (coPassengers.some(p => p.name.toLowerCase() === `${name.toLowerCase()} (ext)`)) {
+      toast({ variant: 'destructive', title: 'Duplicate', description: 'External passenger already added.' });
+      return;
+    }
+    const newId = `ext_${Date.now()}`;
+    form.setValue('coPassengers', [...coPassengers, { id: newId, name: `${name} (Ext)` }]);
     setIsPassengerPopoverOpen(false);
     setPassengerSearchQuery("");
   };
@@ -395,13 +408,13 @@ export default function RequestVehiclePage() {
                                 <FormItem className="flex items-center space-x-2 space-y-0">
                                   <FormControl><RadioGroupItem value="Site" /></FormControl>
                                   <FormLabel className="font-bold cursor-pointer flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Building2 className="h-3.5 w-3.5" /> Project Site
+                                    <Building2 className="h-3.5 w-3.5 text-primary" /> Project Site
                                   </FormLabel>
                                 </FormItem>
                                 <FormItem className="flex items-center space-x-2 space-y-0">
                                   <FormControl><RadioGroupItem value="Other" /></FormControl>
                                   <FormLabel className="font-bold cursor-pointer flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Globe className="h-3.5 w-3.5" /> Other
+                                    <Globe className="h-3.5 w-3.5 text-primary" /> Other
                                   </FormLabel>
                                 </FormItem>
                               </RadioGroup>
@@ -500,35 +513,53 @@ export default function RequestVehiclePage() {
                         <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Add Person
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[280px] p-0" align="end">
+                    <PopoverContent className="w-[300px] p-0" align="end">
                       <div className="flex items-center border-b px-3">
                         <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                         <Input
-                          placeholder="Search personnel..."
+                          placeholder="Search or type name..."
                           className="h-10 w-full border-none focus-visible:ring-0 px-0 text-xs"
                           value={passengerSearchQuery}
                           onChange={(e) => setPassengerSearchQuery(e.target.value)}
                         />
                       </div>
-                      <ScrollArea className="h-[200px]">
+                      <ScrollArea className="h-[250px]">
                         <div className="p-1">
-                          {filteredPotentialPassengers.length > 0 ? (
-                            filteredPotentialPassengers.map((u) => (
-                              <Button
-                                key={u.id}
-                                variant="ghost"
-                                className="w-full justify-start font-normal h-10 text-xs"
-                                onClick={() => addPassenger(u)}
-                              >
-                                <div className="flex flex-col items-start overflow-hidden">
-                                  <span className="truncate font-bold">{u.username}</span>
-                                  <span className="text-[9px] text-muted-foreground uppercase">{u.role}</span>
-                                </div>
-                              </Button>
-                            ))
-                          ) : (
-                            <p className="p-4 text-center text-xs text-muted-foreground italic">No results found.</p>
+                          {passengerSearchQuery.trim() !== "" && (
+                            <Button
+                              variant="ghost"
+                              className="w-full justify-start h-12 mb-1 bg-primary/5 text-primary hover:bg-primary/10"
+                              onClick={addExternalPassenger}
+                            >
+                              <UserCheck className="mr-2 h-4 w-4" />
+                              <div className="flex flex-col items-start overflow-hidden">
+                                <span className="text-xs font-black uppercase truncate">Add "{passengerSearchQuery}"</span>
+                                <span className="text-[9px] text-muted-foreground uppercase">Manual External Entry</span>
+                              </div>
+                            </Button>
                           )}
+                          
+                          {filteredPotentialPassengers.length > 0 ? (
+                            <>
+                              <div className="px-2 py-1.5 text-[9px] font-black text-muted-foreground uppercase tracking-widest bg-muted/30">User Directory</div>
+                              {filteredPotentialPassengers.map((u) => (
+                                <Button
+                                  key={u.id}
+                                  type="button"
+                                  variant="ghost"
+                                  className="w-full justify-start font-normal h-10 text-xs"
+                                  onClick={() => addPassenger(u)}
+                                >
+                                  <div className="flex flex-col items-start overflow-hidden">
+                                    <span className="truncate font-bold">{u.username}</span>
+                                    <span className="text-[9px] text-muted-foreground uppercase">{u.role}</span>
+                                  </div>
+                                </Button>
+                              ))}
+                            </>
+                          ) : passengerSearchQuery.trim() === "" ? (
+                            <p className="p-4 text-center text-xs text-muted-foreground italic">Type to search users or add guest...</p>
+                          ) : null}
                         </div>
                       </ScrollArea>
                     </PopoverContent>
