@@ -198,37 +198,6 @@ export default function RequestVehiclePage() {
     (u.email || '').toLowerCase().includes(passengerSearchQuery.toLowerCase())
   ) || [];
 
-  if (isSuccess) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="bg-primary/10 p-4 rounded-full">
-                <CheckCircle2 className="h-12 w-12 text-primary" />
-              </div>
-            </div>
-            <CardTitle className="text-2xl font-bold">Request Logged</CardTitle>
-            <CardDescription className="text-base">
-              Your vehicle allotment request has been submitted for Admin approval.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button className="w-full rounded-sm font-bold h-11" onClick={() => router.push('/vehicles/assigned')}>
-              Track Request Status
-            </Button>
-            <Button variant="ghost" className="w-full rounded-sm" onClick={() => {
-              setIsSuccess(false);
-              form.reset();
-            }}>
-              Request Another Trip
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
       <div className="flex flex-col gap-1">
@@ -536,6 +505,12 @@ export default function RequestVehiclePage() {
                           className="h-10 w-full border-none focus-visible:ring-0 px-0 text-xs"
                           value={passengerSearchQuery}
                           onChange={(e) => setPassengerSearchQuery(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addExternalPassenger();
+                            }
+                          }}
                         />
                       </div>
                       <ScrollArea className="h-[250px]">
