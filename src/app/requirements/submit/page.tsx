@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -40,28 +39,52 @@ type Site = {
   name: string;
 };
 
+type UserProfile = {
+  id: string;
+  username: string;
+  role: string;
+  siteManagerId?: string;
+  assignedProjectIds?: string[];
+};
+
 export default function SubmitRequirementPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc(userProfileRef);
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
+
+  // Fetch team members for managers to aggregate sites
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
     if (isAdmin) {
         return Array.from(new Map(allSites.map(s => [s.name, s])).values());
     }
-    const assignedIds = userProfile.assignedProjectIds || [];
-    const filtered = allSites.filter(s => assignedIds.includes(s.id));
+    
+    // Aggregated site visibility for Managers
+    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager && teamMembers) {
+      teamMembers.forEach(member => {
+        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
+      });
+    }
+
+    const filtered = allSites.filter(s => assignedIds.has(s.id));
     return Array.from(new Map(filtered.map(s => [s.name, s])).values());
-  }, [allSites, userProfile, isAdmin]);
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");

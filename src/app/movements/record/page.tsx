@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -10,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment, query, where } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
@@ -65,6 +64,7 @@ type UserProfile = {
   role: string;
   mobile?: string;
   siteManagerId?: string;
+  assignedProjectIds?: string[];
   pointsMultiplier?: number;
 };
 
@@ -88,6 +88,7 @@ export default function RecordMovementPage() {
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -98,15 +99,30 @@ export default function RecordMovementPage() {
   const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
   const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
 
+  // Fetch team members for managers to aggregate sites
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
+
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
     if (isAdmin) {
         return Array.from(new Map(allSites.map(s => [s.name, s])).values());
     }
-    const assignedIds = userProfile.assignedProjectIds || [];
-    const filtered = allSites.filter(s => assignedIds.includes(s.id));
+    
+    // Aggregated site visibility for Managers
+    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager && teamMembers) {
+      teamMembers.forEach(member => {
+        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
+      });
+    }
+
+    const filtered = allSites.filter(s => assignedIds.has(s.id));
     return Array.from(new Map(filtered.map(s => [s.name, s])).values());
-  }, [allSites, userProfile, isAdmin]);
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");

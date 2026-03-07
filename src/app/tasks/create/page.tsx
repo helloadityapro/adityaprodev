@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -43,6 +42,7 @@ type UserProfile = {
   role: string;
   mobile?: string;
   siteManagerId?: string;
+  assignedProjectIds?: string[];
   pointsMultiplier?: number;
 };
 
@@ -75,6 +75,31 @@ export default function CreateTaskPage() {
     return colRef;
   }, [firestore, isAdmin, isManager, user]);
   const { data: teamUsers } = useCollection<UserProfile>(usersQuery);
+
+  // Fetch team members for managers to aggregate sites
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
+
+  const accessibleSites = React.useMemo(() => {
+    if (!allSites || !userProfile) return [];
+    if (isAdmin) {
+        return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+    }
+    
+    // Aggregated site visibility for Managers
+    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager && teamMembers) {
+      teamMembers.forEach(member => {
+        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
+      });
+    }
+
+    const filtered = allSites.filter(s => assignedIds.has(s.id));
+    return Array.from(new Map(filtered.map(s => [s.name, s])).values());
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
 
   const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
   const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
@@ -161,7 +186,7 @@ export default function CreateTaskPage() {
     }
   };
 
-  const filteredSites = allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())) || [];
+  const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
   const filteredUsers = teamUsers?.filter(u => u.username.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.email.toLowerCase().includes(userSearchQuery.toLowerCase())) || [];
 
   if (isSubmitted && submittedTask) {

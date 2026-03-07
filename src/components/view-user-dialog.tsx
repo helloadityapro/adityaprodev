@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -101,13 +100,20 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
   }, [allUsers, user]);
 
   const assignedSites = React.useMemo(() => {
-    if (!user?.assignedProjectIds || !allSites) return [];
-    return allSites.filter(s => user.assignedProjectIds?.includes(s.id)).sort((a, b) => a.name.localeCompare(b.name));
-  }, [user, allSites]);
+    if (!allSites || !user) return [];
+    
+    // Aggregated site visibility for Managers
+    const siteIds = new Set<string>(user.assignedProjectIds || []);
+    
+    if (user.role === 'Site Manager' && mappedEngineers) {
+      mappedEngineers.forEach(member => {
+        (member.assignedProjectIds || []).forEach(id => siteIds.add(id));
+      });
+    }
 
-  /**
-   * Recalculates and updates a Manager's assignedProjectIds based on all reporting engineers.
-   */
+    return allSites.filter(s => siteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [user, allSites, mappedEngineers]);
+
   const syncManagerSites = async (managerId: string) => {
     try {
       const q = query(collection(firestore, 'users'), where('siteManagerId', '==', managerId));
@@ -116,8 +122,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
       const allTeamSites = new Set<string>();
       snap.docs.forEach(d => {
           const data = d.data();
-          const sites = data.id === updatedEngineerId ? updatedEngineerSites : (data.assignedProjectIds || []);
-          sites.forEach((id: string) => allTeamSites.add(id));
+          (data.assignedProjectIds || []).forEach((id: string) => allTeamSites.add(id));
       });
 
       const managerRef = doc(firestore, 'users', managerId);
@@ -134,7 +139,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
       const userRef = doc(firestore, 'users', user.id);
       updateDocumentNonBlocking(userRef, { 
         siteManagerId: selectedManagerId,
-        role: 'Site Engineer' // Ensure they are categorized as engineer when mapped
+        role: 'Site Engineer'
       });
 
       await syncManagerSites(selectedManagerId);

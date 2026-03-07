@@ -101,12 +101,27 @@ export default function ReportsDashboard() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSitesList } = useCollection<Site>(sitesQuery);
 
+  // Fetch team members for managers to aggregate sites
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
+
   const accessibleSites = React.useMemo(() => {
     if (!allSitesList || !userProfile) return [];
     if (isAdmin) return Array.from(new Map(allSitesList.map(s => [s.name, s])).values());
-    const assignedIds = userProfile.assignedProjectIds || [];
-    return allSitesList.filter(s => assignedIds.includes(s.id));
-  }, [allSitesList, userProfile, isAdmin]);
+    
+    // Aggregated site visibility for Managers
+    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager && teamMembers) {
+      teamMembers.forEach(member => {
+        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
+      });
+    }
+
+    return allSitesList.filter(s => assignedIds.has(s.id));
+  }, [allSitesList, userProfile, isAdmin, isManager, teamMembers]);
 
   const filteredSiteList = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
@@ -279,7 +294,7 @@ export default function ReportsDashboard() {
         tasks: fTasks.length,
       }
     };
-  }, [isLoading, permits, dprs, movements, requirements, tasks, selectedSite, timeRange, customStartDate, customEndDate]);
+  }, [isLoading, permits, dprs, movements, requirements, tasks, selectedSite, timeRange, customStartDate, customEndDate, rates]);
 
   if (isLoading) {
     return (

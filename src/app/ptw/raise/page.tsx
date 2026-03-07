@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react"
@@ -51,6 +50,14 @@ type Site = {
   dcCapacity: any;
 };
 
+type UserProfile = {
+  id: string;
+  username: string;
+  role: string;
+  siteManagerId?: string;
+  assignedProjectIds?: string[];
+};
+
 const formatCapacity = (val: any) => {
   const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
   return isNaN(num) ? "0.000" : num.toFixed(3);
@@ -69,7 +76,7 @@ export default function RaisePtwPage() {
   const isCorrectionMode = !!permitIdToCorrect;
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const permitToCorrectRef = useMemoFirebase(() => {
     if (!permitIdToCorrect || !firestore) return null;
@@ -85,16 +92,32 @@ export default function RaisePtwPage() {
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
   const isAdmin = React.useMemo(() => isSuperAdmin(user?.email) || userProfile?.role === 'Admin', [user, userProfile]);
+  const isManager = userProfile?.role === 'Site Manager';
+
+  // Fetch team members for managers to aggregate sites
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
   
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
     if (isAdmin) {
       return Array.from(new Map(allSites.map(site => [site.name, site])).values());
     }
-    const assignedIds = userProfile.assignedProjectIds || [];
-    const filtered = allSites.filter(s => assignedIds.includes(s.id));
+    
+    // Aggregated site visibility for Managers
+    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager && teamMembers) {
+      teamMembers.forEach(member => {
+        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
+      });
+    }
+
+    const filtered = allSites.filter(s => assignedIds.has(s.id));
     return Array.from(new Map(filtered.map(site => [site.name, site])).values());
-  }, [allSites, userProfile, isAdmin]);
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
 
   const [selectedSite, setSelectedSite] = React.useState<Site | null>(null);
   const [files, setFiles] = React.useState<File[]>([]);
