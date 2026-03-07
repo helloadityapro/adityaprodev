@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Car, Clock, CheckCircle2, XCircle, User, MapPin, Plus, Loader2, Search, FilterX, Truck, Fuel, ArrowRight } from 'lucide-react';
+import { Car, Clock, CheckCircle2, XCircle, User, MapPin, Plus, Loader2, Search, FilterX, Truck, Fuel, ArrowRight, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -41,6 +41,7 @@ type Assignment = {
   requestDate: any;
   vehicleId?: string;
   driverId?: string;
+  coPassengers?: { id: string, name: string }[];
 };
 
 type UserProfile = {
@@ -176,8 +177,8 @@ export default function ManageVehiclesPage() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="px-6">Personnel</TableHead>
-                  <TableHead>Route (From → To)</TableHead>
+                  <TableHead className="px-6">Personnel & Passengers</TableHead>
+                  <TableHead>Route</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
@@ -188,9 +189,16 @@ export default function ManageVehiclesPage() {
                   <TableRow><TableCell colSpan={5} className="h-32 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" /></TableCell></TableRow>
                 ) : assignments?.map(req => (
                   <TableRow key={req.id} className="hover:bg-muted/5">
-                    <TableCell className="px-6">
-                      <p className="font-bold text-sm">{req.userName}</p>
-                      <p className="text-[10px] text-muted-foreground font-medium uppercase truncate max-w-[150px]">{req.purpose}</p>
+                    <TableCell className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-bold text-sm">{req.userName}</span>
+                        {req.coPassengers && req.coPassengers.length > 0 && (
+                          <Badge variant="outline" className="w-fit text-[8px] font-black uppercase h-4 px-1 border-primary/20 text-primary">
+                            <Users className="h-2 w-2 mr-1" /> +{req.coPassengers.length} Co-passengers
+                          </Badge>
+                        )}
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase truncate max-w-[150px] italic">"{req.purpose}"</p>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
@@ -242,12 +250,21 @@ export default function ManageVehiclesPage() {
           </DialogHeader>
           <div className="space-y-6 py-4">
             <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase text-muted-foreground">Route & Purpose</Label>
+              <Label className="text-[10px] font-bold uppercase text-muted-foreground">Route & Capacity Requirements</Label>
               <div className="p-3 bg-muted/20 border rounded-sm">
                 <p className="text-xs font-bold text-primary flex items-center gap-2">
                   {approvalTarget?.assignment.pickupLocation} <ArrowRight className="h-3 w-3" /> {approvalTarget?.assignment.destination}
                 </p>
-                <p className="text-[10px] text-muted-foreground italic mt-1">"{approvalTarget?.assignment.purpose}"</p>
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase">
+                    <User className="h-3 w-3" /> 1 Requester
+                  </div>
+                  {approvalTarget?.assignment.coPassengers && approvalTarget.assignment.coPassengers.length > 0 && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-black text-primary uppercase">
+                      <Users className="h-3 w-3" /> {approvalTarget.assignment.coPassengers.length} Co-passengers
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

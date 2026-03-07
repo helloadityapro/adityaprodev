@@ -7,7 +7,7 @@ import { collection, query, orderBy, doc, where, or } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CarFront, Clock, MapPin, User, ArrowRight, CheckCircle2, Navigation, MapPinned } from 'lucide-react';
+import { CarFront, Clock, MapPin, User, ArrowRight, CheckCircle2, Navigation, MapPinned, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ type Assignment = {
   endTime?: any;
   startReading?: number;
   endReading?: number;
+  coPassengers?: { id: string, name: string }[];
 };
 
 export default function AssignedVehiclesPage() {
@@ -98,22 +99,41 @@ export default function AssignedVehiclesPage() {
                 <p className="text-sm font-bold text-muted-foreground italic leading-relaxed">"{trip.purpose}"</p>
               </CardHeader>
               
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Assigned Vehicle</Label>
-                      <div className="flex items-center gap-2 font-black text-sm">
-                        <CarFront className="h-4 w-4 text-primary" />
-                        {trip.vehicleDetails || 'Pending Allotment'}
+              <CardContent className="space-y-6 border-t pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Vehicle Details</Label>
+                        <div className="flex items-center gap-2 font-black text-xs">
+                          <CarFront className="h-3.5 w-3.5 text-primary" />
+                          {trip.vehicleDetails || 'Pending Allotment'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Designated Driver</Label>
+                        <div className="flex items-center gap-2 font-black text-xs">
+                          <User className="h-3.5 w-3.5 text-primary" />
+                          {trip.driverName || 'Pending Driver'}
+                        </div>
                       </div>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Designated Driver</Label>
-                      <div className="flex items-center gap-2 font-black text-sm">
-                        <User className="h-4 w-4 text-primary" />
-                        {trip.driverName || 'Pending Driver'}
-                      </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1.5">
+                        <Users className="h-3 w-3" /> Co-passengers ({trip.coPassengers?.length || 0})
+                      </Label>
+                      {trip.coPassengers && trip.coPassengers.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {trip.coPassengers.map(p => (
+                            <Badge key={p.id} variant="secondary" className="rounded-sm text-[9px] h-5 font-bold uppercase tracking-tight bg-primary/5 text-primary border-primary/10">
+                              {p.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground italic">Solo Trip</p>
+                      )}
                     </div>
                   </div>
 

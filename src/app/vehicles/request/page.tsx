@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, useCollection } from '@/firebase';
 import { collection, doc, serverTimestamp, query, where } from 'firebase/firestore';
-import { Fuel, Loader2, Send, CheckCircle2, MapPin, Building2, Globe, Search, ChevronsUpDown, Check, ArrowRight } from 'lucide-react';
+import { Fuel, Loader2, Send, CheckCircle2, Building2, Globe, Search, ChevronsUpDown, Check, ArrowRight, Users, UserPlus, X, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { Badge } from '@/components/ui/badge';
 
 const requestSchema = z.object({
   pickupType: z.enum(['Site', 'Other'], { required_error: 'Please select a pickup type.' }),
@@ -28,6 +29,10 @@ const requestSchema = z.object({
   destinationType: z.enum(['Site', 'Other'], { required_error: 'Please select a destination type.' }),
   destination: z.string().min(1, 'Destination is required.'),
   purpose: z.string().min(5, 'Purpose must be detailed (min 5 chars).'),
+  coPassengers: z.array(z.object({
+    id: z.string(),
+    name: z.string()
+  })).default([]),
 });
 
 type Site = {
@@ -38,6 +43,7 @@ type Site = {
 type UserProfile = {
   id: string;
   username: string;
+  email: string;
   role: string;
   siteManagerId?: string;
   assignedProjectIds?: string[];
@@ -58,6 +64,10 @@ export default function RequestVehiclePage() {
   // Fetch Sites
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
+
+  // Fetch Users for Co-passengers
+  const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: allUsers } = useCollection<UserProfile>(usersQuery);
 
   // Fetch team members for managers to aggregate sites
   const teamQuery = useMemoFirebase(() => {
@@ -93,6 +103,9 @@ export default function RequestVehiclePage() {
   const [isDestPopoverOpen, setIsDestPopoverOpen] = React.useState(false);
   const [destSearchQuery, setDestSearchQuery] = React.useState("");
 
+  const [isPassengerPopoverOpen, setIsPassengerPopoverOpen] = React.useState(false);
+  const [passengerSearchQuery, setPassengerSearchQuery] = React.useState("");
+
   const form = useForm<z.infer<typeof requestSchema>>({
     resolver: zodResolver(requestSchema),
     defaultValues: { 
@@ -100,12 +113,14 @@ export default function RequestVehiclePage() {
       pickupLocation: '',
       destinationType: 'Site',
       destination: '',
-      purpose: '' 
+      purpose: '',
+      coPassengers: []
     },
   });
 
   const pickupType = form.watch('pickupType');
   const destinationType = form.watch('destinationType');
+  const coPassengers = form.watch('coPassengers');
 
   const onSubmit = async (values: z.infer<typeof requestSchema>) => {
     if (!user || !userProfile) return;
@@ -119,6 +134,7 @@ export default function RequestVehiclePage() {
         destination: values.destination,
         destinationType: values.destinationType,
         purpose: values.purpose,
+        coPassengers: values.coPassengers,
         status: 'Pending',
         requestDate: serverTimestamp(),
       });
@@ -131,6 +147,24 @@ export default function RequestVehiclePage() {
     }
   };
 
+  const addPassenger = (u: UserProfile) => {
+    if (u.id === user?.uid) {
+      toast({ variant: 'destructive', title: 'Action Denied', description: 'You are the requester by default.' });
+      return;
+    }
+    if (coPassengers.some(p => p.id === u.id)) {
+      toast({ variant: 'destructive', title: 'Duplicate', description: 'Personnel already added.' });
+      return;
+    }
+    form.setValue('coPassengers', [...coPassengers, { id: u.id, name: u.username || u.email }]);
+    setIsPassengerPopoverOpen(false);
+    setPassengerSearchQuery("");
+  };
+
+  const removePassenger = (id: string) => {
+    form.setValue('coPassengers', coPassengers.filter(p => p.id !== id));
+  };
+
   const filteredPickupSites = accessibleSites.filter(s => 
     s.name.toLowerCase().includes(pickupSearchQuery.toLowerCase())
   );
@@ -138,6 +172,11 @@ export default function RequestVehiclePage() {
   const filteredDestSites = accessibleSites.filter(s => 
     s.name.toLowerCase().includes(destSearchQuery.toLowerCase())
   );
+
+  const filteredPotentialPassengers = allUsers?.filter(u => 
+    (u.username || '').toLowerCase().includes(passengerSearchQuery.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(passengerSearchQuery.toLowerCase())
+  ) || [];
 
   if (isSuccess) {
     return (
@@ -407,10 +446,75 @@ export default function RequestVehiclePage() {
                 />
               </div>
 
+              {/* Co-passengers Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">3</div>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Co-passengers</h3>
+                  </div>
+                  <Popover open={isPassengerPopoverOpen} onOpenChange={setIsPassengerPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+                        <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Add Person
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[280px] p-0" align="end">
+                      <div className="flex items-center border-b px-3">
+                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                        <Input
+                          placeholder="Search personnel..."
+                          className="h-10 w-full border-none focus-visible:ring-0 px-0 text-xs"
+                          value={passengerSearchQuery}
+                          onChange={(e) => setPassengerSearchQuery(e.target.value)}
+                        />
+                      </div>
+                      <ScrollArea className="h-[200px]">
+                        <div className="p-1">
+                          {filteredPotentialPassengers.length > 0 ? (
+                            filteredPotentialPassengers.map((u) => (
+                              <Button
+                                key={u.id}
+                                variant="ghost"
+                                className="w-full justify-start font-normal h-10 text-xs"
+                                onClick={() => addPassenger(u)}
+                              >
+                                <div className="flex flex-col items-start overflow-hidden">
+                                  <span className="truncate font-bold">{u.username}</span>
+                                  <span className="text-[9px] text-muted-foreground uppercase">{u.role}</span>
+                                </div>
+                              </Button>
+                            ))
+                          ) : (
+                            <p className="p-4 text-center text-xs text-muted-foreground italic">No results found.</p>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="min-h-[60px] p-4 border border-dashed rounded-sm bg-muted/10 flex flex-wrap gap-2 items-center">
+                  {coPassengers.length > 0 ? (
+                    coPassengers.map(p => (
+                      <Badge key={p.id} variant="secondary" className="pl-3 pr-1 py-1 h-8 rounded-sm gap-2 flex items-center font-bold text-xs">
+                        <Users className="h-3 w-3 text-primary opacity-60" />
+                        {p.name}
+                        <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-destructive/10 text-muted-foreground hover:text-destructive" onClick={() => removePassenger(p.id)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))
+                  ) : (
+                    <p className="text-[10px] uppercase font-black text-muted-foreground/40 tracking-widest text-center w-full">No co-passengers added</p>
+                  )}
+                </div>
+              </div>
+
               {/* Purpose Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">3</div>
+                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">4</div>
                   <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Purpose</h3>
                 </div>
                 <FormField control={form.control} name="purpose" render={({ field }) => (
