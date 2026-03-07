@@ -83,8 +83,10 @@ export default function SubmitDPRPage() {
     setIsSubmitting(true);
     try {
       const combinedDescription = values.updates.map(u => u.value.trim()).join('\n\n');
+      const siteId = accessibleSites.find(s => s.name === values.siteName)?.id;
       
       addDocumentNonBlocking(collection(firestore, 'dprs'), {
+        siteId: siteId || null,
         siteName: values.siteName,
         reportDate: values.reportDate,
         description: combinedDescription,

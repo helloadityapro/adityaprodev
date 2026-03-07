@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react"
@@ -151,6 +152,7 @@ export default function RaisePtwPage() {
         return;
       }
       navigator.geolocation.getCurrentPosition(
+        (position) => resolve({ latitude: number; longitude: number } | null),
         (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
         () => {
           toast({ variant: 'destructive', title: 'Location Error', description: 'Could not get location.' });
@@ -275,6 +277,7 @@ export default function RaisePtwPage() {
       const effectiveSiteManagerId = userProfile.siteManagerId || (isCorrectionMode ? permitToCorrect?.siteManagerId : null) || null;
 
       const permitData: any = {
+        siteId: selectedSite.id,
         siteName: values.siteName,
         ptwType: values.ptwType,
         descriptionOfWork: values.descriptionOfWork,

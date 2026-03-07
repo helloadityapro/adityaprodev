@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -199,9 +200,11 @@ export default function RecordMovementPage() {
     setIsSubmitting(true);
     try {
       const attachments = await uploadFiles(user.uid);
+      const siteId = accessibleSites.find(s => s.name === values.siteName)?.id;
 
       const promises = values.items.map(item => {
         return addDocumentNonBlocking(collection(firestore, 'material_movements'), {
+          siteId: siteId || null,
           siteName: values.siteName,
           movementType: values.movementType,
           sourceOrDestinationType: values.sourceOrDestinationType,

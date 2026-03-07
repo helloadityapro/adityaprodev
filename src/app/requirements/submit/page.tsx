@@ -86,6 +86,7 @@ export default function SubmitRequirementPage() {
     try {
       const isEngineer = userProfile.role === 'Site Engineer';
       const targetStatus = isEngineer ? "Pending" : (userProfile.role === 'Site Manager' ? "ManagerApproved" : "Approved");
+      const siteId = accessibleSites.find(s => s.name === values.siteName)?.id;
 
       const timelineEntry = {
         action: "Created",
@@ -98,6 +99,7 @@ export default function SubmitRequirementPage() {
 
       const promises = values.items.map(item => {
         return addDocumentNonBlocking(collection(firestore, 'requirements'), {
+          siteId: siteId || null,
           siteName: values.siteName,
           ...item,
           status: targetStatus,
