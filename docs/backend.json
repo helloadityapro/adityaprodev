@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -11,6 +12,7 @@
         "email": { "type": "string", "format": "email" },
         "mobile": { "type": "string" },
         "role": { "type": "string", "enum": ["Admin", "Site Manager", "Site Engineer"] },
+        "department": { "type": "string", "enum": ["Projects", "O&M"] },
         "registrationRequest": { "type": "boolean" },
         "siteManagerId": { "type": "string" },
         "assignedProjectIds": { "type": "array", "items": { "type": "string" } },

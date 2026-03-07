@@ -15,7 +15,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useCollection, useFirestore, useMemoFirebase, useDoc, useUser, updateDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, doc, orderBy, getDocs } from 'firebase/firestore';
-import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight, X, UserPlus, Check, ChevronsUpDown, Search, Loader2 } from 'lucide-react';
+import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight, X, UserPlus, Check, ChevronsUpDown, Search, Loader2, Building2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -31,6 +31,7 @@ type UserProfile = {
   email: string;
   mobile: string;
   role: 'Admin' | 'Site Manager' | 'Site Engineer';
+  department?: 'Projects' | 'O&M';
   assignedProjectIds?: string[];
   siteManagerId?: string;
   totalPoints?: number;
@@ -115,7 +116,8 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
       const allTeamSites = new Set<string>();
       snap.docs.forEach(d => {
           const data = d.data();
-          (data.assignedProjectIds || []).forEach((id: string) => allTeamSites.add(id));
+          const sites = data.id === updatedEngineerId ? updatedEngineerSites : (data.assignedProjectIds || []);
+          sites.forEach((id: string) => allTeamSites.add(id));
       });
 
       const managerRef = doc(firestore, 'users', managerId);
@@ -169,9 +171,16 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                   <DialogTitle className="text-3xl font-black tracking-tighter text-foreground uppercase">
                     {user.username}
                   </DialogTitle>
-                  <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-2 h-5 bg-primary/10 text-primary border-none">
-                    {user.role}
-                  </Badge>
+                  <div className="flex gap-2">
+                    <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-2 h-5 bg-primary/10 text-primary border-none">
+                      {user.role}
+                    </Badge>
+                    {user.department && (
+                      <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-2 h-5 border-primary/20 text-primary flex items-center gap-1">
+                        <Building2 className="h-3 w-3" /> {user.department}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <DialogDescription className="text-sm font-medium text-muted-foreground/70">
                   User Profile

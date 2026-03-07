@@ -1,3 +1,4 @@
+
 'use client'
 
 import Link from "next/link"
@@ -22,6 +23,7 @@ const registerSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
   mobile: z.string().min(1, { message: "Mobile number is required." }),
   role: z.enum(['Site Engineer', 'Site Manager'], { required_error: "Please select a role." }),
+  department: z.enum(['Projects', 'O&M'], { required_error: "Please select a department." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string()
 }).refine(data => data.password === data.confirmPassword, {
@@ -60,6 +62,7 @@ export default function RegisterPage() {
       password: "",
       confirmPassword: "",
       role: undefined,
+      department: undefined,
     },
   })
 
@@ -78,6 +81,7 @@ export default function RegisterPage() {
         email: values.email,
         mobile: values.mobile,
         role: values.role,
+        department: values.department,
         registrationRequest: true,
         assignedProjectIds: [],
         totalPoints: 0,
@@ -143,7 +147,7 @@ export default function RegisterPage() {
         <CardHeader className="text-center pb-8 pt-10">
           <CardTitle className="text-3xl font-bold tracking-tight text-primary">Aditya Pro</CardTitle>
           <CardDescription className="mt-2">
-            {user ? "Complete your profile registration" : "Create your Aditya Pro account"}
+            Create your Aditya Pro account
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -188,27 +192,50 @@ export default function RegisterPage() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a role for your account" />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            <SelectItem value="Site Engineer">Site Engineer</SelectItem>
-                            <SelectItem value="Site Manager">Site Manager</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Select role" />
+                              </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                              <SelectItem value="Site Engineer">Site Engineer</SelectItem>
+                              <SelectItem value="Site Manager">Site Manager</SelectItem>
+                          </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="department"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Select dept" />
+                              </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                              <SelectItem value="Projects">Projects</SelectItem>
+                              <SelectItem value="O&M">O&M</SelectItem>
+                          </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={form.control}
                 name="password"

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react";
@@ -12,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { User, Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp } from "lucide-react"
+import { User, Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp, Building2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
@@ -44,6 +45,7 @@ type User = {
   email?: string;
   mobile?: string;
   role?: UserRole;
+  department?: 'Projects' | 'O&M';
   registrationRequest?: boolean;
   assignedProjectIds?: string[];
   siteManagerId?: string;
@@ -66,7 +68,7 @@ function StatusBadge({ isPending }: { isPending: boolean }) {
 }
 
 type FilterType = 'all' | 'pending' | 'other' | UserRole;
-type SortKey = 'username' | 'role' | 'registrationRequest' | 'createdAt';
+type SortKey = 'username' | 'role' | 'registrationRequest' | 'createdAt' | 'department';
 
 export default function UsersPage() {
     const firestore = useFirestore();
@@ -258,6 +260,7 @@ export default function UsersPage() {
                             <TableRow>
                                 <TableHead onClick={() => handleSort('username')} className="cursor-pointer">User <SortIcon column="username" /></TableHead>
                                 <TableHead onClick={() => handleSort('role')} className="cursor-pointer">Role <SortIcon column="role" /></TableHead>
+                                <TableHead onClick={() => handleSort('department')} className="cursor-pointer">Dept <SortIcon column="department" /></TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -272,6 +275,16 @@ export default function UsersPage() {
                                         </div>
                                     </TableCell>
                                     <TableCell><Badge variant="outline">{u.role || 'Unassigned'}</Badge></TableCell>
+                                    <TableCell>
+                                        {u.department ? (
+                                            <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                                                <Building2 className="h-3 w-3" />
+                                                {u.department}
+                                            </Badge>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">No Dept</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell><StatusBadge isPending={!!u.registrationRequest} /></TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">

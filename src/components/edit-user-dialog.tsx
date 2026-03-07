@@ -32,6 +32,7 @@ const editUserSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
   mobile: z.string().min(1, 'Mobile number is required.'),
   role: z.enum(['Admin', 'Site Manager', 'Site Engineer'], { required_error: 'Role is required' }),
+  department: z.enum(['Projects', 'O&M'], { required_error: 'Department is required' }),
 });
 
 type User = {
@@ -40,6 +41,7 @@ type User = {
   email?: string;
   mobile?: string;
   role?: 'Admin' | 'Site Manager' | 'Site Engineer';
+  department?: 'Projects' | 'O&M';
 };
 
 interface EditUserDialogProps {
@@ -59,6 +61,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
       username: '',
       mobile: '',
       role: 'Site Engineer',
+      department: 'Projects',
     }
   });
 
@@ -68,6 +71,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
         username: user.username || '',
         mobile: user.mobile || '',
         role: user.role || 'Site Engineer',
+        department: user.department || 'Projects',
       });
     }
   }, [user, form]);
@@ -144,28 +148,51 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Site Engineer">Site Engineer</SelectItem>
-                        <SelectItem value="Site Manager">Site Manager</SelectItem>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Site Engineer">Site Engineer</SelectItem>
+                          <SelectItem value="Site Manager">Site Manager</SelectItem>
+                          <SelectItem value="Admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="department"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select dept" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Projects">Projects</SelectItem>
+                          <SelectItem value="O&M">O&M</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                   Cancel
