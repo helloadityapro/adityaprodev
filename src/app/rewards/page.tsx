@@ -6,7 +6,7 @@ import { collection, doc, query, orderBy, limit, where, or, and, getDocs, server
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send, MapPin, Clock, AlertCircle } from "lucide-react";
+import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send, MapPin, Clock, AlertCircle, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -266,6 +266,7 @@ export default function RewardsPage() {
   const [isRedeemDialogOpen, setIsRedeemDialogOpen] = React.useState(false);
   const [redeemPoints, setRedeemPoints] = React.useState<string>("");
   const [isRedeeming, setIsRedeeming] = React.useState(false);
+  const [searchTerm, setSearchTerm] = React.useState("");
 
   // Fetch current user's profile
   const userRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -288,6 +289,14 @@ export default function RewardsPage() {
   const monetaryValue = userPoints * pointValue;
   
   const canRedeem = monetaryValue >= MIN_REDEEM_VALUE_RS;
+
+  const filteredLeaders = React.useMemo(() => {
+    if (!leaders) return [];
+    return leaders.filter(l => 
+      l.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      l.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [leaders, searchTerm]);
 
   const handleInitiateRedemption = async () => {
     if (!canRedeem) {
@@ -434,12 +443,23 @@ export default function RewardsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className="lg:col-span-2 rounded-sm overflow-hidden border-primary/10">
-          <CardHeader className="bg-muted/5 border-b">
-            <div className="flex items-center gap-2">
-                <Medal className="h-5 w-5 text-amber-500" />
-                <CardTitle>Performance Scoreboard</CardTitle>
+          <CardHeader className="bg-muted/5 border-b flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                    <Medal className="h-5 w-5 text-amber-500" />
+                    <CardTitle>Performance Scoreboard</CardTitle>
+                </div>
+                <CardDescription>Top contributors based on site documentation and activity logs.</CardDescription>
             </div>
-            <CardDescription>Top contributors based on site documentation and activity logs.</CardDescription>
+            <div className="relative w-full md:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                    placeholder="Search personnel..." 
+                    className="pl-8 h-9 text-xs rounded-sm border-primary/20" 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <ScrollArea className="w-full">
@@ -456,53 +476,58 @@ export default function RewardsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {leaders?.map((leader, index) => (
-                      <TableRow key={leader.id} className={cn("hover:bg-muted/5 transition-colors", leader.id === user?.uid && "bg-primary/5 font-bold")}>
-                        <TableCell className="text-center font-mono">
-                            {index === 0 ? <Trophy className="h-5 w-5 text-amber-500 mx-auto" /> : 
-                             index === 1 ? <Medal className="h-5 w-5 text-slate-400 mx-auto" /> :
-                             index === 2 ? <Medal className="h-5 w-5 text-amber-700 mx-auto" /> :
-                             index + 1}
-                        </TableCell>
-                        <TableCell>
-                            <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8 border">
-                                    <AvatarFallback className="text-[10px]">{leader.username?.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex flex-col">
-                                    <span className="text-sm">{leader.username}</span>
-                                    <span className="text-[9px] text-muted-foreground uppercase">{leader.email}</span>
-                                </div>
-                            </div>
-                        </TableCell>
-                        <TableCell>
-                            <Badge variant="outline" className="text-[10px] rounded-sm py-0 h-5 font-bold uppercase border-primary/20">
-                                {leader.role}
-                            </Badge>
-                        </TableCell>
-                        <TableCell className="text-right px-2 font-bold text-primary">
-                            {(leader.totalPoints || 0).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-bold text-green-700">
-                            ₹{((leader.totalPoints || 0) * pointValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </TableCell>
-                        {isAdmin && (
-                          <TableCell className="text-right px-6">
-                            <div className="flex justify-end">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm"
-                                onClick={() => setSelectedHistoryUser(leader)}
-                                title="View Earning History"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </div>
+                    {filteredLeaders.map((leader, index) => {
+                      // Find actual rank based on index in full leaders list
+                      const actualRank = leaders?.findIndex(l => l.id === leader.id) ?? index;
+                      
+                      return (
+                        <TableRow key={leader.id} className={cn("hover:bg-muted/5 transition-colors", leader.id === user?.uid && "bg-primary/5 font-bold")}>
+                          <TableCell className="text-center font-mono">
+                              {actualRank === 0 ? <Trophy className="h-5 w-5 text-amber-500 mx-auto" /> : 
+                               actualRank === 1 ? <Medal className="h-5 w-5 text-slate-400 mx-auto" /> :
+                               actualRank === 2 ? <Medal className="h-5 w-5 text-amber-700 mx-auto" /> :
+                               actualRank + 1}
                           </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
+                          <TableCell>
+                              <div className="flex items-center gap-3">
+                                  <Avatar className="h-8 w-8 border">
+                                      <AvatarFallback className="text-[10px]">{leader.username?.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex flex-col">
+                                      <span className="text-sm">{leader.username}</span>
+                                      <span className="text-[9px] text-muted-foreground uppercase">{leader.email}</span>
+                                  </div>
+                              </div>
+                          </TableCell>
+                          <TableCell>
+                              <Badge variant="outline" className="text-[10px] rounded-sm py-0 h-5 font-bold uppercase border-primary/20">
+                                  {leader.role}
+                              </Badge>
+                          </TableCell>
+                          <TableCell className="text-right px-2 font-bold text-primary">
+                              {(leader.totalPoints || 0).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-green-700">
+                              ₹{((leader.totalPoints || 0) * pointValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          {isAdmin && (
+                            <TableCell className="text-right px-6">
+                              <div className="flex justify-end">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm"
+                                  onClick={() => setSelectedHistoryUser(leader)}
+                                  title="View Earning History"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
