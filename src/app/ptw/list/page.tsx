@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs, or, increment, getDoc } from "firebase/firestore";
+import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs, or, and, increment, getDoc } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -207,7 +207,13 @@ export default function PtwListPage() {
     const colRef = collection(firestore, 'permits_to_work');
     if (isAdmin) return colRef;
     if (userRole === 'Site Manager') {
-      return query(colRef, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)));
+      return query(
+        colRef, 
+        and(
+          where('status', '==', 'Pending'),
+          or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid))
+        )
+      );
     }
     return query(colRef, where('siteEngineerId', '==', user.uid));
   }, [firestore, userRole, user, isProfileLoading, isAdmin]);
