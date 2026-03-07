@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
-import { CalendarDays, Search, FileDown, User, Clock, MapPin, CheckCircle2, XCircle, Timer, Loader2 } from 'lucide-react';
+import { CalendarDays, Search, FileDown, User, Clock, MapPin, CheckCircle2, XCircle, Timer, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
 import { Label } from '@/components/ui/label';
@@ -38,6 +38,8 @@ type AttendanceRecord = {
   checkOutLng?: number;
 };
 
+type SortKey = 'personnel' | 'status' | 'checkIn' | 'checkOut';
+
 export default function AttendanceSummaryPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -46,6 +48,7 @@ export default function AttendanceSummaryPage() {
   const [selectedDate, setSelectedDate] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isExporting, setIsExporting] = React.useState(false);
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'personnel', direction: 'asc' });
 
   const currentUserProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(currentUserProfileRef);
@@ -69,7 +72,7 @@ export default function AttendanceSummaryPage() {
   const summaryData = React.useMemo(() => {
     if (!allUsers || !attendanceRecords) return [];
 
-    return allUsers
+    const data = allUsers
       .filter(u => u.role !== 'Admin') // Only show staff engineers/managers
       .map(u => {
         const record = attendanceRecords.find(r => r.userId === u.id);
@@ -82,9 +85,32 @@ export default function AttendanceSummaryPage() {
       .filter(item => 
         item.user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      .sort((a, b) => a.user.username.localeCompare(b.user.username));
-  }, [allUsers, attendanceRecords, searchTerm]);
+      );
+
+    return data.sort((a, b) => {
+      const { key, direction } = sortConfig;
+      let valA: any = '';
+      let valB: any = '';
+
+      if (key === 'personnel') {
+        valA = a.user.username.toLowerCase();
+        valB = b.user.username.toLowerCase();
+      } else if (key === 'status') {
+        valA = a.status;
+        valB = b.status;
+      } else if (key === 'checkIn') {
+        valA = a.record?.checkInTime?.toDate?.()?.getTime() || 0;
+        valB = b.record?.checkInTime?.toDate?.()?.getTime() || 0;
+      } else if (key === 'checkOut') {
+        valA = a.record?.checkOutTime?.toDate?.()?.getTime() || (a.status === 'ongoing' ? Infinity : 0);
+        valB = b.record?.checkOutTime?.toDate?.()?.getTime() || (b.status === 'ongoing' ? Infinity : 0);
+      }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [allUsers, attendanceRecords, searchTerm, sortConfig]);
 
   const stats = React.useMemo(() => {
     const total = summaryData.length;
@@ -93,6 +119,18 @@ export default function AttendanceSummaryPage() {
     const completed = summaryData.filter(i => i.status === 'completed').length;
     return { total, present, absent: total - present, ongoing, completed };
   }, [summaryData]);
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
 
   const handleExport = () => {
     if (summaryData.length === 0) return;
@@ -219,10 +257,38 @@ export default function AttendanceSummaryPage() {
           <Table>
             <TableHeader className="bg-muted/30">
               <TableRow>
-                <TableHead className="px-6 min-w-[200px]">Personnel</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Check-in</TableHead>
-                <TableHead>Check-out</TableHead>
+                <TableHead 
+                  className="px-6 min-w-[200px] cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => handleSort('personnel')}
+                >
+                  <div className="flex items-center">
+                    Personnel <SortIcon column="personnel" />
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => handleSort('status')}
+                >
+                  <div className="flex items-center">
+                    Status <SortIcon column="status" />
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => handleSort('checkIn')}
+                >
+                  <div className="flex items-center">
+                    Check-in <SortIcon column="checkIn" />
+                  </div>
+                </TableHead>
+                <TableHead 
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => handleSort('checkOut')}
+                >
+                  <div className="flex items-center">
+                    Check-out <SortIcon column="checkOut" />
+                  </div>
+                </TableHead>
                 <TableHead className="text-right px-6">Verification Stamps</TableHead>
               </TableRow>
             </TableHeader>
