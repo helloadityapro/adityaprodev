@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, doc, query, where, or } from "firebase/firestore";
+import { collection, doc, query, where, or, and } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, User } from "lucide-react";
@@ -48,8 +48,10 @@ export default function ActiveSiteVisitsPage() {
     if (isManager) {
         return query(
             colRef,
-            where('status', '==', 'ongoing'),
-            or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid))
+            and(
+              where('status', '==', 'ongoing'),
+              or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid))
+            )
         );
     }
     
@@ -67,7 +69,10 @@ export default function ActiveSiteVisitsPage() {
     return (
       <div className="space-y-6 max-w-4xl mx-auto">
         <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-64 w-full" />
+        <div className="grid gap-4">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
       </div>
     );
   }
