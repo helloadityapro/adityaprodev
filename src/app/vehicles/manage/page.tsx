@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Car, Clock, CheckCircle2, XCircle, User, MapPin, Plus, Loader2, Search, FilterX, Truck, Fuel } from 'lucide-react';
+import { Car, Clock, CheckCircle2, XCircle, User, MapPin, Plus, Loader2, Search, FilterX, Truck, Fuel, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -35,6 +35,7 @@ type Assignment = {
   userId: string;
   userName: string;
   purpose: string;
+  pickupLocation: string;
   destination: string;
   status: 'Pending' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected';
   requestDate: any;
@@ -176,7 +177,7 @@ export default function ManageVehiclesPage() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="px-6">Personnel</TableHead>
-                  <TableHead>Destination</TableHead>
+                  <TableHead>Route (From → To)</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
@@ -192,8 +193,13 @@ export default function ManageVehiclesPage() {
                       <p className="text-[10px] text-muted-foreground font-medium uppercase truncate max-w-[150px]">{req.purpose}</p>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
-                        <MapPin className="h-3 w-3" /> {req.destination}
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
+                          <MapPin className="h-3 w-3" /> {req.pickupLocation || 'Source'}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground ml-4">
+                          <ArrowRight className="h-2.5 w-2.5" /> {req.destination}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-[10px] font-mono text-muted-foreground">
@@ -236,9 +242,11 @@ export default function ManageVehiclesPage() {
           </DialogHeader>
           <div className="space-y-6 py-4">
             <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase text-muted-foreground">Purpose & Destination</Label>
+              <Label className="text-[10px] font-bold uppercase text-muted-foreground">Route & Purpose</Label>
               <div className="p-3 bg-muted/20 border rounded-sm">
-                <p className="text-xs font-bold text-primary">{approvalTarget?.assignment.destination}</p>
+                <p className="text-xs font-bold text-primary flex items-center gap-2">
+                  {approvalTarget?.assignment.pickupLocation} <ArrowRight className="h-3 w-3" /> {approvalTarget?.assignment.destination}
+                </p>
                 <p className="text-[10px] text-muted-foreground italic mt-1">"{approvalTarget?.assignment.purpose}"</p>
               </div>
             </div>

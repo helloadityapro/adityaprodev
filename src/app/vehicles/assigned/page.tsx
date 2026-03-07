@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -6,7 +7,7 @@ import { collection, query, orderBy, doc, where, or } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CarFront, Clock, MapPin, User, ArrowRight, CheckCircle2, Navigation } from 'lucide-react';
+import { CarFront, Clock, MapPin, User, ArrowRight, CheckCircle2, Navigation, MapPinned } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ type Assignment = {
   vehicleId?: string;
   vehicleDetails?: string;
   purpose: string;
+  pickupLocation: string;
   destination: string;
   status: 'Pending' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected';
   requestDate: any;
@@ -88,7 +90,11 @@ export default function AssignedVehiclesPage() {
                     REQ: {trip.requestDate ? format(trip.requestDate.toDate(), 'dd MMM, HH:mm') : '—'}
                   </span>
                 </div>
-                <CardTitle className="text-2xl font-black text-foreground">{trip.destination}</CardTitle>
+                <CardTitle className="text-xl font-black text-foreground flex items-center gap-3">
+                  <span className="text-primary">{trip.pickupLocation || 'Source'}</span>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span>{trip.destination}</span>
+                </CardTitle>
                 <p className="text-sm font-bold text-muted-foreground italic leading-relaxed">"{trip.purpose}"</p>
               </CardHeader>
               

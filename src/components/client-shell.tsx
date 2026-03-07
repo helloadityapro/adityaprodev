@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -180,9 +181,16 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     try {
-      const storedIds = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
-      if (storedIds) setDisplayedNotifIds(new Set(JSON.parse(storedIds)));
-    } catch (e) {}
+      const raw = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
+      if (raw && raw.trim().length > 0) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setDisplayedNotifIds(new Set(parsed));
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to parse displayed notifications from session storage", e);
+    }
   }, []);
 
   React.useEffect(() => {
@@ -253,7 +261,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     <SidebarProvider className="h-full overflow-hidden">
       <Sidebar>
         <SidebarHeader className="px-6 py-4 border-b">
-          <span className="text-sm font-bold tracking-widest text-primary uppercase">Aditya Pro</span>
+          <div className="flex items-baseline gap-0.5">
+            <span className="text-lg font-black tracking-tighter text-primary uppercase">Aditya</span>
+            <span className="text-xs font-light tracking-[0.3em] text-muted-foreground uppercase ml-1">Pro</span>
+          </div>
         </SidebarHeader>
         <SidebarContent>
           <MainNav userRole={userRole} pendingPtwCount={pendingPtwCount} />
