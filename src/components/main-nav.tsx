@@ -177,14 +177,24 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </SidebarMenuButton>
           </SidebarMenuItem>
           {(userRole === 'Admin') && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Manage Vehicles" isActive={pathname === '/vehicles/manage'} className="rounded-sm">
-                <Link href="/vehicles/manage">
-                  <Car className="h-4 w-4" />
-                  <span className="font-medium">Manage Vehicles</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Manage All Trips" isActive={pathname === '/vehicles/trips/manage'} className="rounded-sm">
+                  <Link href="/vehicles/trips/manage">
+                    <MapPinned className="h-4 w-4 text-indigo-600" />
+                    <span className="font-bold text-indigo-700">Manage All Trips</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Manage Vehicles" isActive={pathname === '/vehicles/manage'} className="rounded-sm">
+                  <Link href="/vehicles/manage">
+                    <Car className="h-4 w-4" />
+                    <span className="font-medium">Manage Vehicles</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </>
           )}
         </SidebarMenu>
       </SidebarGroup>
@@ -367,14 +377,6 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <Link href="/lms/admin">
                   <BookOpen className="h-4 w-4 text-primary" />
                   <span className="font-medium text-primary font-bold">LMS Admin</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Manage All Trips" isActive={pathname === '/vehicles/trips/manage'} className="rounded-sm">
-                <Link href="/vehicles/trips/manage">
-                  <MapPinned className="h-4 w-4 text-indigo-600" />
-                  <span className="font-bold text-indigo-700">Manage All Trips</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
