@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, useCollection } from '@/firebase';
 import { collection, doc, serverTimestamp, query, where } from 'firebase/firestore';
-import { Fuel, Loader2, Send, CheckCircle2, Building2, Globe, Search, ChevronsUpDown, Check, ArrowRight, Users, UserPlus, X, Trash2, Plus, MapPinned, UserCheck } from 'lucide-react';
+import { Fuel, Loader2, Send, CheckCircle2, Building2, Globe, Search, ChevronsUpDown, Check, ArrowRight, Users, UserPlus, X, Trash2, Plus, MapPinned, MessageCircle, History } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -101,6 +101,7 @@ export default function RequestVehiclePage() {
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
+  const [submittedData, setSubmittedData] = React.useState<z.infer<typeof requestSchema> | null>(null);
   
   const [isPickupPopoverOpen, setIsPickupPopoverOpen] = React.useState(false);
   const [pickupSearchQuery, setPickupSearchQuery] = React.useState("");
@@ -145,6 +146,7 @@ export default function RequestVehiclePage() {
         status: 'Pending',
         requestDate: serverTimestamp(),
       });
+      setSubmittedData(values);
       setIsSuccess(true);
       toast({ title: 'Request Sent', description: 'Administrative approval required.' });
     } catch (e: any) {
@@ -152,6 +154,19 @@ export default function RequestVehiclePage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const triggerWhatsApp = () => {
+    if (!submittedData) return;
+    
+    const destList = submittedData.destinations.map((d, i) => `${i + 1}. ${d.location} (${d.purpose})`).join('\n');
+    const passengerList = submittedData.coPassengers.length > 0 
+      ? `\nCo-passengers: ${submittedData.coPassengers.map(p => p.name).join(', ')}`
+      : '';
+    
+    const message = `*Aditya Pro - Vehicle Allotment Request*\n\n*Requester:* ${userProfile?.username || user?.email}\n*Pickup:* ${submittedData.pickupLocation}\n*Route:*\n${destList}${passengerList}\n\n*General Purpose:* ${submittedData.purpose}\n\n_Note: Request is pending approval in the system._`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
   const addPassenger = (u: UserProfile) => {
@@ -197,6 +212,49 @@ export default function RequestVehiclePage() {
     (u.username || '').toLowerCase().includes(passengerSearchQuery.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(passengerSearchQuery.toLowerCase())
   ) || [];
+
+  if (isSuccess && submittedData) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="bg-primary/10 p-4 rounded-full">
+                <CheckCircle2 className="h-12 w-12 text-primary" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold">Request Submitted</CardTitle>
+            <CardDescription className="text-base leading-relaxed">
+              Your trip request from <strong>{submittedData.pickupLocation}</strong> has been logged and is pending vehicle allotment.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm shadow-md" 
+              onClick={triggerWhatsApp}
+            >
+              <MessageCircle className="mr-2 h-5 w-5" />
+              Share on WhatsApp
+            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="h-11 rounded-sm" onClick={() => router.push('/vehicles/assigned')}>
+                <History className="mr-2 h-4 w-4" />
+                Trip History
+              </Button>
+              <Button variant="secondary" className="h-11 rounded-sm" onClick={() => {
+                setIsSuccess(false);
+                setSubmittedData(null);
+                form.reset();
+              }}>
+                <Plus className="mr-2 h-4 w-4" />
+                Request New
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
@@ -589,8 +647,7 @@ export default function RequestVehiclePage() {
 
               <div className="pt-4 border-t flex justify-end">
                 <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black h-12 px-10 shadow-lg">
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                  SEND FOR APPROVAL
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> SENDING...</> : <><Send className="mr-2 h-4 w-4" /> SEND FOR APPROVAL</>}
                 </Button>
               </div>
             </form>
