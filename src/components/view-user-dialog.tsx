@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -14,7 +15,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useCollection, useFirestore, useMemoFirebase, useDoc, useUser, updateDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, doc, orderBy, getDocs } from 'firebase/firestore';
-import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight, X, UserPlus, Check, ChevronsUpDown, Search, Loader2, Building2 } from 'lucide-react';
+import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight, X, UserPlus, Check, ChevronsUpDown, Search, Loader2, Building2, Truck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -29,7 +30,7 @@ type UserProfile = {
   username: string;
   email: string;
   mobile: string;
-  role: 'Admin' | 'Site Manager' | 'Site Engineer';
+  role: 'Admin' | 'Site Manager' | 'Site Engineer' | 'Driver';
   department?: 'Projects' | 'O&M';
   assignedProjectIds?: string[];
   siteManagerId?: string;
@@ -122,7 +123,8 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
       const allTeamSites = new Set<string>();
       snap.docs.forEach(d => {
           const data = d.data();
-          (data.assignedProjectIds || []).forEach((id: string) => allTeamSites.add(id));
+          const sites = data.id === user?.id ? (user.assignedProjectIds || []) : (data.assignedProjectIds || []);
+          sites.forEach((id: string) => allTeamSites.add(id));
       });
 
       const managerRef = doc(firestore, 'users', managerId);
@@ -327,6 +329,11 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                         )}
                       </div>
                     )}
+                  </div>
+                ) : user.role === 'Driver' ? (
+                  <div className="flex items-center gap-2 px-1">
+                    <Truck className="h-4 w-4 text-primary" />
+                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Organizational Logistics Personnel</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 px-1">

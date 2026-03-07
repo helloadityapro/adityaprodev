@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { User, Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp, Building2 } from "lucide-react"
+import { User, Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp, Building2, Truck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
@@ -37,7 +37,7 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
-type UserRole = 'Admin' | 'Site Manager' | 'Site Engineer';
+type UserRole = 'Admin' | 'Site Manager' | 'Site Engineer' | 'Driver';
 
 type User = {
   id: string;
@@ -146,7 +146,7 @@ export default function UsersPage() {
     };
 
     const summary = React.useMemo(() => {
-        const counts = { totalUsers: 0, pending: 0, admins: 0, managers: 0, engineers: 0, other: 0 };
+        const counts = { totalUsers: 0, pending: 0, admins: 0, managers: 0, engineers: 0, drivers: 0, other: 0 };
         if (!users) return counts;
         counts.totalUsers = users.length;
         users.forEach(u => {
@@ -154,6 +154,7 @@ export default function UsersPage() {
             else if (u.role === 'Admin') counts.admins++;
             else if (u.role === 'Site Manager') counts.managers++;
             else if (u.role === 'Site Engineer') counts.engineers++;
+            else if (u.role === 'Driver') counts.drivers++;
             else counts.other++;
         });
         return counts;
@@ -166,7 +167,7 @@ export default function UsersPage() {
             const matchesSearch = (u.username || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term);
             const matchesFilter = filter === 'all' ? true :
                                   filter === 'pending' ? u.registrationRequest === true :
-                                  filter === 'other' ? (!u.registrationRequest && !['Admin', 'Site Manager', 'Site Engineer'].includes(u.role || '')) :
+                                  filter === 'other' ? (!u.registrationRequest && !['Admin', 'Site Manager', 'Site Engineer', 'Driver'].includes(u.role || '')) :
                                   u.role === filter;
             return matchesSearch && matchesFilter;
         });
@@ -198,48 +199,55 @@ export default function UsersPage() {
                 <Button onClick={() => setIsAddUserDialogOpen(true)}>Add User</Button>
             </div>
 
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
                 <Card onClick={() => setFilter('all')} className={cn("cursor-pointer transition-all", filter === 'all' && "ring-2 ring-primary bg-primary/5")}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase">Total Users</CardTitle>
+                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total</CardTitle>
                         <Users className="h-4 w-4" />
                     </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-2xl font-bold">{summary.totalUsers}</div></CardContent>
+                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.totalUsers}</div></CardContent>
                 </Card>
                 <Card onClick={() => setFilter('pending')} className={cn("cursor-pointer transition-all", filter === 'pending' && "ring-2 ring-yellow-500 bg-yellow-500/5")}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase">Pending</CardTitle>
+                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Pending</CardTitle>
                         <UserPlus className="h-4 w-4" />
                     </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-2xl font-bold">{summary.pending}</div></CardContent>
+                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.pending}</div></CardContent>
                 </Card>
                 <Card onClick={() => setFilter('Admin')} className={cn("cursor-pointer transition-all", filter === 'Admin' && "ring-2 ring-blue-500 bg-blue-500/5")}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase">Admins</CardTitle>
+                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Admins</CardTitle>
                         <Shield className="h-4 w-4" />
                     </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-2xl font-bold">{summary.admins}</div></CardContent>
+                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.admins}</div></CardContent>
                 </Card>
                 <Card onClick={() => setFilter('Site Manager')} className={cn("cursor-pointer transition-all", filter === 'Site Manager' && "ring-2 ring-purple-500 bg-purple-500/5")}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase">Managers</CardTitle>
+                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Managers</CardTitle>
                         <UserCog className="h-4 w-4" />
                     </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-2xl font-bold">{summary.managers}</div></CardContent>
+                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.managers}</div></CardContent>
                 </Card>
                 <Card onClick={() => setFilter('Site Engineer')} className={cn("cursor-pointer transition-all", filter === 'Site Engineer' && "ring-2 ring-orange-500 bg-orange-500/5")}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase">Engineers</CardTitle>
+                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Engineers</CardTitle>
                         <HardHat className="h-4 w-4" />
                     </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-2xl font-bold">{summary.engineers}</div></CardContent>
+                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.engineers}</div></CardContent>
+                </Card>
+                <Card onClick={() => setFilter('Driver')} className={cn("cursor-pointer transition-all", filter === 'Driver' && "ring-2 ring-emerald-500 bg-emerald-500/5")}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
+                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Drivers</CardTitle>
+                        <Truck className="h-4 w-4" />
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.drivers}</div></CardContent>
                 </Card>
                 <Card onClick={() => setFilter('other')} className={cn("cursor-pointer transition-all", filter === 'other' && "ring-2 ring-slate-500 bg-slate-500/5")}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-xs font-medium text-muted-foreground uppercase">Other</CardTitle>
+                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Other</CardTitle>
                         <CircleHelp className="h-4 w-4" />
                     </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-2xl font-bold">{summary.other}</div></CardContent>
+                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.other}</div></CardContent>
                 </Card>
             </div>
 

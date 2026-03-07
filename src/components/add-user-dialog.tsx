@@ -35,7 +35,7 @@ const addUserSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
   email: z.string().email('Invalid email address.'),
   mobile: z.string().min(1, 'Mobile number is required.'),
-  role: z.enum(['Admin', 'Site Manager', 'Site Engineer'], { required_error: 'Role is required' }),
+  role: z.enum(['Admin', 'Site Manager', 'Site Engineer', 'Driver'], { required_error: 'Role is required' }),
   department: z.enum(['Projects', 'O&M'], { required_error: 'Department is required' }),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
 });
@@ -178,6 +178,7 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
                       <SelectContent>
                         <SelectItem value="Site Engineer">Site Engineer</SelectItem>
                         <SelectItem value="Site Manager">Site Manager</SelectItem>
+                        <SelectItem value="Driver">Driver</SelectItem>
                         <SelectItem value="Admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
