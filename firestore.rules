@@ -122,5 +122,11 @@ service cloud.firestore {
     match /notifications/{notifId} { allow read, write: if isSignedIn(); }
     match /point_adjustment_requests/{requestId} { allow read, write: if isAdmin(); }
     match /cleanup_requests/{requestId} { allow read, write: if isAdmin(); }
+    
+    // Add missing rules for PTW Types
+    match /ptw_types/{typeId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
   }
 }
