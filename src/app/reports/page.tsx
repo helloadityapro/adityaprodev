@@ -65,6 +65,7 @@ type DataItem = {
   assignedById?: string;
   siteManagerId?: string | null;
   priority?: string;
+  urgency?: string;
 };
 
 type UserProfile = {
@@ -276,9 +277,9 @@ export default function ReportsDashboard() {
     ];
 
     const requirementUrgency = [
-      { name: 'High', value: fRequirements.filter(r => (r as any).urgency === 'High').length, color: '#ef4444' },
-      { name: 'Medium', value: fRequirements.filter(r => (r as any).urgency === 'Medium').length, color: '#eab308' },
-      { name: 'Low', value: fRequirements.filter(r => (r as any).urgency === 'Low').length, color: '#3b82f6' },
+      { name: 'High', value: fRequirements.filter(r => r.urgency === 'High').length, color: '#ef4444' },
+      { name: 'Medium', value: fRequirements.filter(r => r.urgency === 'Medium').length, color: '#eab308' },
+      { name: 'Low', value: fRequirements.filter(r => r.urgency === 'Low').length, color: '#3b82f6' },
     ];
 
     return {
@@ -294,7 +295,7 @@ export default function ReportsDashboard() {
         tasks: fTasks.length,
       }
     };
-  }, [isLoading, permits, dprs, movements, requirements, tasks, selectedSite, timeRange, customStartDate, customEndDate, rates]);
+  }, [isLoading, permits, dprs, movements, requirements, tasks, selectedSite, timeRange, customStartDate, customEndDate]);
 
   if (isLoading) {
     return (
