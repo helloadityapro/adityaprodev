@@ -37,7 +37,8 @@ import {
   FileBarChart,
   Car,
   CarFront,
-  Fuel
+  Fuel,
+  MapPinned
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -76,11 +77,10 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <CalendarCheck className="h-4 w-4" />
                   <span className="font-medium">Check-in / Out</span>
                 </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      </div>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroup>
+        </div>
     )
   }
 
@@ -271,10 +271,9 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <History className="h-4 w-4" />
                 <span className="font-medium">PtW Activities</span>
               </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroup>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
 
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">DPR Reporting</SidebarGroupLabel>
@@ -293,10 +292,9 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <TableIcon className="h-4 w-4" />
                 <span className="font-medium">DPR Data</span>
               </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroup>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
 
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Site Requirements</SidebarGroupLabel>
@@ -315,10 +313,9 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <ClipboardList className="h-4 w-4" />
                 <span className="font-medium">Requirement Data</span>
               </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroup>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
 
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Material Movement</SidebarGroupLabel>
@@ -337,10 +334,9 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <TableIcon className="h-4 w-4" />
                 <span className="font-medium">Movement Data</span>
               </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroup>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
       
       {userRole === "Admin" && (
         <SidebarGroup className="mt-auto">
@@ -367,6 +363,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <Link href="/lms/admin">
                   <BookOpen className="h-4 w-4 text-primary" />
                   <span className="font-medium text-primary font-bold">LMS Admin</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Manage All Trips" isActive={pathname === '/vehicles/trips/manage'} className="rounded-sm">
+                <Link href="/vehicles/trips/manage">
+                  <MapPinned className="h-4 w-4 text-indigo-600" />
+                  <span className="font-bold text-indigo-700">Manage All Trips</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
