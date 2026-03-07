@@ -152,7 +152,6 @@ export default function RaisePtwPage() {
         return;
       }
       navigator.geolocation.getCurrentPosition(
-        (position) => resolve({ latitude: number; longitude: number } | null),
         (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
         () => {
           toast({ variant: 'destructive', title: 'Location Error', description: 'Could not get location.' });
@@ -169,7 +168,7 @@ export default function RaisePtwPage() {
       return;
     }
     const cleanMobile = mobile.replace(/\D/g, '');
-    const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
+    const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : (cleanMobile.startsWith('91') ? cleanMobile : `91${cleanMobile}`);
     const message = `Hello, I've resubmitted the PtW request.\nSerial: ${serial}\nSite: ${site}\nLink: ${window.location.origin}/ptw/list?view=${permitId}`;
     const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
