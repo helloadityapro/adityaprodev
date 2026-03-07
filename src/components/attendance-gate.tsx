@@ -13,7 +13,7 @@ import { Clock, LogIn, ShieldAlert } from 'lucide-react';
  * Global component to manage attendance compliance.
  * Handles:
  * 1. Forced check-in redirect if no session exists for today.
- * 2. Check-out reminders after 6:00 PM.
+ * 2. Check-out reminders after 7:00 PM.
  * 3. Daily 12 AM system reset for stale sessions.
  */
 export function AttendanceGate() {
@@ -62,8 +62,9 @@ export function AttendanceGate() {
     if (pathname.startsWith('/attendance')) return;
 
     const now = new Date();
-    const sixPm = setMinutes(setHours(new Date(), 18), 0);
-    const isAfterSix = isAfter(now, sixPm);
+    // Updated threshold to 7 PM (19:00)
+    const sevenPm = setMinutes(setHours(new Date(), 19), 0);
+    const isAfterSeven = isAfter(now, sevenPm);
 
     const activeSession = activeSessions?.[0];
     const hasCompletedToday = todayFinished && todayFinished.length > 0;
@@ -84,14 +85,14 @@ export function AttendanceGate() {
     }
 
     // 2. CHECK-IN GATE
-    // Prompt if not checked in at all today AND it's before 6 PM
-    if (!activeSession && !hasCompletedToday && !isAfterSix) {
+    // Prompt if not checked in at all today AND it's before 7 PM
+    if (!activeSession && !hasCompletedToday && !isAfterSeven) {
       setShowCheckIn(true);
     }
 
     // 3. CHECK-OUT PROMPT
-    // Prompt if session is ongoing AND it's after 6 PM
-    if (activeSession && activeSession.date === todayStr && isAfterSix) {
+    // Prompt if session is ongoing AND it's after 7 PM
+    if (activeSession && activeSession.date === todayStr && isAfterSeven) {
       setShowCheckOut(true);
     }
   }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, user, todayStr, pathname, firestore]);
@@ -127,7 +128,7 @@ export function AttendanceGate() {
             </div>
             <DialogTitle className="text-center text-2xl font-black uppercase tracking-tight text-amber-900">Pending Check-out</DialogTitle>
             <DialogDescription className="text-center text-base leading-relaxed text-amber-800">
-              It is past <strong>6:00 PM</strong>. Organizational policy requires a final site verification before concluding your workday.
+              It is past <strong>7:00 PM</strong>. Organizational policy requires a final site verification before concluding your workday.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center pb-4">
