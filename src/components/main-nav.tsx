@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -77,10 +76,11 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <CalendarCheck className="h-4 w-4" />
                   <span className="font-medium">Check-in / Out</span>
                 </Link>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-        </div>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+      </div>
     )
   }
 
@@ -271,9 +271,10 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <History className="h-4 w-4" />
                 <span className="font-medium">PtW Activities</span>
               </Link>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
 
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">DPR Reporting</SidebarGroupLabel>
@@ -292,9 +293,10 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <TableIcon className="h-4 w-4" />
                 <span className="font-medium">DPR Data</span>
               </Link>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
 
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Site Requirements</SidebarGroupLabel>
@@ -313,9 +315,10 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <ClipboardList className="h-4 w-4" />
                 <span className="font-medium">Requirement Data</span>
               </Link>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
 
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Material Movement</SidebarGroupLabel>
@@ -334,9 +337,10 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <TableIcon className="h-4 w-4" />
                 <span className="font-medium">Movement Data</span>
               </Link>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
       
       {userRole === "Admin" && (
         <SidebarGroup className="mt-auto">
