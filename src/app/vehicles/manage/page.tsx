@@ -35,7 +35,7 @@ type Assignment = {
   userName: string;
   purpose: string;
   pickupLocation: string;
-  destinations: { type: string, location: string }[];
+  destinations: { type: string, location: string, purpose: string }[];
   status: 'Pending' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected';
   requestDate: any;
   vehicleId?: string;
@@ -177,7 +177,7 @@ export default function ManageVehiclesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="px-6">Personnel & Passengers</TableHead>
-                  <TableHead>Route</TableHead>
+                  <TableHead>Route & Stops</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
@@ -206,9 +206,12 @@ export default function ManageVehiclesPage() {
                         </div>
                         <div className="flex flex-col ml-4 border-l-2 border-primary/10 pl-2">
                           {req.destinations?.map((dest, idx) => (
-                            <div key={idx} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                              <ArrowRight className="h-2.5 w-2.5 shrink-0" /> 
-                              <span className="truncate max-w-[120px]">{dest.location}</span>
+                            <div key={idx} className="flex flex-col mb-1 last:mb-0">
+                              <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                                <ArrowRight className="h-2.5 w-2.5 shrink-0" /> 
+                                <span className="truncate max-w-[120px]">{dest.location}</span>
+                              </div>
+                              <span className="text-[8px] text-muted-foreground/60 pl-4 italic truncate max-w-[120px]">Purpose: {dest.purpose}</span>
                             </div>
                           ))}
                         </div>
@@ -254,17 +257,22 @@ export default function ManageVehiclesPage() {
           </DialogHeader>
           <div className="space-y-6 py-4">
             <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase text-muted-foreground">Route & Capacity Requirements</Label>
+              <Label className="text-[10px] font-bold uppercase text-muted-foreground">Route & Detailed Stops</Label>
               <div className="p-3 bg-muted/20 border rounded-sm">
-                <div className="flex items-center flex-wrap gap-2 text-xs font-bold text-primary">
-                  {approvalTarget?.assignment.pickupLocation} 
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 text-xs font-black text-emerald-700">
+                    <MapPin className="h-3 w-3" /> {approvalTarget?.assignment.pickupLocation} (Pickup)
+                  </div>
                   {approvalTarget?.assignment.destinations.map((d, i) => (
-                    <React.Fragment key={i}>
-                      <ArrowRight className="h-3 w-3" /> {d.location}
-                    </React.Fragment>
+                    <div key={i} className="flex flex-col gap-0.5 border-l border-primary/20 ml-1.5 pl-3">
+                      <div className="flex items-center gap-2 text-xs font-bold text-primary">
+                        <ArrowRight className="h-3 w-3" /> {d.location}
+                      </div>
+                      <p className="text-[9px] text-muted-foreground italic pl-5">Purpose: {d.purpose}</p>
+                    </div>
                   ))}
                 </div>
-                <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-4 mt-4 border-t pt-2">
                   <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase">
                     <User className="h-3 w-3" /> 1 Requester
                   </div>

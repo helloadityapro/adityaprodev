@@ -26,6 +26,7 @@ import { Separator } from '@/components/ui/separator';
 const destinationSchema = z.object({
   type: z.enum(['Site', 'Other'], { required_error: 'Please select a destination type.' }),
   location: z.string().min(1, 'Destination location is required.'),
+  purpose: z.string().min(1, 'Purpose for this stop is required.'),
 });
 
 const requestSchema = z.object({
@@ -115,7 +116,7 @@ export default function RequestVehiclePage() {
     defaultValues: { 
       pickupType: 'Site',
       pickupLocation: '',
-      destinations: [{ type: 'Site', location: '' }],
+      destinations: [{ type: 'Site', location: '', purpose: '' }],
       purpose: '',
       coPassengers: []
     },
@@ -366,7 +367,7 @@ export default function RequestVehiclePage() {
                     type="button" 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => appendDest({ type: 'Site', location: '' })}
+                    onClick={() => appendDest({ type: 'Site', location: '', purpose: '' })}
                     className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"
                   >
                     <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Stop
@@ -495,6 +496,20 @@ export default function RequestVehiclePage() {
                           </FormItem>
                         )}
                       />
+
+                      <FormField
+                        control={form.control}
+                        name={`destinations.${index}.purpose`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Purpose of Stop</FormLabel>
+                            <FormControl>
+                              <Input placeholder="What needs to be done at this stop?" {...field} className="h-10 rounded-sm bg-background" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   ))}
                 </div>
@@ -587,11 +602,11 @@ export default function RequestVehiclePage() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">4</div>
-                  <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Purpose</h3>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-foreground">General Trip Note</h3>
                 </div>
                 <FormField control={form.control} name="purpose" render={({ field }) => (
                   <FormItem>
-                    <FormControl><Textarea rows={4} placeholder="Reason for requiring organizational transport..." {...field} className="rounded-sm" /></FormControl>
+                    <FormControl><Textarea rows={4} placeholder="General reason for requiring organizational transport..." {...field} className="rounded-sm" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

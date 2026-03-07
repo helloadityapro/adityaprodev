@@ -24,7 +24,7 @@ type Assignment = {
   vehicleDetails?: string;
   purpose: string;
   pickupLocation: string;
-  destinations: { type: string, location: string }[];
+  destinations: { type: string, location: string, purpose: string }[];
   status: 'Pending' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected';
   requestDate: any;
   startTime?: any;
@@ -93,17 +93,8 @@ export default function AssignedVehiclesPage() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center flex-wrap gap-2 text-xl font-black text-foreground">
                     <span className="text-primary">{trip.pickupLocation || 'Source'}</span>
-                    {trip.destinations?.map((dest, idx) => (
-                      <React.Fragment key={idx}>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span>{dest.location}</span>
-                      </React.Fragment>
-                    )) || (
-                      <>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground italic">No destination set</span>
-                      </>
-                    )}
+                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-foreground">Route In Progress</span>
                   </div>
                   <p className="text-sm font-bold text-muted-foreground italic leading-relaxed">"{trip.purpose}"</p>
                 </div>
@@ -112,6 +103,27 @@ export default function AssignedVehiclesPage() {
               <CardContent className="space-y-6 border-t pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-6">
+                    <div className="space-y-3">
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1.5">
+                        <MapPinned className="h-3 w-3" /> Full Route & Stop Purposes
+                      </Label>
+                      <div className="space-y-3 pl-2 border-l border-muted">
+                        <div className="relative pl-4">
+                          <div className="absolute left-[-5px] top-1.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-background" />
+                          <p className="text-xs font-bold uppercase text-emerald-700 tracking-tight">Pickup</p>
+                          <p className="text-sm font-black">{trip.pickupLocation}</p>
+                        </div>
+                        {trip.destinations?.map((dest, idx) => (
+                          <div key={idx} className="relative pl-4">
+                            <div className="absolute left-[-5px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary border-2 border-background" />
+                            <p className="text-xs font-bold uppercase text-primary tracking-tight">Stop {idx + 1}</p>
+                            <p className="text-sm font-black">{dest.location}</p>
+                            <p className="text-[10px] text-muted-foreground italic font-medium mt-0.5">Purpose: {dest.purpose}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Vehicle Details</Label>
@@ -148,7 +160,7 @@ export default function AssignedVehiclesPage() {
                   </div>
 
                   {trip.status !== 'Pending' && trip.status !== 'Rejected' && (
-                    <div className="p-4 bg-muted/20 border rounded-sm space-y-3">
+                    <div className="p-4 bg-muted/20 border rounded-sm space-y-3 h-fit">
                       <div className="flex justify-between items-center text-xs">
                         <span className="font-bold uppercase text-muted-foreground">Start Reading</span>
                         <span className="font-mono font-black text-primary">{trip.startReading || '—'} KM</span>
