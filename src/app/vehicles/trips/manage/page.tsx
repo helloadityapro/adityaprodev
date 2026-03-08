@@ -22,7 +22,11 @@ import {
   Clock,
   User,
   Navigation,
-  FileDown
+  FileDown,
+  CheckCircle2,
+  Timer,
+  AlertCircle,
+  XCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -59,6 +63,12 @@ type Assignment = {
   coPassengers?: { id: string, name: string }[];
 };
 
+type UserProfile = {
+  id: string;
+  username: string;
+  role: string;
+};
+
 export default function ManageAllTripsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -68,7 +78,7 @@ export default function ManageAllTripsPage() {
   const [statusFilter, setStatusFilter] = React.useState("all");
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   const assignmentsQuery = useMemoFirebase(() => {
@@ -77,6 +87,16 @@ export default function ManageAllTripsPage() {
   }, [firestore, isAdmin]);
 
   const { data: assignments, isLoading } = useCollection<Assignment>(assignmentsQuery);
+
+  const stats = React.useMemo(() => {
+    if (!assignments) return { total: 0, pending: 0, ongoing: 0, completed: 0 };
+    return {
+      total: assignments.length,
+      pending: assignments.filter(a => a.status === 'Pending').length,
+      ongoing: assignments.filter(a => a.status === 'Ongoing').length,
+      completed: assignments.filter(a => a.status === 'Completed').length,
+    };
+  }, [assignments]);
 
   const filteredAssignments = React.useMemo(() => {
     if (!assignments) return [];
@@ -120,169 +140,202 @@ export default function ManageAllTripsPage() {
     }
   };
 
-  if (!isAdmin && user) return <div className="p-12 text-center uppercase font-black">Unauthorized</div>;
-
-  if (isLoading || isProfileLoading) {
+  if (isUserLoading || isProfileLoading || isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
+      <div className="space-y-8 p-4">
+        <Skeleton className="h-12 w-64" />
+        <div className="grid grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 w-full" />)}
+        </div>
         <Skeleton className="h-[500px] w-full" />
       </div>
     );
   }
 
+  if (!isAdmin && user) return <div className="p-12 text-center uppercase font-black text-destructive tracking-widest">Unauthorized Access</div>;
+
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Navigation className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-black tracking-tight uppercase">Organizational Trips Registry</h1>
+            <h1 className="text-3xl font-black tracking-tight uppercase">Trip Registry</h1>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Monitoring the full lifecycle of vehicle assignments and site travel.</p>
+          <p className="text-muted-foreground text-sm font-medium">Monitoring the full lifecycle of organizational vehicle assignments and itineraries.</p>
         </div>
-        <Button onClick={handleExport} variant="outline" className="rounded-sm font-bold border-primary text-primary hover:bg-primary/5 h-11 px-6 shadow-sm">
-          <FileDown className="mr-2 h-4 w-4" /> Export Registry
+        <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
+          <FileDown className="h-4 w-4 mr-2" /> Export Registry
         </Button>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search personnel, vehicle or site..." 
-            className="pl-9 h-11 rounded-sm border-primary/20"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px] h-11 rounded-sm border-primary/20">
-              <SelectValue placeholder="All Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Trip Status</SelectItem>
-              <SelectItem value="Pending">Pending Allotment</SelectItem>
-              <SelectItem value="Approved">Approved / Ready</SelectItem>
-              <SelectItem value="Ongoing">In Progress</SelectItem>
-              <SelectItem value="Completed">Completed</SelectItem>
-              <SelectItem value="Rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }} className="h-11 w-11 rounded-sm text-muted-foreground">
-            <FilterX className="h-4 w-4" />
-          </Button>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <SummaryCard title="Total Logs" value={stats.total} icon={History} color="primary" />
+        <SummaryCard title="Awaiting Allotment" value={stats.pending} icon={AlertCircle} color="amber" />
+        <SummaryCard title="Ongoing Journeys" value={stats.ongoing} icon={Timer} color="blue" />
+        <SummaryCard title="Completed" value={stats.completed} icon={CheckCircle2} color="emerald" />
       </div>
 
-      <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead className="px-6 min-w-[180px]">Requester & Passengers</TableHead>
-                  <TableHead className="min-w-[220px]">Route Itinerary</TableHead>
-                  <TableHead>Asset & Driver</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right px-6">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => (
-                  <TableRow key={trip.id} className="hover:bg-muted/5 transition-colors">
-                    <TableCell className="px-6 py-4">
-                      <div className="flex flex-col gap-1.5">
-                        <span className="font-bold text-sm text-foreground">{trip.userName}</span>
-                        {trip.coPassengers && trip.coPassengers.length > 0 && (
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search personnel, vehicle or site..." 
+                className="pl-8 h-9 text-xs rounded-sm border-primary/20"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px] h-9 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
+                <SelectItem value="Pending" className="text-xs font-bold uppercase text-yellow-600">Pending Allotment</SelectItem>
+                <SelectItem value="Approved" className="text-xs font-bold uppercase text-blue-600">Approved / Ready</SelectItem>
+                <SelectItem value="Ongoing" className="text-xs font-bold uppercase text-primary">In Progress</SelectItem>
+                <SelectItem value="Completed" className="text-xs font-bold uppercase text-emerald-600">Completed</SelectItem>
+                <SelectItem value="Rejected" className="text-xs font-bold uppercase text-red-600">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }} className="h-9 px-3 rounded-sm font-bold text-[10px] uppercase tracking-widest text-muted-foreground">
+              <FilterX className="h-3.5 w-3.5 mr-1.5" /> Clear
+            </Button>
+          </div>
+        </div>
+
+        <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="px-6 min-w-[200px]">Requester & Manifest</TableHead>
+                    <TableHead className="min-w-[250px]">Route Itinerary</TableHead>
+                    <TableHead>Resource Allotment</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Logged On</TableHead>
+                    <TableHead className="text-right px-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => (
+                    <TableRow key={trip.id} className="hover:bg-muted/5 transition-colors">
+                      <TableCell className="px-6 py-4">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="font-bold text-sm text-foreground">{trip.userName}</span>
                           <div className="flex flex-wrap gap-1">
-                            {trip.coPassengers.map((p, idx) => (
-                              <Badge key={idx} variant="outline" className="text-[8px] font-bold h-4 px-1 border-primary/10 bg-primary/5 text-primary">
-                                {p.name}
-                              </Badge>
+                            <Badge variant="outline" className="text-[8px] font-black uppercase h-4 px-1 border-primary/10 bg-primary/5 text-primary">
+                              Requester
+                            </Badge>
+                            {trip.coPassengers && trip.coPassengers.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-[9px] font-bold text-muted-foreground uppercase">+{trip.coPassengers.length} More</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
+                            <MapPin className="h-3 w-3" /> {trip.pickupLocation}
+                          </div>
+                          <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-2">
+                            {trip.destinations.map((dest, i) => (
+                              <div key={i} className="flex flex-col leading-tight py-0.5">
+                                <span className="text-[10px] font-bold text-primary flex items-center gap-1">
+                                  <ArrowRight className="h-2.5 w-2.5" /> {dest.location}
+                                </span>
+                                <span className="text-[8px] text-muted-foreground italic pl-4 truncate max-w-[200px] font-medium">"{dest.purpose}"</span>
+                              </div>
                             ))}
                           </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
-                          <MapPin className="h-3 w-3" /> {trip.pickupLocation}
                         </div>
-                        <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-2">
-                          {trip.destinations.map((dest, i) => (
-                            <div key={i} className="flex flex-col leading-tight">
-                              <span className="text-[10px] font-bold text-primary flex items-center gap-1">
-                                <ArrowRight className="h-2.5 w-2.5" /> {dest.location}
-                              </span>
-                              <span className="text-[8px] text-muted-foreground italic pl-4 truncate max-w-[180px]">{dest.purpose}</span>
+                      </TableCell>
+                      <TableCell>
+                        {trip.vehicleId ? (
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                              <CarFront className="h-3 w-3 text-primary" />
+                              {trip.vehicleDetails}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {trip.vehicleId ? (
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5 text-xs font-bold">
-                            <CarFront className="h-3 w-3 text-primary" />
-                            {trip.vehicleDetails}
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-black uppercase tracking-tight">
+                              <User className="h-2.5 w-2.5 text-primary/60" />
+                              {trip.driverName}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium uppercase">
-                            <User className="h-2.5 w-2.5" />
-                            {trip.driverName}
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] font-bold text-muted-foreground/40 uppercase italic tracking-widest">Unassigned</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn(
-                        "text-[9px] font-black uppercase rounded-sm px-2 h-5",
-                        trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                        trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                        trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
-                        trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
-                        "bg-red-50 text-red-700 border-red-200"
-                      )}>
-                        {trip.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">
-                      {trip.requestDate ? format(trip.requestDate.toDate(), 'dd/MM HH:mm') : '—'}
-                    </TableCell>
-                    <TableCell className="text-right px-6">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => router.push(`/vehicles/assigned?view=${trip.id}`)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {trip.status === 'Pending' && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 rounded-sm" onClick={() => router.push('/vehicles/manage')}>
-                            <CarFront className="h-4 w-4" />
-                          </Button>
+                        ) : (
+                          <span className="text-[10px] font-bold text-muted-foreground/40 uppercase italic tracking-widest">Awaiting Allotment</span>
                         )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleDelete(trip.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">
-                      No trip records found matching current criteria.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn(
+                          "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                          trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                          trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                          trip.status === 'Ongoing' ? "bg-primary text-white border-none animate-pulse" :
+                          trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+                          "bg-red-50 text-red-700 border-red-200"
+                        )}>
+                          {trip.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">
+                        {trip.requestDate ? format(trip.requestDate.toDate(), 'dd/MM HH:mm') : '—'}
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" asChild>
+                            <Link href={`/vehicles/assigned?view=${trip.id}`}><Eye className="h-4 w-4" /></Link>
+                          </Button>
+                          {trip.status === 'Pending' && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 rounded-sm hover:bg-blue-50" asChild title="Go to Allotment">
+                              <Link href="/vehicles/manage"><CarFront className="h-4 w-4" /></Link>
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-red-50" onClick={() => handleDelete(trip.id)} title="Delete Record">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No trip records found.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
+  );
+}
+
+function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
+  const colors = {
+    primary: "bg-primary/5 border-primary/10 text-primary",
+    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
+    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
+  };
+
+  return (
+    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-4 w-4" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-black">{value}</div>
+      </CardContent>
+    </Card>
   );
 }
