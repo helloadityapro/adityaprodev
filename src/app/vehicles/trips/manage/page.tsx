@@ -1,8 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, where, or, serverTimestamp, and } from 'firebase/firestore';
+import { collection, query, orderBy, doc, where, or, serverTimestamp, and, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -31,10 +32,12 @@ import {
   Loader2,
   FileText,
   PlayCircle,
-  Flag
+  Flag,
+  Smartphone,
+  Check
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -53,6 +56,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast";
+import { Separator } from '@/components/ui/separator';
 
 type Assignment = {
   id: string;
@@ -64,13 +68,17 @@ type Assignment = {
   vehicleDetails?: string;
   purpose: string;
   pickupLocation: string;
+  pickupType: 'Site' | 'Other';
   destinations: { type: string, location: string, purpose: string }[];
   status: 'Pending' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected';
   requestDate: any;
+  approvalDate?: any;
   startTime?: any;
   endTime?: any;
   startReading?: number;
+  startReadingPhoto?: string;
   endReading?: number;
+  endReadingPhoto?: string;
   coPassengers?: { id: string, name: string }[];
 };
 
@@ -92,12 +100,15 @@ export default function ManageAllTripsPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = React.useState("registry");
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [approvalTarget, setApprovalState] = React.useState<{ assignment: Assignment, vehicleId: string, driverId: string } | null>(null);
+  const [detailsAssignment, setDetailsAssignment] = React.useState<Assignment | null>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -128,6 +139,18 @@ export default function ManageAllTripsPage() {
   const { data: allUsers } = useCollection<UserProfile>(usersQuery);
 
   const driversList = React.useMemo(() => allUsers?.filter(u => u.role === 'Driver') || [], [allUsers]);
+
+  React.useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId && assignments && assignments.length > 0) {
+      const assignment = assignments.find(a => a.id === viewId);
+      if (assignment) {
+        setDetailsAssignment(assignment);
+      }
+    } else {
+      setDetailsAssignment(null);
+    }
+  }, [searchParams, assignments]);
 
   const stats = React.useMemo(() => {
     if (!assignments) return { total: 0, pending: 0, ongoing: 0, completed: 0 };
@@ -357,7 +380,7 @@ export default function ManageAllTripsPage() {
                                   <Link href={`/vehicles/trips/${trip.id}/start`}>Start Trip</Link>
                                 </Button>
                               )}
-                              {(canFinishTrip && (trip.status === 'Ongoing' || trip.status === 'Approved')) && (
+                              {(canFinishTrip && (trip.status === 'Ongoing' || (trip.status === 'Approved' && (isAdmin || isAssignedDriver)))) && (
                                 <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-slate-900 hover:bg-black" asChild>
                                   <Link href={`/vehicles/trips/${trip.id}/finish`}>
                                     <Flag className="h-3 w-3 mr-1.5" /> Finish Trip
@@ -516,6 +539,187 @@ export default function ManageAllTripsPage() {
             >
               Confirm Allotment
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Trip Details Modal */}
+      <Dialog open={!!detailsAssignment} onOpenChange={(o) => {
+        if (!o) {
+          const params = new URLSearchParams(searchParams.toString());
+          params.delete('view');
+          const queryStr = params.toString();
+          router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
+        }
+      }}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><Navigation className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Trip Audit Log</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">ID: {detailsAssignment?.id.slice(0, 12)}</DialogDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {detailsAssignment && (
+                <Badge variant="outline" className={cn(
+                  "text-[9px] font-black uppercase rounded-sm px-2 h-6",
+                  detailsAssignment.status === 'Completed' ? "bg-green-100 text-green-800" : 
+                  detailsAssignment.status === 'Ongoing' ? "bg-primary text-white" : "bg-blue-100 text-blue-800"
+                )}>
+                  {detailsAssignment.status}
+                </Badge>
+              )}
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[75vh]">
+            {detailsAssignment && (
+              <div className="p-8 space-y-10">
+                {/* Header Info */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Requester</Label>
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-bold">{detailsAssignment.userName}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Driver</Label>
+                    <div className="flex items-center gap-2">
+                      <HardHat className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-bold">{detailsAssignment.driverName || 'Not Assigned'}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Vehicle</Label>
+                    <div className="flex items-center gap-2">
+                      <CarFront className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-bold">{detailsAssignment.vehicleDetails || 'Not Assigned'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Itinerary */}
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                    <MapPinned className="h-4 w-4 text-primary" /> Route Itinerary & Purpose
+                  </Label>
+                  <div className="bg-muted/20 border rounded-sm p-6 space-y-6">
+                    <div className="relative pl-8 border-l-2 border-emerald-500 pb-2">
+                      <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-emerald-500 ring-4 ring-background flex items-center justify-center">
+                        <MapPin className="h-2 w-2 text-white" />
+                      </div>
+                      <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter leading-none mb-1">Departure Point ({detailsAssignment.pickupType})</p>
+                      <p className="text-base font-black">{detailsAssignment.pickupLocation}</p>
+                    </div>
+
+                    {detailsAssignment.destinations.map((d, i) => (
+                      <div key={i} className="relative pl-8 border-l-2 border-primary pb-2">
+                        <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-primary ring-4 ring-background flex items-center justify-center">
+                          <Navigation className="h-2 w-2 text-white" />
+                        </div>
+                        <p className="text-[9px] font-black uppercase text-primary tracking-tighter leading-none mb-1">Stop {i + 1} ({d.type})</p>
+                        <p className="text-base font-black">{d.location}</p>
+                        <p className="text-xs font-bold text-muted-foreground mt-1 italic">"{d.purpose}"</p>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="p-4 bg-primary/5 rounded-sm border border-primary/10">
+                    <Label className="text-[9px] font-black uppercase text-primary tracking-widest block mb-1">Primary Trip Purpose</Label>
+                    <p className="text-sm font-medium leading-relaxed">"{detailsAssignment.purpose}"</p>
+                  </div>
+                </div>
+
+                {/* Passengers */}
+                {detailsAssignment.coPassengers && detailsAssignment.coPassengers.length > 0 && (
+                  <div className="space-y-3">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                      <Users className="h-4 w-4 text-primary" /> Co-Passengers Manifest
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                      {detailsAssignment.coPassengers.map(p => (
+                        <Badge key={p.id} variant="secondary" className="h-8 rounded-sm font-bold px-3 py-0 flex items-center gap-2 bg-muted/50 border">
+                          <User className="h-3 w-3 opacity-40" /> {p.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* Audit Readings */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-700 flex items-center gap-2 px-1">
+                      <PlayCircle className="h-4 w-4" /> Start Audit
+                    </h4>
+                    <div className="p-4 border rounded-sm bg-emerald-50/30 border-emerald-100 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-emerald-600 tracking-tighter leading-none mb-1">Initial Reading</p>
+                        <p className="text-xl font-black font-mono">{detailsAssignment.startReading || '—'} <span className="text-[10px] font-bold text-muted-foreground">KM</span></p>
+                      </div>
+                      {detailsAssignment.startReadingPhoto && (
+                        <div className="h-12 w-20 rounded-sm overflow-hidden border shadow-sm cursor-pointer" onClick={() => window.open(detailsAssignment.startReadingPhoto, '_blank')}>
+                          <img src={detailsAssignment.startReadingPhoto} className="w-full h-full object-cover" alt="Start" />
+                        </div>
+                      )}
+                    </div>
+                    {detailsAssignment.startTime && (
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1.5 px-1">
+                        <Clock className="h-3 w-3" /> {format(detailsAssignment.startTime.toDate(), 'dd MMM yyyy, HH:mm')}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-700 flex items-center gap-2 px-1">
+                      <Flag className="h-4 w-4" /> Finish Audit
+                    </h4>
+                    <div className="p-4 border rounded-sm bg-slate-50 border-slate-200 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-black uppercase text-slate-600 tracking-tighter leading-none mb-1">Final Reading</p>
+                        <p className="text-xl font-black font-mono">{detailsAssignment.endReading || '—'} <span className="text-[10px] font-bold text-muted-foreground">KM</span></p>
+                      </div>
+                      {detailsAssignment.endReadingPhoto && (
+                        <div className="h-12 w-20 rounded-sm overflow-hidden border shadow-sm cursor-pointer" onClick={() => window.open(detailsAssignment.endReadingPhoto, '_blank')}>
+                          <img src={detailsAssignment.endReadingPhoto} className="w-full h-full object-cover" alt="End" />
+                        </div>
+                      )}
+                    </div>
+                    {detailsAssignment.endTime && (
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1.5 px-1">
+                        <Clock className="h-3 w-3" /> {format(detailsAssignment.endTime.toDate(), 'dd MMM yyyy, HH:mm')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {detailsAssignment.startReading && detailsAssignment.endReading && (
+                  <div className="p-6 bg-primary/5 border-2 border-primary/10 rounded-sm flex items-center justify-between shadow-inner">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-black uppercase text-primary tracking-widest leading-none">Total Distance Covered</span>
+                      <span className="text-3xl font-black tabular-nums">{detailsAssignment.endReading - detailsAssignment.startReading} <span className="text-xs font-bold text-muted-foreground/60 uppercase ml-1">Kilometers</span></span>
+                    </div>
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                      <TrendingUp className="h-6 w-6 text-primary" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </ScrollArea>
+
+          <DialogFooter className="p-4 bg-muted/5 border-t">
+            <DialogClose asChild>
+              <Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button>
+            </DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
