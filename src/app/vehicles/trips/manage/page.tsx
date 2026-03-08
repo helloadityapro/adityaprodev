@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, doc, where, or, serverTimestamp, and } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -104,24 +104,20 @@ export default function ManageAllTripsPage() {
   
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
-  const isDriver = userProfile?.role === 'Driver';
 
   const assignmentsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'vehicle_assignments');
     
-    // Admins and Managers see all trips for coordination
     if (isAdmin || isManager) {
       return query(colRef, orderBy('requestDate', 'desc'));
     }
 
-    // Drivers see trips where they are the designated driver
-    // Site Engineers see their own requested trips
     return query(
       colRef, 
       or(where('driverId', '==', user.uid), where('userId', '==', user.uid))
     );
-  }, [firestore, isAdmin, isManager, isDriver, user, isProfileLoading]);
+  }, [firestore, isAdmin, isManager, user, isProfileLoading]);
 
   const { data: assignments, isLoading } = useCollection<Assignment>(assignmentsQuery);
 
@@ -361,7 +357,7 @@ export default function ManageAllTripsPage() {
                                   <Link href={`/vehicles/trips/${trip.id}/start`}>Start Trip</Link>
                                 </Button>
                               )}
-                              {(canFinishTrip && trip.status === 'Ongoing') && (
+                              {(canFinishTrip && (trip.status === 'Ongoing' || trip.status === 'Approved')) && (
                                 <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-slate-900 hover:bg-black" asChild>
                                   <Link href={`/vehicles/trips/${trip.id}/finish`}>
                                     <Flag className="h-3 w-3 mr-1.5" /> Finish Trip
