@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Camera, MapPin, Loader2, CheckCircle2, Flag, SwitchCamera, ImagePlus } from 'lucide-react';
+import { Camera, MapPin, Loader2, CheckCircle2, Flag, SwitchCamera, ImagePlus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -114,7 +114,7 @@ export default function FinishTripPage() {
       }
 
       toast({ title: 'Trip Concluded', description: 'Report published. Vehicle is now available for allotment.' });
-      router.push('/vehicles/assigned');
+      router.push('/vehicles/trips/manage');
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
       setIsProcessing(false);
