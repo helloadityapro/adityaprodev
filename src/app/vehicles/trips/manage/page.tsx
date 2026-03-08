@@ -365,7 +365,7 @@ export default function ManageAllTripsPage() {
                               )}
                               {(isAdmin || isManager) && trip.status === 'Pending' && (
                                 <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "" })}>
-                                  Allot Resources
+                                  Allot Vehicle
                                 </Button>
                               )}
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
@@ -416,7 +416,7 @@ export default function ManageAllTripsPage() {
                           <TableCell className="text-right px-6">
                             <div className="flex justify-end gap-1">
                               <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "" })}>
-                                Allot resources
+                                Allot Vehicle
                               </Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => handleReject(trip.id)}>
                                 <XCircle className="h-4 w-4" />
