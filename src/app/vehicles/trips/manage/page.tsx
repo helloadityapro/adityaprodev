@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -34,7 +33,9 @@ import {
   PlayCircle,
   Flag,
   Smartphone,
-  Check
+  Check,
+  HardHat,
+  TrendingUp
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
