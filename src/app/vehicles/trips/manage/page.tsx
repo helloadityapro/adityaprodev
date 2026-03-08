@@ -12,6 +12,7 @@ import {
   Search, 
   FilterX, 
   MapPin, 
+  MapPinned,
   ArrowRight, 
   Users, 
   History, 
@@ -51,6 +52,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { useToast } from "@/hooks/use-toast";
 
 type Assignment = {
   id: string;
@@ -540,5 +542,3 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
     </Card>
   );
 }
-
-import { useToast } from "@/hooks/use-toast";
