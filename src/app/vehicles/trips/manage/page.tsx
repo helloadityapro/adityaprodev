@@ -302,6 +302,9 @@ export default function ManageAllTripsPage() {
                   <TableBody>
                     {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => {
                       const isAssignedDriver = trip.driverId === user?.uid;
+                      const canFinishTrip = isAssignedDriver || isAdmin;
+                      const canStartTrip = isAssignedDriver;
+
                       return (
                         <TableRow key={trip.id} className="hover:bg-muted/5 transition-colors">
                           <TableCell className="px-6 py-4">
@@ -353,14 +356,16 @@ export default function ManageAllTripsPage() {
                           </TableCell>
                           <TableCell className="text-right px-6">
                             <div className="flex justify-end gap-1">
-                              {(isAssignedDriver && trip.status === 'Approved') && (
+                              {(canStartTrip && trip.status === 'Approved') && (
                                 <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" asChild>
                                   <Link href={`/vehicles/trips/${trip.id}/start`}>Start Trip</Link>
                                 </Button>
                               )}
-                              {(isAssignedDriver && trip.status === 'Ongoing') && (
-                                <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-slate-900" asChild>
-                                  <Link href={`/vehicles/trips/${trip.id}/finish`}>Finish Trip</Link>
+                              {(canFinishTrip && trip.status === 'Ongoing') && (
+                                <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-slate-900 hover:bg-black" asChild>
+                                  <Link href={`/vehicles/trips/${trip.id}/finish`}>
+                                    <Flag className="h-3 w-3 mr-1.5" /> Finish Trip
+                                  </Link>
                                 </Button>
                               )}
                               {(isAdmin || isManager) && trip.status === 'Pending' && (
