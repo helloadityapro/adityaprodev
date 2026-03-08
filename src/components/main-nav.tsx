@@ -54,35 +54,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendingPtwCount: number }) {
   const pathname = usePathname()
-  const isDriver = userRole === 'Driver';
-
-  if (isDriver) {
-    return (
-      <div className="flex flex-col gap-4 py-2 flex-1">
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Vehicle Operations</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Assigned Vehicles" isActive={pathname === '/vehicles/assigned'} className="rounded-sm">
-                <Link href="/vehicles/assigned">
-                  <CarFront className="h-4 w-4" />
-                  <span className="font-medium">Assigned Trips</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Attendance" isActive={pathname.startsWith('/attendance')} className="rounded-sm">
-                <Link href="/attendance">
-                  <CalendarCheck className="h-4 w-4" />
-                  <span className="font-medium">Check-in / Out</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      </div>
-    )
-  }
+  const isAdmin = userRole === 'Admin';
 
   return (
     <div className="flex flex-col gap-4 py-2 flex-1">
@@ -169,32 +141,22 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Assigned Vehicles" isActive={pathname === '/vehicles/assigned'} className="rounded-sm">
-              <Link href="/vehicles/assigned">
-                <CarFront className="h-4 w-4" />
-                <span className="font-medium">Assigned Vehicles</span>
+            <SidebarMenuButton asChild tooltip="Manage Trips" isActive={pathname === '/vehicles/trips/manage'} className="rounded-sm">
+              <Link href="/vehicles/trips/manage">
+                <MapPinned className="h-4 w-4 text-indigo-600" />
+                <span className="font-bold">Manage Trips</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          {(userRole === 'Admin') && (
-            <>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Manage All Trips" isActive={pathname === '/vehicles/trips/manage'} className="rounded-sm">
-                  <Link href="/vehicles/trips/manage">
-                    <MapPinned className="h-4 w-4 text-indigo-600" />
-                    <span className="font-bold text-indigo-700">Manage All Trips</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Manage Vehicles" isActive={pathname === '/vehicles/manage'} className="rounded-sm">
-                  <Link href="/vehicles/manage">
-                    <Car className="h-4 w-4" />
-                    <span className="font-medium">Manage Vehicles</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </>
+          {isAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Manage Vehicles" isActive={pathname === '/vehicles/manage'} className="rounded-sm">
+                <Link href="/vehicles/manage">
+                  <Car className="h-4 w-4 text-primary" />
+                  <span className="font-bold">Manage Vehicles</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           )}
         </SidebarMenu>
       </SidebarGroup>
@@ -352,7 +314,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
       
-      {userRole === "Admin" && (
+      {isAdmin && (
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Administration</SidebarGroupLabel>
           <SidebarMenu>
