@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -71,7 +70,7 @@ type UserProfile = {
 
 export default function ManageAllTripsPage() {
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const router = useRouter();
 
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -279,7 +278,7 @@ export default function ManageAllTripsPage() {
                         <Badge variant="outline" className={cn(
                           "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
                           trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                          trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                          req.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
                           trip.status === 'Ongoing' ? "bg-primary text-white border-none animate-pulse" :
                           trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
                           "bg-red-50 text-red-700 border-red-200"
