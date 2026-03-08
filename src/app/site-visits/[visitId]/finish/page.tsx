@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, MapPin, Loader2, Plus, Trash2, CheckCircle2, UserCheck, AlertCircle, Users, ImageIcon, X, Maximize2, UserCircle2 } from "lucide-react";
+import { Camera, MapPin, Loader2, Plus, Trash2, CheckCircle2, UserCheck, AlertCircle, Users, ImageIcon, X, Maximize2, UserCircle2, SwitchCamera, ImagePlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -42,8 +42,10 @@ export default function FinishSiteVisitPage() {
 
   const [selfie, setSelfie] = React.useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = React.useState(false);
+  const [facingMode, setFacingMode] = React.useState<"user" | "environment">("user");
   const [hasCameraPermission, setHasCameraPermission] = React.useState<boolean | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   
   const [purpose, setPurpose] = React.useState("");
   const [details, setDetails] = React.useState("");
@@ -52,11 +54,11 @@ export default function FinishSiteVisitPage() {
   const [tasks, setTasks] = React.useState<TaskItem[]>([{ text: "", photoUrl: null }]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const startCamera = async () => {
+  const startCamera = async (mode: "user" | "environment" = facingMode) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
-          facingMode: "user",
+          facingMode: mode,
           width: { ideal: 1280 },
           height: { ideal: 720 }
         } 
@@ -76,6 +78,16 @@ export default function FinishSiteVisitPage() {
         title: 'Camera Access Denied',
         description: 'Please enable camera permissions to capture the mandatory verification selfie.',
       });
+    }
+  };
+
+  const toggleCamera = async () => {
+    if (isCameraActive) {
+      const stream = videoRef.current?.srcObject as MediaStream;
+      stream?.getTracks().forEach(track => track.stop());
+      const nextMode = facingMode === "user" ? "environment" : "user";
+      setFacingMode(nextMode);
+      startCamera(nextMode);
     }
   };
 
@@ -108,6 +120,17 @@ export default function FinishSiteVisitPage() {
       }
     } else {
       toast({ variant: 'destructive', title: 'Camera Not Ready', description: 'Please wait for the video feed to initialize.' });
+    }
+  };
+
+  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setSelfie(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -243,17 +266,21 @@ export default function FinishSiteVisitPage() {
               <div className={cn("relative w-full max-w-sm aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
                 <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
                 
-                {/* Silhouette Overlay */}
-                <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-40">
-                  <div className="w-24 h-24 rounded-full border-2 border-white mt-4" />
-                  <div className="w-40 h-24 rounded-t-full border-2 border-t-2 border-x-2 border-white -mt-2" />
-                  <p className="text-white text-[8px] font-black uppercase mt-2 bg-black/20 px-2 rounded-full tracking-widest text-center">Center face & shoulders</p>
-                </div>
+                {/* Silhouette Overlay - only for front camera */}
+                {facingMode === "user" && (
+                  <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-40">
+                    <div className="w-24 h-24 rounded-full border-2 border-white mt-4" />
+                    <div className="w-40 h-24 rounded-t-full border-2 border-t-2 border-x-2 border-white -mt-2" />
+                    <p className="text-white text-[8px] font-black uppercase mt-2 bg-black/20 px-2 rounded-full tracking-widest text-center">Center face & shoulders</p>
+                  </div>
+                )}
 
-                <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
+                  <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-10 w-10 p-0 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
                   <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 bg-white hover:bg-white/90 text-black border-4 border-primary shadow-xl" title="Capture">
                     <Camera className="h-6 w-6" />
                   </Button>
+                  <div className="w-10" />
                 </div>
               </div>
 
@@ -275,13 +302,32 @@ export default function FinishSiteVisitPage() {
               )}
 
               {!selfie && !isCameraActive && (
-                <Button onClick={startCamera} variant="outline" className="w-full h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all">
-                  <UserCircle2 className="h-8 w-8 text-primary" />
-                  <div className="flex flex-col items-center text-center">
-                    <span className="font-bold uppercase text-xs tracking-wider text-primary">Open Camera for Presence Audit</span>
-                    <span className="text-[10px] text-muted-foreground mt-1 px-8 leading-tight uppercase font-medium">Front profile including face and upper body is mandatory</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                  <Button onClick={() => startCamera()} variant="outline" className="h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all">
+                    <Camera className="h-8 w-8 text-primary" />
+                    <div className="flex flex-col items-center text-center">
+                      <span className="font-bold uppercase text-xs tracking-wider text-primary">Open Camera</span>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Capture live audit selfie</span>
+                    </div>
+                  </Button>
+
+                  <div className="relative">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      ref={fileInputRef} 
+                      onChange={handleGalleryUpload} 
+                    />
+                    <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all">
+                      <ImagePlus className="h-8 w-8 text-primary" />
+                      <div className="flex flex-col items-center text-center">
+                        <span className="font-bold uppercase text-xs tracking-wider text-primary">Upload Gallery</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Select existing photo</span>
+                      </div>
+                    </Button>
                   </div>
-                </Button>
+                </div>
               )}
               
               {hasCameraPermission === false && (

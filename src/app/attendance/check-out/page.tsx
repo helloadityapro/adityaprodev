@@ -6,7 +6,7 @@ import { collection, doc, query, where, limit, serverTimestamp } from "firebase/
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Loader2, CalendarCheck, Clock, CheckCircle2, Navigation, LogOut, Timer, Camera, Trash2, UserCircle2 } from "lucide-react";
+import { MapPin, Loader2, CalendarCheck, Clock, CheckCircle2, Navigation, LogOut, Timer, Camera, Trash2, UserCircle2, SwitchCamera, ImagePlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { format, formatDistanceToNow } from "date-fns";
@@ -24,7 +24,9 @@ export default function CheckOutPage() {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [selfie, setSelfie] = React.useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = React.useState(false);
+  const [facingMode, setFacingMode] = React.useState<"user" | "environment">("user");
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const activeAttendanceQuery = useMemoFirebase(() => {
     if (!user) return null;
@@ -39,10 +41,10 @@ export default function CheckOutPage() {
   const { data: activeAttendance, isLoading } = useCollection(activeAttendanceQuery);
   const currentEntry = activeAttendance?.[0];
 
-  const startCamera = async () => {
+  const startCamera = async (mode: "user" | "environment" = facingMode) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: "user" } 
+        video: { facingMode: mode } 
       });
       setIsCameraActive(true);
       if (videoRef.current) {
@@ -50,6 +52,16 @@ export default function CheckOutPage() {
       }
     } catch (error) {
       toast({ variant: 'destructive', title: 'Camera Error', description: 'Enable camera to check out.' });
+    }
+  };
+
+  const toggleCamera = async () => {
+    if (isCameraActive) {
+      const stream = videoRef.current?.srcObject as MediaStream;
+      stream?.getTracks().forEach(track => track.stop());
+      const nextMode = facingMode === "user" ? "environment" : "user";
+      setFacingMode(nextMode);
+      startCamera(nextMode);
     }
   };
 
@@ -68,6 +80,17 @@ export default function CheckOutPage() {
         stream?.getTracks().forEach(track => track.stop());
         setIsCameraActive(false);
       }
+    }
+  };
+
+  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setSelfie(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -151,14 +174,20 @@ export default function CheckOutPage() {
             <div className={cn("relative w-full aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
               
-              {/* Silhouette Overlay */}
-              <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-40">
-                <div className="w-24 h-24 rounded-full border-2 border-white mt-4" />
-                <div className="w-40 h-24 rounded-t-full border-2 border-t-2 border-x-2 border-white -mt-2" />
-                <p className="text-white text-[8px] font-black uppercase mt-2 bg-black/20 px-2 rounded-full tracking-widest">Position face and shoulders here</p>
-              </div>
+              {/* Silhouette Overlay - only for front camera */}
+              {facingMode === "user" && (
+                <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-40">
+                  <div className="w-24 h-24 rounded-full border-2 border-white mt-4" />
+                  <div className="w-40 h-24 rounded-t-full border-2 border-t-2 border-x-2 border-white -mt-2" />
+                  <p className="text-white text-[8px] font-black uppercase mt-2 bg-black/20 px-2 rounded-full tracking-widest">Position face and shoulders here</p>
+                </div>
+              )}
 
-              <Button onClick={capturePhoto} className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full h-12 w-12 p-0 shadow-lg border-4 border-white/20"><Camera className="h-6 w-6" /></Button>
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
+                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full bg-black/40 text-white border-white/20 hover:bg-black/60"><SwitchCamera className="h-5 w-5" /></Button>
+                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-lg border-4 border-white/20"><Camera className="h-7 w-7" /></Button>
+                <div className="w-10" />
+              </div>
             </div>
 
             {selfie && !isCameraActive && (
@@ -170,15 +199,36 @@ export default function CheckOutPage() {
             )}
 
             {!selfie && !isCameraActive && (
-              <Button onClick={startCamera} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-emerald-50/50 transition-all border-emerald-200 text-emerald-700">
-                <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
-                  <UserCircle2 className="h-10 w-10" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                <Button onClick={() => startCamera()} variant="outline" className="h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-emerald-50/50 transition-all border-emerald-200 text-emerald-700">
+                  <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
+                    <Camera className="h-8 w-8" />
+                  </div>
+                  <div className="flex flex-col gap-1 text-center px-4">
+                    <span className="font-black uppercase text-xs tracking-widest">Open Camera</span>
+                    <span className="text-[10px] text-muted-foreground font-bold uppercase">Exit Audit</span>
+                  </div>
+                </Button>
+
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    ref={fileInputRef} 
+                    onChange={handleGalleryUpload} 
+                  />
+                  <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-emerald-50/50 transition-all border-emerald-200 text-emerald-700">
+                    <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
+                      <ImagePlus className="h-8 w-8" />
+                    </div>
+                    <div className="flex flex-col gap-1 text-center px-4">
+                      <span className="font-black uppercase text-xs tracking-widest">Upload Photo</span>
+                      <span className="text-[10px] text-muted-foreground font-bold uppercase">From Gallery</span>
+                    </div>
+                  </Button>
                 </div>
-                <div className="flex flex-col gap-1 text-center px-4">
-                  <span className="font-black uppercase text-xs tracking-widest">Capture Check-out Selfie</span>
-                  <span className="text-[10px] text-muted-foreground font-medium">Selfie must clearly show face and upper body</span>
-                </div>
-              </Button>
+              </div>
             )}
           </div>
 

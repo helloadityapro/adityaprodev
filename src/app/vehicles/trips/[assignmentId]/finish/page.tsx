@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -10,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Camera, MapPin, Loader2, CheckCircle2, Flag } from 'lucide-react';
+import { Camera, MapPin, Loader2, CheckCircle2, Flag, SwitchCamera, ImagePlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -30,18 +29,30 @@ export default function FinishTripPage() {
   const [reading, setReading] = React.useState<string>("");
   const [photo, setPhoto] = React.useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = React.useState(false);
+  const [facingMode, setFacingMode] = React.useState<"user" | "environment">("environment");
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
 
-  const startCamera = async () => {
+  const startCamera = async (mode: "user" | "environment" = facingMode) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
       setIsCameraActive(true);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
     } catch (error) {
       toast({ variant: 'destructive', title: 'Camera Denied', description: 'Enable camera to verify reading.' });
+    }
+  };
+
+  const toggleCamera = async () => {
+    if (isCameraActive) {
+      const stream = videoRef.current?.srcObject as MediaStream;
+      stream?.getTracks().forEach(track => track.stop());
+      const nextMode = facingMode === "user" ? "environment" : "user";
+      setFacingMode(nextMode);
+      startCamera(nextMode);
     }
   };
 
@@ -59,6 +70,17 @@ export default function FinishTripPage() {
         stream?.getTracks().forEach(track => track.stop());
         setIsCameraActive(false);
       }
+    }
+  };
+
+  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setPhoto(event.target?.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -130,21 +152,41 @@ export default function FinishTripPage() {
           <div className="flex flex-col items-center gap-4">
             <div className={cn("relative w-full aspect-video bg-black rounded-sm overflow-hidden", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-              <Button onClick={capturePhoto} className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full h-14 w-14 p-0 shadow-2xl border-4 border-white/20"><Camera className="h-6 w-6" /></Button>
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
+                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
+                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-2xl border-4 border-white/20 bg-white text-black hover:bg-white/90"><Camera className="h-7 w-7" /></Button>
+                <div className="w-10" />
+              </div>
             </div>
 
             {photo && !isCameraActive && (
               <div className="relative w-full aspect-video group">
                 <img src={photo} className="w-full h-full object-cover rounded-sm border-2 border-primary shadow-md" alt="Audit" />
-                <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full opacity-0 group-hover:opacity-100" onClick={() => setPhoto(null)}><Camera className="h-4 w-4" /></Button>
+                <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full opacity-0 group-hover:opacity-100" onClick={() => setPhoto(null)}><Trash2 className="h-4 w-4" /></Button>
               </div>
             )}
 
             {!photo && !isCameraActive && (
-              <Button onClick={startCamera} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all">
-                <Camera className="h-10 w-10 text-primary" />
-                <span className="font-black uppercase text-xs tracking-widest text-primary">Capture Finish Reading Photo</span>
-              </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                <Button onClick={() => startCamera()} variant="outline" className="h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all">
+                  <Camera className="h-10 w-10 text-primary" />
+                  <span className="font-black uppercase text-xs tracking-widest text-primary">Capture Live Photo</span>
+                </Button>
+
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    ref={fileInputRef} 
+                    onChange={handleGalleryUpload} 
+                  />
+                  <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all">
+                    <ImagePlus className="h-10 w-10 text-primary" />
+                    <span className="font-black uppercase text-xs tracking-widest text-primary">Upload from Gallery</span>
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
 
