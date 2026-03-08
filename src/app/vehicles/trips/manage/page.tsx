@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, doc, where, or, serverTimestamp, and } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -116,12 +116,11 @@ export default function ManageAllTripsPage() {
     }
 
     // Drivers see trips where they are the designated driver
-    if (isDriver) {
-      return query(colRef, where('driverId', '==', user.uid), orderBy('requestDate', 'desc'));
-    }
-
     // Site Engineers see their own requested trips
-    return query(colRef, where('userId', '==', user.uid), orderBy('requestDate', 'desc'));
+    return query(
+      colRef, 
+      or(where('driverId', '==', user.uid), where('userId', '==', user.uid))
+    );
   }, [firestore, isAdmin, isManager, isDriver, user, isProfileLoading]);
 
   const { data: assignments, isLoading } = useCollection<Assignment>(assignmentsQuery);
@@ -302,7 +301,8 @@ export default function ManageAllTripsPage() {
                   <TableBody>
                     {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => {
                       const isAssignedDriver = trip.driverId === user?.uid;
-                      const canFinishTrip = isAssignedDriver || isAdmin;
+                      const isRequester = trip.userId === user?.uid;
+                      const canFinishTrip = isAssignedDriver || isAdmin || isRequester;
                       const canStartTrip = isAssignedDriver;
 
                       return (
@@ -374,7 +374,7 @@ export default function ManageAllTripsPage() {
                                 </Button>
                               )}
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
-                                <Link href={`/vehicles/assigned?view=${trip.id}`}><Eye className="h-4 w-4" /></Link>
+                                <Link href={`/vehicles/trips/manage?view=${trip.id}`}><Eye className="h-4 w-4" /></Link>
                               </Button>
                             </div>
                           </TableCell>
