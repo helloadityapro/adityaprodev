@@ -28,7 +28,8 @@ import {
   ArrowUp, 
   ArrowDown, 
   Navigation,
-  FileText
+  FileText,
+  Eye
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
