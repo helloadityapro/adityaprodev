@@ -1,16 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
+import { useFirestore, useUser, useMemoFirebase, useCollection, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
 import { collection, doc, query, where, limit, serverTimestamp } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Loader2, CalendarCheck, Clock, CheckCircle2, Navigation, LogOut, Timer, Camera, Trash2, UserCircle2, SwitchCamera, ImagePlus } from "lucide-react";
+import { Loader2, CalendarCheck, CheckCircle2, LogOut, Camera, Trash2, SwitchCamera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { format, formatDistanceToNow } from "date-fns";
-import { Badge } from "@/components/ui/badge";
+import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +25,6 @@ export default function CheckOutPage() {
   const [isCameraActive, setIsCameraActive] = React.useState(false);
   const [facingMode, setFacingMode] = React.useState<"user" | "environment">("user");
   const videoRef = React.useRef<HTMLVideoElement>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const activeAttendanceQuery = useMemoFirebase(() => {
     if (!user) return null;
@@ -80,17 +78,6 @@ export default function CheckOutPage() {
         stream?.getTracks().forEach(track => track.stop());
         setIsCameraActive(false);
       }
-    }
-  };
-
-  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setSelfie(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -174,7 +161,6 @@ export default function CheckOutPage() {
             <div className={cn("relative w-full aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
               
-              {/* Silhouette Overlay - only for front camera */}
               {facingMode === "user" && (
                 <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-40">
                   <div className="w-24 h-24 rounded-full border-2 border-white mt-4" />
@@ -184,7 +170,7 @@ export default function CheckOutPage() {
               )}
 
               <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
-                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full bg-black/40 text-white border-white/20 hover:bg-black/60"><SwitchCamera className="h-5 w-5" /></Button>
+                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
                 <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-lg border-4 border-white/20"><Camera className="h-7 w-7" /></Button>
                 <div className="w-10" />
               </div>
@@ -199,36 +185,15 @@ export default function CheckOutPage() {
             )}
 
             {!selfie && !isCameraActive && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-                <Button onClick={() => startCamera()} variant="outline" className="h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-emerald-50/50 transition-all border-emerald-200 text-emerald-700">
-                  <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
-                    <Camera className="h-8 w-8" />
-                  </div>
-                  <div className="flex flex-col gap-1 text-center px-4">
-                    <span className="font-black uppercase text-xs tracking-widest">Open Camera</span>
-                    <span className="text-[10px] text-muted-foreground font-bold uppercase">Exit Audit</span>
-                  </div>
-                </Button>
-
-                <div className="relative">
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    ref={fileInputRef} 
-                    onChange={handleGalleryUpload} 
-                  />
-                  <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-emerald-50/50 transition-all border-emerald-200 text-emerald-700">
-                    <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
-                      <ImagePlus className="h-8 w-8" />
-                    </div>
-                    <div className="flex flex-col gap-1 text-center px-4">
-                      <span className="font-black uppercase text-xs tracking-widest">Upload Photo</span>
-                      <span className="text-[10px] text-muted-foreground font-bold uppercase">From Gallery</span>
-                    </div>
-                  </Button>
+              <Button onClick={() => startCamera()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-emerald-50/50 transition-all border-emerald-200 text-emerald-700">
+                <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
+                  <Camera className="h-8 w-8" />
                 </div>
-              </div>
+                <div className="flex flex-col gap-1 text-center px-4">
+                  <span className="font-black uppercase text-xs tracking-widest">Open Camera</span>
+                  <span className="text-[10px] text-muted-foreground font-bold uppercase">Live Exit Audit Required</span>
+                </div>
+              </Button>
             )}
           </div>
 

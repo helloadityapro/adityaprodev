@@ -6,11 +6,10 @@ import { collection, doc, serverTimestamp } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Loader2, CalendarCheck, Clock, Navigation, Camera, Trash2, AlertCircle, UserCircle2, History, SwitchCamera, ImagePlus, Upload } from "lucide-react";
+import { MapPin, Loader2, CalendarCheck, Camera, Trash2, SwitchCamera, History } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -27,7 +26,6 @@ export default function CheckInPage() {
   const [facingMode, setFacingMode] = React.useState<"user" | "environment">("user");
   const [hasCameraPermission, setHasCameraPermission] = React.useState<boolean | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc(userProfileRef);
@@ -73,17 +71,6 @@ export default function CheckInPage() {
         stream?.getTracks().forEach(track => track.stop());
         setIsCameraActive(false);
       }
-    }
-  };
-
-  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setSelfie(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -171,7 +158,6 @@ export default function CheckInPage() {
             <div className={cn("relative w-full aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
               
-              {/* Silhouette Overlay for upper body positioning - only show for front camera */}
               {facingMode === "user" && (
                 <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-40">
                   <div className="w-24 h-24 rounded-full border-2 border-white mt-4" />
@@ -183,7 +169,7 @@ export default function CheckInPage() {
               <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
                 <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full bg-black/40 text-white border-white/20 hover:bg-black/60"><SwitchCamera className="h-5 w-5" /></Button>
                 <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-lg border-4 border-white/20"><Camera className="h-7 w-7" /></Button>
-                <div className="w-10" /> {/* Spacer */}
+                <div className="w-10" />
               </div>
             </div>
 
@@ -196,36 +182,15 @@ export default function CheckInPage() {
             )}
 
             {!selfie && !isCameraActive && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-                <Button onClick={() => startCamera()} variant="outline" className="h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all">
-                  <div className="p-3 bg-primary/10 rounded-full">
-                    <Camera className="h-8 w-8 text-primary" />
-                  </div>
-                  <div className="flex flex-col gap-1 text-center px-4">
-                    <span className="font-black uppercase text-xs tracking-widest text-primary">Open Camera</span>
-                    <span className="text-[10px] text-muted-foreground uppercase font-bold">Live Verification</span>
-                  </div>
-                </Button>
-
-                <div className="relative">
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    ref={fileInputRef} 
-                    onChange={handleGalleryUpload} 
-                  />
-                  <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all">
-                    <div className="p-3 bg-primary/10 rounded-full">
-                      <ImagePlus className="h-8 w-8 text-primary" />
-                    </div>
-                    <div className="flex flex-col gap-1 text-center px-4">
-                      <span className="font-black uppercase text-xs tracking-widest text-primary">Upload from Gallery</span>
-                      <span className="text-[10px] text-muted-foreground uppercase font-bold">Select saved photo</span>
-                    </div>
-                  </Button>
+              <Button onClick={() => startCamera()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all">
+                <div className="p-3 bg-primary/10 rounded-full">
+                  <Camera className="h-8 w-8 text-primary" />
                 </div>
-              </div>
+                <div className="flex flex-col gap-1 text-center px-4">
+                  <span className="font-black uppercase text-xs tracking-widest text-primary">Open Camera</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold">Live Verification Required</span>
+                </div>
+              </Button>
             )}
           </div>
 
@@ -236,7 +201,7 @@ export default function CheckInPage() {
                 Audit Compliance Notification
               </p>
               <p className="text-[10px] text-amber-700 leading-snug">
-                Verified <strong>front profile (face and upper body)</strong> and GPS coordinates are mandatory for organizational audit compliance.
+                Verified <strong>live front profile</strong> and GPS coordinates are mandatory for organizational audit compliance. Gallery uploads are restricted for attendance.
               </p>
             </div>
           </div>
