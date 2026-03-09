@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
-import Link from 'next/link';
+import Link from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -171,50 +171,48 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[950px] w-[95vw] rounded-sm max-h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl bg-background">
         <DialogHeader className="p-8 pb-6 shrink-0 text-left space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-4 min-w-0 text-left">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <DialogTitle className="text-3xl font-black tracking-tighter text-foreground uppercase">
-                    {user.username}
-                  </DialogTitle>
-                  <div className="flex gap-2">
-                    <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-2 h-5 bg-primary/10 text-primary border-none">
-                      {user.role}
+          <div className="flex flex-col gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <DialogTitle className="text-3xl font-black tracking-tighter text-foreground uppercase">
+                  {user.username}
+                </DialogTitle>
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-2 h-5 bg-primary/10 text-primary border-none">
+                    {user.role}
+                  </Badge>
+                  {user.department && (
+                    <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-2 h-5 border-primary/20 text-primary flex items-center gap-1">
+                      <Building2 className="h-3 w-3" /> {user.department}
                     </Badge>
-                    {user.department && (
-                      <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-2 h-5 border-primary/20 text-primary flex items-center gap-1">
-                        <Building2 className="h-3 w-3" /> {user.department}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <DialogDescription className="text-sm font-medium text-muted-foreground/70">
-                  User Profile
-                </DialogDescription>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Mail className="h-3.5 w-3.5" />
-                  <span className="text-xs font-semibold">{user.email}</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Smartphone className="h-3.5 w-3.5" />
-                  <span className="text-xs font-semibold">{user.mobile || 'N/A'}</span>
+                  )}
                 </div>
               </div>
+              <DialogDescription className="text-sm font-medium text-muted-foreground/70">
+                User Profile
+              </DialogDescription>
             </div>
-            
-            <div className="flex items-center gap-8 pr-8 shrink-0">
-              <div className="text-right space-y-0.5">
+
+            <div className="flex items-center gap-8 py-1">
+              <div className="text-left space-y-0.5">
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Balance</p>
                 <p className="text-2xl font-black text-primary tabular-nums">{(user.totalPoints || 0).toFixed(2)}<span className="text-xs font-bold ml-1 text-muted-foreground/40">pts</span></p>
               </div>
               <Separator orientation="vertical" className="h-8 opacity-20" />
-              <div className="text-right space-y-0.5">
+              <div className="text-left space-y-0.5">
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Ranking</p>
                 <p className="text-2xl font-black text-amber-600 tabular-nums">#{globalRank || '—'}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Mail className="h-3.5 w-3.5" />
+                <span className="text-xs font-semibold">{user.email}</span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Smartphone className="h-3.5 w-3.5" />
+                <span className="text-xs font-semibold">{user.mobile || 'N/A'}</span>
               </div>
             </div>
           </div>
@@ -247,7 +245,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                       {isViewerAdmin && (
                         !isMappingMode ? (
                           <Button variant="outline" size="sm" onClick={() => setIsMappingMode(true)} className="h-8 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5 px-4 text-[10px] uppercase tracking-wider">
-                            <UserPlus className="h-3 w-3 mr-1.5" /> Add Reporting Manager
+                            <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Add Reporting Manager
                           </Button>
                         ) : (
                           <div className="w-full space-y-4 p-4 border rounded-sm bg-primary/5 border-primary/10 animate-in fade-in slide-in-from-top-2 duration-300">
