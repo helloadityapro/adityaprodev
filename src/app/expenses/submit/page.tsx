@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -99,7 +100,7 @@ export default function SubmitExpensePage() {
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
-  const [submittedId, setSubmittedId] = React.useState<string | null>(null);
+  const [submittedData, setSubmittedData] = React.useState<{ id: string, title: string, siteName: string, total: number, items: any[] } | null>(null);
 
   const form = useForm<z.infer<typeof expenseSchema>>({
     resolver: zodResolver(expenseSchema),
@@ -158,14 +159,20 @@ export default function SubmitExpensePage() {
         userName: userProfile.username || user.email,
         title: values.title,
         siteId,
-        siteName: values.siteName,
+        siteName: values.siteName || "General",
         items: processedItems,
         totalAmount,
         status: 'Pending',
         createdAt: serverTimestamp(),
       }, { merge: true });
 
-      setSubmittedId(expenseId);
+      setSubmittedData({
+        id: expenseId,
+        title: values.title,
+        siteName: values.siteName || "General",
+        total: totalAmount,
+        items: processedItems
+      });
       setIsSuccess(true);
       toast({ title: 'Expense Submitted', description: 'Your request is pending review.' });
     } catch (e: any) {
@@ -176,18 +183,18 @@ export default function SubmitExpensePage() {
   };
 
   const triggerWhatsApp = () => {
-    if (!submittedId || !userProfile) return;
-    const values = form.getValues();
-    const itemsList = values.items.map(item => `- [${item.category}] ${item.description}: ₹${item.amount.toFixed(2)}`).join('\n');
+    if (!submittedData || !userProfile) return;
     
-    const message = `*Aditya Pro - New Expense Submission*\n\n*Title:* ${values.title}\n*Site:* ${values.siteName}\n*Total:* ₹${totalAmount.toFixed(2)}\n\n*Items:*\n${itemsList}\n\n*Submitted By:* ${userProfile.username}\n\n*Review Link:* ${window.location.origin}/expenses/list?view=${submittedId}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    const itemsList = submittedData.items.map(item => `- [${item.category}] ${item.description}: ₹${(Number(item.amount) || 0).toFixed(2)}`).join('\n');
+    
+    const message = `*Aditya Pro - New Expense Submission*\n\n*Title:* ${submittedData.title}\n*Site:* ${submittedData.siteName}\n*Total:* ₹${submittedData.total.toFixed(2)}\n\n*Items:*\n${itemsList}\n\n*Submitted By:* ${userProfile.username}\n\n*Review Link:* ${window.location.origin}/expenses/list?view=${submittedData.id}`;
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 
   const filteredSites = allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())) || [];
 
-  if (isSuccess) {
+  if (isSuccess && submittedData) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300 rounded-sm">
@@ -198,8 +205,8 @@ export default function SubmitExpensePage() {
               </div>
             </div>
             <CardTitle className="text-2xl font-bold uppercase tracking-tight">Expense Logged</CardTitle>
-            <CardDescription className="text-base">
-              Your submission for <strong className="text-primary font-black">₹{totalAmount.toFixed(2)}</strong> has been received and is awaiting review.
+            <CardDescription className="text-base leading-relaxed">
+              Your submission for <strong className="text-primary font-black">₹{submittedData.total.toFixed(2)}</strong> has been received and is awaiting review.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -212,7 +219,7 @@ export default function SubmitExpensePage() {
             </Button>
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" className="h-11 rounded-sm font-bold" onClick={() => router.push('/expenses/list')}>History</Button>
-              <Button variant="secondary" className="h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); setSubmittedId(null); }}>Log New</Button>
+              <Button variant="secondary" className="h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); setSubmittedData(null); }}>Log New</Button>
             </div>
           </CardContent>
         </Card>
