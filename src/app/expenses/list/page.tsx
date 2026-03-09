@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -30,10 +29,11 @@ import {
   ExternalLink,
   Loader2,
   Receipt,
-  Plus
+  Plus,
+  MessageCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -84,6 +84,8 @@ export default function ExpensesListPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -108,6 +110,25 @@ export default function ExpensesListPage() {
 
   const { data: expenses, isLoading: isExpensesLoading } = useCollection<ExpenseSubmission>(expensesQuery);
 
+  // Handle deep link via URL view parameter
+  React.useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId && expenses && expenses.length > 0) {
+      const found = expenses.find(e => e.id === viewId);
+      if (found) {
+        setSelectedExpense(found);
+      }
+    }
+  }, [searchParams, expenses]);
+
+  const handleCloseDetail = () => {
+    setSelectedExpense(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    const queryStr = params.toString();
+    router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
+  };
+
   const handleAction = async (remarks: string) => {
     if (!actionState) return;
     setIsProcessing(true);
@@ -125,7 +146,7 @@ export default function ExpensesListPage() {
         userId: actionState.expense.userId,
         title: `Expense ${actionState.type}`,
         description: `Your submission "${actionState.expense.title}" was ${actionState.type.toLowerCase()}. Remarks: ${remarks}`,
-        link: "/expenses/list",
+        link: `/expenses/list?view=${actionState.expense.id}`,
         read: false,
         createdAt: serverTimestamp(),
       });
@@ -137,6 +158,13 @@ export default function ExpensesListPage() {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const triggerWhatsApp = (expense: ExpenseSubmission) => {
+    const itemsList = expense.items.map(item => `- [${item.category}] ${item.description}: ₹${item.amount.toFixed(2)}`).join('\n');
+    const message = `*Aditya Pro - New Expense Submission*\n\n*Title:* ${expense.title}\n*Site:* ${expense.siteName}\n*Total:* ₹${expense.totalAmount.toFixed(2)}\n\n*Items:*\n${itemsList}\n\n*Submitted By:* ${expense.userName}\n\n*Review Link:* ${window.location.origin}/expenses/list?view=${expense.id}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
   const filteredExpenses = React.useMemo(() => {
@@ -254,6 +282,9 @@ export default function ExpensesListPage() {
                     </TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => triggerWhatsApp(expense)} title="Push to WhatsApp">
+                          <MessageCircle className="h-4 w-4" />
+                        </Button>
                         {isAdmin && expense.status === 'Pending' && (
                           <div className="flex gap-1">
                             <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3" onClick={() => setActionState({ expense, type: 'Approved' })}>
@@ -280,7 +311,7 @@ export default function ExpensesListPage() {
       </Card>
 
       {/* Detail Modal */}
-      <Dialog open={!!selectedExpense} onOpenChange={(o) => !o && setSelectedExpense(null)}>
+      <Dialog open={!!selectedExpense} onOpenChange={(o) => !o && handleCloseDetail()}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
             <div className="flex items-center gap-3">
@@ -389,10 +420,19 @@ export default function ExpensesListPage() {
           </ScrollArea>
 
           <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0">
+            {selectedExpense && (
+              <Button 
+                variant="outline" 
+                className="mr-auto h-10 rounded-sm font-black uppercase text-[10px] tracking-widest text-green-700 border-green-200 hover:bg-green-50"
+                onClick={() => triggerWhatsApp(selectedExpense)}
+              >
+                <MessageCircle className="h-4 w-4 mr-1.5" /> Share WA
+              </Button>
+            )}
             {isAdmin && selectedExpense?.status === 'Pending' && (
-              <div className="flex flex-1 gap-2">
-                <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => { setSelectedExpense(null); setActionState({ expense: selectedExpense!, type: 'Approved' }); }}>Approve</Button>
-                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => { setSelectedExpense(null); setActionState({ expense: selectedExpense!, type: 'Rejected' }); }}>Reject</Button>
+              <div className="flex gap-2">
+                <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => { setActionState({ expense: selectedExpense!, type: 'Approved' }); setSelectedExpense(null); }}>Approve</Button>
+                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => { setActionState({ expense: selectedExpense!, type: 'Rejected' }); setSelectedExpense(null); }}>Reject</Button>
               </div>
             )}
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>

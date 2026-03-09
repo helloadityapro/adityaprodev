@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -12,7 +11,7 @@ import {
   useDoc, 
   useMemoFirebase, 
   useCollection, 
-  addDocumentNonBlocking, 
+  setDocumentNonBlocking, 
   useFirebaseApp 
 } from '@/firebase';
 import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
@@ -37,7 +36,8 @@ import {
   Building2,
   Calendar as CalendarIcon,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  MessageCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -98,6 +98,7 @@ export default function SubmitExpensePage() {
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
+  const [submittedId, setSubmittedId] = React.useState<string | null>(null);
 
   const form = useForm<z.infer<typeof expenseSchema>>({
     resolver: zodResolver(expenseSchema),
@@ -115,11 +116,11 @@ export default function SubmitExpensePage() {
 
   const totalAmount = form.watch('items').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
-  const uploadReceipt = async (file: File, userId: string, index: number): Promise<string | null> => {
+  const uploadReceipt = async (file: File, userId: string, index: number, expenseId: string): Promise<string | null> => {
     if (!file) return null;
     const storage = getStorage(firebaseApp);
     const timestamp = Date.now();
-    const storagePath = `expenses/${userId}/${timestamp}_item_${index}_${file.name.replace(/\s+/g, '_')}`;
+    const storagePath = `expenses/${userId}/${expenseId}/${timestamp}_item_${index}_${file.name.replace(/\s+/g, '_')}`;
     const storageRef = ref(storage, storagePath);
     
     const uploadTask = uploadBytesResumable(storageRef, file);
@@ -136,10 +137,13 @@ export default function SubmitExpensePage() {
     setIsSubmitting(true);
 
     try {
+      const expenseRef = doc(collection(firestore, 'expenses'));
+      const expenseId = expenseRef.id;
+
       const processedItems = await Promise.all(values.items.map(async (item, idx) => {
         let receiptUrl = null;
         if (item.localReceipt instanceof File) {
-          receiptUrl = await uploadReceipt(item.localReceipt, user.uid, idx);
+          receiptUrl = await uploadReceipt(item.localReceipt, user.uid, idx, expenseId);
         }
         const { localReceipt, ...rest } = item;
         return { ...rest, receiptUrl };
@@ -147,7 +151,8 @@ export default function SubmitExpensePage() {
 
       const siteId = allSites?.find(s => s.name === values.siteName)?.id || null;
 
-      await addDocumentNonBlocking(collection(firestore, 'expenses'), {
+      await setDocumentNonBlocking(expenseRef, {
+        id: expenseId,
         userId: user.uid,
         userName: userProfile.username || user.email,
         title: values.title,
@@ -157,21 +162,9 @@ export default function SubmitExpensePage() {
         totalAmount,
         status: 'Pending',
         createdAt: serverTimestamp(),
-      });
+      }, { merge: true });
 
-      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
-      const adminDocs = await getDocs(adminsQuery);
-      adminDocs.forEach(adminDoc => {
-        addDocumentNonBlocking(collection(firestore, 'notifications'), {
-          userId: adminDoc.id,
-          title: "New Expense Submitted",
-          description: `${userProfile.username} submitted an expense for ₹${totalAmount.toFixed(2)}: "${values.title}"`,
-          link: "/expenses/list",
-          read: false,
-          createdAt: serverTimestamp(),
-        });
-      });
-
+      setSubmittedId(expenseId);
       setIsSuccess(true);
       toast({ title: 'Expense Submitted', description: 'Your request is pending review.' });
     } catch (e: any) {
@@ -179,6 +172,16 @@ export default function SubmitExpensePage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const triggerWhatsApp = () => {
+    if (!submittedId || !userProfile) return;
+    const values = form.getValues();
+    const itemsList = values.items.map(item => `- [${item.category}] ${item.description}: ₹${item.amount.toFixed(2)}`).join('\n');
+    
+    const message = `*Aditya Pro - New Expense Submission*\n\n*Title:* ${values.title}\n*Site:* ${values.siteName}\n*Total:* ₹${totalAmount.toFixed(2)}\n\n*Items:*\n${itemsList}\n\n*Submitted By:* ${userProfile.username}\n\n*Review Link:* ${window.location.origin}/expenses/list?view=${submittedId}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
   const filteredSites = allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())) || [];
@@ -195,13 +198,22 @@ export default function SubmitExpensePage() {
             </div>
             <CardTitle className="text-2xl font-bold uppercase tracking-tight">Expense Logged</CardTitle>
             <CardDescription className="text-base">
-              Your submission for <strong className="text-primary font-black">₹{totalAmount.toFixed(2)}</strong> has been received.
+              Your submission for <strong className="text-primary font-black">₹{totalAmount.toFixed(2)}</strong> has been received and is awaiting review.
             </CardDescription>
           </CardHeader>
-          <CardFooter className="flex flex-col gap-3">
-            <Button className="w-full rounded-sm font-bold" onClick={() => router.push('/expenses/list')}>View My Submissions</Button>
-            <Button variant="outline" className="w-full rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); }}>Log Another</Button>
-          </CardFooter>
+          <CardContent className="space-y-4">
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm shadow-md" 
+              onClick={triggerWhatsApp}
+            >
+              <MessageCircle className="mr-2 h-5 w-5" />
+              Push to WhatsApp
+            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button variant="outline" className="h-11 rounded-sm font-bold" onClick={() => router.push('/expenses/list')}>History</Button>
+              <Button variant="secondary" className="h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); setSubmittedId(null); }}>Log New</Button>
+            </div>
+          </CardContent>
         </Card>
       </div>
     );
