@@ -35,7 +35,8 @@ import {
   Smartphone,
   Check,
   HardHat,
-  TrendingUp
+  TrendingUp,
+  CircleX
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -121,15 +122,22 @@ export default function ManageAllTripsPage() {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'vehicle_assignments');
     
-    if (isAdmin || isManager) {
+    // Only administrators can view all organizational trips globally.
+    if (isAdmin) {
       return query(colRef, orderBy('requestDate', 'desc'));
     }
 
+    // Other users (Managers, Engineers, Drivers) see trips they are linked to.
+    // Managers see trips from their team because we capture siteManagerId during request.
     return query(
       colRef, 
-      or(where('driverId', '==', user.uid), where('userId', '==', user.uid))
+      or(
+        where('driverId', '==', user.uid), 
+        where('userId', '==', user.uid),
+        where('siteManagerId', '==', user.uid)
+      )
     );
-  }, [firestore, isAdmin, isManager, user, isProfileLoading]);
+  }, [firestore, isAdmin, user, isProfileLoading]);
 
   const { data: assignments, isLoading } = useCollection<Assignment>(assignmentsQuery);
 
@@ -165,6 +173,8 @@ export default function ManageAllTripsPage() {
 
   const filteredAssignments = React.useMemo(() => {
     if (!assignments) return [];
+    
+    // Perform filtering and in-memory sorting
     return assignments.filter(trip => {
       const matchesSearch = trip.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trip.pickupLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -175,6 +185,11 @@ export default function ManageAllTripsPage() {
       const isQueue = activeTab === 'queue' ? trip.status === 'Pending' : true;
       
       return matchesSearch && matchesStatus && isQueue;
+    }).sort((a, b) => {
+      // Ensure results are always sorted by date descending regardless of the security query used.
+      const dateA = a.requestDate?.toDate?.()?.getTime() || 0;
+      const dateB = b.requestDate?.toDate?.()?.getTime() || 0;
+      return dateB - dateA;
     });
   }, [assignments, searchTerm, statusFilter, activeTab]);
 
@@ -444,7 +459,7 @@ export default function ManageAllTripsPage() {
                                 Allot Vehicle
                               </Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => handleReject(trip.id)}>
-                                <XCircle className="h-4 w-4" />
+                                <CircleX className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -481,7 +496,7 @@ export default function ManageAllTripsPage() {
                   <MapPin className="h-3 w-3" /> Logged Route Itinerary
                 </Label>
                 <div className="bg-muted/20 border rounded-sm p-4 space-y-4">
-                  <div className="relative pl-6 border-l-2 border-emerald-500">
+                  <div className="relative pl-6 border-l-2 border-emerald-500 pb-2">
                     <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
                     <p className="text-[10px] font-black uppercase text-emerald-700 tracking-tighter">Pickup Location</p>
                     <p className="text-sm font-black">{approvalTarget?.assignment.pickupLocation}</p>

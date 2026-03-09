@@ -158,6 +158,7 @@ export default function RequestVehiclePage() {
       await addDocumentNonBlocking(collection(firestore, 'vehicle_assignments'), {
         userId: user.uid,
         userName: userProfile.username || user.email,
+        siteManagerId: userProfile.siteManagerId || null,
         pickupLocation: values.pickupLocation,
         pickupType: values.pickupType,
         destinations: values.destinations,
@@ -257,7 +258,7 @@ export default function RequestVehiclePage() {
               Share on WhatsApp
             </Button>
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-11 rounded-sm" onClick={() => router.push('/vehicles/assigned')}>
+              <Button variant="outline" className="h-11 rounded-sm" onClick={() => router.push('/vehicles/trips/manage')}>
                 <History className="mr-2 h-4 w-4" />
                 Trip History
               </Button>
