@@ -725,7 +725,6 @@ export default function RequestVehiclePage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">4</div>
                     <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Co-passengers</h3>
                   </div>
                   <Popover open={isPassengerPopoverOpen} onOpenChange={setIsPassengerPopoverOpen}>
@@ -813,7 +812,6 @@ export default function RequestVehiclePage() {
               {/* Step 5: Purpose */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">5</div>
                   <h3 className="text-sm font-black uppercase tracking-widest text-foreground">General Trip Note</h3>
                 </div>
                 <FormField control={form.control} name="purpose" render={({ field }) => (
