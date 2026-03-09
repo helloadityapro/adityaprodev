@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -8,9 +7,10 @@ import {
   useDoc, 
   useMemoFirebase, 
   useCollection, 
-  updateDocumentNonBlocking 
+  updateDocumentNonBlocking,
+  addDocumentNonBlocking
 } from '@/firebase';
-import { collection, query, where, orderBy, doc, limit, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, limit, serverTimestamp, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -32,7 +32,8 @@ import {
   AlertCircle,
   MoreHorizontal,
   ChevronRight,
-  Receipt
+  Receipt,
+  Plus
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -55,6 +56,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 
 type ExpenseItem = {
+  category: string;
   description: string;
   amount: number;
   date: string;
@@ -116,7 +118,7 @@ export default function ExpensesListPage() {
 
     try {
       const claimRef = doc(firestore, 'expenses', actionState.claim.id);
-      await updateDocumentNonBlocking(claimRef, {
+      updateDocumentNonBlocking(claimRef, {
         status: actionState.type,
         adminRemarks: remarks,
         processedAt: serverTimestamp(),
@@ -124,7 +126,7 @@ export default function ExpensesListPage() {
       });
 
       // Notify User
-      await addDocumentNonBlocking(collection(firestore, 'notifications'), {
+      addDocumentNonBlocking(collection(firestore, 'notifications'), {
         userId: actionState.claim.userId,
         title: `Expense Claim ${actionState.type}`,
         description: `Your claim "${actionState.claim.title}" was ${actionState.type.toLowerCase()}. Remarks: ${remarks}`,
@@ -337,6 +339,7 @@ export default function ExpensesListPage() {
                       <TableHeader className="bg-muted/30">
                         <TableRow>
                           <TableHead className="text-[10px] font-black uppercase px-4">Date</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase">Category</TableHead>
                           <TableHead className="text-[10px] font-black uppercase">Description</TableHead>
                           <TableHead className="text-[10px] font-black uppercase">Amount</TableHead>
                           <TableHead className="text-right px-4 text-[10px] font-black uppercase">Voucher</TableHead>
@@ -346,6 +349,9 @@ export default function ExpensesListPage() {
                         {selectedClaim.items.map((item, idx) => (
                           <TableRow key={idx} className="bg-background">
                             <TableCell className="px-4 font-mono text-[10px] font-bold text-muted-foreground">{item.date}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-[8px] h-4 px-1 rounded-sm uppercase font-bold">{item.category}</Badge>
+                            </TableCell>
                             <TableCell className="text-xs font-semibold leading-relaxed">{item.description}</TableCell>
                             <TableCell className="font-mono text-xs font-bold text-primary">₹{item.amount.toFixed(2)}</TableCell>
                             <TableCell className="text-right px-4">

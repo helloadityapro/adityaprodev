@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -15,7 +14,7 @@ import {
   addDocumentNonBlocking, 
   useFirebaseApp 
 } from '@/firebase';
-import { collection, doc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,17 +37,20 @@ import {
   Building2,
   Calendar as CalendarIcon,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  LayoutGrid
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
 const expenseItemSchema = z.object({
+  category: z.string().min(1, 'Category is required.'),
   description: z.string().min(1, 'Description is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
   date: z.string().min(1, 'Date is required.'),
@@ -62,6 +64,11 @@ const expenseClaimSchema = z.object({
 });
 
 type Site = {
+  id: string;
+  name: string;
+};
+
+type GenericItem = {
   id: string;
   name: string;
 };
@@ -86,6 +93,9 @@ export default function SubmitExpensePage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
+  const categoriesQuery = useMemoFirebase(() => collection(firestore, 'expense_categories'), [firestore]);
+  const { data: categories } = useCollection<GenericItem>(categoriesQuery);
+
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -96,7 +106,7 @@ export default function SubmitExpensePage() {
     defaultValues: {
       title: "",
       siteName: "General / Outside Purchase",
-      items: [{ description: "", amount: 0, date: format(new Date(), 'yyyy-MM-dd') }]
+      items: [{ category: "", description: "", amount: 0, date: format(new Date(), 'yyyy-MM-dd') }]
     },
   });
 
@@ -312,7 +322,7 @@ export default function SubmitExpensePage() {
                     type="button" 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => append({ description: "", amount: 0, date: format(new Date(), 'yyyy-MM-dd') })}
+                    onClick={() => append({ category: "", description: "", amount: 0, date: format(new Date(), 'yyyy-MM-dd') })}
                     className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"
                   >
                     <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Item
@@ -335,34 +345,43 @@ export default function SubmitExpensePage() {
                       )}
 
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                        <div className="md:col-span-5">
+                        <div className="md:col-span-3">
                           <FormField
                             control={form.control}
-                            name={`items.${index}.description`}
+                            name={`items.${index}.category`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Item Description</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="e.g. Fuel for Site Visit" {...field} className="h-10 rounded-sm bg-background" />
-                                </FormControl>
+                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Category</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger className="h-10 rounded-sm bg-background">
+                                      <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {categories?.map(cat => (
+                                      <SelectItem key={cat.id} value={cat.name} className="text-xs">{cat.name}</SelectItem>
+                                    ))}
+                                    {!categories?.length && (
+                                      <div className="p-2 text-[10px] text-muted-foreground italic text-center">Contact Admin to set categories</div>
+                                    )}
+                                  </SelectContent>
+                                </Select>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
                         </div>
 
-                        <div className="md:col-span-3">
+                        <div className="md:col-span-4">
                           <FormField
                             control={form.control}
-                            name={`items.${index}.date`}
+                            name={`items.${index}.description`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Spend Date</FormLabel>
+                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Description</FormLabel>
                                 <FormControl>
-                                  <div className="relative">
-                                    <Input type="date" {...field} className="h-10 rounded-sm bg-background pr-10" />
-                                    <CalendarIcon className="absolute right-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
-                                  </div>
+                                  <Input placeholder="e.g. Fuel for Site Visit" {...field} className="h-10 rounded-sm bg-background" />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -373,10 +392,29 @@ export default function SubmitExpensePage() {
                         <div className="md:col-span-2">
                           <FormField
                             control={form.control}
+                            name={`items.${index}.date`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Date</FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <Input type="date" {...field} className="h-10 rounded-sm bg-background pr-10 text-[10px]" />
+                                    <CalendarIcon className="absolute right-2 top-3 h-3 w-3 text-muted-foreground pointer-events-none" />
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <div className="md:col-span-1.5 md:col-span-2">
+                          <FormField
+                            control={form.control}
                             name={`items.${index}.amount`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Amount (₹)</FormLabel>
+                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Amount</FormLabel>
                                 <FormControl>
                                   <Input type="number" step="0.01" placeholder="0.00" {...field} className="h-10 rounded-sm bg-background font-mono" />
                                 </FormControl>
@@ -386,7 +424,7 @@ export default function SubmitExpensePage() {
                           />
                         </div>
 
-                        <div className="md:col-span-2 flex flex-col justify-end">
+                        <div className="md:col-span-1 flex flex-col justify-end">
                           <FormField
                             control={form.control}
                             name={`items.${index}.localReceipt`}
@@ -414,9 +452,9 @@ export default function SubmitExpensePage() {
                                         </div>
                                       </div>
                                     ) : (
-                                      <Button asChild variant="outline" size="sm" className="w-full h-10 border-dashed rounded-sm text-primary hover:bg-primary/5 cursor-pointer">
+                                      <Button asChild variant="outline" size="icon" className="w-full h-10 border-dashed rounded-sm text-primary hover:bg-primary/5 cursor-pointer">
                                         <label htmlFor={`receipt-${index}`}>
-                                          <FileUp className="h-4 w-4 mr-1.5" /> Receipt
+                                          <ImageIcon className="h-4 w-4" />
                                         </label>
                                       </Button>
                                     )}
