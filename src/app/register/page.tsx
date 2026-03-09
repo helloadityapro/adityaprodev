@@ -176,7 +176,7 @@ export default function RegisterPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm font-semibold text-foreground">Work Email</FormLabel>
+                    <FormLabel className="text-sm font-semibold text-foreground">Email</FormLabel>
                     <FormControl>
                       <Input placeholder="name@adityagreenenergy.com" {...field} className="rounded-sm h-11" />
                     </FormControl>
@@ -273,7 +273,7 @@ export default function RegisterPage() {
                   name="confirmPassword"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-semibold text-foreground">Confirm</FormLabel>
+                      <FormLabel className="text-sm font-semibold text-foreground">Confirm Password</FormLabel>
                       <FormControl>
                         <Input type="password" {...field} className="rounded-sm h-11" />
                       </FormControl>
