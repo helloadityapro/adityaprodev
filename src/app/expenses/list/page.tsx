@@ -10,7 +10,7 @@ import {
   updateDocumentNonBlocking,
   addDocumentNonBlocking
 } from '@/firebase';
-import { collection, query, where, orderBy, doc, limit, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, query, where, doc, limit, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +28,6 @@ import {
   Building2, 
   ExternalLink,
   Loader2,
-  Receipt,
   Plus,
   MessageCircle
 } from 'lucide-react';
@@ -103,9 +102,9 @@ export default function ExpensesListPage() {
     const colRef = collection(firestore, 'expenses');
     
     if (isAdmin) {
-      return query(colRef, orderBy('createdAt', 'desc'), limit(100));
+      return query(colRef, limit(100));
     }
-    return query(colRef, where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(50));
+    return query(colRef, where('userId', '==', user.uid), limit(50));
   }, [firestore, isAdmin, user, isProfileLoading]);
 
   const { data: expenses, isLoading: isExpensesLoading } = useCollection<ExpenseSubmission>(expensesQuery);
@@ -169,7 +168,15 @@ export default function ExpensesListPage() {
 
   const filteredExpenses = React.useMemo(() => {
     if (!expenses) return [];
-    return expenses.filter(e => {
+    
+    // Sort in memory to avoid index requirements
+    const sorted = [...expenses].sort((a, b) => {
+      const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
+      const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
+      return dateB - dateA;
+    });
+
+    return sorted.filter(e => {
       const matchesSearch = e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.siteName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -431,8 +438,8 @@ export default function ExpensesListPage() {
             )}
             {isAdmin && selectedExpense?.status === 'Pending' && (
               <div className="flex gap-2">
-                <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => { setActionState({ expense: selectedExpense!, type: 'Approved' }); setSelectedExpense(null); }}>Approve</Button>
-                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => { setActionState({ expense: selectedExpense!, type: 'Rejected' }); setSelectedExpense(null); }}>Reject</Button>
+                <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => { setApprovalState({ expense: selectedExpense!, type: 'Approved' }); setSelectedExpense(null); }}>Approve</Button>
+                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => { setApprovalState({ expense: selectedExpense!, type: 'Rejected' }); setSelectedExpense(null); }}>Reject</Button>
               </div>
             )}
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>
