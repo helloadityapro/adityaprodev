@@ -11,8 +11,8 @@
         "username": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "mobile": { "type": "string" },
-        "role": { "type": "string", "enum": ["Admin", "Site Manager", "Site Engineer", "Driver"] },
-        "department": { "type": "string", "enum": ["Projects", "O&M"] },
+        "role": { "type": "string", "description": "Dynamic role assigned from user_roles collection." },
+        "department": { "type": "string", "description": "Dynamic department assigned from user_departments collection." },
         "registrationRequest": { "type": "boolean" },
         "siteManagerId": { "type": "string" },
         "assignedProjectIds": { "type": "array", "items": { "type": "string" } },
@@ -57,6 +57,22 @@
         "endReading": { "type": "number" },
         "endReadingPhoto": { "type": "string" }
       }
+    },
+    "UserRole": {
+      "title": "User Role",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    },
+    "UserDepartment": {
+      "title": "User Department",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      }
     }
   },
   "auth": {
@@ -78,6 +94,14 @@
     "/attendance/{attendanceId}": {
       "schema": { "$ref": "#/backend/entities/Attendance" },
       "description": "Daily check-in and check-out logs."
+    },
+    "/user_roles/{roleId}": {
+      "schema": { "$ref": "#/backend/entities/UserRole" },
+      "description": "Dynamic organization roles."
+    },
+    "/user_departments/{deptId}": {
+      "schema": { "$ref": "#/backend/entities/UserDepartment" },
+      "description": "Dynamic organization departments."
     }
   }
 }

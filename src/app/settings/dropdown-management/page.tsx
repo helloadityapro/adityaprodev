@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -13,8 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch, arrayUnion, getDocs, query, where, or, getDoc, increment, serverTimestamp } from 'firebase/firestore';
-import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserX, KeyRound, ShieldAlert, User, UserCog, CheckCircle2, XCircle } from 'lucide-react';
+import { collection, doc, writeBatch, arrayUnion, getDocs, query, where, or, serverTimestamp } from 'firebase/firestore';
+import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserCog, CheckCircle2, XCircle, Building2, UserCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -41,6 +42,11 @@ type PtwType = {
   allowedApproverIds?: string[];
 };
 
+type GenericItem = {
+  id: string;
+  name: string;
+};
+
 type UserProfile = {
     id: string;
     username: string;
@@ -62,17 +68,8 @@ type Permit = {
   requestDate: any;
 };
 
-type CleanupRequest = {
-  id: string;
-  targetEmail: string;
-  requestedById: string;
-  requestedByName: string;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: any;
-};
-
-const ptwTypeSchema = z.object({
-  name: z.string().min(1, 'PTW Type name is required.'),
+const genericItemSchema = z.object({
+  name: z.string().min(1, 'Name is required.'),
 });
 
 export default function AdminSettingsPage() {
@@ -89,10 +86,6 @@ export default function AdminSettingsPage() {
   const [deleteDialog, setDeleteDialog] = React.useState<{ open: boolean, targets: string[], isAll: boolean }>({ open: false, targets: [], isAll: false });
   const [isDeleting, setIsDeleting] = React.useState(false);
 
-  // Data Cleanup States
-  const [purgeEmail, setPurgeEmail] = React.useState("");
-  const [isRequestingPurge, setIsRequestingPurge] = React.useState(false);
-
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
@@ -108,14 +101,17 @@ export default function AdminSettingsPage() {
   const ptwTypesQuery = useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]);
   const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection<PtwType>(ptwTypesQuery);
 
+  const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
+  const { data: roles } = useCollection<GenericItem>(rolesQuery);
+
+  const departmentsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
+  const { data: departments } = useCollection<GenericItem>(departmentsQuery);
+
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers } = useCollection<UserProfile>(usersQuery);
 
   const permitsQuery = useMemoFirebase(() => collection(firestore, 'permits_to_work'), [firestore]);
   const { data: allPermits, isLoading: permitsLoading } = useCollection<Permit>(permitsQuery);
-
-  const cleanupRequestsQuery = useMemoFirebase(() => collection(firestore, 'cleanup_requests'), [firestore]);
-  const { data: cleanupRequests, isLoading: cleanupRequestsLoading } = useCollection<CleanupRequest>(cleanupRequestsQuery);
 
   const potentialApprovers = React.useMemo(() => {
     if (!allUsers) return [];
@@ -135,20 +131,52 @@ export default function AdminSettingsPage() {
     return allPermits.filter(p => !hiddenIds.includes(p.id));
   }, [allPermits, userProfile]);
 
-  const ptwTypeForm = useForm<z.infer<typeof ptwTypeSchema>>({
-    resolver: zodResolver(ptwTypeSchema),
+  const ptwTypeForm = useForm<z.infer<typeof genericItemSchema>>({
+    resolver: zodResolver(genericItemSchema),
     defaultValues: { name: '' },
   });
 
-  const onPtwTypeSubmit = (values: z.infer<typeof ptwTypeSchema>) => {
+  const roleForm = useForm<z.infer<typeof genericItemSchema>>({
+    resolver: zodResolver(genericItemSchema),
+    defaultValues: { name: '' },
+  });
+
+  const departmentForm = useForm<z.infer<typeof genericItemSchema>>({
+    resolver: zodResolver(genericItemSchema),
+    defaultValues: { name: '' },
+  });
+
+  const onPtwTypeSubmit = (values: z.infer<typeof genericItemSchema>) => {
     addDocumentNonBlocking(collection(firestore, 'ptw_types'), values);
     toast({ title: 'Success', description: 'New PTW Type added.' });
     ptwTypeForm.reset();
   };
 
+  const onRoleSubmit = (values: z.infer<typeof genericItemSchema>) => {
+    addDocumentNonBlocking(collection(firestore, 'user_roles'), values);
+    toast({ title: 'Success', description: 'New Role added.' });
+    roleForm.reset();
+  };
+
+  const onDepartmentSubmit = (values: z.infer<typeof genericItemSchema>) => {
+    addDocumentNonBlocking(collection(firestore, 'user_departments'), values);
+    toast({ title: 'Success', description: 'New Department added.' });
+    departmentForm.reset();
+  };
+
   const deletePtwType = (id: string) => {
     deleteDocumentNonBlocking(doc(firestore, 'ptw_types', id));
     toast({ title: 'Success', description: 'PTW Type deleted.' });
+  };
+
+  const deleteRole = (id: string) => {
+    deleteDocumentNonBlocking(doc(firestore, 'user_roles', id));
+    toast({ title: 'Success', description: 'Role deleted.' });
+  };
+
+  const deleteDepartment = (id: string) => {
+    deleteDocumentNonBlocking(doc(firestore, 'user_departments', id));
+    toast({ title: 'Success', description: 'Department deleted.' });
   };
 
   const toggleApprover = (userId: string) => {
@@ -173,24 +201,6 @@ export default function AdminSettingsPage() {
     setSelectedPermitIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
-  const handleDeleteForMe = async () => {
-    if (!user || deleteDialog.targets.length === 0) return;
-    setIsDeleting(true);
-    try {
-      const userRef = doc(firestore, 'users', user.uid);
-      updateDocumentNonBlocking(userRef, {
-        hiddenPermitIds: arrayUnion(...deleteDialog.targets)
-      });
-      toast({ title: "Hidden Successfully", description: "Selected requests hidden from your view." });
-      setSelectedPermitIds([]);
-      setDeleteDialog({ open: false, targets: [], isAll: false });
-    } catch (e) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not hide requests.' });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   const handleDeleteForEveryone = async () => {
     if (!firestore || (!deleteDialog.isAll && deleteDialog.targets.length === 0)) return;
     setIsDeleting(true);
@@ -200,12 +210,9 @@ export default function AdminSettingsPage() {
       if (deleteDialog.isAll) {
         const snapshot = await getDocs(collection(firestore, 'permits_to_work'));
         idsToDelete = snapshot.docs.map(doc => doc.id);
-        
-        // Reset the global monotonic counter
         updateDocumentNonBlocking(doc(firestore, 'system_settings', 'counters'), { lastPtwNumber: 0 });
       }
 
-      // Perform Batch Deletion
       const batchSize = 500;
       for (let i = 0; i < idsToDelete.length; i += batchSize) {
         const batch = writeBatch(firestore);
@@ -226,101 +233,7 @@ export default function AdminSettingsPage() {
     }
   };
 
-  // Data Purge Approval Workflow
-  const handleRequestPurge = async () => {
-    if (!purgeEmail.trim() || !user || !userProfile) return;
-    
-    const email = purgeEmail.toLowerCase().trim();
-    const userExists = allUsers?.some(u => u.email.toLowerCase() === email);
-    
-    if (!userExists) {
-      toast({ variant: 'destructive', title: 'Not Found', description: 'No user account found with this email.' });
-      return;
-    }
-
-    setIsRequestingPurge(true);
-    try {
-      await addDocumentNonBlocking(collection(firestore, 'cleanup_requests'), {
-        targetEmail: email,
-        requestedById: user.uid,
-        requestedByName: userProfile.username || user.email || 'Admin',
-        status: 'pending',
-        createdAt: serverTimestamp()
-      });
-
-      toast({ title: 'Purge Requested', description: `Cleanup for ${email} submitted for Super Admin authorization.` });
-      setPurgeEmail("");
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Request Failed', description: e.message });
-    } finally {
-      setIsRequestingPurge(false);
-    }
-  };
-
-  const handleProcessCleanupRequest = async (req: CleanupRequest, action: 'approved' | 'rejected') => {
-    if (!isSuperAdminUser || !firestore) return;
-
-    if (action === 'rejected') {
-      updateDocumentNonBlocking(doc(firestore, 'cleanup_requests', req.id), { status: 'rejected' });
-      toast({ title: 'Request Rejected' });
-      return;
-    }
-
-    // Approved: Execute actual purge of entries ONLY
-    setIsDeleting(true);
-    try {
-      const usersSnap = await getDocs(query(collection(firestore, 'users'), where('email', '==', req.targetEmail)));
-      if (usersSnap.empty) {
-        toast({ variant: 'destructive', title: 'Execution Failed', description: 'User account no longer exists.' });
-        updateDocumentNonBlocking(doc(firestore, 'cleanup_requests', req.id), { status: 'rejected' });
-        return;
-      }
-
-      const userId = usersSnap.docs[0].id;
-      // List of collections where user entries are stored
-      const collections = ['permits_to_work', 'tasks', 'requirements', 'dprs', 'material_movements', 'notifications'];
-      let totalDeleted = 0;
-
-      for (const colName of collections) {
-        // Query for entries CREATED BY or ASSIGNED TO the user
-        const q = query(collection(firestore, colName), or(where('userId', '==', userId), where('siteEngineerId', '==', userId), where('assignedToId', '==', userId)));
-        const snap = await getDocs(q);
-        
-        if (!snap.empty) {
-          const batch = writeBatch(firestore);
-          snap.docs.forEach(doc => {
-            batch.delete(doc.ref);
-            totalDeleted++;
-          });
-          await batch.commit();
-        }
-      }
-
-      // Reset points.
-      updateDocumentNonBlocking(doc(firestore, 'users', userId), { 
-        totalPoints: 0,
-        lastPurgeAt: serverTimestamp() 
-      });
-
-      updateDocumentNonBlocking(doc(firestore, 'cleanup_requests', req.id), { status: 'approved' });
-
-      toast({ variant: 'success', title: 'Entries Purged', description: `Deleted ${totalDeleted} activity records.` });
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const pendingCleanupRequests = React.useMemo(() => {
-    return cleanupRequests?.filter(r => r.status === 'pending').sort((a, b) => {
-      const da = a.createdAt?.toDate?.()?.getTime() || 0;
-      const db = b.createdAt?.toDate?.()?.getTime() || 0;
-      return db - da;
-    }) || [];
-  }, [cleanupRequests]);
-
-  if (isUserLoading || isProfileLoading || ptwTypesLoading || permitsLoading || cleanupRequestsLoading) {
+  if (isUserLoading || isProfileLoading || ptwTypesLoading || permitsLoading) {
     return (
         <div className="space-y-6 animate-pulse">
             <Skeleton className="h-9 w-64" />
@@ -335,32 +248,35 @@ export default function AdminSettingsPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight">System Settings</h1>
-        <p className="text-muted-foreground">Global configuration and permit record management.</p>
+        <p className="text-muted-foreground">Global configuration and platform dropdown management.</p>
       </div>
 
-      <Tabs defaultValue="configuration" className="w-full">
+      <Tabs defaultValue="org" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-8 rounded-sm max-w-xl">
-          <TabsTrigger value="configuration" className="flex items-center gap-2 rounded-sm"><SlidersHorizontal className="h-4 w-4" /> Manage Types</TabsTrigger>
+          <TabsTrigger value="org" className="flex items-center gap-2 rounded-sm"><Building2 className="h-4 w-4" /> Organization</TabsTrigger>
+          <TabsTrigger value="configuration" className="flex items-center gap-2 rounded-sm"><SlidersHorizontal className="h-4 w-4" /> PTW Types</TabsTrigger>
           <TabsTrigger value="permits" className="flex items-center gap-2 rounded-sm"><ClipboardList className="h-4 w-4" /> Delete Records</TabsTrigger>
-          <TabsTrigger value="cleanup" className="flex items-center gap-2 rounded-sm"><Eraser className="h-4 w-4" /> Data Cleanup</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="configuration" className="space-y-6 animate-in fade-in-50 duration-300">
-          <div className="grid gap-6 md:grid-cols-1">
+        <TabsContent value="org" className="space-y-8 animate-in fade-in-50 duration-300">
+          <div className="grid gap-8 md:grid-cols-2">
             <Card className="rounded-sm">
               <CardHeader>
-                <CardTitle>Manage PTW Types</CardTitle>
-                <CardDescription>Define categories for permits and assign authorized approvers.</CardDescription>
+                <div className="flex items-center gap-2">
+                  <UserCircle2 className="h-5 w-5 text-primary" />
+                  <CardTitle>Manage Roles</CardTitle>
+                </div>
+                <CardDescription>Define organizational roles for personnel assignment.</CardDescription>
               </CardHeader>
               <CardContent>
-                <Form {...ptwTypeForm}>
-                  <form onSubmit={ptwTypeForm.handleSubmit(onPtwTypeSubmit)} className="flex items-start gap-2 mb-4">
+                <Form {...roleForm}>
+                  <form onSubmit={roleForm.handleSubmit(onRoleSubmit)} className="flex items-start gap-2 mb-4">
                     <FormField
-                      control={ptwTypeForm.control}
+                      control={roleForm.control}
                       name="name"
                       render={({ field }) => (
                         <FormItem className="flex-grow">
-                          <FormControl><Input placeholder="Enter new PTW type" {...field} className="rounded-sm" /></FormControl>
+                          <FormControl><Input placeholder="e.g. Area Manager" {...field} className="rounded-sm" /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -368,30 +284,64 @@ export default function AdminSettingsPage() {
                     <Button type="submit" className="rounded-sm">Add</Button>
                   </form>
                 </Form>
-                <div className="rounded-sm border max-h-96 overflow-auto">
+                <div className="rounded-sm border max-h-60 overflow-auto">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Type Name</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
                     <TableBody>
-                      {ptwTypes?.map((type) => (
-                        <TableRow key={type.id}>
-                          <TableCell className="font-medium">{type.name}</TableCell>
+                      {roles?.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.name}</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                                <Button variant="ghost" size="icon" title="Manage Approvers" className="rounded-sm" onClick={() => setPtwTypeToManage(type)}>
-                                    <ShieldCheck className="h-4 w-4 text-primary" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="rounded-sm" onClick={() => deletePtwType(type.id)}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                            </div>
+                            <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8" onClick={() => deleteRole(item.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
+                      {!roles?.length && <TableRow><TableCell className="text-center py-8 text-muted-foreground italic">No custom roles defined.</TableCell></TableRow>}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-sm">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  <CardTitle>Manage Departments</CardTitle>
+                </div>
+                <CardDescription>Configure organizational departments/verticals.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...departmentForm}>
+                  <form onSubmit={departmentForm.handleSubmit(onDepartmentSubmit)} className="flex items-start gap-2 mb-4">
+                    <FormField
+                      control={departmentForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem className="flex-grow">
+                          <FormControl><Input placeholder="e.g. Quality Control" {...field} className="rounded-sm" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" className="rounded-sm">Add</Button>
+                  </form>
+                </Form>
+                <div className="rounded-sm border max-h-60 overflow-auto">
+                  <Table>
+                    <TableBody>
+                      {departments?.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8" onClick={() => deleteDepartment(item.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {!departments?.length && <TableRow><TableCell className="text-center py-8 text-muted-foreground italic">No departments defined.</TableCell></TableRow>}
                     </TableBody>
                   </Table>
                 </div>
@@ -400,12 +350,65 @@ export default function AdminSettingsPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="configuration" className="space-y-6 animate-in fade-in-50 duration-300">
+          <Card className="rounded-sm">
+            <CardHeader>
+              <CardTitle>Manage PTW Types</CardTitle>
+              <CardDescription>Define categories for permits and assign authorized approvers.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...ptwTypeForm}>
+                <form onSubmit={ptwTypeForm.handleSubmit(onPtwTypeSubmit)} className="flex items-start gap-2 mb-4">
+                  <FormField
+                    control={ptwTypeForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem className="flex-grow">
+                        <FormControl><Input placeholder="Enter new PTW type" {...field} className="rounded-sm" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" className="rounded-sm">Add</Button>
+                </form>
+              </Form>
+              <div className="rounded-sm border max-h-96 overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Type Name</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ptwTypes?.map((type) => (
+                      <TableRow key={type.id}>
+                        <TableCell className="font-medium">{type.name}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" title="Manage Approvers" className="rounded-sm" onClick={() => setPtwTypeToManage(type)}>
+                                  <ShieldCheck className="h-4 w-4 text-primary" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="rounded-sm" onClick={() => deletePtwType(type.id)}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="permits" className="space-y-6 animate-in fade-in-50 duration-300">
           <Card className="rounded-sm">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle>Delete Operational Records</CardTitle>
-                <CardDescription>Manage administrative visibility across the entire platform. Records deleted for everyone are permanently removed.</CardDescription>
+                <CardDescription>Wipe records from the database. This action is permanent.</CardDescription>
               </div>
               <Button 
                 variant="destructive" 
@@ -446,7 +449,6 @@ export default function AdminSettingsPage() {
                       <TableHead>Site Name</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
                       <TableHead className="text-right px-6">Action</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -466,9 +468,6 @@ export default function AdminSettingsPage() {
                           <TableCell>
                               <Badge variant="outline" className="rounded-sm text-[10px] font-bold uppercase">{p.status}</Badge>
                           </TableCell>
-                          <TableCell className="text-[11px] text-muted-foreground">
-                              {p.requestDate ? format(p.requestDate.toDate(), 'dd/MM/yyyy HH:mm') : 'N/A'}
-                          </TableCell>
                           <TableCell className="text-right px-6">
                               <Button 
                                   variant="ghost" 
@@ -483,7 +482,7 @@ export default function AdminSettingsPage() {
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-12 text-muted-foreground italic">
+                        <TableCell colSpan={6} className="text-center py-12 text-muted-foreground italic">
                           No permit requests found.
                         </TableCell>
                       </TableRow>
@@ -493,117 +492,6 @@ export default function AdminSettingsPage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="cleanup" className="space-y-6 animate-in fade-in-50 duration-300">
-          <div className="grid gap-8">
-            <Card className="rounded-sm border-destructive/20">
-              <CardHeader className="bg-destructive/5 border-b border-destructive/10">
-                <div className="flex items-center gap-3">
-                  <div className="bg-destructive/10 p-2 rounded-sm">
-                    <Eraser className="h-6 w-6 text-destructive" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-destructive">User Data Cleanup</CardTitle>
-                    <CardDescription>Purge all activity entries for a user while preserving their profile and account access.</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-6">
-                <div className="flex flex-col gap-4 p-4 bg-amber-50 border border-amber-100 rounded-sm">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                    <div className="text-xs text-amber-800 leading-relaxed space-y-2">
-                      <p className="font-bold uppercase">Cleanup Workflow Information</p>
-                      <p>This action will permanently delete all activity logs (Permits, Tasks, Reports) for the target user. Reward points will be reset to zero.</p>
-                      <p className="font-bold">User profile and platform access will NOT be affected.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4 max-w-md">
-                  <div className="space-y-2">
-                    <Label htmlFor="purge-email">Target User Email</Label>
-                    <Input 
-                      id="purge-email" 
-                      placeholder="e.g. user@example.com" 
-                      value={purgeEmail}
-                      onChange={(e) => setPurgeEmail(e.target.value)}
-                      className="rounded-sm"
-                    />
-                  </div>
-                  <Button 
-                    variant="destructive" 
-                    className="w-full rounded-sm font-bold h-11" 
-                    disabled={!purgeEmail.includes('@') || isRequestingPurge}
-                    onClick={handleRequestPurge}
-                  >
-                    {isRequestingPurge ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : <><RefreshCw className="mr-2 h-4 w-4" /> Request Log Cleanup</>}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {pendingCleanupRequests.length > 0 && (
-              <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
-                <CardHeader className="bg-primary/5 border-b">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-5 w-5 text-primary" />
-                    <CardTitle>Cleanup Authorization Queue</CardTitle>
-                  </div>
-                  <CardDescription>Data removal requests awaiting authorization from project leadership.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader className="bg-muted/30">
-                      <TableRow>
-                        <TableHead className="px-6">Target Account</TableHead>
-                        <TableHead>Requested By</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead className="text-right px-6">Authorization</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingCleanupRequests.map(req => (
-                        <TableRow key={req.id}>
-                          <TableCell className="px-6 py-4 font-bold text-sm">{req.targetEmail}</TableCell>
-                          <TableCell className="text-xs font-medium text-muted-foreground">{req.requestedByName}</TableCell>
-                          <TableCell className="text-[11px] text-muted-foreground">
-                            {req.createdAt ? format(req.createdAt.toDate(), 'dd MMM HH:mm') : 'N/A'}
-                          </TableCell>
-                          <TableCell className="text-right px-6">
-                            {isSuperAdminUser ? (
-                              <div className="flex justify-end gap-1">
-                                <Button 
-                                  size="sm" 
-                                  className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold" 
-                                  onClick={() => handleProcessCleanupRequest(req, 'approved')}
-                                  disabled={isDeleting}
-                                >
-                                  {isDeleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
-                                  Authorize
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost" 
-                                  className="h-8 rounded-sm text-red-600 hover:bg-red-50" 
-                                  onClick={() => handleProcessCleanupRequest(req, 'rejected')}
-                                >
-                                  <XCircle className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <Badge variant="outline" className="text-[9px] uppercase tracking-wider font-bold">Awaiting Super Admin</Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
-          </div>
         </TabsContent>
       </Tabs>
 
@@ -657,39 +545,18 @@ export default function AdminSettingsPage() {
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {deleteDialog.isAll ? 'Factory Reset PtW Data' : `Delete ${deleteDialog.targets.length > 1 ? 'Requests' : 'Request'}`}
+              {deleteDialog.isAll ? 'Wipe All Data' : `Delete Records`}
             </AlertDialogTitle>
             <AlertDialogDescription>
-                {deleteDialog.isAll 
-                  ? 'This will permanently remove EVERY Permit to Work from the database. The global sequence count will reset to 1. Are you absolutely sure?'
-                  : 'Choose how you want to handle the deletion of these records.'
-                }
+                This will permanently remove the selected operational records from the organization database. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="flex flex-col gap-3 py-4">
-            {!deleteDialog.isAll && (
-              <div className="flex flex-col gap-1 p-3 border rounded-sm bg-accent/30">
-                  <p className="text-sm font-bold">Delete for me</p>
-                  <p className="text-xs text-muted-foreground">Only hides these requests from your administration dashboard.</p>
-                  <Button variant="outline" className="mt-2 w-full rounded-sm" onClick={handleDeleteForMe} disabled={isDeleting}>
-                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete for me"}
-                  </Button>
-              </div>
-            )}
-            <div className="flex flex-col gap-1 p-3 border border-destructive/20 rounded-sm bg-destructive/5">
-                <p className="text-sm font-bold text-destructive">Delete for everyone</p>
-                <p className="text-xs text-muted-foreground">
-                  {deleteDialog.isAll 
-                    ? 'WIPE ALL DATA: This cannot be undone.' 
-                    : 'Permanently removes these records from the database for all users.'}
-                </p>
-                <Button variant="destructive" className="mt-2 w-full rounded-sm" onClick={handleDeleteForEveryone} disabled={isDeleting}>
-                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : deleteDialog.isAll ? "Wipe All Data" : "Delete for everyone"}
-                </Button>
-            </div>
-          </div>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm" disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDeleteForEveryone} disabled={isDeleting}>
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                {deleteDialog.isAll ? "Wipe All Data" : "Confirm Delete"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

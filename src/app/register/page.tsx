@@ -11,10 +11,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { useAuth, useFirestore, setDocumentNonBlocking, useUser, useDoc, useMemoFirebase } from "@/firebase"
+import { useAuth, useFirestore, setDocumentNonBlocking, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase"
 import { useToast } from "@/hooks/use-toast"
 import { createUserWithEmailAndPassword } from "firebase/auth"
-import { doc, serverTimestamp } from "firebase/firestore"
+import { doc, serverTimestamp, collection } from "firebase/firestore"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, CheckCircle2 } from "lucide-react"
 
@@ -22,8 +22,8 @@ const registerSchema = z.object({
   username: z.string().min(1, { message: "Username is required." }),
   email: z.string().email({ message: "Invalid email address." }),
   mobile: z.string().min(1, { message: "Mobile number is required." }),
-  role: z.enum(['Site Engineer', 'Site Manager', 'Driver'], { required_error: "Please select a role." }),
-  department: z.enum(['Projects', 'O&M'], { required_error: "Please select a department." }),
+  role: z.string().min(1, "Please select a role."),
+  department: z.string().min(1, "Please select a department."),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string()
 }).refine(data => data.password === data.confirmPassword, {
@@ -47,6 +47,12 @@ export default function RegisterPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
+  const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
+  const { data: roles } = useCollection(rolesQuery);
+
+  const deptsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
+  const { data: departments } = useCollection(deptsQuery);
+
   useEffect(() => {
     if (mounted && user && userProfile && !isProfileLoading && !userProfile.registrationRequest) {
       router.replace('/rewards')
@@ -61,8 +67,8 @@ export default function RegisterPage() {
       mobile: "",
       password: "",
       confirmPassword: "",
-      role: undefined,
-      department: undefined,
+      role: "",
+      department: "",
     },
   })
 
@@ -199,16 +205,22 @@ export default function RegisterPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                               <SelectTrigger>
                                   <SelectValue placeholder="Select role" />
                               </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                              <SelectItem value="Site Engineer">Site Engineer</SelectItem>
-                              <SelectItem value="Site Manager">Site Manager</SelectItem>
-                              <SelectItem value="Driver">Driver</SelectItem>
+                              {roles?.length ? roles.map(r => (
+                                <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                              )) : (
+                                <>
+                                  <SelectItem value="Site Engineer">Site Engineer</SelectItem>
+                                  <SelectItem value="Site Manager">Site Manager</SelectItem>
+                                  <SelectItem value="Driver">Driver</SelectItem>
+                                </>
+                              )}
                           </SelectContent>
                       </Select>
                       <FormMessage />
@@ -221,15 +233,21 @@ export default function RegisterPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Department</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                               <SelectTrigger>
                                   <SelectValue placeholder="Select dept" />
                               </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                              <SelectItem value="Projects">Projects</SelectItem>
-                              <SelectItem value="O&M">O&M</SelectItem>
+                              {departments?.length ? departments.map(d => (
+                                <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                              )) : (
+                                <>
+                                  <SelectItem value="Projects">Projects</SelectItem>
+                                  <SelectItem value="O&M">O&M</SelectItem>
+                                </>
+                              )}
                           </SelectContent>
                       </Select>
                       <FormMessage />

@@ -25,14 +25,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useFirestore, updateDocumentNonBlocking, useCollection, useMemoFirebase } from '@/firebase';
+import { doc, collection } from 'firebase/firestore';
 
 const editUserSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
   mobile: z.string().min(1, 'Mobile number is required.'),
-  role: z.enum(['Admin', 'Site Manager', 'Site Engineer', 'Driver'], { required_error: 'Role is required' }),
-  department: z.enum(['Projects', 'O&M'], { required_error: 'Department is required' }),
+  role: z.string().min(1, 'Role is required'),
+  department: z.string().min(1, 'Department is required'),
 });
 
 type User = {
@@ -40,8 +40,8 @@ type User = {
   username?: string;
   email?: string;
   mobile?: string;
-  role?: 'Admin' | 'Site Manager' | 'Site Engineer' | 'Driver';
-  department?: 'Projects' | 'O&M';
+  role?: string;
+  department?: string;
 };
 
 interface EditUserDialogProps {
@@ -55,13 +55,19 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
+  const { data: roles } = useCollection(rolesQuery);
+
+  const deptsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
+  const { data: departments } = useCollection(deptsQuery);
+
   const form = useForm<z.infer<typeof editUserSchema>>({
     resolver: zodResolver(editUserSchema),
     defaultValues: {
       username: '',
       mobile: '',
-      role: 'Site Engineer',
-      department: 'Projects',
+      role: '',
+      department: '',
     }
   });
 
@@ -70,8 +76,8 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
       form.reset({
         username: user.username || '',
         mobile: user.mobile || '',
-        role: user.role || 'Site Engineer',
-        department: user.department || 'Projects',
+        role: user.role || '',
+        department: user.department || '',
       });
     }
   }, [user, form]);
@@ -162,10 +168,16 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Site Engineer">Site Engineer</SelectItem>
-                          <SelectItem value="Site Manager">Site Manager</SelectItem>
-                          <SelectItem value="Driver">Driver</SelectItem>
-                          <SelectItem value="Admin">Admin</SelectItem>
+                          {roles?.length ? roles.map(r => (
+                            <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                          )) : (
+                            <>
+                              <SelectItem value="Site Engineer">Site Engineer</SelectItem>
+                              <SelectItem value="Site Manager">Site Manager</SelectItem>
+                              <SelectItem value="Driver">Driver</SelectItem>
+                              <SelectItem value="Admin">Admin</SelectItem>
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -185,8 +197,14 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Projects">Projects</SelectItem>
-                          <SelectItem value="O&M">O&M</SelectItem>
+                          {departments?.length ? departments.map(d => (
+                            <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                          )) : (
+                            <>
+                              <SelectItem value="Projects">Projects</SelectItem>
+                              <SelectItem value="O&M">O&M</SelectItem>
+                            </>
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />

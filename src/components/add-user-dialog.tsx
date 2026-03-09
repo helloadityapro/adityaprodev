@@ -25,8 +25,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useFirestore, setDocumentNonBlocking } from '@/firebase';
-import { doc, serverTimestamp } from 'firebase/firestore';
+import { useFirestore, setDocumentNonBlocking, useCollection, useMemoFirebase } from '@/firebase';
+import { doc, serverTimestamp, collection } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
@@ -35,8 +35,8 @@ const addUserSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
   email: z.string().email('Invalid email address.'),
   mobile: z.string().min(1, 'Mobile number is required.'),
-  role: z.enum(['Admin', 'Site Manager', 'Site Engineer', 'Driver'], { required_error: 'Role is required' }),
-  department: z.enum(['Projects', 'O&M'], { required_error: 'Department is required' }),
+  role: z.string().min(1, 'Role is required'),
+  department: z.string().min(1, 'Department is required'),
   password: z.string().min(6, 'Password must be at least 6 characters.'),
 });
 
@@ -50,6 +50,12 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
+  const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
+  const { data: roles } = useCollection(rolesQuery);
+
+  const deptsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
+  const { data: departments } = useCollection(deptsQuery);
+
   const form = useForm<z.infer<typeof addUserSchema>>({
     resolver: zodResolver(addUserSchema),
     defaultValues: {
@@ -57,8 +63,8 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
       email: '',
       mobile: '',
       password: '',
-      role: 'Site Engineer',
-      department: 'Projects',
+      role: '',
+      department: '',
     },
   });
 
@@ -169,17 +175,23 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select role" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Site Engineer">Site Engineer</SelectItem>
-                        <SelectItem value="Site Manager">Site Manager</SelectItem>
-                        <SelectItem value="Driver">Driver</SelectItem>
-                        <SelectItem value="Admin">Admin</SelectItem>
+                        {roles?.length ? roles.map(r => (
+                          <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                        )) : (
+                          <>
+                            <SelectItem value="Site Engineer">Site Engineer</SelectItem>
+                            <SelectItem value="Site Manager">Site Manager</SelectItem>
+                            <SelectItem value="Driver">Driver</SelectItem>
+                            <SelectItem value="Admin">Admin</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -192,15 +204,21 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Department</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select dept" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Projects">Projects</SelectItem>
-                        <SelectItem value="O&M">O&M</SelectItem>
+                        {departments?.length ? departments.map(d => (
+                          <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                        )) : (
+                          <>
+                            <SelectItem value="Projects">Projects</SelectItem>
+                            <SelectItem value="O&M">O&M</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
