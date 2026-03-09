@@ -123,8 +123,17 @@ service cloud.firestore {
     match /point_adjustment_requests/{requestId} { allow read, write: if isAdmin(); }
     match /cleanup_requests/{requestId} { allow read, write: if isAdmin(); }
     
-    // Add missing rules for PTW Types
     match /ptw_types/{typeId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /user_roles/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /user_departments/{deptId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
