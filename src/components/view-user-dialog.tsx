@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
-import Link from 'next/navigation';
+import Link from 'next/link';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -321,7 +321,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                         {isViewerAdmin && (
                           <Button variant="outline" size="sm" asChild className="h-8 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5 px-4 text-[10px] uppercase tracking-wider">
                             <Link href="/settings/teams">
-                              <UserPlus className="h-3 w-3 mr-1.5" /> Assign Team Members
+                              <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Assign Team Members
                             </Link>
                           </Button>
                         )}
