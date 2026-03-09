@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -133,7 +134,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
       </SidebarGroup>
 
       <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Expenses</SidebarGroupLabel>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Organisation Expenses</SidebarGroupLabel>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Submit Expense" isActive={pathname === '/expenses/submit'} className="rounded-sm">
@@ -144,10 +145,10 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="My Expenses" isActive={pathname === '/expenses/list'} className="rounded-sm">
+            <SidebarMenuButton asChild tooltip="Expense History" isActive={pathname === '/expenses/list'} className="rounded-sm">
               <Link href="/expenses/list">
                 <History className="h-4 w-4" />
-                <span className="font-medium">Expenses List</span>
+                <span className="font-medium">Expense History</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

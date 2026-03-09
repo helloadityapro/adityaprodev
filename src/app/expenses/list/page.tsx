@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -28,10 +29,6 @@ import {
   Building2, 
   ExternalLink,
   Loader2,
-  FileText,
-  AlertCircle,
-  MoreHorizontal,
-  ChevronRight,
   Receipt,
   Plus
 } from 'lucide-react';
@@ -53,7 +50,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 
 type ExpenseItem = {
   category: string;
@@ -63,7 +59,7 @@ type ExpenseItem = {
   receiptUrl?: string;
 };
 
-type ExpenseClaim = {
+type ExpenseSubmission = {
   id: string;
   userId: string;
   userName: string;
@@ -91,8 +87,8 @@ export default function ExpensesListPage() {
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
-  const [selectedClaim, setSelectedClaim] = React.useState<ExpenseClaim | null>(null);
-  const [actionState, setActionState] = React.useState<{ claim: ExpenseClaim, type: 'Approved' | 'Rejected' } | null>(null);
+  const [selectedExpense, setSelectedExpense] = React.useState<ExpenseSubmission | null>(null);
+  const [actionState, setActionState] = React.useState<{ expense: ExpenseSubmission, type: 'Approved' | 'Rejected' } | null>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -110,32 +106,31 @@ export default function ExpensesListPage() {
     return query(colRef, where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(50));
   }, [firestore, isAdmin, user, isProfileLoading]);
 
-  const { data: claims, isLoading: isClaimsLoading } = useCollection<ExpenseClaim>(expensesQuery);
+  const { data: expenses, isLoading: isExpensesLoading } = useCollection<ExpenseSubmission>(expensesQuery);
 
   const handleAction = async (remarks: string) => {
     if (!actionState) return;
     setIsProcessing(true);
 
     try {
-      const claimRef = doc(firestore, 'expenses', actionState.claim.id);
-      updateDocumentNonBlocking(claimRef, {
+      const expenseRef = doc(firestore, 'expenses', actionState.expense.id);
+      updateDocumentNonBlocking(expenseRef, {
         status: actionState.type,
         adminRemarks: remarks,
         processedAt: serverTimestamp(),
         adminId: user?.uid,
       });
 
-      // Notify User
       addDocumentNonBlocking(collection(firestore, 'notifications'), {
-        userId: actionState.claim.userId,
-        title: `Expense Claim ${actionState.type}`,
-        description: `Your claim "${actionState.claim.title}" was ${actionState.type.toLowerCase()}. Remarks: ${remarks}`,
+        userId: actionState.expense.userId,
+        title: `Expense ${actionState.type}`,
+        description: `Your submission "${actionState.expense.title}" was ${actionState.type.toLowerCase()}. Remarks: ${remarks}`,
         link: "/expenses/list",
         read: false,
         createdAt: serverTimestamp(),
       });
 
-      toast({ title: `Claim ${actionState.type}`, description: 'The expense record has been updated.' });
+      toast({ title: `Expense ${actionState.type}`, description: 'Record updated successfully.' });
       setActionState(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
@@ -144,19 +139,19 @@ export default function ExpensesListPage() {
     }
   };
 
-  const filteredClaims = React.useMemo(() => {
-    if (!claims) return [];
-    return claims.filter(c => {
-      const matchesSearch = c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.siteName.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredExpenses = React.useMemo(() => {
+    if (!expenses) return [];
+    return expenses.filter(e => {
+      const matchesSearch = e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.siteName.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || e.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
-  }, [claims, searchTerm, statusFilter]);
+  }, [expenses, searchTerm, statusFilter]);
 
-  if (isProfileLoading || isClaimsLoading) {
+  if (isProfileLoading || isExpensesLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
 
@@ -166,12 +161,12 @@ export default function ExpensesListPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Wallet className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-black tracking-tight uppercase">{isAdmin ? "All Organizational Expenses" : "My Expense History"}</h1>
+            <h1 className="text-3xl font-black tracking-tight uppercase">{isAdmin ? "Organization Expenses" : "My Expense History"}</h1>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Tracking and auditing payments, purchases and reimbursements.</p>
+          <p className="text-muted-foreground text-sm font-medium">Tracking and auditing organizational payments and purchases.</p>
         </div>
         <Button onClick={() => router.push('/expenses/submit')} className="h-10 rounded-sm font-bold shadow-md px-6">
-          <Plus className="h-4 w-4 mr-2" /> New Expense Claim
+          <Plus className="h-4 w-4 mr-2" /> New Expense Submission
         </Button>
       </div>
 
@@ -179,7 +174,7 @@ export default function ExpensesListPage() {
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search claim, personnel or site..." 
+            placeholder="Search personnel or site..." 
             className="pl-10 h-10 text-sm rounded-sm border-primary/20"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -191,7 +186,7 @@ export default function ExpensesListPage() {
               <SelectValue placeholder="Filter Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all" className="text-xs font-bold">All Claims</SelectItem>
+              <SelectItem value="all" className="text-xs font-bold">All Submissions</SelectItem>
               <SelectItem value="Pending" className="text-xs font-bold">Pending</SelectItem>
               <SelectItem value="Approved" className="text-xs font-bold text-green-600">Approved</SelectItem>
               <SelectItem value="Rejected" className="text-xs font-bold text-red-600">Rejected</SelectItem>
@@ -210,73 +205,73 @@ export default function ExpensesListPage() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="px-6 min-w-[150px]">Date & Personnel</TableHead>
-                  <TableHead className="min-w-[200px]">Claim Summary</TableHead>
+                  <TableHead className="min-w-[200px]">Submission Summary</TableHead>
                   <TableHead>Total Amount</TableHead>
-                  <TableHead>Site / Context</TableHead>
+                  <TableHead>Site Context</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClaims.length > 0 ? filteredClaims.map((claim) => (
-                  <TableRow key={claim.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setSelectedClaim(claim)}>
+                {filteredExpenses.length > 0 ? filteredExpenses.map((expense) => (
+                  <TableRow key={expense.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setSelectedExpense(expense)}>
                     <TableCell className="px-6 py-4">
                       <div className="flex flex-col gap-1">
                         <div className="text-[10px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                           <Calendar className="h-3 w-3" />
-                          {claim.createdAt ? format(claim.createdAt.toDate(), 'dd MMM yyyy') : '—'}
+                          {expense.createdAt ? format(expense.createdAt.toDate(), 'dd MMM yyyy') : '—'}
                         </div>
                         <div className="flex items-center gap-2">
                           <UserIcon className="h-3.5 w-3.5 text-primary" />
-                          <span className="font-bold text-sm text-foreground">{claim.userName}</span>
+                          <span className="font-bold text-sm text-foreground">{expense.userName}</span>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-bold text-sm leading-tight text-foreground">{claim.title}</span>
-                        <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">{claim.items.length} Expense Item(s)</span>
+                        <span className="font-bold text-sm leading-tight text-foreground">{expense.title}</span>
+                        <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">{expense.items.length} Items Logged</span>
                       </div>
                     </TableCell>
                     <TableCell className="font-black text-primary text-sm font-mono">
-                      ₹{claim.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹{expense.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
                         <Building2 className="h-3.5 w-3.5" />
-                        {claim.siteName}
+                        {expense.siteName}
                       </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={cn(
                         "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                        claim.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                        claim.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                        expense.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                        expense.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
                         "bg-red-50 text-red-700 border-red-200"
                       )}>
-                        {claim.status}
+                        {expense.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                        {isAdmin && claim.status === 'Pending' && (
+                        {isAdmin && expense.status === 'Pending' && (
                           <div className="flex gap-1">
-                            <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3" onClick={() => setActionState({ claim, type: 'Approved' })}>
+                            <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3" onClick={() => setActionState({ expense, type: 'Approved' })}>
                               Approve
                             </Button>
-                            <Button size="sm" variant="destructive" className="h-8 rounded-sm font-bold px-3" onClick={() => setActionState({ claim, type: 'Rejected' })}>
+                            <Button size="sm" variant="destructive" className="h-8 rounded-sm font-bold px-3" onClick={() => setActionState({ expense, type: 'Rejected' })}>
                               Reject
                             </Button>
                           </div>
                         )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setSelectedClaim(claim)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setSelectedExpense(expense)}>
                           <Eye className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No expense claims found matching filters.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No expense submissions found.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -284,55 +279,55 @@ export default function ExpensesListPage() {
         </CardContent>
       </Card>
 
-      {/* Claim Detail Modal */}
-      <Dialog open={!!selectedClaim} onOpenChange={(o) => !o && setSelectedClaim(null)}>
+      {/* Detail Modal */}
+      <Dialog open={!!selectedExpense} onOpenChange={(o) => !o && setSelectedExpense(null)}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Wallet className="h-5 w-5 text-primary" /></div>
               <div>
                 <DialogTitle className="text-xl font-black uppercase tracking-tight">Expense Audit Log</DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Submitted by {selectedClaim?.userName}</DialogDescription>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Submitted by {selectedExpense?.userName}</DialogDescription>
               </div>
             </div>
-            {selectedClaim && (
+            {selectedExpense && (
               <Badge variant="outline" className={cn(
                 "text-[9px] font-black uppercase rounded-sm px-2 h-6",
-                selectedClaim.status === 'Approved' ? "bg-green-100 text-green-800" : 
-                selectedClaim.status === 'Pending' ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"
+                selectedExpense.status === 'Approved' ? "bg-green-100 text-green-800" : 
+                selectedExpense.status === 'Pending' ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"
               )}>
-                {selectedClaim.status}
+                {selectedExpense.status}
               </Badge>
             )}
           </DialogHeader>
 
           <ScrollArea className="max-h-[70vh]">
-            {selectedClaim && (
+            {selectedExpense && (
               <div className="p-8 space-y-10">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Claim Title</Label>
-                      <p className="text-lg font-black text-foreground leading-tight">{selectedClaim.title}</p>
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Description</Label>
+                      <p className="text-lg font-black text-foreground leading-tight">{selectedExpense.title}</p>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Context / Site</Label>
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Linked Site</Label>
                       <div className="flex items-center gap-2 text-sm font-bold text-primary">
                         <Building2 className="h-4 w-4" />
-                        {selectedClaim.siteName}
+                        {selectedExpense.siteName}
                       </div>
                     </div>
                   </div>
                   
                   <div className="bg-primary/5 rounded-sm border-2 border-primary/10 p-6 flex flex-col justify-center items-center text-center shadow-inner">
-                    <span className="text-[10px] font-black uppercase text-primary tracking-widest leading-none mb-2">Total Amount Requested</span>
-                    <span className="text-4xl font-black tabular-nums text-primary">₹{selectedClaim.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-[10px] font-black uppercase text-primary tracking-widest leading-none mb-2">Aggregate Total</span>
+                    <span className="text-4xl font-black tabular-nums text-primary">₹{selectedExpense.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                    <History className="h-4 w-4 text-primary" /> Breakdown of Expenses
+                    <History className="h-4 w-4 text-primary" /> Items Breakdown
                   </Label>
                   <div className="border rounded-sm overflow-hidden bg-muted/10">
                     <Table>
@@ -340,13 +335,13 @@ export default function ExpensesListPage() {
                         <TableRow>
                           <TableHead className="text-[10px] font-black uppercase px-4">Date</TableHead>
                           <TableHead className="text-[10px] font-black uppercase">Category</TableHead>
-                          <TableHead className="text-[10px] font-black uppercase">Description</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase">Note</TableHead>
                           <TableHead className="text-[10px] font-black uppercase">Amount</TableHead>
-                          <TableHead className="text-right px-4 text-[10px] font-black uppercase">Voucher</TableHead>
+                          <TableHead className="text-right px-4 text-[10px] font-black uppercase">Receipt</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {selectedClaim.items.map((item, idx) => (
+                        {selectedExpense.items.map((item, idx) => (
                           <TableRow key={idx} className="bg-background">
                             <TableCell className="px-4 font-mono text-[10px] font-bold text-muted-foreground">{item.date}</TableCell>
                             <TableCell>
@@ -370,21 +365,21 @@ export default function ExpensesListPage() {
                   </div>
                 </div>
 
-                {(selectedClaim.adminRemarks || selectedClaim.status !== 'Pending') && (
+                {(selectedExpense.adminRemarks || selectedExpense.status !== 'Pending') && (
                   <div className={cn(
                     "p-6 rounded-sm border-2 space-y-2",
-                    selectedClaim.status === 'Approved' ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
+                    selectedExpense.status === 'Approved' ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
                   )}>
                     <Label className={cn(
                       "text-[10px] font-black uppercase tracking-widest",
-                      selectedClaim.status === 'Approved' ? "text-green-700" : "text-red-700"
-                    )}>Reviewer Remarks</Label>
+                      selectedExpense.status === 'Approved' ? "text-green-700" : "text-red-700"
+                    )}>Decision Remarks</Label>
                     <p className="text-sm font-medium italic leading-relaxed text-foreground/80">
-                      "{selectedClaim.adminRemarks || 'The request was processed without specific remarks.'}"
+                      "{selectedExpense.adminRemarks || 'Processed without additional remarks.'}"
                     </p>
-                    {selectedClaim.processedAt && (
+                    {selectedExpense.processedAt && (
                       <p className="text-[9px] font-bold opacity-40 uppercase pt-2">
-                        Processed on {format(selectedClaim.processedAt.toDate(), 'dd MMM yyyy, HH:mm')}
+                        Updated on {format(selectedExpense.processedAt.toDate(), 'dd MMM yyyy, HH:mm')}
                       </p>
                     )}
                   </div>
@@ -394,10 +389,10 @@ export default function ExpensesListPage() {
           </ScrollArea>
 
           <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0">
-            {isAdmin && selectedClaim?.status === 'Pending' && (
+            {isAdmin && selectedExpense?.status === 'Pending' && (
               <div className="flex flex-1 gap-2">
-                <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => { setSelectedClaim(null); setActionState({ claim: selectedClaim!, type: 'Approved' }); }}>Approve Claim</Button>
-                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => { setSelectedClaim(null); setActionState({ claim: selectedClaim!, type: 'Rejected' }); }}>Reject Claim</Button>
+                <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => { setSelectedExpense(null); setActionState({ expense: selectedExpense!, type: 'Approved' }); }}>Approve</Button>
+                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => { setSelectedExpense(null); setActionState({ expense: selectedExpense!, type: 'Rejected' }); }}>Reject</Button>
               </div>
             )}
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>
@@ -405,23 +400,19 @@ export default function ExpensesListPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Action Decision Modal */}
+      {/* Action Modal */}
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent className="rounded-sm max-w-md">
           <DialogHeader>
-            <DialogTitle className="uppercase tracking-tight font-black">{actionState?.type} Claim</DialogTitle>
-            <DialogDescription>Setting final status for "{actionState?.claim.title}"</DialogDescription>
+            <DialogTitle className="uppercase tracking-tight font-black">{actionState?.type} Submission</DialogTitle>
+            <DialogDescription>Setting status for "{actionState?.expense.title}"</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
-            <div className="p-4 bg-muted/30 border-2 border-dashed rounded-sm text-center">
-              <span className="text-xs font-bold text-muted-foreground uppercase block mb-1">Total Requested Amount</span>
-              <span className="text-2xl font-black text-primary">₹{actionState?.claim.totalAmount.toLocaleString()}</span>
-            </div>
             <div className="space-y-2">
-              <Label htmlFor="admin-remarks" className="text-xs font-bold uppercase text-muted-foreground">Internal Decision Remarks</Label>
+              <Label className="text-xs font-bold uppercase text-muted-foreground">Admin Feedback</Label>
               <Textarea 
                 id="admin-remarks" 
-                placeholder="Briefly explain approval/rejection for personnel records..." 
+                placeholder="Explain decision for personnel records..." 
                 className="min-h-[100px] rounded-sm"
               />
             </div>

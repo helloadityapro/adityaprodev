@@ -5,18 +5,17 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user in the PermitFlow application.",
+      "description": "Represents a user in the Aditya Pro application.",
       "properties": {
         "id": { "type": "string" },
         "username": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "mobile": { "type": "string" },
-        "role": { "type": "string", "description": "Dynamic role assigned from user_roles collection." },
-        "department": { "type": "string", "description": "Dynamic department assigned from user_departments collection." },
+        "role": { "type": "string" },
+        "department": { "type": "string" },
         "registrationRequest": { "type": "boolean" },
         "siteManagerId": { "type": "string" },
         "assignedProjectIds": { "type": "array", "items": { "type": "string" } },
-        "hiddenPermitIds": { "type": "array", "items": { "type": "string" } },
         "totalPoints": { "type": "number", "default": 0 },
         "pointsMultiplier": { "type": "number", "default": 1 }
       },
@@ -36,30 +35,8 @@
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
-    "VehicleAssignment": {
-      "title": "Vehicle Assignment / Trip",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "userName": { "type": "string" },
-        "vehicleId": { "type": "string" },
-        "vehicleDetails": { "type": "string" },
-        "driverId": { "type": "string" },
-        "driverName": { "type": "string" },
-        "purpose": { "type": "string" },
-        "status": { "type": "string", "enum": ["Pending", "Approved", "Ongoing", "Completed", "Rejected"] },
-        "requestDate": { "type": "string", "format": "date-time" },
-        "startTime": { "type": "string", "format": "date-time" },
-        "startReading": { "type": "number" },
-        "startReadingPhoto": { "type": "string" },
-        "endTime": { "type": "string", "format": "date-time" },
-        "endReading": { "type": "number" },
-        "endReadingPhoto": { "type": "string" }
-      }
-    },
-    "ExpenseClaim": {
-      "title": "Expense Claim",
+    "Expense": {
+      "title": "Expense Submission",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -93,59 +70,27 @@
         "id": { "type": "string" },
         "name": { "type": "string" }
       }
-    },
-    "UserRole": {
-      "title": "User Role",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" }
-      }
-    },
-    "UserDepartment": {
-      "title": "User Department",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" }
-      }
     }
   },
   "auth": {
-    "providers": ["password", "anonymous"]
+    "providers": ["password"]
   },
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/backend/entities/User" },
-      "description": "User profiles and roles."
+      "description": "User profiles and performance data."
     },
     "/vehicles/{vehicleId}": {
       "schema": { "$ref": "#/backend/entities/Vehicle" },
-      "description": "Organizational vehicle registry."
-    },
-    "/vehicle_assignments/{assignmentId}": {
-      "schema": { "$ref": "#/backend/entities/VehicleAssignment" },
-      "description": "Trip requests and execution logs."
+      "description": "Organizational fleet registry."
     },
     "/expenses/{expenseId}": {
-      "schema": { "$ref": "#/backend/entities/ExpenseClaim" },
-      "description": "Payment and purchase reimbursement requests."
+      "schema": { "$ref": "#/backend/entities/Expense" },
+      "description": "Personnel expense and purchase logs."
     },
     "/expense_categories/{categoryId}": {
       "schema": { "$ref": "#/backend/entities/ExpenseCategory" },
-      "description": "Custom categories for classifying expenses."
-    },
-    "/attendance/{attendanceId}": {
-      "schema": { "$ref": "#/backend/entities/Attendance" },
-      "description": "Daily check-in and check-out logs."
-    },
-    "/user_roles/{roleId}": {
-      "schema": { "$ref": "#/backend/entities/UserRole" },
-      "description": "Dynamic organization roles."
-    },
-    "/user_departments/{deptId}": {
-      "schema": { "$ref": "#/backend/entities/UserDepartment" },
-      "description": "Dynamic organization departments."
+      "description": "Custom classification categories for expenses."
     }
   }
 }

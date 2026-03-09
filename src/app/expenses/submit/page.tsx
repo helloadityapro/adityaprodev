@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -28,7 +29,6 @@ import {
   Loader2, 
   FileUp, 
   Image as ImageIcon, 
-  MapPin, 
   Search, 
   Check, 
   ChevronsUpDown, 
@@ -37,8 +37,7 @@ import {
   Building2,
   Calendar as CalendarIcon,
   Send,
-  CheckCircle2,
-  LayoutGrid
+  CheckCircle2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -54,11 +53,11 @@ const expenseItemSchema = z.object({
   description: z.string().min(1, 'Description is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
   date: z.string().min(1, 'Date is required.'),
-  localReceipt: z.any().optional(), // Used for preview
+  localReceipt: z.any().optional(),
 });
 
-const expenseClaimSchema = z.object({
-  title: z.string().min(3, 'Claim title is required (e.g. Travel Reimbursement).'),
+const expenseSchema = z.object({
+  title: z.string().min(3, 'Title is required (e.g. Travel Reimbursement).'),
   siteName: z.string().optional(),
   items: z.array(expenseItemSchema).min(1, 'At least one expense item is required.'),
 });
@@ -77,7 +76,6 @@ type UserProfile = {
   id: string;
   username: string;
   role: string;
-  assignedProjectIds?: string[];
 };
 
 export default function SubmitExpensePage() {
@@ -101,8 +99,8 @@ export default function SubmitExpensePage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
 
-  const form = useForm<z.infer<typeof expenseClaimSchema>>({
-    resolver: zodResolver(expenseClaimSchema),
+  const form = useForm<z.infer<typeof expenseSchema>>({
+    resolver: zodResolver(expenseSchema),
     defaultValues: {
       title: "",
       siteName: "General / Outside Purchase",
@@ -133,7 +131,7 @@ export default function SubmitExpensePage() {
     });
   };
 
-  const onSubmit = async (values: z.infer<typeof expenseClaimSchema>) => {
+  const onSubmit = async (values: z.infer<typeof expenseSchema>) => {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
 
@@ -161,14 +159,13 @@ export default function SubmitExpensePage() {
         createdAt: serverTimestamp(),
       });
 
-      // Notify Admins
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
         addDocumentNonBlocking(collection(firestore, 'notifications'), {
           userId: adminDoc.id,
-          title: "New Expense Claim",
-          description: `${userProfile.username} submitted a claim for ₹${totalAmount.toFixed(2)}: "${values.title}"`,
+          title: "New Expense Submitted",
+          description: `${userProfile.username} submitted an expense for ₹${totalAmount.toFixed(2)}: "${values.title}"`,
           link: "/expenses/list",
           read: false,
           createdAt: serverTimestamp(),
@@ -176,7 +173,7 @@ export default function SubmitExpensePage() {
       });
 
       setIsSuccess(true);
-      toast({ title: 'Claim Submitted', description: 'Your expense request is pending review.' });
+      toast({ title: 'Expense Submitted', description: 'Your request is pending review.' });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Submission Error', description: e.message });
     } finally {
@@ -198,12 +195,12 @@ export default function SubmitExpensePage() {
             </div>
             <CardTitle className="text-2xl font-bold uppercase tracking-tight">Expense Logged</CardTitle>
             <CardDescription className="text-base">
-              Your claim for <strong className="text-primary font-black">₹{totalAmount.toFixed(2)}</strong> has been received and is in the approval queue.
+              Your submission for <strong className="text-primary font-black">₹{totalAmount.toFixed(2)}</strong> has been received.
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex flex-col gap-3">
-            <Button className="w-full rounded-sm font-bold" onClick={() => router.push('/expenses/list')}>View My Claims</Button>
-            <Button variant="outline" className="w-full rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); }}>Submit Another</Button>
+            <Button className="w-full rounded-sm font-bold" onClick={() => router.push('/expenses/list')}>View My Submissions</Button>
+            <Button variant="outline" className="w-full rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); }}>Log Another</Button>
           </CardFooter>
         </Card>
       </div>
@@ -214,14 +211,14 @@ export default function SubmitExpensePage() {
     <div className="space-y-8 max-w-4xl mx-auto pb-20">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <Wallet className="h-8 w-8" /> New Expense Claim
+          <Wallet className="h-8 w-8" /> New Expense Submission
         </h1>
-        <p className="text-muted-foreground font-medium">Log your official purchases and payments for organizational approval.</p>
+        <p className="text-muted-foreground font-medium">Log official purchases or payments for organizational review.</p>
       </div>
 
       <Card className="rounded-sm shadow-lg border-primary/10">
         <CardHeader className="bg-muted/5 border-b">
-          <CardTitle className="text-sm font-bold uppercase tracking-widest">Claim Details</CardTitle>
+          <CardTitle className="text-sm font-bold uppercase tracking-widest">Expense Details</CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
           <Form {...form}>
@@ -232,9 +229,9 @@ export default function SubmitExpensePage() {
                   name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Claim Summary / Title</FormLabel>
+                      <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Expense Summary / Title</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Site Visit Reimbursement - Jan Week 2" {...field} className="h-11 rounded-sm" />
+                        <Input placeholder="e.g. Site Visit Reimbursement" {...field} className="h-11 rounded-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -292,7 +289,7 @@ export default function SubmitExpensePage() {
                                   key={site.id}
                                   type="button"
                                   variant="ghost"
-                                  className="w-full justify-start font-normal h-10 text-xs"
+                                  className="w-full justify-start font-normal h-10 text-sm"
                                   onClick={() => {
                                     field.onChange(site.name);
                                     setIsSitePopoverOpen(false);
@@ -316,7 +313,7 @@ export default function SubmitExpensePage() {
                 <div className="flex items-center justify-between border-b pb-2">
                   <div className="flex items-center gap-2">
                     <Receipt className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-black uppercase tracking-widest">Expense Items</h3>
+                    <h3 className="text-sm font-black uppercase tracking-widest">Items List</h3>
                   </div>
                   <Button 
                     type="button" 
@@ -360,11 +357,8 @@ export default function SubmitExpensePage() {
                                   </FormControl>
                                   <SelectContent>
                                     {categories?.map(cat => (
-                                      <SelectItem key={cat.id} value={cat.name} className="text-xs">{cat.name}</SelectItem>
+                                      <SelectItem key={cat.id} value={cat.name} className="text-xs font-bold">{cat.name}</SelectItem>
                                     ))}
-                                    {!categories?.length && (
-                                      <div className="p-2 text-[10px] text-muted-foreground italic text-center">Contact Admin to set categories</div>
-                                    )}
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -408,7 +402,7 @@ export default function SubmitExpensePage() {
                           />
                         </div>
 
-                        <div className="md:col-span-1.5 md:col-span-2">
+                        <div className="md:col-span-2">
                           <FormField
                             control={form.control}
                             name={`items.${index}.amount`}
@@ -477,7 +471,7 @@ export default function SubmitExpensePage() {
                     <CheckCircle2 className="h-6 w-6" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Aggregate Total Claim</span>
+                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Total Submission Amount</span>
                     <span className="text-3xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
@@ -486,7 +480,7 @@ export default function SubmitExpensePage() {
                   disabled={isSubmitting || totalAmount <= 0} 
                   className="w-full sm:w-auto h-12 px-10 font-black text-lg rounded-sm shadow-xl"
                 >
-                  {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> SUBMITTING...</> : <><Send className="mr-2 h-4 w-4" /> SEND FOR APPROVAL</>}
+                  {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> SUBMITTING...</> : <><Send className="mr-2 h-4 w-4" /> SEND FOR REVIEW</>}
                 </Button>
               </div>
             </form>
