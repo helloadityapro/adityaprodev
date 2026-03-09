@@ -37,7 +37,8 @@ import {
   Calendar as CalendarIcon,
   Send,
   CheckCircle2,
-  MessageCircle
+  MessageCircle,
+  IndianRupee
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -220,7 +221,7 @@ export default function SubmitExpensePage() {
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto pb-20">
+    <div className="space-y-8 max-w-5xl mx-auto pb-20">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <Wallet className="h-8 w-8" /> New Expense Submission
@@ -420,9 +421,18 @@ export default function SubmitExpensePage() {
                             name={`items.${index}.amount`}
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Amount</FormLabel>
+                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Amount (₹)</FormLabel>
                                 <FormControl>
-                                  <Input type="number" step="0.01" placeholder="0.00" {...field} className="h-10 rounded-sm bg-background font-mono" />
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-bold">₹</span>
+                                    <Input 
+                                      type="number" 
+                                      step="0.01" 
+                                      placeholder="0.00" 
+                                      {...field} 
+                                      className="h-10 rounded-sm bg-background font-mono pl-7" 
+                                    />
+                                  </div>
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -460,7 +470,7 @@ export default function SubmitExpensePage() {
                                     ) : (
                                       <Button asChild variant="outline" size="icon" className="w-full h-10 border-dashed rounded-sm text-primary hover:bg-primary/5 cursor-pointer">
                                         <label htmlFor={`receipt-${index}`}>
-                                          <ImageIcon className="h-4 w-4" />
+                                          <FileUp className="h-4 w-4" />
                                         </label>
                                       </Button>
                                     )}
