@@ -117,7 +117,14 @@ export default function SiteVisitDetailPage() {
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Badge className="bg-primary h-6 text-[10px] uppercase font-black px-3 rounded-sm">{visit.status}</Badge>
+                {visit.department && (
+                  <Badge variant="secondary" className="text-[9px] h-6 font-black uppercase rounded-sm border-none bg-primary text-white flex items-center gap-1.5 px-3">
+                    <Building2 className="h-3 w-3" /> {visit.department}
+                  </Badge>
+                )}
+                <Badge className={cn("h-6 text-[10px] uppercase font-black px-3 rounded-sm border-none", visit.status === 'ongoing' ? "bg-amber-500 text-white" : "bg-green-600 text-white")}>
+                  {visit.status}
+                </Badge>
                 <div className="flex items-center gap-1.5 text-[9px] font-black text-muted-foreground uppercase bg-white/50 px-2 py-0.5 rounded-sm border border-primary/10">
                   <FolderArchive className="h-3 w-3" /> site_visits/{visit.managerId}
                 </div>
@@ -127,11 +134,6 @@ export default function SiteVisitDetailPage() {
                 <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
                   <User className="h-4 w-4 text-primary" />
                   Visit Logged by {visit.managerName}
-                  {visit.department && (
-                    <Badge variant="outline" className="ml-1 text-[8px] h-4 font-black uppercase border-primary/20 text-primary flex items-center gap-1">
-                      <Building2 className="h-2.5 w-2.5" /> {visit.department}
-                    </Badge>
-                  )}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground font-semibold">
                   <History className="h-4 w-4" />

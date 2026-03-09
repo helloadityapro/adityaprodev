@@ -7,7 +7,7 @@ import { collection, query, where, limit, doc, or } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
-import { History, Timer, FileText, Search, User, ArrowRight } from "lucide-react";
+import { History, Timer, FileText, Search, User, ArrowRight, Building2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -146,9 +146,16 @@ export default function SiteVisitsHistoryPage() {
                     <TableCell className="font-black text-sm">{visit.siteName}</TableCell>
                     {(isAdmin || isManager) && (
                       <TableCell>
-                        <div className="flex items-center gap-2 text-xs font-bold">
-                          <User className="h-3 w-3 text-primary" />
-                          {visit.managerName}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 text-xs font-bold">
+                            <User className="h-3 w-3 text-primary" />
+                            {visit.managerName}
+                          </div>
+                          {visit.department && (
+                            <Badge variant="outline" className="w-fit text-[8px] h-4 font-black uppercase border-primary/20 text-primary bg-primary/5 flex items-center gap-1">
+                              <Building2 className="h-2.5 w-2.5" /> {visit.department}
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                     )}

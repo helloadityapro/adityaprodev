@@ -98,12 +98,12 @@ export default function ActiveSiteVisitsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {visit.department && (
-                      <Badge variant="outline" className="text-[8px] h-5 font-black uppercase border-primary/20 text-primary bg-white flex items-center gap-1">
-                        <Building2 className="h-2.5 w-2.5" /> {visit.department}
+                      <Badge variant="secondary" className="text-[9px] h-6 font-black uppercase rounded-sm border-none bg-primary/10 text-primary flex items-center gap-1.5 px-2.5">
+                        <Building2 className="h-3 w-3" /> {visit.department}
                       </Badge>
                     )}
-                    <Badge className="bg-primary text-white font-bold uppercase text-[10px] tracking-widest rounded-sm">Ongoing</Badge>
-                    <div className="flex items-center text-xs text-muted-foreground gap-1">
+                    <Badge className="bg-primary text-white font-bold uppercase text-[10px] tracking-widest rounded-sm h-6 px-3">Ongoing</Badge>
+                    <div className="flex items-center text-xs text-muted-foreground gap-1 ml-2">
                       <Clock className="h-3 w-3" />
                       Started {formatDistanceToNow(visit.startTime?.toDate() || new Date(), { addSuffix: true })}
                     </div>
