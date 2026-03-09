@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -14,7 +15,7 @@ import { Clock, LogIn, ShieldAlert } from 'lucide-react';
  * Handles:
  * 1. Forced check-in redirect if no session exists for today.
  * 2. Check-out reminders after 7:00 PM.
- * 3. Daily 12 AM system reset for stale sessions.
+ * 3. Daily 12 AM system reset for stale sessions (Marked as System Check Out).
  */
 export function AttendanceGate() {
   const { user } = useUser();
@@ -62,7 +63,7 @@ export function AttendanceGate() {
     if (pathname.startsWith('/attendance')) return;
 
     const now = new Date();
-    // Updated threshold to 7 PM (19:00)
+    // Threshold set to 7 PM (19:00)
     const sevenPm = setMinutes(setHours(new Date(), 19), 0);
     const isAfterSeven = isAfter(now, sevenPm);
 
@@ -78,8 +79,8 @@ export function AttendanceGate() {
         checkOutTime: serverTimestamp(),
         checkOutLat: activeSession.checkInLat, // Best effort fallback
         checkOutLng: activeSession.checkInLng,
-        checkOutType: 'system',
-        remarks: 'Automatic system check-out due to 12 AM cycle reset.'
+        checkOutType: 'System Check Out',
+        remarks: 'System Check Out: Session automatically closed at 12:00 AM reset.'
       });
       return;
     }

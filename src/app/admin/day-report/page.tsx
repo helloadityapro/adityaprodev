@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -356,9 +357,14 @@ export default function AdminDayReportPage() {
                         </div>
                         <div className="p-4 bg-slate-50 border border-slate-200 rounded-sm">
                           <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest mb-1">Check-out Time</p>
-                          <p className="text-2xl font-black text-slate-900">
-                            {reportData.attendance.checkOutTime ? format(reportData.attendance.checkOutTime.toDate(), 'HH:mm') : 'Ongoing'}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-2xl font-black text-slate-900">
+                              {reportData.attendance.checkOutTime ? format(reportData.attendance.checkOutTime.toDate(), 'HH:mm') : 'Ongoing'}
+                            </p>
+                            {reportData.attendance.checkOutType === 'System Check Out' && (
+                              <Badge variant="destructive" className="h-5 rounded-sm text-[8px] font-black uppercase">System Check Out</Badge>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1 mt-2 text-slate-500 font-mono text-[10px] font-bold">
                             <MapPin className="h-3 w-3" />
                             {reportData.attendance.checkOutLat ? `${reportData.attendance.checkOutLat.toFixed(5)}, ${reportData.attendance.checkOutLng?.toFixed(5)}` : 'N/A'}
@@ -393,7 +399,7 @@ export default function AdminDayReportPage() {
                         </Label>
                         {reportData.attendance.checkOutSelfieUrl ? (
                           <img src={reportData.attendance.checkOutSelfieUrl} className="aspect-video w-full object-cover rounded-sm border shadow-sm" alt="Check-out" />
-                        ) : <div className="aspect-video bg-muted/20 rounded-sm border-2 border-dashed flex items-center justify-center text-[10px] text-muted-foreground uppercase font-bold">No Exit Selfie</div>}
+                        ) : <div className="aspect-video bg-muted/20 rounded-sm border-2 border-dashed flex items-center justify-center text-[10px] text-muted-foreground uppercase font-bold">{reportData.attendance.checkOutType === 'System Check Out' ? 'Auto System Closure' : 'No Exit Selfie'}</div>}
                       </div>
                     </div>
                   </div>
@@ -513,7 +519,12 @@ export default function AdminDayReportPage() {
                                 <TableRow key={att.id}>
                                   <TableCell className="px-6 font-bold text-xs">{att.userName}</TableCell>
                                   <TableCell className="text-xs font-mono font-bold text-primary">{att.checkInTime ? format(att.checkInTime.toDate(), 'HH:mm') : '—'}</TableCell>
-                                  <TableCell className="text-xs font-mono font-bold text-primary">{att.checkOutTime ? format(att.checkOutTime.toDate(), 'HH:mm') : 'Active'}</TableCell>
+                                  <TableCell className="text-xs font-mono font-bold text-primary">
+                                    {att.checkOutTime ? format(att.checkOutTime.toDate(), 'HH:mm') : 'Active'}
+                                    {att.checkOutType === 'System Check Out' && (
+                                      <Badge variant="outline" className="ml-1 bg-red-50 text-red-600 border-red-100 text-[7px] h-3.5 px-1 font-black uppercase">Auto</Badge>
+                                    )}
+                                  </TableCell>
                                   <TableCell>
                                     <Badge variant="outline" className={cn("text-[8px] font-black uppercase rounded-sm px-1.5 h-4", att.status === 'ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-green-50 text-green-700 border-green-200")}>
                                       {att.status}

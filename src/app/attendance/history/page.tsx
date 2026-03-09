@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -26,6 +27,7 @@ type AttendanceEntry = {
   checkOutLng?: number;
   checkInSelfieUrl?: string;
   checkOutSelfieUrl?: string;
+  checkOutType?: string;
   status: 'ongoing' | 'completed';
   date: string;
 };
@@ -72,8 +74,6 @@ export default function AttendanceHistoryPage() {
     if (!user || !userProfile || isProfileLoading) return null;
     const colRef = collection(firestore, 'attendance');
     
-    // We remove orderBy from Firestore query to avoid index requirements
-    // Sorting is handled in memory via filteredEntries useMemo
     if (isAdmin) {
       return query(colRef, limit(100));
     }
@@ -179,6 +179,9 @@ export default function AttendanceHistoryPage() {
                           <div className="flex flex-col items-center gap-1">
                             <div className="flex items-center gap-1 text-xs font-bold text-slate-700">
                               <LogOut className="h-3 w-3" /> {formatTime(entry.checkOutTime)}
+                              {entry.checkOutType === 'System Check Out' && (
+                                <Badge variant="outline" className="ml-1 bg-red-50 text-red-600 border-red-100 text-[7px] h-3.5 px-1 font-black uppercase">System</Badge>
+                              )}
                             </div>
                             <div className="flex gap-1">
                               {entry.checkOutSelfieUrl && (

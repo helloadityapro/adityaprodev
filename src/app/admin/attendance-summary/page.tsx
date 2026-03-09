@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -31,6 +32,7 @@ type AttendanceRecord = {
   userName: string;
   checkInTime: any;
   checkOutTime?: any;
+  checkOutType?: string;
   status: 'ongoing' | 'completed';
   date: string;
   checkInLat?: number;
@@ -154,6 +156,7 @@ export default function AttendanceSummaryPage() {
       'Email': item.user.email,
       'Role': item.user.role,
       'Status': item.status === 'absent' ? 'Absent' : (item.status === 'ongoing' ? 'Ongoing' : 'Completed'),
+      'Check-out Method': item.record?.checkOutType || 'Manual',
       'Check-in Time': item.record?.checkInTime ? format(item.record.checkInTime.toDate(), 'HH:mm') : '—',
       'Check-out Time': item.record?.checkOutTime ? format(item.record.checkOutTime.toDate(), 'HH:mm') : (item.status === 'ongoing' ? 'Active' : '—'),
       'Duration': item.record?.checkInTime && item.record?.checkOutTime ? 
@@ -380,6 +383,9 @@ export default function AttendanceSummaryPage() {
                     <div className="flex items-center gap-2 text-xs font-mono font-bold">
                       <Clock className="h-3 w-3 text-muted-foreground" />
                       {item.record?.checkOutTime ? format(item.record.checkOutTime.toDate(), 'HH:mm') : (item.status === 'ongoing' ? 'Active' : '—')}
+                      {item.record?.checkOutType === 'System Check Out' && (
+                        <Badge variant="outline" className="bg-red-50 text-red-600 border-red-100 text-[7px] h-3.5 px-1 font-black uppercase">System</Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right px-6">
