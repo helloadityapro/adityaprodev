@@ -147,15 +147,15 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-      <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300 shadow-2xl border-none rounded-sm overflow-hidden">
-        <CardHeader className="text-center bg-primary pb-8 pt-10 text-primary-foreground">
-          <CardTitle className="text-3xl font-black tracking-tighter uppercase">Aditya Pro</CardTitle>
-          <CardDescription className="mt-2 text-primary-foreground/80 font-medium">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
+        <CardHeader className="text-center pb-8 pt-10">
+          <CardTitle className="text-3xl font-bold tracking-tight text-primary uppercase">Aditya Pro</CardTitle>
+          <CardDescription className="mt-2">
             Organizational Enrollment Gateway
           </CardDescription>
         </CardHeader>
-        <CardContent className="pt-8">
+        <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-5">
               <FormField
@@ -291,9 +291,9 @@ export default function RegisterPage() {
               </Button>
             </form>
           </Form>
-          <div className="mt-6 text-center text-sm border-t pt-6">
+          <div className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/login" className="font-black text-primary uppercase tracking-tight hover:underline">
+            <Link href="/login" className="font-bold text-primary hover:underline">
               Sign In
             </Link>
           </div>
