@@ -22,6 +22,7 @@ type SiteVisit = {
   managerName: string;
   managerId: string;
   siteManagerId?: string;
+  department?: string;
   startTime: any;
   endTime?: any;
   purpose?: string;

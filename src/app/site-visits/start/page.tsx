@@ -56,7 +56,7 @@ export default function StartSiteVisitPage() {
       navigator.geolocation.getCurrentPosition(
         (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
         () => {
-          toast({ variant: 'destructive', title: 'Location Access Required', description: 'Please enable GPS to start a site visit.' });
+          toast({ variant: 'destructive', title: 'Location Error', description: 'Please enable GPS to start a site visit.' });
           resolve(null);
         },
         { enableHighAccuracy: true, timeout: 10000 }
@@ -100,6 +100,7 @@ export default function StartSiteVisitPage() {
         managerId: user.uid,
         managerName: userProfile.username || user.email,
         siteManagerId: userProfile.siteManagerId || null,
+        department: userProfile.department || null,
         startTime: serverTimestamp(),
         startLat: location.lat,
         startLng: location.lng,

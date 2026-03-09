@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -6,7 +7,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, Navigation, History, UserCheck, Timer, FileText, ImageIcon, Users, Maximize2, X, User, FolderArchive, ArrowLeft, Printer, ExternalLink, CheckCircle2, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { MapPin, Navigation, History, UserCheck, Timer, FileText, ImageIcon, Users, Maximize2, X, User, FolderArchive, ArrowLeft, Printer, ExternalLink, CheckCircle2, ZoomIn, ZoomOut, RotateCcw, Building2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,8 @@ type SiteVisit = {
   siteName: string;
   managerName: string;
   managerId: string;
+  siteManagerId?: string;
+  department?: string;
   startTime: any;
   endTime?: any;
   startLat: number;
@@ -124,6 +127,11 @@ export default function SiteVisitDetailPage() {
                 <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
                   <User className="h-4 w-4 text-primary" />
                   Visit Logged by {visit.managerName}
+                  {visit.department && (
+                    <Badge variant="outline" className="ml-1 text-[8px] h-4 font-black uppercase border-primary/20 text-primary flex items-center gap-1">
+                      <Building2 className="h-2.5 w-2.5" /> {visit.department}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground font-semibold">
                   <History className="h-4 w-4" />

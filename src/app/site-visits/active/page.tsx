@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -5,7 +6,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@
 import { collection, doc, query, where, or, and } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, User } from "lucide-react";
+import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, User, Building2 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +19,7 @@ type SiteVisit = {
   managerName: string;
   managerId: string;
   siteManagerId?: string;
+  department?: string;
   startTime: any;
   startLat: number;
   startLng: number;
@@ -111,6 +113,11 @@ export default function ActiveSiteVisitsPage() {
                   <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                     <User className="h-3.5 w-3.5" />
                     {visit.managerName} {visit.managerId === user?.uid && "(You)"}
+                    {visit.department && (
+                      <Badge variant="outline" className="ml-2 text-[8px] h-4 font-black uppercase border-primary/20 text-primary flex items-center gap-1">
+                        <Building2 className="h-2.5 w-2.5" /> {visit.department}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </CardHeader>
