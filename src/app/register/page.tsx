@@ -282,7 +282,7 @@ export default function RegisterPage() {
                   )}
                 />
               </div>
-              <Button type="submit" className="w-full rounded-sm h-12 font-black uppercase text-sm shadow-xl tracking-wider" disabled={form.formState.isSubmitting}>
+              <Button type="submit" className="w-full rounded-sm h-12 font-black text-sm shadow-xl tracking-wider" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Finalizing Profile...</>
                 ) : (
