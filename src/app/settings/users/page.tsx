@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react";
@@ -37,20 +36,27 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
-type UserRole = 'Admin' | 'Site Manager' | 'Site Engineer' | 'Driver';
-
 type User = {
   id: string;
   username?: string;
   email?: string;
   mobile?: string;
-  role?: UserRole;
-  department?: 'Projects' | 'O&M';
+  role?: string;
+  department?: string;
   registrationRequest?: boolean;
   assignedProjectIds?: string[];
   siteManagerId?: string;
   avatarUrl?: string;
   createdAt?: any;
+};
+
+const getRoleIcon = (roleName: string) => {
+    const name = roleName?.toLowerCase() || '';
+    if (name.includes('admin')) return <Shield className="h-4 w-4" />;
+    if (name.includes('manager')) return <UserCog className="h-4 w-4" />;
+    if (name.includes('engineer')) return <HardHat className="h-4 w-4" />;
+    if (name.includes('driver')) return <Truck className="h-4 w-4" />;
+    return <User className="h-4 w-4" />;
 };
 
 function StatusBadge({ isPending }: { isPending: boolean }) {
@@ -67,7 +73,6 @@ function StatusBadge({ isPending }: { isPending: boolean }) {
   )
 }
 
-type FilterType = 'all' | 'pending' | 'other' | UserRole;
 type SortKey = 'username' | 'role' | 'registrationRequest' | 'createdAt' | 'department';
 
 export default function UsersPage() {
@@ -96,7 +101,10 @@ export default function UsersPage() {
     }, [firestore, isAdmin]);
     const { data: users, isLoading: isUsersLoading } = useCollection<User>(usersQuery);
 
-    const [filter, setFilter] = React.useState<FilterType>('all');
+    const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
+    const { data: dbRoles } = useCollection<{ name: string }>(rolesQuery);
+
+    const [filter, setFilter] = React.useState<string>('all');
     const [searchTerm, setSearchTerm] = React.useState('');
     const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
@@ -146,19 +154,23 @@ export default function UsersPage() {
     };
 
     const summary = React.useMemo(() => {
-        const counts = { totalUsers: 0, pending: 0, admins: 0, managers: 0, engineers: 0, drivers: 0, other: 0 };
+        const counts: Record<string, number> = { total: 0, pending: 0 };
         if (!users) return counts;
-        counts.totalUsers = users.length;
+        
+        counts.total = users.length;
+        
+        const knownRoles = dbRoles?.length ? dbRoles.map(r => r.name) : ['Admin', 'Site Manager', 'Site Engineer', 'Driver'];
+        
         users.forEach(u => {
-            if (u.registrationRequest) counts.pending++;
-            else if (u.role === 'Admin') counts.admins++;
-            else if (u.role === 'Site Manager') counts.managers++;
-            else if (u.role === 'Site Engineer') counts.engineers++;
-            else if (u.role === 'Driver') counts.drivers++;
-            else counts.other++;
+            if (u.registrationRequest) {
+                counts.pending++;
+            } else {
+                const role = u.role || 'Other';
+                counts[role] = (counts[role] || 0) + 1;
+            }
         });
         return counts;
-    }, [users]);
+    }, [users, dbRoles]);
 
     const sortedAndFilteredUsers = React.useMemo(() => {
         if (!users) return [];
@@ -167,7 +179,6 @@ export default function UsersPage() {
             const matchesSearch = (u.username || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term);
             const matchesFilter = filter === 'all' ? true :
                                   filter === 'pending' ? u.registrationRequest === true :
-                                  filter === 'other' ? (!u.registrationRequest && !['Admin', 'Site Manager', 'Site Engineer', 'Driver'].includes(u.role || '')) :
                                   u.role === filter;
             return matchesSearch && matchesFilter;
         });
@@ -195,123 +206,115 @@ export default function UsersPage() {
     return (
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Users</h1>
-                <Button onClick={() => setIsAddUserDialogOpen(true)}>Add User</Button>
+                <h1 className="text-2xl font-bold">Personnel Directory</h1>
+                <Button onClick={() => setIsAddUserDialogOpen(true)} className="rounded-sm font-bold">
+                    <UserPlus className="mr-2 h-4 w-4" /> Add User
+                </Button>
             </div>
 
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
-                <Card onClick={() => setFilter('all')} className={cn("cursor-pointer transition-all", filter === 'all' && "ring-2 ring-primary bg-primary/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total</CardTitle>
-                        <Users className="h-4 w-4" />
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.totalUsers}</div></CardContent>
-                </Card>
-                <Card onClick={() => setFilter('pending')} className={cn("cursor-pointer transition-all", filter === 'pending' && "ring-2 ring-yellow-500 bg-yellow-500/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Pending</CardTitle>
-                        <UserPlus className="h-4 w-4" />
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.pending}</div></CardContent>
-                </Card>
-                <Card onClick={() => setFilter('Admin')} className={cn("cursor-pointer transition-all", filter === 'Admin' && "ring-2 ring-blue-500 bg-blue-500/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Admins</CardTitle>
-                        <Shield className="h-4 w-4" />
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.admins}</div></CardContent>
-                </Card>
-                <Card onClick={() => setFilter('Site Manager')} className={cn("cursor-pointer transition-all", filter === 'Site Manager' && "ring-2 ring-purple-500 bg-purple-500/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Managers</CardTitle>
-                        <UserCog className="h-4 w-4" />
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.managers}</div></CardContent>
-                </Card>
-                <Card onClick={() => setFilter('Site Engineer')} className={cn("cursor-pointer transition-all", filter === 'Site Engineer' && "ring-2 ring-orange-500 bg-orange-500/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Engineers</CardTitle>
-                        <HardHat className="h-4 w-4" />
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.engineers}</div></CardContent>
-                </Card>
-                <Card onClick={() => setFilter('Driver')} className={cn("cursor-pointer transition-all", filter === 'Driver' && "ring-2 ring-emerald-500 bg-emerald-500/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Drivers</CardTitle>
-                        <Truck className="h-4 w-4" />
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.drivers}</div></CardContent>
-                </Card>
-                <Card onClick={() => setFilter('other')} className={cn("cursor-pointer transition-all", filter === 'other' && "ring-2 ring-slate-500 bg-slate-500/5")}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-                        <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Other</CardTitle>
-                        <CircleHelp className="h-4 w-4" />
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.other}</div></CardContent>
-                </Card>
-            </div>
+            <ScrollArea className="w-full whitespace-nowrap pb-4">
+                <div className="flex gap-4">
+                    <Card onClick={() => setFilter('all')} className={cn("min-w-[140px] cursor-pointer transition-all hover:shadow-md", filter === 'all' && "ring-2 ring-primary bg-primary/5")}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
+                            <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total</CardTitle>
+                            <Users className="h-4 w-4" />
+                        </CardHeader>
+                        <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.total}</div></CardContent>
+                    </Card>
+                    <Card onClick={() => setFilter('pending')} className={cn("min-w-[140px] cursor-pointer transition-all hover:shadow-md", filter === 'pending' && "ring-2 ring-yellow-500 bg-yellow-500/5")}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
+                            <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Pending</CardTitle>
+                            <UserPlus className="h-4 w-4" />
+                        </CardHeader>
+                        <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{summary.pending}</div></CardContent>
+                    </Card>
+                    {Object.entries(summary).map(([roleName, count]) => {
+                        if (roleName === 'total' || roleName === 'pending') return null;
+                        return (
+                            <Card key={roleName} onClick={() => setFilter(roleName)} className={cn("min-w-[140px] cursor-pointer transition-all hover:shadow-md", filter === roleName && "ring-2 ring-primary bg-primary/5")}>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
+                                    <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate max-w-[80px]" title={roleName}>{roleName}</CardTitle>
+                                    {getRoleIcon(roleName)}
+                                </CardHeader>
+                                <CardContent className="p-4 pt-0"><div className="text-xl font-bold">{count}</div></CardContent>
+                            </Card>
+                        );
+                    })}
+                </div>
+            </ScrollArea>
 
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+            <Card className="rounded-sm overflow-hidden">
+                <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b bg-muted/5">
                     <div>
-                        <CardTitle>Users List</CardTitle>
-                        <CardDescription>Manage user accounts and approvals.</CardDescription>
+                        <CardTitle className="text-lg">Users Management</CardTitle>
+                        <CardDescription>Manage organizational accounts and access approvals.</CardDescription>
                     </div>
-                    <div className="relative w-64">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8" />
+                    <div className="relative w-full md:w-72">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Search name or email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 rounded-sm h-10" />
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                     <Table>
-                        <TableHeader>
+                        <TableHeader className="bg-muted/30">
                             <TableRow>
-                                <TableHead onClick={() => handleSort('username')} className="cursor-pointer">User <SortIcon column="username" /></TableHead>
-                                <TableHead onClick={() => handleSort('role')} className="cursor-pointer">Role <SortIcon column="role" /></TableHead>
-                                <TableHead onClick={() => handleSort('department')} className="cursor-pointer">Dept <SortIcon column="department" /></TableHead>
+                                <TableHead onClick={() => handleSort('username')} className="cursor-pointer hover:text-primary transition-colors">User <SortIcon column="username" /></TableHead>
+                                <TableHead onClick={() => handleSort('role')} className="cursor-pointer hover:text-primary transition-colors">Role <SortIcon column="role" /></TableHead>
+                                <TableHead onClick={() => handleSort('department')} className="cursor-pointer hover:text-primary transition-colors">Dept <SortIcon column="department" /></TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+                                <TableHead className="text-right px-6">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {sortedAndFilteredUsers.map((u) => (
-                                <TableRow key={u.id}>
+                            {sortedAndFilteredUsers.length > 0 ? sortedAndFilteredUsers.map((u) => (
+                                <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
                                     <TableCell>
                                         <div className="flex items-center gap-3">
-                                            <Avatar className="h-9 w-9"><AvatarFallback>{(u.username || u.email || '?').charAt(0)}</AvatarFallback></Avatar>
-                                            <div><p className="font-medium">{u.username || 'N/A'}</p><p className="text-xs text-muted-foreground">{u.email}</p></div>
+                                            <Avatar className="h-9 w-9 border"><AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">{(u.username || u.email || '?').charAt(0).toUpperCase()}</AvatarFallback></Avatar>
+                                            <div className="flex flex-col">
+                                                <p className="font-bold text-sm leading-none">{u.username || 'N/A'}</p>
+                                                <p className="text-[10px] text-muted-foreground mt-1">{u.email}</p>
+                                            </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell><Badge variant="outline">{u.role || 'Unassigned'}</Badge></TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className="rounded-sm font-bold uppercase text-[9px] border-primary/20 text-primary">
+                                            {u.role || 'Unassigned'}
+                                        </Badge>
+                                    </TableCell>
                                     <TableCell>
                                         {u.department ? (
-                                            <Badge variant="secondary" className="flex items-center gap-1 w-fit">
+                                            <Badge variant="secondary" className="flex items-center gap-1 w-fit rounded-sm font-bold text-[9px] uppercase">
                                                 <Building2 className="h-3 w-3" />
                                                 {u.department}
                                             </Badge>
                                         ) : (
-                                            <span className="text-xs text-muted-foreground italic">No Dept</span>
+                                            <span className="text-[10px] text-muted-foreground italic font-medium">No Dept</span>
                                         )}
                                     </TableCell>
                                     <TableCell><StatusBadge isPending={!!u.registrationRequest} /></TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-2">
+                                    <TableCell className="text-right px-6">
+                                        <div className="flex justify-end gap-1">
                                             {u.registrationRequest ? (
                                                 <>
-                                                    <Button size="sm" onClick={() => handleApproveRegistration(u.id)}>Approve</Button>
-                                                    <Button size="sm" variant="destructive" onClick={() => handleRejectClick(u)}>Reject</Button>
+                                                    <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700" onClick={() => handleApproveRegistration(u.id)}>Approve</Button>
+                                                    <Button size="sm" variant="destructive" className="h-8 rounded-sm" onClick={() => handleRejectClick(u)}>Reject</Button>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Button variant="ghost" size="icon" onClick={() => setUserToView(u as any)}><User className="h-4 w-4" /></Button>
-                                                    <Button variant="ghost" size="icon" onClick={() => setUserToEdit(u as any)}><Pencil className="h-4 w-4" /></Button>
-                                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteClick(u)}><Trash2 className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setUserToView(u as any)} title="View Profile"><User className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={() => setUserToEdit(u as any)} title="Edit Details"><Pencil className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleDeleteClick(u)} title="Delete Account"><Trash2 className="h-4 w-4" /></Button>
                                                 </>
                                             )}
                                         </div>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">No users found matching your filters.</TableCell>
+                                </TableRow>
+                            )}
                         </TableBody>
                     </Table>
                 </CardContent>
@@ -320,15 +323,22 @@ export default function UsersPage() {
             <AddUserDialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen} />
             <EditUserDialog user={userToEdit as any} open={!!userToEdit} onOpenChange={() => setUserToEdit(null)} />
             <ViewUserDialog user={userToView as any} open={!!userToView} onOpenChange={() => setUserToView(null)} />
+            
             <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
-                <AlertDialogContent>
+                <AlertDialogContent className="rounded-sm">
                     <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>{isRejecting ? "Reject and delete this user?" : "Permanently delete this user?"}</AlertDialogDescription>
+                    <AlertDialogTitle>{isRejecting ? "Reject Authorization" : "Confirm Deletion"}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        {isRejecting 
+                            ? `This will deny access and remove the registration request for ${userToDelete?.username}.` 
+                            : `Are you sure you want to permanently delete ${userToDelete?.username}'s account and profile?`}
+                    </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => userToDelete && handleConfirmDelete(userToDelete.id)} className={isRejecting ? "bg-red-600" : "bg-destructive"}>Confirm</AlertDialogAction>
+                    <AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => userToDelete && handleConfirmDelete(userToDelete.id)} className={cn("rounded-sm", isRejecting ? "bg-red-600 hover:bg-red-700" : "bg-destructive hover:bg-destructive/90")}>
+                        {isRejecting ? "Reject Request" : "Confirm Delete"}
+                    </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

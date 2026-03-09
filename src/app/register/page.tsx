@@ -1,4 +1,3 @@
-
 'use client'
 
 import Link from "next/link"
@@ -48,10 +47,10 @@ export default function RegisterPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
 
   const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
-  const { data: roles } = useCollection(rolesQuery);
+  const { data: roles } = useCollection<{ name: string }>(rolesQuery);
 
   const deptsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
-  const { data: departments } = useCollection(deptsQuery);
+  const { data: departments } = useCollection<{ name: string }>(deptsQuery);
 
   useEffect(() => {
     if (mounted && user && userProfile && !isProfileLoading && !userProfile.registrationRequest) {
@@ -124,22 +123,22 @@ export default function RegisterPage() {
   if (isSuccess) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="mx-auto w-full max-w-md text-center py-10">
+        <Card className="mx-auto w-full max-w-md text-center py-10 shadow-xl border-primary/10 rounded-sm">
           <CardHeader>
             <div className="flex justify-center mb-4">
               <CheckCircle2 className="h-16 w-16 text-green-500" />
             </div>
-            <CardTitle className="text-2xl font-bold">Registration Pending</CardTitle>
-            <CardDescription className="text-lg">
-              Account created successfully.
+            <CardTitle className="text-2xl font-black uppercase tracking-tight">Authorization Pending</CardTitle>
+            <CardDescription className="text-base font-medium">
+              Profile initialized successfully.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Your request for access to Aditya Pro has been received. Project administration will review and approve your credentials shortly.
+              Your request for access to Aditya Pro has been received. Project administration will review and verify your credentials shortly. You will be notified once access is granted.
             </p>
-            <Button variant="outline" onClick={() => auth.signOut()} className="w-full">
-              Sign Out
+            <Button variant="outline" onClick={() => auth.signOut()} className="w-full rounded-sm font-bold border-primary/20">
+              Sign Out & Close
             </Button>
           </CardContent>
         </Card>
@@ -148,25 +147,25 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
-        <CardHeader className="text-center pb-8 pt-10">
-          <CardTitle className="text-3xl font-bold tracking-tight text-primary">Aditya Pro</CardTitle>
-          <CardDescription className="mt-2">
-            Create your Aditya Pro account
+    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+      <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300 shadow-2xl border-none rounded-sm overflow-hidden">
+        <CardHeader className="text-center bg-primary pb-8 pt-10 text-primary-foreground">
+          <CardTitle className="text-3xl font-black tracking-tighter uppercase">Aditya Pro</CardTitle>
+          <CardDescription className="mt-2 text-primary-foreground/80 font-medium">
+            Organizational Enrollment Gateway
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-8">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-5">
               <FormField
                 control={form.control}
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="John Doe" {...field} />
+                      <Input placeholder="Enter your full name" {...field} className="rounded-sm h-11" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -177,9 +176,9 @@ export default function RegisterPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Work Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="m@example.com" {...field} />
+                      <Input placeholder="name@adityagreenenergy.com" {...field} className="rounded-sm h-11" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -190,9 +189,9 @@ export default function RegisterPage() {
                 name="mobile"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mobile Number</FormLabel>
+                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Contact Number</FormLabel>
                     <FormControl>
-                      <Input placeholder="8989898989" {...field} />
+                      <Input placeholder="10-digit mobile number" {...field} className="rounded-sm h-11" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -204,16 +203,16 @@ export default function RegisterPage() {
                   name="role"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Role</FormLabel>
+                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Designation</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                              <SelectTrigger>
-                                  <SelectValue placeholder="Select role" />
+                              <SelectTrigger className="rounded-sm h-11">
+                                  <SelectValue placeholder="Select" />
                               </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                               {roles?.length ? roles.map(r => (
-                                <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                                <SelectItem key={r.id} value={r.name} className="font-medium">{r.name}</SelectItem>
                               )) : (
                                 <>
                                   <SelectItem value="Site Engineer">Site Engineer</SelectItem>
@@ -232,16 +231,16 @@ export default function RegisterPage() {
                   name="department"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Department</FormLabel>
+                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Department</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                              <SelectTrigger>
-                                  <SelectValue placeholder="Select dept" />
+                              <SelectTrigger className="rounded-sm h-11">
+                                  <SelectValue placeholder="Select" />
                               </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                               {departments?.length ? departments.map(d => (
-                                <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                                <SelectItem key={d.id} value={d.name} className="font-medium">{d.name}</SelectItem>
                               )) : (
                                 <>
                                   <SelectItem value="Projects">Projects</SelectItem>
@@ -255,45 +254,47 @@ export default function RegisterPage() {
                   )}
                 />
               </div>
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" {...field} className="rounded-sm h-11" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Confirm</FormLabel>
+                      <FormControl>
+                        <Input type="password" {...field} className="rounded-sm h-11" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <Button type="submit" className="w-full rounded-sm h-12 font-black uppercase text-sm shadow-xl tracking-wider" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Finalizing Profile...</>
                 ) : (
-                  user ? 'Restore Profile' : 'Create an account'
+                  user ? 'Restore My Profile' : 'Complete Enrollment'
                 )}
               </Button>
             </form>
           </Form>
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-6 text-center text-sm border-t pt-6">
             Already have an account?{" "}
-            <Link href="/login" className="underline font-medium text-primary">
-              Sign in
+            <Link href="/login" className="font-black text-primary uppercase tracking-tight hover:underline">
+              Sign In
             </Link>
           </div>
         </CardContent>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -56,10 +55,10 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
-  const { data: roles } = useCollection(rolesQuery);
+  const { data: roles } = useCollection<{ name: string }>(rolesQuery);
 
   const deptsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
-  const { data: departments } = useCollection(deptsQuery);
+  const { data: departments } = useCollection<{ name: string }>(deptsQuery);
 
   const form = useForm<z.infer<typeof editUserSchema>>({
     resolver: zodResolver(editUserSchema),
@@ -114,41 +113,41 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] rounded-sm">
         <DialogHeader>
-          <DialogTitle>Edit User</DialogTitle>
-          <DialogDescription>
-            Modify the user details below. Email cannot be changed.
+          <DialogTitle className="text-xl font-black uppercase tracking-tight">Edit Credentials</DialogTitle>
+          <DialogDescription className="text-xs font-medium">
+            Modify the professional profile for {user?.username}.
           </DialogDescription>
         </DialogHeader>
         {user && (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-4 py-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-5 py-4">
               <FormField
                 control={form.control}
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Full Name</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input {...field} className="rounded-sm" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <FormItem>
-                <FormLabel>Email</FormLabel>
-                <Input readOnly disabled value={user.email || 'N/A'} />
+                <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground opacity-50">Email (Identity Locked)</FormLabel>
+                <Input readOnly disabled value={user.email || 'N/A'} className="rounded-sm bg-muted/20" />
               </FormItem>
               <FormField
                 control={form.control}
                 name="mobile"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mobile Number</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Contact Number</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input {...field} className="rounded-sm" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -160,16 +159,16 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                   name="role"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Role</FormLabel>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Role</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select role" />
+                          <SelectTrigger className="rounded-sm">
+                            <SelectValue placeholder="Select" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {roles?.length ? roles.map(r => (
-                            <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                            <SelectItem key={r.id} value={r.name} className="text-xs font-bold">{r.name}</SelectItem>
                           )) : (
                             <>
                               <SelectItem value="Site Engineer">Site Engineer</SelectItem>
@@ -189,16 +188,16 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                   name="department"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Department</FormLabel>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Dept</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select dept" />
+                          <SelectTrigger className="rounded-sm">
+                            <SelectValue placeholder="Select" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {departments?.length ? departments.map(d => (
-                            <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                            <SelectItem key={d.id} value={d.name} className="text-xs font-bold">{d.name}</SelectItem>
                           )) : (
                             <>
                               <SelectItem value="Projects">Projects</SelectItem>
@@ -212,12 +211,12 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                   )}
                 />
               </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+              <DialogFooter className="gap-2 border-t pt-4">
+                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting} className="rounded-sm font-bold uppercase text-[10px]">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : 'Save Changes'}
+                <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] px-6">
+                  {isSubmitting ? 'Saving...' : 'Confirm Changes'}
                 </Button>
               </DialogFooter>
             </form>
