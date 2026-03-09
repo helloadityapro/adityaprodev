@@ -58,6 +58,33 @@
         "endReadingPhoto": { "type": "string" }
       }
     },
+    "ExpenseClaim": {
+      "title": "Expense Claim",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "title": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "amount": { "type": "number" },
+              "date": { "type": "string", "format": "date" },
+              "receiptUrl": { "type": "string" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "UserRole": {
       "title": "User Role",
       "type": "object",
@@ -90,6 +117,10 @@
     "/vehicle_assignments/{assignmentId}": {
       "schema": { "$ref": "#/backend/entities/VehicleAssignment" },
       "description": "Trip requests and execution logs."
+    },
+    "/expenses/{expenseId}": {
+      "schema": { "$ref": "#/backend/entities/ExpenseClaim" },
+      "description": "Payment and purchase reimbursement requests."
     },
     "/attendance/{attendanceId}": {
       "schema": { "$ref": "#/backend/entities/Attendance" },

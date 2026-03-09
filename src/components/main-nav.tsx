@@ -37,7 +37,10 @@ import {
   Car,
   CarFront,
   Fuel,
-  MapPinned
+  MapPinned,
+  Receipt,
+  IndianRupee,
+  Wallet
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -123,6 +126,28 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <Link href="/rewards">
                 <Trophy className="h-4 w-4 text-amber-500" />
                 <span className="font-medium">Points Bank</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Expenses</SidebarGroupLabel>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Submit Expense" isActive={pathname === '/expenses/submit'} className="rounded-sm">
+              <Link href="/expenses/submit">
+                <Wallet className="h-4 w-4" />
+                <span className="font-medium">Submit Expense</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="My Expenses" isActive={pathname === '/expenses/list'} className="rounded-sm">
+              <Link href="/expenses/list">
+                <History className="h-4 w-4" />
+                <span className="font-medium">Expenses List</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
