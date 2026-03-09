@@ -75,29 +75,31 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground scroll-smooth;
+    @apply bg-background text-foreground scroll-smooth overflow-x-hidden selection:bg-primary/20;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
 @layer utilities {
-  /* Ensure scrollbars are always visible and distinct */
+  /* Mobile-optimized scrollbars */
   .custom-scrollbar::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 6px;
+    height: 6px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
-    background: hsl(var(--muted) / 0.3);
-    border-radius: 10px;
+    background: transparent;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: hsl(var(--primary) / 0.4);
+    background: hsl(var(--primary) / 0.2);
     border-radius: 10px;
-    border: 2px solid transparent;
-    background-clip: content-box;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--primary) / 0.6);
-    background-clip: content-box;
+    background: hsl(var(--primary) / 0.4);
+  }
+
+  /* Safe area padding for notched phones */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
@@ -128,7 +130,6 @@
     overflow: visible !important;
     height: auto !important;
   }
-  /* Force containers to expand for printing */
   .sidebar-inset, [data-sidebar="inset"], .flex-1, main, div {
     overflow: visible !important;
     height: auto !important;

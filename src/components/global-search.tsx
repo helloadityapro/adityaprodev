@@ -55,7 +55,6 @@ export function GlobalSearch() {
   const { data: userProfile } = useDoc(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
-  // Shortcut key listener
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
@@ -79,7 +78,6 @@ export function GlobalSearch() {
     const searchResults: SearchResult[] = [];
 
     try {
-      // 1. Search Sites (Exhaustive Search)
       const sitesSnap = await getDocs(collection(firestore, 'sites'));
       sitesSnap.docs.forEach(d => {
         const data = d.data();
@@ -98,7 +96,6 @@ export function GlobalSearch() {
         }
       });
 
-      // 2. Search Permits (Increased limit for broader discovery)
       const permitsSnap = await getDocs(query(collection(firestore, 'permits_to_work'), limit(200)));
       permitsSnap.docs.forEach(d => {
         const data = d.data();
@@ -117,7 +114,6 @@ export function GlobalSearch() {
         }
       });
 
-      // 3. Search Tasks
       const tasksSnap = await getDocs(query(collection(firestore, 'tasks'), limit(150)));
       tasksSnap.docs.forEach(d => {
         const data = d.data();
@@ -136,7 +132,6 @@ export function GlobalSearch() {
         }
       });
 
-      // 4. Search DPRs
       const dprsSnap = await getDocs(query(collection(firestore, 'dprs'), limit(100)));
       dprsSnap.docs.forEach(d => {
         const data = d.data();
@@ -155,7 +150,6 @@ export function GlobalSearch() {
         }
       });
 
-      // 5. Search Material Movements
       const movsSnap = await getDocs(query(collection(firestore, 'material_movements'), limit(100)));
       movsSnap.docs.forEach(d => {
         const data = d.data();
@@ -174,7 +168,6 @@ export function GlobalSearch() {
         }
       });
 
-      // 6. Search Users
       const usersSnap = await getDocs(query(collection(firestore, 'users'), limit(500)));
       usersSnap.docs.forEach(d => {
         const data = d.data();
@@ -226,11 +219,14 @@ export function GlobalSearch() {
     <>
       <div 
         onClick={() => setIsOpen(true)}
-        className="relative w-full max-w-[200px] lg:max-w-md group cursor-pointer"
+        className="relative w-full max-w-md group cursor-pointer"
       >
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-        <div className="flex h-9 w-full rounded-sm border border-input bg-muted/50 px-9 py-2 text-xs text-muted-foreground transition-all group-hover:bg-accent group-hover:border-primary/20 items-center justify-between">
-          <span>Search sites, permits, tasks...</span>
+        <div className="flex h-9 w-full rounded-md border border-input bg-muted/50 px-9 py-2 text-xs text-muted-foreground transition-all group-hover:bg-accent group-hover:border-primary/20 items-center justify-between">
+          <span className="truncate">
+            <span className="hidden xs:inline">Search sites, permits, tasks...</span>
+            <span className="xs:hidden">Search...</span>
+          </span>
           <kbd className="pointer-none hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
             <span className="text-xs">⌘</span>K
           </kbd>
@@ -242,7 +238,7 @@ export function GlobalSearch() {
           <DialogHeader className="p-4 border-b bg-muted/5">
             <div className="flex items-center gap-2">
               <Search className="h-5 w-5 text-primary" />
-              <DialogTitle className="text-sm font-bold uppercase tracking-widest text-primary">Global Platform Search</DialogTitle>
+              <DialogTitle className="text-sm font-bold uppercase tracking-widest text-primary">Global Search</DialogTitle>
             </div>
           </DialogHeader>
           
@@ -250,8 +246,8 @@ export function GlobalSearch() {
             <div className="relative">
               <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
               <Input 
-                placeholder="Search by serial, site, name or email..." 
-                className="pl-10 h-12 text-lg rounded-sm border-primary/20 focus-visible:ring-primary/30"
+                placeholder="Type to find anything..." 
+                className="pl-10 h-12 text-base rounded-sm border-primary/20 focus-visible:ring-primary/30"
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 autoFocus
@@ -264,7 +260,7 @@ export function GlobalSearch() {
             </div>
           </div>
 
-          <ScrollArea className="max-h-[450px]">
+          <ScrollArea className="max-h-[60vh] md:max-h-[450px]">
             {results.length > 0 ? (
               <div className="p-2 space-y-4 pb-6">
                 {['Site', 'User', 'Permit', 'Task', 'DPR', 'Movement'].map((category) => {
@@ -302,18 +298,17 @@ export function GlobalSearch() {
             ) : searchQuery.length >= 2 && !isSearching ? (
               <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
                 <Search className="h-12 w-12 opacity-10 mb-4" />
-                <p className="text-sm font-medium">No records found for "{searchQuery}"</p>
-                <p className="text-xs uppercase font-bold tracking-tighter mt-1">Try searching for a Site Name or Serial Number</p>
+                <p className="text-sm font-medium">No results found</p>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground/40 italic">
+              <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground/40">
                 <CommandIcon className="h-12 w-12 opacity-10 mb-4" />
-                <p className="text-sm font-medium">Start typing to search across Aditya Pro...</p>
+                <p className="text-sm font-medium italic">Start typing to search...</p>
               </div>
             )}
           </ScrollArea>
 
-          <div className="p-3 border-t bg-muted/5 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+          <div className="p-3 border-t bg-muted/5 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 hidden sm:flex">
             <div className="flex gap-4">
               <span className="flex items-center gap-1"><kbd className="border px-1 rounded bg-background">↵</kbd> Select</span>
               <span className="flex items-center gap-1"><kbd className="border px-1 rounded bg-background">↑↓</kbd> Navigate</span>

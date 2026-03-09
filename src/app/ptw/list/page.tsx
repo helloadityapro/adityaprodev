@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X, ZoomIn, ZoomOut, RotateCcw, Search, FilterX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs, or, and, increment, getDoc } from "firebase/firestore";
@@ -26,6 +26,8 @@ import {
   CarouselPrevious 
 } from "@/components/ui/carousel";
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 
 type Attachment = { 
   url: string; 
@@ -81,18 +83,17 @@ type SortKey = 'serialNumber' | 'ptwType' | 'siteName' | 'requestDate' | 'status
 
 function StatusBadge({ permit, className }: { permit: Permit, className?: string }) {
   const firestore = useFirestore();
-  
   const managerRef = useMemoFirebase(() => (permit.status === 'Pending' && permit.siteManagerId) ? doc(firestore, 'users', permit.siteManagerId) : null, [firestore, permit.siteManagerId, permit.status]);
   const { data: managerProfile } = useDoc(managerRef);
 
   const statusConfig = {
     Pending: { 
-      label: managerProfile ? `Pending with ${managerProfile.username}` : 'Pending Manager', 
+      label: managerProfile ? `With ${managerProfile.username}` : 'Pending Manager', 
       icon: Clock, 
       className: 'bg-yellow-100 text-yellow-800 border-yellow-200' 
     },
     ManagerApproved: { 
-      label: 'Pending with Admin', 
+      label: 'With Admin', 
       icon: Clock, 
       className: 'bg-blue-100 text-blue-800 border-blue-200' 
     },
@@ -102,8 +103,8 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
   const config = statusConfig[permit.status] || statusConfig.Pending;
   const Icon = config.icon;
   return (
-    <Badge variant="outline" className={cn("flex items-center gap-1.5 text-xs font-semibold w-fit border rounded-sm", config.className, className)}>
-      <Icon className="h-3 w-3" /> {config.label}
+    <Badge variant="outline" className={cn("flex items-center gap-1.5 text-[10px] font-black uppercase whitespace-nowrap border rounded-sm h-5 px-2", config.className, className)}>
+      <Icon className="h-2.5 w-2.5" /> {config.label}
     </Badge>
   );
 }
@@ -116,31 +117,13 @@ function WhatsAppUpdateEngineer({ permit }: { permit: Permit }) {
         if (!engineerProfile?.mobile) return;
         const cleanMobile = engineerProfile.mobile.replace(/\D/g, '');
         const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : (cleanMobile.startsWith('91') ? cleanMobile : `91${cleanMobile}`);
-        
-        const lastEntry = [...(permit.timeline || [])].sort((a, b) => {
-            const dateA = a.timestamp?.toDate?.()?.getTime() || 0;
-            const dateB = b.timestamp?.toDate?.()?.getTime() || 0;
-            return dateB - dateA;
-        })[0];
-
-        const message = `Aditya Pro PtW Update:\nPermit: ${permit.serialNumber}\nSite: ${permit.siteName}\nStatus: ${permit.status}\nRemarks: ${lastEntry?.remarks || "No remarks"}\nLink: ${window.location.origin}/ptw/list?view=${permit.id}`;
-        const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
+        const lastEntry = [...(permit.timeline || [])].sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0))[0];
+        const message = `Aditya Pro Update:\nPermit: ${permit.serialNumber}\nSite: ${permit.siteName}\nStatus: ${permit.status}\nRemarks: ${lastEntry?.remarks || "None"}\nLink: ${window.location.origin}/ptw/list?view=${permit.id}`;
+        window.open(`https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`, '_blank');
     };
 
     if (!engineerProfile?.mobile) return null;
-
-    return (
-        <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-sm" 
-            title="Update Engineer via WhatsApp"
-            onClick={(e) => { e.stopPropagation(); triggerWhatsApp(); }}
-        >
-            <MessageCircle className="h-4 w-4" />
-        </Button>
-    );
+    return <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={(e) => { e.stopPropagation(); triggerWhatsApp(); }}><MessageCircle className="h-4 w-4" /></Button>;
 }
 
 function WhatsAppReminder({ userId, permit }: { userId: string | undefined, permit: Permit }) {
@@ -151,36 +134,13 @@ function WhatsAppReminder({ userId, permit }: { userId: string | undefined, perm
         if (!targetUser?.mobile) return;
         const cleanMobile = targetUser.mobile.replace(/\D/g, '');
         const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : (cleanMobile.startsWith('91') ? cleanMobile : `91${cleanMobile}`);
-        const message = `Reminder: PtW request ${permit.serialNumber} for "${permit.siteName}" is pending your review.\nStatus: ${permit.status}\nLink: ${window.location.origin}/ptw/list?view=${permit.id}`;
-        const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
+        const message = `Reminder: PtW request ${permit.serialNumber} ("${permit.siteName}") is pending your review.\nLink: ${window.location.origin}/ptw/list?view=${permit.id}`;
+        window.open(`https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`, '_blank');
     };
 
     if (!targetUser?.mobile) return null;
-
-    return (
-        <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-green-600 hover:text-green-700 hover:bg-green-50 rounded-sm" 
-            title="Send WhatsApp Reminder"
-            onClick={(e) => { e.stopPropagation(); triggerWhatsApp(); }}
-        >
-            <MessageCircle className="h-4 w-4" />
-        </Button>
-    );
+    return <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={(e) => { e.stopPropagation(); triggerWhatsApp(); }}><MessageCircle className="h-4 w-4" /></Button>;
 }
-
-const SortIcon = ({ column, sortConfig }: { column: SortKey, sortConfig: { key: SortKey; direction: 'asc' | 'desc' } }) => {
-  if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
-  return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
-};
-
-const formatTimestamp = (ts: any) => {
-  if (!ts) return 'N/A';
-  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
-  return format(date, 'dd/MM/yyyy HH:mm');
-};
 
 export default function PtwListPage() {
   const firestore = useFirestore();
@@ -189,6 +149,7 @@ export default function PtwListPage() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
+  const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState('all');
   const [actionState, setActionState] = React.useState<{ permit: Permit, status: 'Approved' | 'Rejected' | 'ManagerApproved' } | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
@@ -197,7 +158,7 @@ export default function PtwListPage() {
   const [zoom, setZoom] = React.useState(1);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
   
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
   const userRole = isAdmin ? "Admin" : (userProfile?.role || "Site Engineer");
@@ -207,42 +168,22 @@ export default function PtwListPage() {
     const colRef = collection(firestore, 'permits_to_work');
     if (isAdmin) return colRef;
     if (userRole === 'Site Manager') {
-      return query(
-        colRef, 
-        and(
-          where('status', '==', 'Pending'),
-          or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid))
-        )
-      );
+      return query(colRef, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)));
     }
     return query(colRef, where('siteEngineerId', '==', user.uid));
   }, [firestore, userRole, user, isProfileLoading, isAdmin]);
 
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
   const { data: ptwTypes } = useCollection<PtwType>(useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]));
-
-  const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
-  const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
+  const { data: rewardSettings } = useDoc<RewardSettings>(useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]));
 
   React.useEffect(() => {
     const viewId = searchParams.get('view');
     if (viewId && permits && permits.length > 0) {
       const permit = permits.find(p => p.id === viewId);
-      if (permit) {
-        setDetailsPermit(permit);
-      }
+      if (permit) setDetailsPermit(permit);
     }
   }, [searchParams, permits]);
-
-  const isAuthorizedForType = (typeName: string) => {
-    if (!user) return false;
-    if (isAdmin) return true;
-    const typeDoc = ptwTypes?.find(t => t.name === typeName);
-    if (!typeDoc || !typeDoc.allowedApproverIds || typeDoc.allowedApproverIds.length === 0) {
-      return true;
-    }
-    return typeDoc.allowedApproverIds.includes(user.uid);
-  };
 
   const handleAction = async (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
     if (!user || !userProfile) return;
@@ -256,628 +197,274 @@ export default function PtwListPage() {
       userName: userProfile.username || user.email || 'System',
       userRole: userProfile.role || userRole,
       remarks: remarks,
-      action: targetStatus === 'Rejected' ? `Rejected by ${userProfile.role || userRole}` : (targetStatus === 'ManagerApproved' ? 'Approved by Manager' : 'Final Approval by Admin'),
+      action: targetStatus === 'Rejected' ? `Rejected` : (targetStatus === 'ManagerApproved' ? 'Approved by Manager' : 'Final Approval'),
       submissionIndex: currentSubmission
     };
 
-    const updateData: any = {
+    updateDocumentNonBlocking(permitRef, {
       status: targetStatus,
       statusChangeDate: serverTimestamp(),
-      timeline: arrayUnion({ ...timelineEntry, timestamp: new Date() })
-    };
+      timeline: arrayUnion({ ...timelineEntry, timestamp: new Date() }),
+      ...(userProfile.role === 'Site Manager' && permit.status === 'Pending' ? { siteManagerId: user.uid } : {}),
+      ...(isAdmin ? { adminId: user.uid } : {})
+    });
 
-    if (userProfile.role === 'Site Manager' && permit.status === 'Pending') {
-      updateData.siteManagerId = user.uid;
-    } else if (isAdmin) {
-      updateData.adminId = user.uid;
-    }
-
-    updateDocumentNonBlocking(permitRef, updateData);
-
-    // Rewards Point Logic
     if (targetStatus === 'Approved') {
-        const engineerRef = doc(firestore, 'users', permit.siteEngineerId);
-        const engineerDoc = await getDoc(engineerRef);
-        
+        const engineerDoc = await getDoc(doc(firestore, 'users', permit.siteEngineerId));
         if (engineerDoc.exists()) {
-            const engineerData = engineerDoc.data();
-            const multiplier = engineerData.pointsMultiplier || 1;
-            
-            // Check for any rejections in lifecycle
+            const multiplier = engineerDoc.data()?.pointsMultiplier || 1;
             const hasRejection = (permit.timeline || []).some(t => t.status === 'Rejected');
-            
-            const baseNoCorrection = rewardSettings?.ptwNoCorrection ?? 1.0;
-            const baseWithCorrection = rewardSettings?.ptwWithCorrection ?? 0.5;
-            
-            const basePoints = hasRejection ? baseWithCorrection : baseNoCorrection;
-            
-            // 1. Award Engineer
-            const pointsForEngineer = basePoints * multiplier;
-            updateDocumentNonBlocking(engineerRef, {
-                totalPoints: increment(pointsForEngineer)
-            });
-
-            // 2. Award Manager (50% of base points as per user request)
+            const basePoints = hasRejection ? (rewardSettings?.ptwWithCorrection ?? 0.5) : (rewardSettings?.ptwNoCorrection ?? 1.0);
+            updateDocumentNonBlocking(doc(firestore, 'users', permit.siteEngineerId), { totalPoints: increment(basePoints * multiplier) });
             if (permit.siteManagerId) {
-                const pointsForManager = basePoints * 0.5;
-                updateDocumentNonBlocking(doc(firestore, 'users', permit.siteManagerId), {
-                    totalPoints: increment(pointsForManager)
-                });
+                updateDocumentNonBlocking(doc(firestore, 'users', permit.siteManagerId), { totalPoints: increment(basePoints * 0.5) });
             }
-
-            // Notification for points
-            addDocumentNonBlocking(collection(firestore, 'notifications'), {
-                userId: permit.siteEngineerId,
-                title: "Points Earned!",
-                description: `You earned ${pointsForEngineer.toFixed(2)} points for permit ${permit.serialNumber}.`,
-                link: `/rewards`,
-                read: false,
-                createdAt: serverTimestamp(),
-            });
         }
     }
 
-    // Notify Engineer
     addDocumentNonBlocking(collection(firestore, 'notifications'), {
       userId: permit.siteEngineerId,
-      title: targetStatus === 'Approved' ? "Permit Fully Approved" : (targetStatus === 'Rejected' ? "Permit Rejected" : "Permit Manager Approved"),
-      description: `Your permit ${permit.serialNumber} for "${permit.siteName}" is now ${targetStatus}. Remarks: ${remarks}`,
+      title: "Permit Update",
+      description: `Permit ${permit.serialNumber} is now ${targetStatus}.`,
       link: `/ptw/list?view=${permit.id}`,
       read: false,
       createdAt: serverTimestamp(),
     });
 
-    if (isAdmin && permit.siteManagerId && permit.siteManagerId !== user.uid) {
-        addDocumentNonBlocking(collection(firestore, 'notifications'), {
-            userId: permit.siteManagerId,
-            title: "Admin Action on Permit",
-            description: `Admin ${targetStatus.toLowerCase()} permit ${permit.serialNumber} for "${permit.siteName}".`,
-            link: `/ptw/list?view=${permit.id}`,
-            read: false,
-            createdAt: serverTimestamp(),
-        });
-    }
-
-    const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
-    getDocs(adminsQuery).then(snapshot => {
-      snapshot.forEach(adminDoc => {
-        if (adminDoc.id === user.uid) return;
-        
-        addDocumentNonBlocking(collection(firestore, 'notifications'), {
-          userId: adminDoc.id,
-          title: "Permit Status Update",
-          description: `Permit ${permit.serialNumber} ("${permit.siteName}") changed to ${targetStatus} by ${userProfile.username}.`,
-          link: `/ptw/list?view=${permit.id}`,
-          read: false,
-          createdAt: serverTimestamp(),
-        });
-      });
-    });
-
-    toast({ title: "Status Updated", description: `Permit marked as ${targetStatus}.` });
-  };
-
-  const handleSort = (key: SortKey) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
+    toast({ title: "Updated", description: `Permit set to ${targetStatus}.` });
   };
 
   const filteredPermits = React.useMemo(() => {
     if (!permits) return [];
-    
     const hiddenIds = userProfile?.hiddenPermitIds || [];
-    
-    return permits.filter(p => {
-      if (hiddenIds.includes(p.id)) return false;
-      const matchStatus = statusFilter === 'all' ? true : p.status === statusFilter;
-      return matchStatus;
-    }).sort((a, b) => {
-      const { key, direction } = sortConfig;
-      let valA: any = (a[key] as any) || '';
-      let valB: any = (b[key] as any) || '';
-      
-      if (key === 'requestDate') {
-        valA = a.requestDate?.toDate?.()?.getTime() || 0;
-        valB = b.requestDate?.toDate?.()?.getTime() || 0;
-      }
-      if (key === 'siteEngineerName') {
-        valA = (a.siteEngineerName || a.timeline?.find(t => t.action === 'Created')?.userName || '').toLowerCase();
-        valB = (b.siteEngineerName || b.timeline?.find(t => t.action === 'Created')?.userName || '').toLowerCase();
-      }
-      
-      if (valA < valB) return direction === 'asc' ? -1 : 1;
-      if (valA > valB) return direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [permits, statusFilter, sortConfig, userProfile]);
+    return permits.filter(p => !hiddenIds.includes(p.id))
+      .filter(p => {
+        const matchesStatus = statusFilter === 'all' ? true : p.status === statusFilter;
+        const matchesSearch = p.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             p.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             p.siteEngineerName?.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesStatus && matchesSearch;
+      })
+      .sort((a, b) => {
+        const { key, direction } = sortConfig;
+        let valA: any = a[key] || '';
+        let valB: any = b[key] || '';
+        if (key === 'requestDate') {
+          valA = a.requestDate?.toDate?.().getTime() || 0;
+          valB = b.requestDate?.toDate?.().getTime() || 0;
+        }
+        return direction === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+      });
+  }, [permits, statusFilter, searchTerm, sortConfig, userProfile]);
 
   const stats = React.useMemo(() => {
-    if (!permits) return { total: 0, pending: 0, approved: 0, rejected: 0 };
+    if (!permits) return { total: 0, pending: 0, approved: 0 };
     return {
       total: permits.length,
       pending: permits.filter(p => p.status === 'Pending' || p.status === 'ManagerApproved').length,
       approved: permits.filter(p => p.status === 'Approved').length,
-      rejected: permits.filter(p => p.status === 'Rejected').length,
     };
   }, [permits]);
 
-  const handlePrint = () => {
-    if (typeof window !== 'undefined') {
-      window.print();
-    }
-  };
-
-  const groupedAttachments = React.useMemo(() => {
-    if (!detailsPermit?.attachments) return {};
-    return detailsPermit.attachments.reduce((acc, attachment) => {
-      const index = attachment.submissionIndex || 1;
-      if (!acc[index]) acc[index] = [];
-      acc[index].push(attachment);
-      return acc;
-    }, {} as Record<number, Attachment[]>);
-  }, [detailsPermit]);
-
-  if (isLoading || isProfileLoading || !userRole) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
+  if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight">PtW Dashboard</h1>
-        <p className="text-muted-foreground">Monitor permit status and manage compliance.</p>
+        <h1 className="text-3xl font-black tracking-tight text-foreground uppercase">PtW Audit</h1>
+        <p className="text-muted-foreground text-sm font-medium">Compliance monitoring and permit authorization hub.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-primary/5 border-primary/20 rounded-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-primary">Total Permits</CardTitle>
-            <FileText className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{stats.total}</div></CardContent>
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+        <Card className="bg-primary/5 border-primary/10 rounded-sm">
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Total</CardTitle></CardHeader>
+          <CardContent className="p-4 pt-0 font-black text-2xl">{stats.total}</CardContent>
         </Card>
-        <Card className="bg-yellow-500/5 border-yellow-500/20 rounded-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-yellow-600">Pending Actions</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{stats.pending}</div></CardContent>
+        <Card className="bg-amber-500/5 border-amber-500/10 rounded-sm">
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-600 tracking-widest">Pending</CardTitle></CardHeader>
+          <CardContent className="p-4 pt-0 font-black text-2xl text-amber-700">{stats.pending}</CardContent>
         </Card>
-        <Card className="bg-green-500/5 border-green-500/20 rounded-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-green-600">Fully Approved</CardTitle>
-            <CircleCheck className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{stats.approved}</div></CardContent>
-        </Card>
-        <Card className="bg-destructive/5 border-destructive/20 rounded-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-destructive">Rejected</CardTitle>
-            <CircleX className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent><div className="text-2xl font-bold">{stats.rejected}</div></CardContent>
+        <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600 tracking-widest">Approved</CardTitle></CardHeader>
+          <CardContent className="p-4 pt-0 font-black text-2xl text-green-700">{stats.approved}</CardContent>
         </Card>
       </div>
 
-      <Card className="rounded-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
-            <div className="space-y-1">
-                <CardTitle className="text-sm font-medium">Filter by Status</CardTitle>
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[200px] rounded-sm"><SelectValue placeholder="All Status" /></SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="Pending">Pending Manager</SelectItem>
-                    <SelectItem value="ManagerApproved">Pending Admin</SelectItem>
-                    <SelectItem value="Approved">Fully Approved</SelectItem>
-                    <SelectItem value="Rejected">Rejected</SelectItem>
-                </SelectContent>
-            </Select>
-        </CardHeader>
-      </Card>
+      <div className="flex flex-col gap-4 bg-card p-4 border rounded-sm shadow-sm">
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search by serial or site..." className="pl-9 h-10 rounded-sm bg-muted/20 border-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        </div>
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-print">
+          {['all', 'Pending', 'ManagerApproved', 'Approved', 'Rejected'].map(s => (
+            <Badge 
+              key={s} 
+              variant={statusFilter === s ? 'default' : 'outline'} 
+              className="cursor-pointer font-black text-[9px] uppercase h-7 px-3 rounded-sm whitespace-nowrap"
+              onClick={() => setStatusFilter(s)}
+            >
+              {s === 'all' ? 'All Permits' : s === 'ManagerApproved' ? 'Pending Admin' : s}
+            </Badge>
+          ))}
+        </div>
+      </div>
 
-      <Card className="overflow-hidden rounded-sm">
+      <Card className="rounded-sm overflow-hidden border-primary/10">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead onClick={() => handleSort('serialNumber')} className="cursor-pointer">Serial No <SortIcon column="serialNumber" sortConfig={sortConfig} /></TableHead>
-                <TableHead onClick={() => handleSort('ptwType')} className="cursor-pointer">PTW Type <SortIcon column="ptwType" sortConfig={sortConfig} /></TableHead>
-                <TableHead onClick={() => handleSort('siteEngineerName')} className="cursor-pointer">Requested By <SortIcon column="siteEngineerName" sortConfig={sortConfig} /></TableHead>
-                <TableHead onClick={() => handleSort('siteName')} className="cursor-pointer">Site <SortIcon column="siteName" sortConfig={sortConfig} /></TableHead>
-                <TableHead onClick={() => handleSort('status')} className="cursor-pointer">Status <SortIcon column="status" sortConfig={sortConfig} /></TableHead>
-                <TableHead onClick={() => handleSort('requestDate')} className="cursor-pointer">Date <SortIcon column="requestDate" sortConfig={sortConfig} /></TableHead>
-                <TableHead className="text-right px-6">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredPermits.map(permit => {
-                const isAuthorized = isAuthorizedForType(permit.ptwType);
-                const isMappedManager = permit.siteManagerId === user?.uid;
-                const isOwnerOrManager = permit.siteEngineerId === user?.uid || (userProfile?.role === 'Site Manager' && isMappedManager);
-                
-                const requestedBy = permit.siteEngineerName || permit.timeline?.find(t => t.action === 'Created')?.userName || '—';
-
-                return (
-                  <TableRow 
-                    key={permit.id} 
-                    className="cursor-pointer hover:bg-muted/50 transition-colors group"
-                    onClick={() => setDetailsPermit(permit)}
-                  >
-                    <TableCell className="font-mono text-xs">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
-                    <TableCell className="font-medium">{permit.ptwType}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-sm font-medium">{requestedBy}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{permit.siteName}</TableCell>
-                    <TableCell><StatusBadge permit={permit} /></TableCell>
-                    <TableCell>{formatTimestamp(permit.requestDate)}</TableCell>
-                    <TableCell className="text-right px-6">
-                      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="rounded-sm" title="View Details" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
-
-                        {userProfile?.role === 'Site Engineer' && (permit.status === 'Pending' || permit.status === 'ManagerApproved') && (
-                          <WhatsAppReminder userId={permit.status === 'Pending' ? permit.siteManagerId : undefined} permit={permit} />
-                        )}
-
-                        {(isAdmin || userProfile?.role === 'Site Manager') && (permit.status === 'Approved' || permit.status === 'Rejected' || permit.status === 'ManagerApproved') && (
-                          <WhatsAppUpdateEngineer permit={permit} />
-                        )}
-
-                        {isMappedManager && permit.status === 'Pending' && isAuthorized && (
-                          <>
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'ManagerApproved' })}>Approve</Button>
-                            <Button size="sm" variant="destructive" className="h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'Rejected' })}>Reject</Button>
-                          </>
-                        )}
-
-                        {isAdmin && (permit.status === 'ManagerApproved' || (permit.status === 'Pending' && !permit.siteManagerId)) && isAuthorized && (
-                          <>
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'Approved' })}>Approve</Button>
-                            <Button size="sm" variant="destructive" className="h-8 rounded-sm" onClick={() => setActionState({ permit, status: 'Rejected' })}>Reject</Button>
-                          </>
-                        )}
-
-                        {isOwnerOrManager && permit.status === 'Rejected' && (
-                          <Button size="sm" variant="outline" className="h-8 rounded-sm" onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}>
-                            <FilePen className="h-3 w-3 mr-1.5" /> Resubmit
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
+          <ScrollArea className="w-full">
+            <div className="min-w-[800px]">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead>Serial & Site</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Request Date</TableHead>
+                    <TableHead className="text-right px-6">Action</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredPermits.map(permit => (
+                    <TableRow key={permit.id} className="hover:bg-muted/5 cursor-pointer" onClick={() => setDetailsPermit(permit)}>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-mono text-[10px] font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</span>
+                          <span className="font-bold text-sm truncate max-w-[180px]">{permit.siteName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-semibold">{permit.ptwType}</TableCell>
+                      <TableCell><StatusBadge permit={permit} /></TableCell>
+                      <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{formatTimestamp(permit.requestDate)}</TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
+                          {(isAdmin || userProfile?.role === 'Site Manager') && <WhatsAppUpdateEngineer permit={permit} />}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
         </CardContent>
       </Card>
 
+      {/* Decision Dialog */}
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
-        <DialogContent className="rounded-sm">
-          <DialogHeader>
-            <DialogTitle>{actionState?.status === 'Rejected' ? 'Reject' : 'Approve'} Permit Request</DialogTitle>
-            <DialogDescription className="sr-only">Decision processing for permit {actionState?.permit?.serialNumber}</DialogDescription>
+        <DialogContent className="max-w-md w-[95vw] rounded-sm p-6">
+          <DialogHeader className="text-left space-y-2">
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Process Decision</DialogTitle>
+            <DialogDescription className="text-xs font-medium">Process permit {actionState?.permit?.serialNumber}</DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-2">
-            <Label htmlFor="action-remarks">Remarks/Comments</Label>
-            <Textarea id="action-remarks" placeholder="Explain your decision..." className="min-h-[100px] rounded-sm" />
+          <div className="py-6 space-y-2">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Action Remarks</Label>
+            <Textarea id="action-remarks" placeholder="Provide feedback or justification..." className="min-h-[120px] rounded-sm" />
           </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
-            <Button className="rounded-sm" onClick={() => {
-              const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "";
-              if (remarks.trim()) {
-                handleAction(actionState!.permit, actionState!.status, remarks);
-                setActionState(null);
-              } else {
-                toast({ variant: 'destructive', title: 'Remarks Required', description: 'Please enter a comment.' });
-              }
-            }}>{actionState?.status === 'Rejected' ? 'Confirm Rejection' : 'Confirm Approval'}</Button>
+          <DialogFooter className="flex flex-col sm:flex-row gap-3">
+            <DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-12 font-bold rounded-sm uppercase text-xs">Cancel</Button></DialogClose>
+            <Button 
+              className={cn("w-full sm:flex-1 h-12 font-black rounded-sm uppercase text-xs", actionState?.status === 'Rejected' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700')}
+              onClick={() => {
+                const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "";
+                if (remarks.trim()) {
+                  handleAction(actionState!.permit, actionState!.status as any, remarks);
+                  setActionState(null);
+                } else {
+                  toast({ variant: 'destructive', title: 'Remarks Required' });
+                }
+              }}
+            >
+              Confirm {actionState?.status === 'Rejected' ? 'Rejection' : 'Approval'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!detailsPermit} onOpenChange={() => setDetailsPermit(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 border-none rounded-sm">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Permit to Work Details: {detailsPermit?.serialNumber}</DialogTitle>
-            <DialogDescription>Full overview of site, scope, location and submission history for permit {detailsPermit?.serialNumber}.</DialogDescription>
-          </DialogHeader>
-          
-          <div id="printable-permit-area" className="bg-background">
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-6 py-4 flex items-center justify-between no-print">
-              <div className="flex flex-col">
-                <span className="text-xl font-bold tracking-tight">Permit to Work Details</span>
-                <span className="text-xs font-mono text-primary font-semibold">{detailsPermit?.serialNumber}</span>
-              </div>
-              <div className="flex gap-2">
-                {detailsPermit && (
-                  <div className="flex items-center gap-2 mr-4">
-                    {(isAdmin || userProfile?.role === 'Site Manager') && (detailsPermit.status === 'Approved' || detailsPermit.status === 'Rejected' || detailsPermit.status === 'ManagerApproved') && (
-                      <WhatsAppUpdateEngineer permit={detailsPermit} />
-                    )}
-                    {(detailsPermit.siteManagerId === user?.uid && detailsPermit.status === 'Pending') && (
-                      <div className="flex gap-2">
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'ManagerApproved' }); }}>Approve</Button>
-                        <Button size="sm" variant="destructive" className="h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>Reject</Button>
-                      </div>
-                    )}
-                    {isAdmin && (detailsPermit.status === 'ManagerApproved' || (detailsPermit.status === 'Pending' && !detailsPermit.siteManagerId)) && (
-                      <div className="flex gap-2">
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700 h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Approved' }); }}>Approve</Button>
-                        <Button size="sm" variant="destructive" className="h-8 text-xs font-bold rounded-sm" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>Reject</Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <Button variant="outline" size="sm" className="h-8 text-xs font-bold rounded-sm" onClick={handlePrint}><Printer className="h-3.5 w-3.5 mr-1.5" /> Print</Button>
-                <DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm"><CircleX className="h-4 w-4" /></Button></DialogClose>
+      {/* Detailed View Overlay */}
+      <Dialog open={!!detailsPermit} onOpenChange={(o) => !o && setDetailsPermit(null)}>
+        <DialogContent className="max-w-4xl w-[98vw] h-[95vh] p-0 border-none rounded-sm overflow-hidden flex flex-col shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><FileText className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-lg font-black uppercase tracking-tight">Permit Audit Log</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase">{detailsPermit?.serialNumber}</DialogDescription>
               </div>
             </div>
+            <div className="flex items-center gap-2 no-print">
+              <Button variant="outline" size="icon" className="h-9 w-9 rounded-sm border-primary/20 text-primary" onClick={() => window.print()}><Printer className="h-4 w-4" /></Button>
+              <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-sm"><X className="h-5 w-5" /></Button></DialogClose>
+            </div>
+          </DialogHeader>
 
+          <ScrollArea className="flex-1 bg-background">
             {detailsPermit && (
-              <div className="p-6 space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="md:col-span-3 space-y-6">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                      <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Site Name</Label><p className="font-semibold text-sm">{detailsPermit.siteName}</p></div>
-                      <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Permit Type</Label><p className="font-semibold text-sm">{detailsPermit.ptwType}</p></div>
-                      <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Submission Date</Label><p className="text-sm font-medium">{formatTimestamp(detailsPermit.requestDate)}</p></div>
+              <div id="printable-permit-area" className="p-6 md:p-10 space-y-12 pb-20">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Project Site</Label><p className="font-black text-lg leading-tight">{detailsPermit.siteName}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Permit Type</Label><p className="font-bold text-lg leading-tight">{detailsPermit.ptwType}</p></div>
                     </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Description of Work</Label>
-                      <div className="p-4 bg-muted/20 rounded-sm border text-sm leading-relaxed whitespace-pre-wrap">{detailsPermit.descriptionOfWork}</div>
-                    </div>
+                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Work Description</Label><div className="p-4 bg-muted/20 border rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium">"{detailsPermit.descriptionOfWork}"</div></div>
                   </div>
-
-                  <div className="space-y-6">
-                    <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Status</Label><div><StatusBadge permit={detailsPermit} className="text-[10px] px-2" /></div></div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Submission Location</Label>
-                      <div className="p-3 bg-primary/5 rounded-sm border border-primary/20 flex flex-col gap-2">
-                        {detailsPermit.latitude && detailsPermit.longitude ? (
-                          <>
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-mono font-medium">{detailsPermit.latitude.toFixed(5)}, {detailsPermit.longitude.toFixed(5)}</span>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary no-print rounded-sm" asChild>
-                                <a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer">
-                                  <MapPin className="h-3.5 w-3.5" />
-                                </a>
-                              </Button>
-                            </div>
-                            <Button variant="outline" size="sm" className="w-full h-7 text-[10px] font-bold rounded-sm no-print" asChild>
-                              <a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
-                            </Button>
-                          </>
-                        ) : (
-                          <p className="text-[10px] text-muted-foreground italic">No location recorded</p>
-                        )}
-                      </div>
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Submission</Label><p className="text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p></div>
                     </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase tracking-widest">Submission Documentation History</h3></div>
-                  
-                  {Object.keys(groupedAttachments).length > 0 ? (
-                    <div className="space-y-8">
-                      {Object.entries(groupedAttachments).sort(([a], [b]) => Number(b) - Number(a)).map(([index, files]) => {
-                        const images = files.filter(f => f.contentType.startsWith('image/'));
-                        const videos = files.filter(f => f.contentType.startsWith('video/'));
-                        const others = files.filter(f => !f.contentType.startsWith('image/') && !f.contentType.startsWith('video/'));
-
-                        return (
-                          <div key={index} className="p-4 rounded-sm border bg-muted/5 space-y-4">
-                            <div className="flex items-center justify-between">
-                              <Badge variant="secondary" className="px-2 py-0.5 text-[10px] font-bold rounded-sm">Submission {index}</Badge>
-                              <span className="text-[10px] text-muted-foreground italic">{index === "1" ? "Initial submission" : "Correction/Resubmission"}</span>
-                            </div>
-
-                            {images.length > 0 && (
-                              <div className="space-y-3">
-                                <Label className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1.5 px-1">
-                                  <ImageIcon className="h-3.5 w-3.5" /> Photo Gallery
-                                </Label>
-                                <Carousel className="w-full" opts={{ align: "start" }}>
-                                  <CarouselContent className="-ml-2">
-                                    {images.map((img, idx) => (
-                                      <CarouselItem key={idx} className="pl-2 basis-1/2 md:basis-1/3 lg:basis-1/4">
-                                        <Card 
-                                          className="overflow-hidden border-none group rounded-sm shadow-sm hover:shadow-md transition-all cursor-pointer"
-                                          onClick={() => { setZoom(1); setViewerImages({ images, initialIndex: idx }); }}
-                                        >
-                                          <CardContent className="p-0 aspect-square relative flex items-center justify-center bg-muted/30">
-                                            <img 
-                                              src={img.url} 
-                                              alt={img.name} 
-                                              className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300" 
-                                            />
-                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
-                                              <Maximize2 className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            </div>
-                                          </CardContent>
-                                        </Card>
-                                      </CarouselItem>
-                                    ))}
-                                  </CarouselContent>
-                                  {images.length > 2 && (
-                                    <>
-                                      <CarouselPrevious className="h-7 w-7 rounded-full -left-3 border-muted shadow-lg bg-background/80 backdrop-blur" />
-                                      <CarouselNext className="h-7 w-7 rounded-full -right-3 border-muted shadow-lg bg-background/80 backdrop-blur" />
-                                    </>
-                                  )}
-                                </Carousel>
-                              </div>
-                            )}
-
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                              {videos.map((vid, idx) => (
-                                <div key={idx} className="space-y-2">
-                                  <Label className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><Film className="h-3 w-3" /> Video Preview</Label>
-                                  <Card className="overflow-hidden group rounded-sm">
-                                    <div className="aspect-video bg-black relative flex items-center justify-center">
-                                      <video src={vid.url} className="w-full h-full object-contain" />
-                                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="secondary" size="sm" className="h-7 text-[10px] font-bold rounded-sm" asChild>
-                                          <a href={vid.url} target="_blank" rel="noopener noreferrer">View Full</a>
-                                        </Button>
-                                      </div>
-                                    </div>
-                                    <div className="p-1.5 border-t bg-background text-[10px] truncate font-medium">{vid.name}</div>
-                                  </Card>
-                                </div>
-                              ))}
-
-                              {others.map((file, idx) => (
-                                <div key={idx} className="space-y-2">
-                                  <Label className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1"><Paperclip className="h-3 w-3" /> Document</Label>
-                                  <Card className="p-2 flex items-center gap-2 border-dashed rounded-sm">
-                                    <FileText className="h-4 w-4 text-primary" />
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-[10px] font-bold truncate">{file.name}</p>
-                                    </div>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-sm" asChild>
-                                      <a href={file.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3 w-3" /></a>
-                                    </Button>
-                                  </Card>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center p-8 bg-muted/10 rounded-sm border border-dashed text-xs text-muted-foreground">No attachments provided.</div>
-                  )}
-                </div>
-
-                <Separator />
-
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2"><History className="h-4 w-4 text-primary" /><h3 className="font-bold text-sm uppercase tracking-widest">Activity Log</h3></div>
-                  <div className="space-y-0 relative border-l-2 border-muted ml-3 pl-6">
-                    {[...(detailsPermit.timeline || [])].sort((a, b) => {
-                      const dateA = a.timestamp?.toDate?.().getTime() || 0;
-                      const dateB = b.timestamp?.toDate?.().getTime() || 0;
-                      return dateB - dateA;
-                    }).map((entry, idx) => {
-                      const entryFiles = detailsPermit.attachments?.filter(a => a.submissionIndex === entry.submissionIndex) || [];
-                      return (
-                        <div key={idx} className="relative pb-8">
-                          <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-primary">
-                                  {entry.action} — {entry.userName}
-                                </span>
-                                {entry.submissionIndex && (
-                                  <Badge variant="outline" className="text-[9px] h-3.5 px-1 py-0 border-primary/30 rounded-sm">Submission {entry.submissionIndex}</Badge>
-                                )}
-                              </div>
-                              <span className="text-[10px] font-mono text-muted-foreground">{formatTimestamp(entry.timestamp)}</span>
-                            </div>
-                            <p className="text-sm italic leading-relaxed text-foreground/80">"{entry.remarks}"</p>
-                            <p className="text-[10px] font-semibold text-muted-foreground">— {entry.userName}</p>
-
-                            {entryFiles.length > 0 && (
-                              <div className="mt-3 flex flex-wrap gap-2 no-print">
-                                {entryFiles.map((file, fIdx) => (
-                                  <div key={fIdx} className="group relative">
-                                    {file.contentType.startsWith('image/') ? (
-                                      <div 
-                                        className="h-10 w-10 rounded-sm border overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
-                                        onClick={() => { setZoom(1); setViewerImages({ images: [file], initialIndex: 0 }); }}
-                                      >
-                                        <img src={file.url} alt={file.name} className="h-full w-full object-cover" />
-                                      </div>
-                                    ) : (
-                                      <a 
-                                        href={file.url} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="h-10 w-10 rounded-sm border bg-muted/40 flex items-center justify-center hover:bg-muted transition-colors"
-                                        title={file.name}
-                                      >
-                                        {file.contentType.startsWith('video/') ? <Film className="h-4 w-4 text-primary" /> : <FileText className="h-4 w-4 text-muted-foreground" />}
-                                      </a>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                    <div className="space-y-3"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><MapPin className="h-3.5 w-3.5" /> GPS Stamped Location</Label>
+                      {detailsPermit.latitude ? (
+                        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold text-primary">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude?.toFixed(6)}</span>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm no-print" asChild><a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>
                         </div>
-                      );
-                    })}
+                      ) : <p className="text-xs italic text-muted-foreground">Location not available</p>}
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-6">
+                  <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><History className="h-4 w-4 text-primary" /> Lifecycle History</h3>
+                  <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-8">
+                    {[...(detailsPermit.timeline || [])].sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0)).map((entry, idx) => (
+                      <div key={idx} className="relative">
+                        <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-xs font-black uppercase tracking-tight text-primary">{entry.action} — {entry.userName}</span>
+                            <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{formatTimestamp(entry.timestamp)}</span>
+                          </div>
+                          <p className="text-sm italic font-medium leading-relaxed opacity-80">"{entry.remarks}"</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             )}
-          </div>
-          <div className="p-4 border-t bg-muted/20 flex justify-end no-print">
-            <DialogClose asChild><Button variant="outline" className="h-8 text-xs font-bold rounded-sm">Close</Button></DialogClose>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </ScrollArea>
 
-      <Dialog open={!!viewerImages} onOpenChange={(o) => { if(!o) setZoom(1); setViewerImages(null); }}>
-        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Full Screen Document Viewer</DialogTitle>
-            <DialogDescription>Viewing images from submission in full size.</DialogDescription>
-          </DialogHeader>
-          
-          <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.min(prev + 0.25, 4))} title="Zoom In">
-              <ZoomIn className="h-5 w-5" />
-            </Button>
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} title="Zoom Out">
-              <ZoomOut className="h-5 w-5" />
-            </Button>
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(1)} title="Reset Zoom">
-              <RotateCcw className="h-5 w-5" />
-            </Button>
-            <Badge variant="outline" className="h-10 px-3 flex items-center justify-center bg-black/40 text-white border-white/10 rounded-full font-mono font-bold">
-              {Math.round(zoom * 100)}%
-            </Badge>
-          </div>
-
-          {viewerImages && (
-            <div className="w-full h-full">
-              <Carousel className="w-full h-full" opts={{ startIndex: viewerImages.initialIndex }}>
-                <CarouselContent className="h-full">
-                  {viewerImages.images.map((img, idx) => (
-                    <CarouselItem key={idx} className="h-full w-full">
-                      <div className="h-full w-full overflow-auto flex">
-                        <div 
-                          className="m-auto transition-transform duration-200 ease-out flex items-center justify-center" 
-                          style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
-                        >
-                          <img src={img.url} alt={img.name} className="max-w-[90vw] max-h-[85vh] object-contain shadow-2xl" />
-                        </div>
-                      </div>
-                    </CarouselItem>
-                  ))}
-                </CarouselContent>
-                <CarouselPrevious className="left-8 h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl border-none rounded-full transition-all flex items-center justify-center" />
-                <CarouselNext className="right-8 h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xl border-none rounded-full transition-all flex items-center justify-center" />
-              </Carousel>
+          {detailsPermit && detailsPermit.status !== 'Approved' && detailsPermit.status !== 'Rejected' && (
+            <div className="p-4 border-t bg-muted/5 grid grid-cols-2 gap-3 no-print">
+              {((userProfile?.role === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || isAdmin) && (
+                <>
+                  <Button className="h-12 rounded-sm font-black uppercase text-xs bg-green-600 hover:bg-green-700 shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
+                    Authorize
+                  </Button>
+                  <Button variant="destructive" className="h-12 rounded-sm font-black uppercase text-xs shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>
+                    Reject
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

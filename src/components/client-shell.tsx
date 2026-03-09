@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from "react";
@@ -54,10 +53,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       setTheme(isDark ? 'dark' : 'light');
     };
 
-    // Initial sync
     syncThemeState();
-
-    // Listen for theme changes from other components (like Settings page)
     window.addEventListener('theme-change', syncThemeState);
     return () => window.removeEventListener('theme-change', syncThemeState);
   }, []);
@@ -72,7 +68,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       document.documentElement.classList.remove('dark');
       localStorage.setItem('theme', 'light');
     }
-    // Notify other components
     window.dispatchEvent(new Event('theme-change'));
   };
 
@@ -95,7 +90,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (user && !isProfileLoading) {
       if (!isSuperAdmin(user.email)) return;
 
-      // Bootstrap logic for Super Admins to ensure they have the Admin role and correct name
       const needsBootstrap = !userProfile || 
                              userProfile.role !== 'Admin' || 
                              userProfile.registrationRequest === true || 
@@ -227,15 +221,14 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         </div>
         <h1 className="mb-2 text-3xl font-black uppercase tracking-tight text-destructive">Profile Not Found</h1>
         <p className="mb-8 max-w-md text-muted-foreground text-lg leading-relaxed">
-          Your account is authenticated, but your professional profile could not be found in the database. 
-          This happens if your data was cleared or registration was not completed.
+          Your account is authenticated, but your professional profile could not be found in the database.
         </p>
         <div className="flex flex-col gap-3 w-full max-xs">
           <Button onClick={() => router.push('/register')} className="w-full font-black h-12 text-lg shadow-md rounded-sm">
             <RefreshCw className="mr-2 h-5 w-5" /> Restore Profile
           </Button>
           <Button variant="ghost" onClick={() => auth.signOut()} className="w-full flex items-center justify-center gap-2 font-semibold">
-            <LogOut className="h-4 w-4" /> Sign Out & Re-login
+            <LogOut className="h-4 w-4" /> Sign Out
           </Button>
         </div>
       </div>
@@ -249,7 +242,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <ShieldAlert className="h-16 w-16 text-yellow-600 opacity-80" />
         </div>
         <h1 className="text-3xl font-black uppercase tracking-tight">Authorization Pending</h1>
-        <p className="text-muted-foreground max-w-sm text-lg">Your account has been created successfully but is currently awaiting administrative approval.</p>
+        <p className="text-muted-foreground max-w-sm text-lg leading-relaxed">Your account is awaiting administrative approval. You will be notified via email once your profile is verified.</p>
         <div className="flex flex-col gap-3 w-full max-w-xs">
           <Button variant="outline" onClick={() => auth.signOut()} className="rounded-sm font-bold h-11">Sign Out & Exit</Button>
         </div>
@@ -271,21 +264,22 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="flex flex-col h-full overflow-hidden">
-        <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-background px-4 lg:px-6 z-10">
-          <SidebarTrigger />
-          <div className="flex-1 max-w-md">
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-3 lg:px-6 z-10 sticky top-0">
+          <SidebarTrigger className="h-9 w-9" />
+          <div className="flex-1 min-w-0">
             <GlobalSearch />
           </div>
-          <div className="flex-1" />
-          <QuickActions />
-          <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
-            {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-          </Button>
-          <UserNotifications />
-          <UserNav />
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <QuickActions />
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full h-8 w-8 hidden xs:flex">
+              {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            </Button>
+            <UserNotifications />
+            <UserNav />
+          </div>
         </header>
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/40">
-          <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6 min-h-full">
+          <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6 min-h-full pb-safe">
             <AttendanceGate />
             {children}
           </div>
