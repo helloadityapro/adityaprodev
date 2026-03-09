@@ -97,6 +97,11 @@ export default function ActiveSiteVisitsPage() {
               <CardHeader className="bg-primary/5 pb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
+                    {visit.department && (
+                      <Badge variant="outline" className="text-[8px] h-5 font-black uppercase border-primary/20 text-primary bg-white flex items-center gap-1">
+                        <Building2 className="h-2.5 w-2.5" /> {visit.department}
+                      </Badge>
+                    )}
                     <Badge className="bg-primary text-white font-bold uppercase text-[10px] tracking-widest rounded-sm">Ongoing</Badge>
                     <div className="flex items-center text-xs text-muted-foreground gap-1">
                       <Clock className="h-3 w-3" />
@@ -113,11 +118,6 @@ export default function ActiveSiteVisitsPage() {
                   <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                     <User className="h-3.5 w-3.5" />
                     {visit.managerName} {visit.managerId === user?.uid && "(You)"}
-                    {visit.department && (
-                      <Badge variant="outline" className="ml-2 text-[8px] h-4 font-black uppercase border-primary/20 text-primary flex items-center gap-1">
-                        <Building2 className="h-2.5 w-2.5" /> {visit.department}
-                      </Badge>
-                    )}
                   </div>
                 </div>
               </CardHeader>
