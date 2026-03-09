@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -152,8 +151,8 @@ export default function SiteVisitsHistoryPage() {
                             {visit.managerName}
                           </div>
                           {visit.department && (
-                            <Badge variant="outline" className="w-fit text-[8px] h-4 font-black uppercase border-primary/20 text-primary bg-primary/5 flex items-center gap-1">
-                              <Building2 className="h-2.5 w-2.5" /> {visit.department}
+                            <Badge className="w-fit text-[8px] h-4 font-black uppercase rounded-sm border-none bg-slate-900 text-white flex items-center gap-1 px-1.5">
+                              {visit.department}
                             </Badge>
                           )}
                         </div>

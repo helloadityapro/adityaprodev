@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -98,11 +97,11 @@ export default function ActiveSiteVisitsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {visit.department && (
-                      <Badge variant="secondary" className="text-[9px] h-6 font-black uppercase rounded-sm border-none bg-primary/10 text-primary flex items-center gap-1.5 px-2.5">
+                      <Badge className="text-[9px] h-6 font-black uppercase rounded-sm border-none bg-slate-900 text-white flex items-center gap-1.5 px-2.5 shadow-sm">
                         <Building2 className="h-3 w-3" /> {visit.department}
                       </Badge>
                     )}
-                    <Badge className="bg-primary text-white font-bold uppercase text-[10px] tracking-widest rounded-sm h-6 px-3">Ongoing</Badge>
+                    <Badge className="bg-primary text-white font-bold uppercase text-[10px] tracking-widest rounded-sm h-6 px-3 border-none">Ongoing</Badge>
                     <div className="flex items-center text-xs text-muted-foreground gap-1 ml-2">
                       <Clock className="h-3 w-3" />
                       Started {formatDistanceToNow(visit.startTime?.toDate() || new Date(), { addSuffix: true })}
@@ -118,6 +117,11 @@ export default function ActiveSiteVisitsPage() {
                   <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                     <User className="h-3.5 w-3.5" />
                     {visit.managerName} {visit.managerId === user?.uid && "(You)"}
+                    {visit.department && (
+                      <Badge variant="outline" className="ml-1 text-[8px] h-4 font-black uppercase border-primary/20 text-primary bg-primary/5 rounded-sm px-1.5">
+                        {visit.department}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </CardHeader>
