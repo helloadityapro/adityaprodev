@@ -197,63 +197,64 @@ export default function RegisterPage() {
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-semibold text-foreground">Designation</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                              <SelectTrigger className="rounded-sm h-11">
-                                  <SelectValue placeholder="Select" />
-                              </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                              {roles?.length ? roles.map(r => (
-                                <SelectItem key={r.id} value={r.name} className="font-medium">{r.name}</SelectItem>
-                              )) : (
-                                <>
-                                  <SelectItem value="Site Engineer">Site Engineer</SelectItem>
-                                  <SelectItem value="Site Manager">Site Manager</SelectItem>
-                                  <SelectItem value="Driver">Driver</SelectItem>
-                                </>
-                              )}
-                          </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="department"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-semibold text-foreground">Department</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                              <SelectTrigger className="rounded-sm h-11">
-                                  <SelectValue placeholder="Select" />
-                              </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                              {departments?.length ? departments.map(d => (
-                                <SelectItem key={d.id} value={d.name} className="font-medium">{d.name}</SelectItem>
-                              )) : (
-                                <>
-                                  <SelectItem value="Projects">Projects</SelectItem>
-                                  <SelectItem value="O&M">O&M</SelectItem>
-                                </>
-                              )}
-                          </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-semibold text-foreground">Designation</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                            <SelectTrigger className="rounded-sm h-11">
+                                <SelectValue placeholder="Select Designation" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {roles?.length ? roles.map(r => (
+                              <SelectItem key={r.id} value={r.name} className="font-medium">{r.name}</SelectItem>
+                            )) : (
+                              <>
+                                <SelectItem value="Site Engineer">Site Engineer</SelectItem>
+                                <SelectItem value="Site Manager">Site Manager</SelectItem>
+                                <SelectItem value="Driver">Driver</SelectItem>
+                              </>
+                            )}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="department"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-semibold text-foreground">Department</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                            <SelectTrigger className="rounded-sm h-11">
+                                <SelectValue placeholder="Select Department" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            {departments?.length ? departments.map(d => (
+                              <SelectItem key={d.id} value={d.name} className="font-medium">{d.name}</SelectItem>
+                            )) : (
+                              <>
+                                <SelectItem value="Projects">Projects</SelectItem>
+                                <SelectItem value="O&M">O&M</SelectItem>
+                              </>
+                            )}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -282,7 +283,7 @@ export default function RegisterPage() {
                   )}
                 />
               </div>
-              <Button type="submit" className="w-full rounded-sm h-12 font-black text-sm shadow-xl tracking-wider" disabled={form.formState.isSubmitting}>
+              <Button type="submit" className="w-full rounded-sm h-12 font-bold text-sm shadow-xl tracking-wider" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Finalizing Profile...</>
                 ) : (
