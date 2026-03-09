@@ -286,7 +286,7 @@ export default function RegisterPage() {
                 {form.formState.isSubmitting ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Finalizing Profile...</>
                 ) : (
-                  user ? 'Restore My Profile' : 'Complete Enrollment'
+                  user ? 'Restore My Profile' : 'Create an account'
                 )}
               </Button>
             </form>
