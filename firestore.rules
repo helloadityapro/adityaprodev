@@ -44,6 +44,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /expense_categories/{categoryId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /attendance/{attendanceId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();

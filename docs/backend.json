@@ -78,11 +78,20 @@
               "description": { "type": "string" },
               "amount": { "type": "number" },
               "date": { "type": "string", "format": "date" },
-              "receiptUrl": { "type": "string" }
+              "receiptUrl": { "type": "string" },
+              "category": { "type": "string" }
             }
           }
         },
         "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ExpenseCategory": {
+      "title": "Expense Category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
       }
     },
     "UserRole": {
@@ -121,6 +130,10 @@
     "/expenses/{expenseId}": {
       "schema": { "$ref": "#/backend/entities/ExpenseClaim" },
       "description": "Payment and purchase reimbursement requests."
+    },
+    "/expense_categories/{categoryId}": {
+      "schema": { "$ref": "#/backend/entities/ExpenseCategory" },
+      "description": "Custom categories for classifying expenses."
     },
     "/attendance/{attendanceId}": {
       "schema": { "$ref": "#/backend/entities/Attendance" },
