@@ -31,7 +31,9 @@ import {
   MapPinned, 
   MessageCircle, 
   History, 
-  UserCheck 
+  UserCheck,
+  RefreshCcw,
+  Flag
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,16 +45,18 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 
-const destinationSchema = z.object({
-  type: z.enum(['Site', 'Other'], { required_error: 'Please select a destination type.' }),
-  location: z.string().min(1, 'Destination location is required.'),
+const stopSchema = z.object({
+  type: z.enum(['Site', 'Other'], { required_error: 'Please select a stop type.' }),
+  location: z.string().min(1, 'Stop location is required.'),
   purpose: z.string().min(1, 'Purpose for this stop is required.'),
 });
 
 const requestSchema = z.object({
   pickupType: z.enum(['Site', 'Other'], { required_error: 'Please select a pickup type.' }),
   pickupLocation: z.string().min(1, 'Pickup location is required.'),
-  destinations: z.array(destinationSchema).min(1, 'Add at least one destination.'),
+  intermediateStops: z.array(stopSchema).default([]),
+  dropType: z.enum(['Site', 'Other'], { required_error: 'Please select a drop-off type.' }),
+  dropLocation: z.string().min(1, 'Drop-off location is required.'),
   purpose: z.string().min(5, 'Purpose must be detailed (min 5 chars).'),
   coPassengers: z.array(z.object({
     id: z.string(),
@@ -121,13 +125,16 @@ export default function RequestVehiclePage() {
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
-  const [submittedData, setSubmittedData] = React.useState<z.infer<typeof requestSchema> | null>(null);
+  const [submittedData, setSubmittedData] = React.useState<any>(null);
   
   const [isPickupPopoverOpen, setIsPickupPopoverOpen] = React.useState(false);
   const [pickupSearchQuery, setPickupSearchQuery] = React.useState("");
   
-  const [openDestPopoverIndex, setOpenDestPopoverIndex] = React.useState<number | null>(null);
-  const [destSearchQuery, setDestSearchQuery] = React.useState("");
+  const [openStopPopoverIndex, setOpenStopPopoverIndex] = React.useState<number | null>(null);
+  const [stopSearchQuery, setStopSearchQuery] = React.useState("");
+
+  const [isDropPopoverOpen, setIsDropPopoverOpen] = React.useState(false);
+  const [dropSearchQuery, setDropSearchQuery] = React.useState("");
 
   const [isPassengerPopoverOpen, setIsPassengerPopoverOpen] = React.useState(false);
   const [passengerSearchQuery, setPassengerSearchQuery] = React.useState("");
@@ -137,37 +144,56 @@ export default function RequestVehiclePage() {
     defaultValues: { 
       pickupType: 'Site',
       pickupLocation: '',
-      destinations: [{ type: 'Site', location: '', purpose: '' }],
+      intermediateStops: [],
+      dropType: 'Site',
+      dropLocation: '',
       purpose: '',
       coPassengers: []
     },
   });
 
-  const { fields: destFields, append: appendDest, remove: removeDest } = useFieldArray({
+  const { fields: stopFields, append: appendStop, remove: removeStop } = useFieldArray({
     control: form.control,
-    name: "destinations"
+    name: "intermediateStops"
   });
 
   const pickupType = form.watch('pickupType');
+  const pickupLocation = form.watch('pickupLocation');
+  const dropType = form.watch('dropType');
   const coPassengers = form.watch('coPassengers');
+
+  const makeRoundTrip = () => {
+    form.setValue('dropType', pickupType);
+    form.setValue('dropLocation', pickupLocation);
+    toast({ title: 'Return Trip Set', description: 'Final drop-off point matched to pickup location.' });
+  };
 
   const onSubmit = async (values: z.infer<typeof requestSchema>) => {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
     try {
+      // Combine route for legacy dashboard visibility
+      const combinedDestinations = [
+        ...values.intermediateStops,
+        { type: values.dropType, location: values.dropLocation, purpose: 'Final Destination' }
+      ];
+
       await addDocumentNonBlocking(collection(firestore, 'vehicle_assignments'), {
         userId: user.uid,
         userName: userProfile.username || user.email,
         siteManagerId: userProfile.siteManagerId || null,
         pickupLocation: values.pickupLocation,
         pickupType: values.pickupType,
-        destinations: values.destinations,
+        intermediateStops: values.intermediateStops,
+        dropLocation: values.dropLocation,
+        dropType: values.dropType,
+        destinations: combinedDestinations, // Preserved for view compatibility
         purpose: values.purpose,
         coPassengers: values.coPassengers,
         status: 'Pending',
         requestDate: serverTimestamp(),
       });
-      setSubmittedData(values);
+      setSubmittedData({ ...values, destinations: combinedDestinations });
       setIsSuccess(true);
       toast({ title: 'Request Sent', description: 'Administrative approval required.' });
     } catch (e: any) {
@@ -180,12 +206,15 @@ export default function RequestVehiclePage() {
   const triggerWhatsApp = () => {
     if (!submittedData) return;
     
-    const destList = submittedData.destinations.map((d, i) => `${i + 1}. ${d.location} (${d.purpose})`).join('\n');
-    const passengerList = submittedData.coPassengers.length > 0 
-      ? `\nCo-passengers: ${submittedData.coPassengers.map(p => p.name).join(', ')}`
+    const stopsText = submittedData.intermediateStops.length > 0 
+      ? `\n*Intermediate Stops:*\n${submittedData.intermediateStops.map((d: any, i: number) => `${i + 1}. ${d.location} (${d.purpose})`).join('\n')}`
       : '';
     
-    const message = `*Aditya Pro - Vehicle Allotment Request*\n\n*Requester:* ${userProfile?.username || user?.email}\n*Pickup:* ${submittedData.pickupLocation}\n*Route:*\n${destList}${passengerList}\n\n*General Purpose:* ${submittedData.purpose}\n\n_Note: Request is pending approval in the system._`;
+    const passengerList = submittedData.coPassengers.length > 0 
+      ? `\n*Co-passengers:* ${submittedData.coPassengers.map((p: any) => p.name).join(', ')}`
+      : '';
+    
+    const message = `*Aditya Pro - Vehicle Allotment Request*\n\n*Requester:* ${userProfile?.username || user?.email}\n*Pickup:* ${submittedData.pickupLocation}${stopsText}\n*Final Drop:* ${submittedData.dropLocation}${passengerList}\n\n*General Purpose:* ${submittedData.purpose}\n\n_Note: Request is pending approval in the system._`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -225,8 +254,12 @@ export default function RequestVehiclePage() {
     s.name.toLowerCase().includes(pickupSearchQuery.toLowerCase())
   );
 
-  const filteredDestSites = accessibleSites.filter(s => 
-    s.name.toLowerCase().includes(destSearchQuery.toLowerCase())
+  const filteredStopSites = accessibleSites.filter(s => 
+    s.name.toLowerCase().includes(stopSearchQuery.toLowerCase())
+  );
+
+  const filteredDropSites = accessibleSites.filter(s => 
+    s.name.toLowerCase().includes(dropSearchQuery.toLowerCase())
   );
 
   const filteredPotentialPassengers = allUsers?.filter(u => 
@@ -246,7 +279,7 @@ export default function RequestVehiclePage() {
             </div>
             <CardTitle className="text-2xl font-bold">Request Submitted</CardTitle>
             <CardDescription className="text-base leading-relaxed">
-              Your trip request from <strong>{submittedData.pickupLocation}</strong> has been logged and is pending vehicle allotment.
+              Your trip request from <strong>{submittedData.pickupLocation}</strong> to <strong>{submittedData.dropLocation}</strong> has been logged.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -288,17 +321,17 @@ export default function RequestVehiclePage() {
 
       <Card className="rounded-sm shadow-md border-primary/10">
         <CardHeader>
-          <CardTitle>Trip Information</CardTitle>
-          <CardDescription>A vehicle and driver will be assigned upon approval.</CardDescription>
+          <CardTitle>Trip Itinerary Form</CardTitle>
+          <CardDescription>Plan your route including intermediate stops and the final destination.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
-              {/* Pickup Section */}
+              {/* Step 1: Pickup */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">1</div>
-                  <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Pickup Location</h3>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Pickup Point</h3>
                 </div>
                 
                 <FormField
@@ -404,18 +437,18 @@ export default function RequestVehiclePage() {
                 />
               </div>
 
-              {/* Destinations Section */}
+              {/* Step 2: Intermediate Stops */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">2</div>
-                    <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Destinations</h3>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Intermediate Stops (Optional)</h3>
                   </div>
                   <Button 
                     type="button" 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => appendDest({ type: 'Site', location: '', purpose: '' })}
+                    onClick={() => appendStop({ type: 'Site', location: '', purpose: '' })}
                     className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"
                   >
                     <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Stop
@@ -423,33 +456,31 @@ export default function RequestVehiclePage() {
                 </div>
 
                 <div className="space-y-4">
-                  {destFields.map((field, index) => (
+                  {stopFields.map((field, index) => (
                     <div key={field.id} className="p-4 border rounded-sm bg-muted/5 space-y-4 relative animate-in fade-in slide-in-from-top-2 duration-300">
                       <div className="flex items-center justify-between">
                         <Badge variant="outline" className="text-[9px] font-bold uppercase rounded-sm border-primary/20 text-primary">Stop #{index + 1}</Badge>
-                        {destFields.length > 1 && (
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6 text-destructive hover:bg-destructive/10 rounded-sm"
-                            onClick={() => removeDest(index)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-6 w-6 text-destructive hover:bg-destructive/10 rounded-sm"
+                          onClick={() => removeStop(index)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
 
                       <FormField
                         control={form.control}
-                        name={`destinations.${index}.type`}
+                        name={`intermediateStops.${index}.type`}
                         render={({ field }) => (
                           <FormItem className="space-y-3">
                             <FormControl>
                               <RadioGroup
                                 onValueChange={(val) => {
                                   field.onChange(val);
-                                  form.setValue(`destinations.${index}.location`, '');
+                                  form.setValue(`intermediateStops.${index}.location`, '');
                                 }}
                                 defaultValue={field.value}
                                 className="flex gap-6"
@@ -475,13 +506,13 @@ export default function RequestVehiclePage() {
 
                       <FormField
                         control={form.control}
-                        name={`destinations.${index}.location`}
+                        name={`intermediateStops.${index}.location`}
                         render={({ field: locationField }) => (
                           <FormItem className="flex flex-col">
-                            {form.watch(`destinations.${index}.type`) === 'Site' ? (
+                            {form.watch(`intermediateStops.${index}.type`) === 'Site' ? (
                               <Popover 
-                                open={openDestPopoverIndex === index} 
-                                onOpenChange={(open) => setOpenDestPopoverIndex(open ? index : null)}
+                                open={openStopPopoverIndex === index} 
+                                onOpenChange={(open) => setOpenStopPopoverIndex(open ? index : null)}
                               >
                                 <PopoverTrigger asChild>
                                   <FormControl>
@@ -504,15 +535,15 @@ export default function RequestVehiclePage() {
                                     <Input
                                       placeholder="Search sites..."
                                       className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
-                                      value={destSearchQuery}
-                                      onChange={(e) => setDestSearchQuery(e.target.value)}
+                                      value={stopSearchQuery}
+                                      onChange={(e) => setStopSearchQuery(e.target.value)}
                                       onKeyDown={(e) => e.stopPropagation()}
                                     />
                                   </div>
                                   <ScrollArea className="h-[200px]">
                                     <div className="p-1">
-                                      {filteredDestSites.length > 0 ? (
-                                        filteredDestSites.map((site) => (
+                                      {filteredStopSites.length > 0 ? (
+                                        filteredStopSites.map((site) => (
                                           <Button
                                             key={site.id}
                                             type="button"
@@ -520,8 +551,8 @@ export default function RequestVehiclePage() {
                                             className="w-full justify-start font-normal h-10 text-sm"
                                             onClick={() => {
                                               locationField.onChange(site.name);
-                                              setOpenDestPopoverIndex(null);
-                                              setDestSearchQuery("");
+                                              setOpenStopPopoverIndex(null);
+                                              setStopSearchQuery("");
                                             }}
                                           >
                                             <Check className={cn("mr-2 h-4 w-4 text-primary", site.name === locationField.value ? "opacity-100" : "opacity-0")} />
@@ -547,7 +578,7 @@ export default function RequestVehiclePage() {
 
                       <FormField
                         control={form.control}
-                        name={`destinations.${index}.purpose`}
+                        name={`intermediateStops.${index}.purpose`}
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Purpose of Stop</FormLabel>
@@ -560,14 +591,141 @@ export default function RequestVehiclePage() {
                       />
                     </div>
                   ))}
+                  {stopFields.length === 0 && (
+                    <div className="p-6 border border-dashed rounded-sm text-center bg-muted/5">
+                      <p className="text-xs text-muted-foreground italic">No intermediate stops defined. Add stops if this is not a direct point-to-point trip.</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Co-passengers Section */}
+              {/* Step 3: Final Drop-off */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">3</div>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Final Drop-off</h3>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={makeRoundTrip}
+                    disabled={!pickupLocation}
+                    className="h-8 rounded-sm font-bold text-primary hover:bg-primary/5 border border-primary/10"
+                  >
+                    <RefreshCcw className="h-3 w-3 mr-1.5" /> Same as Pickup (Round Trip)
+                  </Button>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="dropType"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            form.setValue('dropLocation', '');
+                          }}
+                          value={field.value}
+                          className="flex gap-6"
+                        >
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl><RadioGroupItem value="Site" /></FormControl>
+                            <FormLabel className="font-bold cursor-pointer flex items-center gap-1.5 text-xs">
+                              <Building2 className="h-3.5 w-3.5 text-primary" /> Project Site
+                            </FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl><RadioGroupItem value="Other" /></FormControl>
+                            <FormLabel className="font-bold cursor-pointer flex items-center gap-1.5 text-xs">
+                              <Globe className="h-3.5 w-3.5 text-primary" /> Other
+                            </FormLabel>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="dropLocation"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      {dropType === 'Site' ? (
+                        <Popover open={isDropPopoverOpen} onOpenChange={setIsDropPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className={cn(
+                                  "w-full justify-between font-normal rounded-sm h-11",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value || "Select final destination..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                            <div className="flex items-center border-b px-3">
+                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                              <Input
+                                placeholder="Search sites..."
+                                className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
+                                value={dropSearchQuery}
+                                onChange={(e) => setDropSearchQuery(e.target.value)}
+                                onKeyDown={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <ScrollArea className="h-[200px]">
+                              <div className="p-1">
+                                {filteredDropSites.length > 0 ? (
+                                  filteredDropSites.map((site) => (
+                                    <Button
+                                      key={site.id}
+                                      type="button"
+                                      variant="ghost"
+                                      className="w-full justify-start font-normal h-10 text-sm"
+                                      onClick={() => {
+                                        field.onChange(site.name);
+                                        setIsDropPopoverOpen(false);
+                                        setDropSearchQuery("");
+                                      }}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />
+                                      {site.name}
+                                    </Button>
+                                  ))
+                                ) : (
+                                  <p className="p-4 text-center text-xs text-muted-foreground italic">No matching sites found.</p>
+                                )}
+                              </div>
+                            </ScrollArea>
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <FormControl>
+                          <Input placeholder="Enter final destination address..." {...field} className="h-11 rounded-sm" />
+                        </FormControl>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Step 4: Co-passengers */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">4</div>
                     <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Co-passengers</h3>
                   </div>
                   <Popover open={isPassengerPopoverOpen} onOpenChange={setIsPassengerPopoverOpen}>
@@ -652,10 +810,10 @@ export default function RequestVehiclePage() {
                 </div>
               </div>
 
-              {/* Purpose Section */}
+              {/* Step 5: Purpose */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">4</div>
+                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">5</div>
                   <h3 className="text-sm font-black uppercase tracking-widest text-foreground">General Trip Note</h3>
                 </div>
                 <FormField control={form.control} name="purpose" render={({ field }) => (
