@@ -150,9 +150,9 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="text-center pb-8 pt-10">
-          <CardTitle className="text-3xl font-bold tracking-tight text-primary uppercase">Aditya Pro</CardTitle>
+          <CardTitle className="text-3xl font-bold tracking-tight text-primary">Aditya Pro</CardTitle>
           <CardDescription className="mt-2">
-            Organizational Enrollment Gateway
+            Create your Aditya Pro account
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -163,7 +163,7 @@ export default function RegisterPage() {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</FormLabel>
+                    <FormLabel className="text-sm font-semibold text-foreground">Full Name</FormLabel>
                     <FormControl>
                       <Input placeholder="Enter your full name" {...field} className="rounded-sm h-11" />
                     </FormControl>
@@ -176,7 +176,7 @@ export default function RegisterPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Work Email</FormLabel>
+                    <FormLabel className="text-sm font-semibold text-foreground">Work Email</FormLabel>
                     <FormControl>
                       <Input placeholder="name@adityagreenenergy.com" {...field} className="rounded-sm h-11" />
                     </FormControl>
@@ -189,7 +189,7 @@ export default function RegisterPage() {
                 name="mobile"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Contact Number</FormLabel>
+                    <FormLabel className="text-sm font-semibold text-foreground">Contact Number</FormLabel>
                     <FormControl>
                       <Input placeholder="10-digit mobile number" {...field} className="rounded-sm h-11" />
                     </FormControl>
@@ -203,7 +203,7 @@ export default function RegisterPage() {
                   name="role"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Designation</FormLabel>
+                      <FormLabel className="text-sm font-semibold text-foreground">Designation</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                               <SelectTrigger className="rounded-sm h-11">
@@ -231,7 +231,7 @@ export default function RegisterPage() {
                   name="department"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Department</FormLabel>
+                      <FormLabel className="text-sm font-semibold text-foreground">Department</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                               <SelectTrigger className="rounded-sm h-11">
@@ -260,7 +260,7 @@ export default function RegisterPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Password</FormLabel>
+                      <FormLabel className="text-sm font-semibold text-foreground">Password</FormLabel>
                       <FormControl>
                         <Input type="password" {...field} className="rounded-sm h-11" />
                       </FormControl>
@@ -273,7 +273,7 @@ export default function RegisterPage() {
                   name="confirmPassword"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Confirm</FormLabel>
+                      <FormLabel className="text-sm font-semibold text-foreground">Confirm</FormLabel>
                       <FormControl>
                         <Input type="password" {...field} className="rounded-sm h-11" />
                       </FormControl>
