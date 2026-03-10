@@ -27,8 +27,13 @@ jobs:
       - name: Install Capacitor Android
         run: npm install @capacitor/android
 
+      - name: Prepare Capacitor directories
+        run: |
+          mkdir -p android/app/src/main/assets
+          mkdir -p android/app/src/main/res
+
       - name: Sync Capacitor
-        run: npx cap sync
+        run: npx cap sync android
 
       - name: Setup Java
         uses: actions/setup-java@v4
