@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -312,48 +311,52 @@ export default function PtwListPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPermits.map(permit => (
-                    <TableRow key={permit.id} className="hover:bg-muted/5 cursor-pointer" onClick={() => setDetailsPermit(permit)}>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-mono text-[10px] font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</span>
-                          <span className="font-bold text-sm truncate max-w-[180px]">{permit.siteName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs font-semibold">{permit.ptwType}</TableCell>
-                      <TableCell><StatusBadge permit={permit} /></TableCell>
-                      <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{formatTimestamp(permit.requestDate)}</TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                          {/* Inline Direct Actions */}
-                          {((userRole === 'Site Manager' && permit.status === 'Pending' && permit.siteManagerId === user?.uid) || isAdmin) && (
-                            <>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" 
-                                onClick={() => setActionState({ permit, status: isAdmin && permit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' })}
-                                title="Quick Approve"
-                              >
-                                <CircleCheck className="h-4 w-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" 
-                                onClick={() => setActionState({ permit, status: 'Rejected' })}
-                                title="Quick Reject"
-                              >
-                                <CircleX className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
-                          {(isAdmin || userProfile?.role === 'Site Manager') && <WhatsAppUpdateEngineer permit={permit} />}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredPermits.map(permit => {
+                    const canManagerAct = userRole === 'Site Manager' && permit.status === 'Pending' && permit.siteManagerId === user?.uid;
+                    const canAdminAct = isAdmin && permit.status === 'ManagerApproved';
+                    
+                    return (
+                      <TableRow key={permit.id} className="hover:bg-muted/5 cursor-pointer" onClick={() => setDetailsPermit(permit)}>
+                        <TableCell>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-mono text-[10px] font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</span>
+                            <span className="font-bold text-sm truncate max-w-[180px]">{permit.siteName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs font-semibold">{permit.ptwType}</TableCell>
+                        <TableCell><StatusBadge permit={permit} /></TableCell>
+                        <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{formatTimestamp(permit.requestDate)}</TableCell>
+                        <TableCell className="text-right px-6">
+                          <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                            {(canManagerAct || canAdminAct) && (
+                              <>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" 
+                                  onClick={() => setActionState({ permit, status: isAdmin ? 'Approved' : 'ManagerApproved' })}
+                                  title="Approve"
+                                >
+                                  <CircleCheck className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" 
+                                  onClick={() => setActionState({ permit, status: 'Rejected' })}
+                                  title="Reject"
+                                >
+                                  <CircleX className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
+                            {(isAdmin || userProfile?.role === 'Site Manager') && <WhatsAppUpdateEngineer permit={permit} />}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

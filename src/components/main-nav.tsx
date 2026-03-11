@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -23,7 +22,6 @@ import {
   Trophy,
   GraduationCap,
   BarChart3,
-  BookOpen,
   Coins,
   Truck,
   Navigation,
@@ -263,9 +261,8 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <TableIcon className="h-4 w-4" />
                 <span className="font-medium">DPR Data</span>
               </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
       </SidebarGroup>
 
       <SidebarGroup>
