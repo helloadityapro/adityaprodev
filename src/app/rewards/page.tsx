@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -357,7 +358,7 @@ export default function RewardsPage() {
             {!canRedeem && (
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-11 w-10 rounded-sm text-amber-600 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-11 w-10 rounded-sm text-muted-foreground shrink-0">
                     <Info className="h-5 w-5" />
                   </Button>
                 </PopoverTrigger>

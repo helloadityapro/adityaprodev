@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -71,7 +72,7 @@ export function QuickActions() {
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full bg-primary/5 hover:bg-primary/10 text-primary">
+              <Button variant="default" size="icon" className="relative h-8 w-8 rounded-full shadow-lg bg-primary text-primary-foreground">
                 <Plus className="h-5 w-5" />
                 <span className="sr-only">Quick Actions</span>
               </Button>

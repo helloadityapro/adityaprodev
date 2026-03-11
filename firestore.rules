@@ -3,8 +3,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Last updated: 2024-05-20T12:00:00Z - Forcing deployment refresh
-
     function isSignedIn() {
       return request.auth != null;
     }
@@ -37,18 +35,6 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update: if isSignedIn();
       allow delete: if isAdmin();
-    }
-
-    match /expenses/{expenseId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    match /expense_categories/{categoryId} {
-      allow read, list: if isSignedIn();
-      allow write: if isAdmin();
     }
 
     match /attendance/{attendanceId} {

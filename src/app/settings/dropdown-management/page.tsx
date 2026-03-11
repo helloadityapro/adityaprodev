@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -105,9 +106,6 @@ export default function AdminSettingsPage() {
   const departmentsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
   const { data: departments } = useCollection<GenericItem>(departmentsQuery);
 
-  const expenseCategoriesQuery = useMemoFirebase(() => collection(firestore, 'expense_categories'), [firestore]);
-  const { data: expenseCategories } = useCollection<GenericItem>(expenseCategoriesQuery);
-
   const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers } = useCollection<UserProfile>(allUsersQuery);
 
@@ -147,11 +145,6 @@ export default function AdminSettingsPage() {
     defaultValues: { name: '' },
   });
 
-  const expenseCategoryForm = useForm<z.infer<typeof genericItemSchema>>({
-    resolver: zodResolver(genericItemSchema),
-    defaultValues: { name: '' },
-  });
-
   const onPtwTypeSubmit = (values: z.infer<typeof genericItemSchema>) => {
     addDocumentNonBlocking(collection(firestore, 'ptw_types'), values);
     toast({ title: 'Success', description: 'New PTW Type added.' });
@@ -170,12 +163,6 @@ export default function AdminSettingsPage() {
     departmentForm.reset();
   };
 
-  const onExpenseCategorySubmit = (values: z.infer<typeof genericItemSchema>) => {
-    addDocumentNonBlocking(collection(firestore, 'expense_categories'), values);
-    toast({ title: 'Success', description: 'New Expense Category added.' });
-    expenseCategoryForm.reset();
-  };
-
   const deletePtwType = (id: string) => {
     deleteDocumentNonBlocking(doc(firestore, 'ptw_types', id));
     toast({ title: 'Success', description: 'PTW Type deleted.' });
@@ -189,11 +176,6 @@ export default function AdminSettingsPage() {
   const deleteDepartment = (id: string) => {
     deleteDocumentNonBlocking(doc(firestore, 'user_departments', id));
     toast({ title: 'Success', description: 'Department deleted.' });
-  };
-
-  const deleteExpenseCategory = (id: string) => {
-    deleteDocumentNonBlocking(doc(firestore, 'expense_categories', id));
-    toast({ title: 'Success', description: 'Expense Category deleted.' });
   };
 
   const toggleApprover = (userId: string) => {
@@ -359,50 +341,6 @@ export default function AdminSettingsPage() {
                         </TableRow>
                       ))}
                       {!departments?.length && <TableRow><TableCell className="text-center py-8 text-muted-foreground italic">No departments defined.</TableCell></TableRow>}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-sm md:col-span-2">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Wallet className="h-5 w-5 text-primary" />
-                  <CardTitle>Expense Categories</CardTitle>
-                </div>
-                <CardDescription>Manage categories for organizational expense claims.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Form {...expenseCategoryForm}>
-                  <form onSubmit={expenseCategoryForm.handleSubmit(onExpenseCategorySubmit)} className="flex items-start gap-2 mb-4 max-w-md">
-                    <FormField
-                      control={expenseCategoryForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem className="flex-grow">
-                          <FormControl><Input placeholder="e.g. Fuel, Site Hardware" {...field} className="rounded-sm" /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" className="rounded-sm">Add Category</Button>
-                  </form>
-                </Form>
-                <div className="rounded-sm border max-h-60 overflow-auto">
-                  <Table>
-                    <TableBody>
-                      {expenseCategories?.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.name}</TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8" onClick={() => deleteExpenseCategory(item.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {!expenseCategories?.length && <TableRow><TableCell className="text-center py-8 text-muted-foreground italic">No expense categories defined.</TableCell></TableRow>}
                     </TableBody>
                   </Table>
                 </div>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -126,21 +127,11 @@ function WhatsAppUpdateEngineer({ permit }: { permit: Permit }) {
     return <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={(e) => { e.stopPropagation(); triggerWhatsApp(); }}><MessageCircle className="h-4 w-4" /></Button>;
 }
 
-function WhatsAppReminder({ userId, permit }: { userId: string | undefined, permit: Permit }) {
-    const firestore = useFirestore();
-    const { data: targetUser } = useDoc(useMemoFirebase(() => userId ? doc(firestore, 'users', userId) : null, [firestore, userId]));
-    
-    const triggerWhatsApp = () => {
-        if (!targetUser?.mobile) return;
-        const cleanMobile = targetUser.mobile.replace(/\D/g, '');
-        const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : (cleanMobile.startsWith('91') ? cleanMobile : `91${cleanMobile}`);
-        const message = `Reminder: PtW request ${permit.serialNumber} ("${permit.siteName}") is pending your review.\nLink: ${window.location.origin}/ptw/list?view=${permit.id}`;
-        window.open(`https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`, '_blank');
-    };
-
-    if (!targetUser?.mobile) return null;
-    return <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={(e) => { e.stopPropagation(); triggerWhatsApp(); }}><MessageCircle className="h-4 w-4" /></Button>;
-}
+const formatTimestamp = (ts: any) => {
+  if (!ts) return 'N/A';
+  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
+  return format(date, 'dd MMM yyyy HH:mm');
+};
 
 export default function PtwListPage() {
   const firestore = useFirestore();
@@ -154,8 +145,6 @@ export default function PtwListPage() {
   const [actionState, setActionState] = React.useState<{ permit: Permit, status: 'Approved' | 'Rejected' | 'ManagerApproved' } | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
-  const [viewerImages, setViewerImages] = React.useState<{ images: Attachment[], initialIndex: number } | null>(null);
-  const [zoom, setZoom] = React.useState(1);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -174,7 +163,6 @@ export default function PtwListPage() {
   }, [firestore, userRole, user, isProfileLoading, isAdmin]);
 
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
-  const { data: ptwTypes } = useCollection<PtwType>(useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]));
   const { data: rewardSettings } = useDoc<RewardSettings>(useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]));
 
   React.useEffect(() => {
@@ -337,7 +325,30 @@ export default function PtwListPage() {
                       <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{formatTimestamp(permit.requestDate)}</TableCell>
                       <TableCell className="text-right px-6">
                         <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
+                          {/* Inline Direct Actions */}
+                          {((userRole === 'Site Manager' && permit.status === 'Pending' && permit.siteManagerId === user?.uid) || isAdmin) && (
+                            <>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" 
+                                onClick={() => setActionState({ permit, status: isAdmin && permit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' })}
+                                title="Quick Approve"
+                              >
+                                <CircleCheck className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" 
+                                onClick={() => setActionState({ permit, status: 'Rejected' })}
+                                title="Quick Reject"
+                              >
+                                <CircleX className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
                           {(isAdmin || userProfile?.role === 'Site Manager') && <WhatsAppUpdateEngineer permit={permit} />}
                         </div>
                       </TableCell>
@@ -451,7 +462,7 @@ export default function PtwListPage() {
 
           {detailsPermit && detailsPermit.status !== 'Approved' && detailsPermit.status !== 'Rejected' && (
             <div className="p-4 border-t bg-muted/5 grid grid-cols-2 gap-3 no-print">
-              {((userProfile?.role === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || isAdmin) && (
+              {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || isAdmin) && (
                 <>
                   <Button className="h-12 rounded-sm font-black uppercase text-xs bg-green-600 hover:bg-green-700 shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
                     Authorize

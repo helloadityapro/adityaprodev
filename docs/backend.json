@@ -34,42 +34,6 @@
         "status": { "type": "string", "enum": ["Available", "Assigned", "Maintenance"] },
         "createdAt": { "type": "string", "format": "date-time" }
       }
-    },
-    "Expense": {
-      "title": "Expense Submission",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "userName": { "type": "string" },
-        "title": { "type": "string" },
-        "siteId": { "type": "string" },
-        "siteName": { "type": "string" },
-        "totalAmount": { "type": "number" },
-        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
-        "items": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "description": { "type": "string" },
-              "amount": { "type": "number" },
-              "date": { "type": "string", "format": "date" },
-              "receiptUrl": { "type": "string" },
-              "category": { "type": "string" }
-            }
-          }
-        },
-        "createdAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "ExpenseCategory": {
-      "title": "Expense Category",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" }
-      }
     }
   },
   "auth": {
@@ -82,15 +46,7 @@
     },
     "/vehicles/{vehicleId}": {
       "schema": { "$ref": "#/backend/entities/Vehicle" },
-      "description": "Organizational fleet registry."
-    },
-    "/expenses/{expenseId}": {
-      "schema": { "$ref": "#/backend/entities/Expense" },
-      "description": "Personnel expense and purchase logs."
-    },
-    "/expense_categories/{categoryId}": {
-      "schema": { "$ref": "#/backend/entities/ExpenseCategory" },
-      "description": "Custom classification categories for expenses."
+      "description": "Fleet registry."
     }
   }
 }

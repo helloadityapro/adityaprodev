@@ -30,18 +30,12 @@ import {
   Activity,
   CalendarCheck,
   Clock,
-  LogOut,
-  UserCheck,
   ChevronDown,
   CalendarDays,
   FileBarChart,
   Car,
-  CarFront,
-  Fuel,
   MapPinned,
-  Receipt,
-  IndianRupee,
-  Wallet
+  Fuel
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -58,7 +52,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendingPtwCount: number }) {
   const pathname = usePathname()
-  const isAdmin = userRole === 'Admin';
+  const isAdminOrHR = userRole === 'Admin' || userRole === 'Manager - Human Resources';
 
   return (
     <div className="flex flex-col gap-4 py-2 flex-1">
@@ -134,28 +128,6 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
       </SidebarGroup>
 
       <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Organisation Expenses</SidebarGroupLabel>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Submit Expense" isActive={pathname === '/expenses/submit'} className="rounded-sm">
-              <Link href="/expenses/submit">
-                <Wallet className="h-4 w-4" />
-                <span className="font-medium">Submit Expense</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Expense History" isActive={pathname === '/expenses/list'} className="rounded-sm">
-              <Link href="/expenses/list">
-                <History className="h-4 w-4" />
-                <span className="font-medium">Expense History</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroup>
-
-      <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Vehicles Management</SidebarGroupLabel>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -174,7 +146,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          {isAdmin && (
+          {(userRole === 'Admin') && (
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Manage Vehicles" isActive={pathname === '/vehicles/manage'} className="rounded-sm">
                 <Link href="/vehicles/manage">
@@ -313,9 +285,8 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <ClipboardList className="h-4 w-4" />
                 <span className="font-medium">Requirement Data</span>
               </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
       </SidebarGroup>
 
       <SidebarGroup>
@@ -335,12 +306,11 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <TableIcon className="h-4 w-4" />
                 <span className="font-medium">Movement Data</span>
               </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
       </SidebarGroup>
       
-      {isAdmin && (
+      {isAdminOrHR && (
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Administration</SidebarGroupLabel>
           <SidebarMenu>
@@ -352,78 +322,82 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Day Report" isActive={pathname === '/admin/day-report'} className="rounded-sm">
-                <Link href="/admin/day-report">
-                  <CalendarDays className="h-4 w-4 text-amber-600" />
-                  <span className="font-bold text-amber-700">Day Report</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="LMS Admin" isActive={pathname.startsWith('/lms/admin')} className="rounded-sm">
-                <Link href="/lms/admin">
-                  <BookOpen className="h-4 w-4 text-primary" />
-                  <span className="font-medium text-primary font-bold">LMS Admin</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/admin/dashboard'} className="rounded-sm">
-                <Link href="/admin/dashboard">
-                  <LayoutDashboard className="h-4 w-4" />
-                  <span className="font-medium">Dashboard</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Manage Sites" isActive={pathname === '/settings/manage-sites'} className="rounded-sm">
-                <Link href="/settings/manage-sites">
-                  <MapPin className="h-4 w-4" />
-                  <span className="font-medium">Manage Sites</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Rewards Setup" isActive={pathname === '/settings/rewards'} className="rounded-sm">
-                <Link href="/settings/rewards">
-                  <Coins className="h-4 w-4 text-amber-600" />
-                  <span className="font-medium">Rewards Setup</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Suppliers" isActive={pathname.startsWith('/settings/suppliers')} className="rounded-sm">
-                <Link href="/settings/suppliers">
-                  <Truck className="h-4 w-4" />
-                  <span className="font-medium">Suppliers</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Users" isActive={pathname.startsWith('/settings/users')} className="rounded-sm">
-                <Link href="/settings/users">
-                  <Users className="h-4 w-4" />
-                  <span className="font-medium">Users</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Teams" isActive={pathname === '/settings/teams'} className="rounded-sm">
-                <Link href="/settings/teams">
-                  <Workflow className="h-4 w-4" />
-                  <span className="font-medium">Teams</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Settings" isActive={pathname.startsWith('/settings/dropdown-management')} className="rounded-sm">
-                <Link href="/settings/dropdown-management">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  <span className="font-medium">Settings</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {userRole === 'Admin' && (
+              <>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Day Report" isActive={pathname === '/admin/day-report'} className="rounded-sm">
+                    <Link href="/admin/day-report">
+                      <CalendarDays className="h-4 w-4 text-amber-600" />
+                      <span className="font-bold text-amber-700">Day Report</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="LMS Admin" isActive={pathname.startsWith('/lms/admin')} className="rounded-sm">
+                    <Link href="/lms/admin">
+                      <BookOpen className="h-4 w-4 text-primary" />
+                      <span className="font-medium text-primary font-bold">LMS Admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/admin/dashboard'} className="rounded-sm">
+                    <Link href="/admin/dashboard">
+                      <LayoutDashboard className="h-4 w-4" />
+                      <span className="font-medium">Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Manage Sites" isActive={pathname === '/settings/manage-sites'} className="rounded-sm">
+                    <Link href="/settings/manage-sites">
+                      <MapPin className="h-4 w-4" />
+                      <span className="font-medium">Manage Sites</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Rewards Setup" isActive={pathname === '/settings/rewards'} className="rounded-sm">
+                    <Link href="/settings/rewards">
+                      <Coins className="h-4 w-4 text-amber-600" />
+                      <span className="font-medium">Rewards Setup</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Suppliers" isActive={pathname.startsWith('/settings/suppliers')} className="rounded-sm">
+                    <Link href="/settings/suppliers">
+                      <Truck className="h-4 w-4" />
+                      <span className="font-medium">Suppliers</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Users" isActive={pathname.startsWith('/settings/users')} className="rounded-sm">
+                    <Link href="/settings/users">
+                      <Users className="h-4 w-4" />
+                      <span className="font-medium">Users</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Teams" isActive={pathname === '/settings/teams'} className="rounded-sm">
+                    <Link href="/settings/teams">
+                      <Workflow className="h-4 w-4" />
+                      <span className="font-medium">Teams</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Settings" isActive={pathname.startsWith('/settings/dropdown-management')} className="rounded-sm">
+                    <Link href="/settings/dropdown-management">
+                      <SlidersHorizontal className="h-4 w-4" />
+                      <span className="font-medium">Settings</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </>
+            )}
           </SidebarMenu>
         </SidebarGroup>
       )}

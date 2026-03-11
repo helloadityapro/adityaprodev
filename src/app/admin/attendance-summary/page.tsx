@@ -58,7 +58,7 @@ export default function AttendanceSummaryPage() {
   const currentUserProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(currentUserProfileRef);
 
-  const isAdmin = isSuperAdmin(user?.email) || currentUserProfile?.role === 'Admin';
+  const isAdmin = isSuperAdmin(user?.email) || currentUserProfile?.role === 'Admin' || currentUserProfile?.role === 'Manager - Human Resources';
 
   React.useEffect(() => {
     if (!isUserLoading && !isProfileLoading && !isAdmin) {
@@ -78,7 +78,7 @@ export default function AttendanceSummaryPage() {
     if (!allUsers || !attendanceRecords) return [];
 
     const data = allUsers
-      .filter(u => u.role !== 'Admin') // Only show staff engineers/managers
+      .filter(u => u.role !== 'Admin' && u.role !== 'Manager - Human Resources') // Only show operations staff
       .map(u => {
         const record = attendanceRecords.find(r => r.userId === u.id);
         return {
