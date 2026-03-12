@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -104,7 +105,7 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
   const Icon = config.icon;
   return (
     <Badge variant="outline" className={cn("flex items-center gap-1.5 text-[10px] font-black uppercase whitespace-nowrap border rounded-sm h-5 px-2", config.className, className)}>
-      <Icon className="h-2.5 w-2.5" /> {config.label}
+      {config.label}
     </Badge>
   );
 }
@@ -144,6 +145,8 @@ export default function PtwListPage() {
   const [actionState, setActionState] = React.useState<{ permit: Permit, status: 'Approved' | 'Rejected' | 'ManagerApproved' } | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
+  const [enlargedImage, setEnlargedImage] = React.useState<string | null>(null);
+  const [zoom, setZoom] = React.useState(1);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -252,6 +255,13 @@ export default function PtwListPage() {
       approved: permits.filter(p => p.status === 'Approved').length,
     };
   }, [permits]);
+
+  const isImage = (file: Attachment) => {
+    if (file.contentType?.startsWith('image/')) return true;
+    // Fallback for cases where contentType might be missing but the name has an extension
+    const name = (file.name || "").toLowerCase();
+    return name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.gif') || name.endsWith('.webp');
+  };
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
@@ -442,6 +452,56 @@ export default function PtwListPage() {
 
                 <Separator />
 
+                {/* Attachments Section */}
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2">
+                    <Paperclip className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-black uppercase tracking-widest">Documentation & Evidence</h3>
+                  </div>
+                  
+                  {detailsPermit.attachments && detailsPermit.attachments.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      {detailsPermit.attachments.map((file, idx) => (
+                        <div key={idx} className="group relative aspect-square rounded-sm overflow-hidden border bg-muted flex flex-col items-center justify-center">
+                          {isImage(file) ? (
+                            <>
+                              <img 
+                                src={file.url} 
+                                alt={file.name} 
+                                className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105" 
+                                onClick={() => { setZoom(1); setEnlargedImage(file.url); }}
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                <Maximize2 className="h-6 w-6 text-white" />
+                              </div>
+                              <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-black uppercase truncate text-center">
+                                {file.name}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex flex-col items-center justify-between p-3 h-full w-full bg-background border">
+                              <div className="flex-1 flex flex-col items-center justify-center gap-2">
+                                <FileText className={cn("h-8 w-8", file.contentType?.includes('pdf') ? "text-red-500" : "text-blue-500")} />
+                                <span className="text-[8px] font-bold uppercase text-center line-clamp-2">{file.name}</span>
+                              </div>
+                              <Button variant="secondary" size="sm" className="w-full h-6 text-[8px] font-black uppercase rounded-none mt-2" asChild>
+                                <a href={file.url} target="_blank" rel="noopener noreferrer">View File</a>
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-12 text-center border-2 border-dashed rounded-sm bg-muted/5">
+                      <ImageIcon className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
+                      <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest italic">No files attached to this permit.</p>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
                 <div className="space-y-6">
                   <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><History className="h-4 w-4 text-primary" /> Lifecycle History</h3>
                   <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-8">
@@ -477,6 +537,39 @@ export default function PtwListPage() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Preview Overlay */}
+      <Dialog open={!!enlargedImage} onOpenChange={(o) => { if(!o) setZoom(1); setEnlargedImage(null); }}>
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Audit Image Detail</DialogTitle>
+            <DialogDescription>Enlarged view of permit attachment.</DialogDescription>
+          </DialogHeader>
+          
+          <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.min(prev + 0.25, 4))} title="Zoom In">
+              <ZoomIn className="h-5 w-5" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} title="Zoom Out">
+              <ZoomOut className="h-5 w-5" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(1)} title="Reset Zoom">
+              <RotateCcw className="h-5 w-5" />
+            </Button>
+          </div>
+          
+          <div className="relative w-full h-full flex overflow-auto p-4">
+            <div 
+              className="m-auto transition-transform duration-200 ease-out flex items-center justify-center" 
+              style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
+            >
+              {enlargedImage && (
+                <img src={enlargedImage} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Evidence" />
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

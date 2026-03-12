@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -33,7 +34,8 @@ import {
   FileBarChart,
   Car,
   MapPinned,
-  Fuel
+  Fuel,
+  BookOpen
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -54,6 +56,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
 
   return (
     <div className="flex flex-col gap-4 py-2 flex-1">
+      {/* Main Section */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Main</SidebarGroupLabel>
         <SidebarMenu>
@@ -125,6 +128,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
 
+      {/* Vehicles Management */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Vehicles Management</SidebarGroupLabel>
         <SidebarMenu>
@@ -144,7 +148,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
-          {(userRole === 'Admin') && (
+          {userRole === 'Admin' && (
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Manage Vehicles" isActive={pathname === '/vehicles/manage'} className="rounded-sm">
                 <Link href="/vehicles/manage">
@@ -157,6 +161,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
 
+      {/* Site Visits */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Site Visits</SidebarGroupLabel>
         <SidebarMenu>
@@ -187,6 +192,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
 
+      {/* Task Management */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Task Management</SidebarGroupLabel>
         <SidebarMenu>
@@ -209,6 +215,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
 
+      {/* Permit to Work */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Permit to Work</SidebarGroupLabel>
         <SidebarMenu>
@@ -229,7 +236,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </SidebarMenuButton>
             {(userRole === 'Admin' || userRole === 'Site Manager') && pendingPtwCount > 0 && (
               <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
-                  {pendingPtwCount}
+                {pendingPtwCount}
               </SidebarMenuBadge>
             )}
           </SidebarMenuItem>
@@ -244,6 +251,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
 
+      {/* DPR Reporting */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">DPR Reporting</SidebarGroupLabel>
         <SidebarMenu>
@@ -261,10 +269,12 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <TableIcon className="h-4 w-4" />
                 <span className="font-medium">DPR Data</span>
               </Link>
-            </SidebarMenuItem>
-          </SidebarMenu>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarGroup>
 
+      {/* Site Requirements */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Site Requirements</SidebarGroupLabel>
         <SidebarMenu>
@@ -282,10 +292,12 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <ClipboardList className="h-4 w-4" />
                 <span className="font-medium">Requirement Data</span>
               </Link>
-            </SidebarMenuItem>
-          </SidebarMenu>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarGroup>
 
+      {/* Material Movement */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Material Movement</SidebarGroupLabel>
         <SidebarMenu>
@@ -303,10 +315,12 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <TableIcon className="h-4 w-4" />
                 <span className="font-medium">Movement Data</span>
               </Link>
-            </SidebarMenuItem>
-          </SidebarMenu>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarGroup>
       
+      {/* Administration Section */}
       {isAdminOrHR && (
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Administration</SidebarGroupLabel>
