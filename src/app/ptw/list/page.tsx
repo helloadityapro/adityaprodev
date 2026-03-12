@@ -77,19 +77,19 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
     Pending: { 
       label: managerProfile ? `With ${managerProfile.username}` : 'Pending Manager', 
       icon: Clock, 
-      className: 'bg-yellow-100 text-yellow-800 border-yellow-200' 
+      className: 'bg-yellow-50 text-yellow-700 border-yellow-200' 
     },
     ManagerApproved: { 
-      label: 'With Admin', 
+      label: 'Pending Admin', 
       icon: Clock, 
-      className: 'bg-blue-100 text-blue-800 border-blue-200' 
+      className: 'bg-blue-50 text-blue-700 border-blue-200' 
     },
-    Approved: { label: 'Approved', icon: CircleCheck, className: 'bg-green-100 text-green-800 border-green-200' },
-    Rejected: { label: 'Rejected', icon: CircleX, className: 'bg-red-100 text-red-800 border-red-200' },
+    Approved: { label: 'Approved', icon: CircleCheck, className: 'bg-green-50 text-green-700 border-green-200' },
+    Rejected: { label: 'Rejected', icon: CircleX, className: 'bg-red-50 text-red-700 border-red-200' },
   };
   const config = statusConfig[permit.status] || statusConfig.Pending;
   return (
-    <Badge variant="outline" className={cn("flex items-center gap-1.5 text-[10px] font-black uppercase whitespace-nowrap border rounded-sm h-5 px-2", config.className, className)}>
+    <Badge variant="outline" className={cn("flex items-center gap-1.5 text-[10px] font-bold whitespace-nowrap border rounded-sm h-5 px-2", config.className, className)}>
       {config.label}
     </Badge>
   );
@@ -320,7 +320,7 @@ export default function PtwListPage() {
             <Badge 
               key={s} 
               variant={statusFilter === s ? 'default' : 'outline'} 
-              className="cursor-pointer font-black text-[9px] uppercase h-7 px-3 rounded-sm whitespace-nowrap"
+              className="cursor-pointer font-semibold text-xs h-8 px-4 rounded-sm whitespace-nowrap border-primary/20"
               onClick={() => setStatusFilter(s)}
             >
               {s === 'all' ? 'All Permits' : s === 'ManagerApproved' ? 'Pending Admin' : s}
@@ -366,7 +366,7 @@ export default function PtwListPage() {
                         </TableCell>
                         <TableCell className="text-xs font-semibold">{permit.ptwType}</TableCell>
                         <TableCell><StatusBadge permit={permit} /></TableCell>
-                        <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{formatTimestamp(permit.requestDate)}</TableCell>
+                        <TableCell className="text-[10px] font-bold text-muted-foreground">{formatTimestamp(permit.requestDate)}</TableCell>
                         <TableCell className="text-right px-6">
                           <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
                             {(canManagerAct || canAdminAct) && (
@@ -410,17 +410,17 @@ export default function PtwListPage() {
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent className="max-w-md w-[95vw] rounded-sm p-6">
           <DialogHeader className="text-left space-y-2">
-            <DialogTitle className="text-xl font-black uppercase tracking-tight">Process Decision</DialogTitle>
+            <DialogTitle className="text-xl font-black tracking-tight">Process Decision</DialogTitle>
             <DialogDescription className="text-xs font-medium">Process permit {actionState?.permit?.serialNumber}</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Action Remarks</Label>
+            <Label className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">Action Remarks</Label>
             <Textarea id="action-remarks" placeholder="Provide feedback or justification..." className="min-h-[120px] rounded-sm" />
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-3">
-            <DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-12 font-bold rounded-sm uppercase text-xs">Cancel</Button></DialogClose>
+            <DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-12 font-bold rounded-sm text-xs">Cancel</Button></DialogClose>
             <Button 
-              className={cn("w-full sm:flex-1 h-12 font-black rounded-sm uppercase text-xs", actionState?.status === 'Rejected' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700')}
+              className={cn("w-full sm:flex-1 h-12 font-black rounded-sm text-xs", actionState?.status === 'Rejected' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700')}
               onClick={() => {
                 const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "";
                 if (remarks.trim()) {
@@ -444,8 +444,8 @@ export default function PtwListPage() {
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><FileText className="h-5 w-5 text-primary" /></div>
               <div>
-                <DialogTitle className="text-lg font-black uppercase tracking-tight">Permit Audit Log</DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase">{detailsPermit?.serialNumber}</DialogDescription>
+                <DialogTitle className="text-lg font-black tracking-tight uppercase">Permit Audit Log</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground">{detailsPermit?.serialNumber}</DialogDescription>
               </div>
             </div>
             <div className="flex items-center gap-2 no-print">
@@ -460,20 +460,20 @@ export default function PtwListPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-8">
                     <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Project Site</Label><p className="font-black text-lg leading-tight">{detailsPermit.siteName}</p></div>
-                      <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Permit Type</Label><p className="font-bold text-lg leading-tight">{detailsPermit.ptwType}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Project Site</Label><p className="font-black text-lg leading-tight">{detailsPermit.siteName}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Type</Label><p className="font-bold text-lg leading-tight">{detailsPermit.ptwType}</p></div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Permit Raised By</Label>
+                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Raised By</Label>
                         <p className="font-bold text-sm flex items-center gap-2">
                           <User className="h-3 w-3 text-primary" />
                           {detailsPermit.siteEngineerName || 'N/A'}
                         </p>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Permit Approved By</Label>
+                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Approved By</Label>
                         <p className="font-bold text-sm flex items-center gap-2">
                           <ShieldCheck className="h-3 w-3 text-green-600" />
                           {detailsPermit.timeline?.find(t => t.status === 'Approved')?.userName || 
@@ -483,14 +483,14 @@ export default function PtwListPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Work Description</Label><div className="p-4 bg-muted/20 border rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium">"{detailsPermit.descriptionOfWork}"</div></div>
+                    <div className="space-y-2"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Work Description</Label><div className="p-4 bg-muted/20 border rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium">"{detailsPermit.descriptionOfWork}"</div></div>
                   </div>
                   <div className="space-y-8">
                     <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
-                      <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Submission</Label><p className="text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Submission</Label><p className="text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p></div>
                     </div>
-                    <div className="space-y-3"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><MapPin className="h-3.5 w-3.5" /> GPS Stamped Location</Label>
+                    <div className="space-y-3"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest flex items-center gap-2 uppercase"><MapPin className="h-3.5 w-3.5" /> GPS Stamped Location</Label>
                       {detailsPermit.latitude ? (
                         <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between">
                           <span className="font-mono text-xs font-bold text-primary">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude?.toFixed(6)}</span>
