@@ -6,7 +6,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, Navigation, History, UserCheck, Timer, FileText, ImageIcon, Users, Maximize2, X, User, FolderArchive, ArrowLeft, Printer, ExternalLink, CheckCircle2, ZoomIn, ZoomOut, RotateCcw, Building2 } from "lucide-react";
+import { MapPin, Navigation, History, UserCheck, Timer, FileText, ImageIcon, Users, Maximize2, X, User, FolderArchive, ArrowLeft, Printer, ExternalLink, CheckCircle2, ZoomIn, ZoomOut, RotateCcw, Building2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,8 @@ export default function SiteVisitDetailPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const [enlargedImage, setEnlargedImage] = React.useState<string | null>(null);
+  const [enlargedImages, setEnlargedImages] = React.useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [zoom, setZoom] = React.useState(1);
 
   const visitRef = useMemoFirebase(() => doc(firestore, 'site_visits', visitId), [firestore, visitId]);
@@ -76,6 +78,31 @@ export default function SiteVisitDetailPage() {
     if (typeof window !== 'undefined') {
       window.print();
     }
+  };
+
+  const openImageViewer = (url: string) => {
+    const images = [visit?.selfieUrl, ...(visit?.tasks?.map(t => t.photoUrl) || [])].filter(Boolean) as string[];
+    const index = images.indexOf(url);
+    setEnlargedImages(images);
+    setCurrentImageIndex(index >= 0 ? index : 0);
+    setEnlargedImage(url);
+    setZoom(1);
+  };
+
+  const nextImage = () => {
+    if (enlargedImages.length <= 1) return;
+    const nextIdx = (currentImageIndex + 1) % enlargedImages.length;
+    setCurrentImageIndex(nextIdx);
+    setEnlargedImage(enlargedImages[nextIdx]);
+    setZoom(1);
+  };
+
+  const prevImage = () => {
+    if (enlargedImages.length <= 1) return;
+    const prevIdx = (currentImageIndex - 1 + enlargedImages.length) % enlargedImages.length;
+    setCurrentImageIndex(prevIdx);
+    setEnlargedImage(enlargedImages[prevIdx]);
+    setZoom(1);
   };
 
   if (isLoading) return (
@@ -162,7 +189,7 @@ export default function SiteVisitDetailPage() {
                   <UserCheck className="h-4 w-4" /> Presence Verification
                 </Label>
                 {visit.selfieUrl ? (
-                  <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/10 shadow-lg bg-muted group cursor-pointer" onClick={() => { setZoom(1); setEnlargedImage(visit.selfieUrl || null); }}>
+                  <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/10 shadow-lg bg-muted group cursor-pointer" onClick={() => openImageViewer(visit.selfieUrl!)}>
                     <img src={visit.selfieUrl} className="w-full h-full object-cover" alt="Verification Selfie" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
                       <Maximize2 className="h-8 w-8 text-white opacity-0 group-hover:opacity-100" />
@@ -256,7 +283,7 @@ export default function SiteVisitDetailPage() {
                             <span className="text-sm font-bold leading-snug pt-0.5">{task.text}</span>
                           </div>
                           {task.photoUrl && (
-                            <div className="relative aspect-video w-full cursor-pointer group" onClick={() => { setZoom(1); setEnlargedImage(task.photoUrl); }}>
+                            <div className="relative aspect-video w-full cursor-pointer group" onClick={() => openImageViewer(task.photoUrl!)}>
                               <img src={task.photoUrl} className="w-full h-full object-cover" alt={`Proof for task ${i+1}`} />
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
                                 <Maximize2 className="h-8 w-8 text-white opacity-0 group-hover:opacity-100" />
@@ -289,7 +316,7 @@ export default function SiteVisitDetailPage() {
         </CardFooter>
       </Card>
 
-      <Dialog open={!!enlargedImage} onOpenChange={(o) => { if(!o) setZoom(1); setEnlargedImage(null); }}>
+      <Dialog open={!!enlargedImage} onOpenChange={(o) => { if(!o) { setZoom(1); setEnlargedImage(null); setEnlargedImages([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>Audit Image Detail</DialogTitle>
@@ -313,6 +340,26 @@ export default function SiteVisitDetailPage() {
               <X className="h-6 w-6" />
             </Button>
           </div>
+
+          {enlargedImages.length > 1 && (
+            <>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={prevImage}>
+                  <ChevronLeft className="h-8 w-8" />
+                </Button>
+              </div>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={nextImage}>
+                  <ChevronRight className="h-8 w-8" />
+                </Button>
+              </div>
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
+                <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
+                  {currentImageIndex + 1} / {enlargedImages.length}
+                </Badge>
+              </div>
+            </>
+          )}
           
           <div className="relative w-full h-full overflow-auto p-4 flex">
             <div 

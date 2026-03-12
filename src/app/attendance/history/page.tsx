@@ -6,7 +6,7 @@ import { collection, query, where, limit, doc, or } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, History, Search, User, Timer, LogIn, LogOut, ImageIcon, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { MapPin, History, Search, User, Timer, LogIn, LogOut, ImageIcon, X, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,8 @@ export default function AttendanceHistoryPage() {
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = React.useState("");
   const [viewImage, setViewImage] = React.useState<string | null>(null);
+  const [viewImages, setViewImages] = React.useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [zoom, setZoom] = React.useState(1);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -97,7 +99,6 @@ export default function AttendanceHistoryPage() {
   const filteredEntries = React.useMemo(() => {
     if (!entries) return [];
     
-    // Sort in memory: Latest check-ins first
     const sorted = [...entries].sort((a, b) => {
         const dateA = a.checkInTime?.toDate?.()?.getTime() || 0;
         const dateB = b.checkInTime?.toDate?.()?.getTime() || 0;
@@ -109,6 +110,31 @@ export default function AttendanceHistoryPage() {
       e.date.includes(searchTerm)
     );
   }, [entries, searchTerm]);
+
+  const openViewer = (url: string, entry: AttendanceEntry) => {
+    const images = [entry.checkInSelfieUrl, entry.checkOutSelfieUrl].filter(Boolean) as string[];
+    const index = images.indexOf(url);
+    setViewImages(images);
+    setCurrentImageIndex(index >= 0 ? index : 0);
+    setViewImage(url);
+    setZoom(1);
+  };
+
+  const nextImage = () => {
+    if (viewImages.length <= 1) return;
+    const nextIdx = (currentImageIndex + 1) % viewImages.length;
+    setCurrentImageIndex(nextIdx);
+    setViewImage(viewImages[nextIdx]);
+    setZoom(1);
+  };
+
+  const prevImage = () => {
+    if (viewImages.length <= 1) return;
+    const prevIdx = (currentImageIndex - 1 + viewImages.length) % viewImages.length;
+    setCurrentImageIndex(prevIdx);
+    setViewImage(viewImages[prevIdx]);
+    setZoom(1);
+  };
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4 max-w-5xl mx-auto"><Skeleton className="h-[500px] w-full" /></div>;
 
@@ -163,7 +189,7 @@ export default function AttendanceHistoryPage() {
                           </div>
                           <div className="flex gap-1">
                             {entry.checkInSelfieUrl && (
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => { setZoom(1); setViewImage(entry.checkInSelfieUrl!); }}><ImageIcon className="h-3 w-3" /></Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkInSelfieUrl!, entry)}><ImageIcon className="h-3 w-3" /></Button>
                             )}
                             <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
                               <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkInLat},${entry.checkInLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
@@ -184,7 +210,7 @@ export default function AttendanceHistoryPage() {
                             </div>
                             <div className="flex gap-1">
                               {entry.checkOutSelfieUrl && (
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => { setZoom(1); setViewImage(entry.checkOutSelfieUrl!); }}><ImageIcon className="h-3 w-3" /></Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkOutSelfieUrl!, entry)}><ImageIcon className="h-3 w-3" /></Button>
                               )}
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
                                 <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
@@ -210,7 +236,7 @@ export default function AttendanceHistoryPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!viewImage} onOpenChange={(o) => { if(!o) setZoom(1); setViewImage(null); }}>
+      <Dialog open={!!viewImage} onOpenChange={(o) => { if(!o) { setZoom(1); setViewImage(null); setViewImages([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 bg-black/95 border-none rounded-sm overflow-hidden flex flex-col items-center justify-center">
           <DialogHeader className="sr-only">
             <DialogTitle>Verification Photo</DialogTitle>
@@ -234,6 +260,26 @@ export default function AttendanceHistoryPage() {
               <X className="h-6 w-6" />
             </Button>
           </div>
+
+          {viewImages.length > 1 && (
+            <>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={prevImage}>
+                  <ChevronLeft className="h-8 w-8" />
+                </Button>
+              </div>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={nextImage}>
+                  <ChevronRight className="h-8 w-8" />
+                </Button>
+              </div>
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
+                <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
+                  {currentImageIndex === 0 ? 'ENTRY' : 'EXIT'}
+                </Badge>
+              </div>
+            </>
+          )}
 
           <div className="relative w-full h-full overflow-auto p-4 flex">
             <div 

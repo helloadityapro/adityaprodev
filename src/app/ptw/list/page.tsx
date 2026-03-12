@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X, ZoomIn, ZoomOut, RotateCcw, Search, FilterX } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X, ZoomIn, ZoomOut, RotateCcw, Search, FilterX, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs, or, and, increment, getDoc } from "firebase/firestore";
@@ -145,6 +145,8 @@ export default function PtwListPage() {
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
   const [enlargedImage, setEnlargedImage] = React.useState<string | null>(null);
+  const [enlargedImages, setEnlargedImages] = React.useState<string[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
   const [zoom, setZoom] = React.useState(1);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -257,9 +259,33 @@ export default function PtwListPage() {
 
   const isImage = (file: Attachment) => {
     if (file.contentType?.startsWith('image/')) return true;
-    // Fallback for cases where contentType might be missing but the name has an extension
     const name = (file.name || "").toLowerCase();
     return name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.gif') || name.endsWith('.webp');
+  };
+
+  const openImageViewer = (url: string, attachments: Attachment[]) => {
+    const images = attachments.filter(isImage).map(a => a.url);
+    const index = images.indexOf(url);
+    setEnlargedImages(images);
+    setCurrentImageIndex(index >= 0 ? index : 0);
+    setEnlargedImage(url);
+    setZoom(1);
+  };
+
+  const nextImage = () => {
+    if (enlargedImages.length <= 1) return;
+    const nextIdx = (currentImageIndex + 1) % enlargedImages.length;
+    setCurrentImageIndex(nextIdx);
+    setEnlargedImage(enlargedImages[nextIdx]);
+    setZoom(1);
+  };
+
+  const prevImage = () => {
+    if (enlargedImages.length <= 1) return;
+    const prevIdx = (currentImageIndex - 1 + enlargedImages.length) % enlargedImages.length;
+    setCurrentImageIndex(prevIdx);
+    setEnlargedImage(enlargedImages[prevIdx]);
+    setZoom(1);
   };
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
@@ -468,7 +494,7 @@ export default function PtwListPage() {
                                 src={file.url} 
                                 alt={file.name} 
                                 className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105" 
-                                onClick={() => { setZoom(1); setEnlargedImage(file.url); }}
+                                onClick={() => openImageViewer(file.url, detailsPermit.attachments!)}
                               />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                                 <Maximize2 className="h-6 w-6 text-white" />
@@ -540,11 +566,11 @@ export default function PtwListPage() {
       </Dialog>
 
       {/* Image Preview Overlay */}
-      <Dialog open={!!enlargedImage} onOpenChange={(o) => { if(!o) setZoom(1); setEnlargedImage(null); }}>
+      <Dialog open={!!enlargedImage} onOpenChange={(o) => { if(!o) { setZoom(1); setEnlargedImage(null); setEnlargedImages([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>Audit Image Detail</DialogTitle>
-            <DialogDescription>Enlarged view of permit attachment.</DialogDescription>
+            <DialogDescription>Enlarged high-resolution view of site audit proof.</DialogDescription>
           </DialogHeader>
           
           <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
@@ -564,6 +590,26 @@ export default function PtwListPage() {
               <X className="h-6 w-6" />
             </Button>
           </div>
+
+          {enlargedImages.length > 1 && (
+            <>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={prevImage}>
+                  <ChevronLeft className="h-8 w-8" />
+                </Button>
+              </div>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={nextImage}>
+                  <ChevronRight className="h-8 w-8" />
+                </Button>
+              </div>
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
+                <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
+                  {currentImageIndex + 1} / {enlargedImages.length}
+                </Badge>
+              </div>
+            </>
+          )}
           
           <div className="relative w-full h-full overflow-auto p-4 flex">
             <div 
@@ -571,7 +617,7 @@ export default function PtwListPage() {
               style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
             >
               {enlargedImage && (
-                <img src={enlargedImage} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Evidence" />
+                <img src={enlargedImage} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Audit Evidence" />
               )}
             </div>
           </div>

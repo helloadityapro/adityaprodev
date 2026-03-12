@@ -71,7 +71,7 @@ export function QuickActions() {
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button variant="default" size="icon" className="relative h-8 w-8 rounded-full shadow-lg bg-primary text-primary-foreground">
+              <Button variant="default" size="icon" className="relative h-8 w-8 rounded-full shadow-lg bg-primary text-primary-foreground hover:bg-primary/90">
                 <Plus className="h-5 w-5" />
                 <span className="sr-only">Quick Actions</span>
               </Button>

@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -347,7 +346,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <SidebarMenuButton asChild tooltip="LMS Admin" isActive={pathname.startsWith('/lms/admin')} className="rounded-sm">
                     <Link href="/lms/admin">
                       <BookOpen className="h-4 w-4 text-primary" />
-                      <span className="font-medium text-primary font-bold">LMS Admin</span>
+                      <span className="font-bold">LMS Admin</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
