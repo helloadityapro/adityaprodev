@@ -18,13 +18,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { 
-  Carousel, 
-  CarouselContent, 
-  CarouselItem, 
-  CarouselNext, 
-  CarouselPrevious 
-} from "@/components/ui/carousel";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -68,18 +61,12 @@ type Permit = {
   longitude?: number;
 };
 
-type PtwType = {
-    id: string;
-    name: string;
-    allowedApproverIds?: string[];
-};
-
 type RewardSettings = {
   ptwNoCorrection?: number;
   ptwWithCorrection?: number;
 };
 
-type SortKey = 'serialNumber' | 'ptwType' | 'siteName' | 'requestDate' | 'status' | 'siteEngineerName';
+type SortKey = 'serialNumber' | 'ptwType' | 'siteName' | 'requestDate' | 'status';
 
 function StatusBadge({ permit, className }: { permit: Permit, className?: string }) {
   const firestore = useFirestore();
@@ -101,7 +88,6 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
     Rejected: { label: 'Rejected', icon: CircleX, className: 'bg-red-100 text-red-800 border-red-200' },
   };
   const config = statusConfig[permit.status] || statusConfig.Pending;
-  const Icon = config.icon;
   return (
     <Badge variant="outline" className={cn("flex items-center gap-1.5 text-[10px] font-black uppercase whitespace-nowrap border rounded-sm h-5 px-2", config.className, className)}>
       {config.label}
@@ -225,6 +211,18 @@ export default function PtwListPage() {
     toast({ title: "Updated", description: `Permit set to ${targetStatus}.` });
   };
 
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
+
   const filteredPermits = React.useMemo(() => {
     if (!permits) return [];
     const hiddenIds = userProfile?.hiddenPermitIds || [];
@@ -338,10 +336,18 @@ export default function PtwListPage() {
               <Table>
                 <TableHeader className="bg-muted/30">
                   <TableRow>
-                    <TableHead>Serial & Site</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Request Date</TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('serialNumber')}>
+                      <div className="flex items-center">Serial & Site <SortIcon column="serialNumber" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('ptwType')}>
+                      <div className="flex items-center">Type <SortIcon column="ptwType" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('status')}>
+                      <div className="flex items-center">Status <SortIcon column="status" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('requestDate')}>
+                      <div className="flex items-center">Request Date <SortIcon column="requestDate" /></div>
+                    </TableHead>
                     <TableHead className="text-right px-6">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -567,20 +573,20 @@ export default function PtwListPage() {
 
       {/* Image Preview Overlay */}
       <Dialog open={!!enlargedImage} onOpenChange={(o) => { if(!o) { setZoom(1); setEnlargedImage(null); setEnlargedImages([]); } }}>
-        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden">
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
           <DialogHeader className="sr-only">
             <DialogTitle>Audit Image Detail</DialogTitle>
             <DialogDescription>Enlarged high-resolution view of site audit proof.</DialogDescription>
           </DialogHeader>
           
           <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.min(prev + 0.25, 4))} title="Zoom In">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }} title="Zoom In">
               <ZoomIn className="h-5 w-5" />
             </Button>
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} title="Zoom Out">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }} title="Zoom Out">
               <ZoomOut className="h-5 w-5" />
             </Button>
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(1)} title="Reset Zoom">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }} title="Reset Zoom">
               <RotateCcw className="h-5 w-5" />
             </Button>
           </div>
@@ -594,12 +600,12 @@ export default function PtwListPage() {
           {enlargedImages.length > 1 && (
             <>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={prevImage}>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); prevImage(); }}>
                   <ChevronLeft className="h-8 w-8" />
                 </Button>
               </div>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={nextImage}>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); nextImage(); }}>
                   <ChevronRight className="h-8 w-8" />
                 </Button>
               </div>
@@ -613,7 +619,10 @@ export default function PtwListPage() {
           
           <div className="relative w-full h-full overflow-auto p-4 flex">
             <div 
-              className="m-auto transition-transform duration-200 ease-out flex items-center justify-center" 
+              className={cn(
+                "m-auto transition-transform duration-200 ease-out flex items-center justify-center",
+                zoom > 1 ? "cursor-move" : "cursor-default"
+              )}
               style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
             >
               {enlargedImage && (
