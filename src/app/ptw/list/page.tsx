@@ -578,10 +578,10 @@ export default function PtwListPage() {
             <div className="p-4 border-t bg-muted/5 grid grid-cols-2 gap-3 no-print">
               {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || isAdmin) && (
                 <>
-                  <Button className="h-12 rounded-sm font-black uppercase text-xs bg-green-600 hover:bg-green-700 shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
-                    Authorize
+                  <Button className="h-12 rounded-sm font-bold text-sm bg-green-600 hover:bg-green-700 shadow-lg px-8" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
+                    Approve
                   </Button>
-                  <Button variant="destructive" className="h-12 rounded-sm font-black uppercase text-xs shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>
+                  <Button variant="destructive" className="h-12 rounded-sm font-bold text-sm shadow-lg px-8" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>
                     Reject
                   </Button>
                 </>
