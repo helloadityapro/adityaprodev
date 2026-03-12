@@ -7,15 +7,27 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
     function isAdmin() {
       let superAdminEmails = ['khalil@adityagreenenergy.com', 'prafulrana143@gmail.com'];
       let userEmail = request.auth.token.get('email', '').lower();
       let isSuperAdmin = userEmail in superAdminEmails;
                          
-      let hasAdminRole = exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-                         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'Admin';
+      let role = getUserData().get('role', '');
+      let hasAdminRole = role == 'Admin';
                          
       return isSignedIn() && (isSuperAdmin || hasAdminRole);
+    }
+
+    function isHR() {
+      return isSignedIn() && getUserData().get('department', '') == 'Human Resource';
+    }
+
+    function isAccounts() {
+      return isSignedIn() && getUserData().get('department', '') == 'Account';
     }
 
     match /users/{userId} {
@@ -100,6 +112,18 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow delete: if isAdmin() || (isSignedIn() && resource.data.uploadedById == request.auth.uid);
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isSignedIn() && (isAdmin() || isHR() || isAccounts() || resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (isAdmin() || isHR() || isAccounts() || resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /expense_categories/{catId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /lms_courses/{courseId} { allow read: if isSignedIn(); allow write: if isAdmin(); }

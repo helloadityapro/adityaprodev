@@ -34,6 +34,42 @@
         "status": { "type": "string", "enum": ["Available", "Assigned", "Maintenance"] },
         "createdAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "Expense": {
+      "title": "Expense Report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "type": { "type": "string", "enum": ["Site", "General"] },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "HR_Approved", "Approved", "Rejected", "Paid"] },
+        "items": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "category": { "type": "string" },
+              "description": { "type": "string" },
+              "amount": { "type": "number" },
+              "proofUrl": { "type": "string" }
+            }
+          }
+        },
+        "remarks": { "type": "string" },
+        "paymentDetails": {
+          "type": "object",
+          "properties": {
+            "transactionId": { "type": "string" },
+            "paymentDate": { "type": "string", "format": "date-time" },
+            "paidBy": { "type": "string" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -47,6 +83,10 @@
     "/vehicles/{vehicleId}": {
       "schema": { "$ref": "#/backend/entities/Vehicle" },
       "description": "Fleet registry."
+    },
+    "/expenses/{expenseId}": {
+      "schema": { "$ref": "#/backend/entities/Expense" },
+      "description": "Organizational expense tracking and approval workflow."
     }
   }
 }

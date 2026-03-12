@@ -8,7 +8,7 @@ export default function ExpensesBasePage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/expenses/list');
+    router.replace('/expenses/manage');
   }, [router]);
 
   return null;

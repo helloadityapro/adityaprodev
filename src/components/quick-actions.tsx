@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -20,6 +21,7 @@ import {
   CheckSquare,
   Plus,
   Navigation,
+  Wallet
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -27,6 +29,12 @@ export function QuickActions() {
   const router = useRouter();
 
   const actions = [
+    {
+      label: 'Submit Expense',
+      icon: <Wallet className="mr-2 h-4 w-4 text-emerald-500" />,
+      href: '/expenses/submit',
+      description: 'Log a new expense claim',
+    },
     {
       label: 'Start Site Visit',
       icon: <Navigation className="mr-2 h-4 w-4 text-indigo-500" />,
