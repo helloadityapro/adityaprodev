@@ -438,8 +438,8 @@ export default function ExpensesListPage() {
             )}
             {isAdmin && selectedExpense?.status === 'Pending' && (
               <div className="flex gap-2">
-                <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => { setApprovalState({ expense: selectedExpense!, type: 'Approved' }); setSelectedExpense(null); }}>Approve</Button>
-                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => { setApprovalState({ expense: selectedExpense!, type: 'Rejected' }); setSelectedExpense(null); }}>Reject</Button>
+                <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => { setActionState({ expense: selectedExpense!, type: 'Approved' }); setSelectedExpense(null); }}>Approve</Button>
+                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => { setActionState({ expense: selectedExpense!, type: 'Rejected' }); setSelectedExpense(null); }}>Reject</Button>
               </div>
             )}
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>
