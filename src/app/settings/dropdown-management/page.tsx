@@ -13,33 +13,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, writeBatch, arrayUnion, getDocs, query, where, or, serverTimestamp } from 'firebase/firestore';
-import { Trash2, Search, ShieldCheck, AlertCircle, Loader2, SlidersHorizontal, ClipboardList, RefreshCw, Eraser, UserCog, CheckCircle2, XCircle, Building2, UserCircle2, Wallet } from 'lucide-react';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import { Trash2, SlidersHorizontal, Building2, UserCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { format } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
 
 type PtwType = {
   id: string;
   name: string;
-  allowedApproverIds?: string[];
 };
 
 type GenericItem = {
@@ -52,7 +36,6 @@ type UserProfile = {
     username: string;
     email: string;
     role: string;
-    hiddenPermitIds?: string[];
 };
 
 const genericItemSchema = z.object({
@@ -64,9 +47,6 @@ export default function AdminSettingsPage() {
   const { toast } = useToast();
   const router = useRouter();
   const { user, isUserLoading } = useUser();
-
-  const [ptwTypeToManage, setPtwTypeToManage] = React.useState<PtwType | null>(null);
-  const [approverSearch, setApproverSearch] = React.useState("");
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -88,9 +68,6 @@ export default function AdminSettingsPage() {
   const departmentsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
   const { data: departments } = useCollection<GenericItem>(departmentsQuery);
 
-  const expenseCategoriesQuery = useMemoFirebase(() => collection(firestore, 'expense_categories'), [firestore]);
-  const { data: expenseCategories } = useCollection<GenericItem>(expenseCategoriesQuery);
-
   const ptwTypeForm = useForm<z.infer<typeof genericItemSchema>>({
     resolver: zodResolver(genericItemSchema),
     defaultValues: { name: '' },
@@ -102,11 +79,6 @@ export default function AdminSettingsPage() {
   });
 
   const departmentForm = useForm<z.infer<typeof genericItemSchema>>({
-    resolver: zodResolver(genericItemSchema),
-    defaultValues: { name: '' },
-  });
-
-  const expenseCategoryForm = useForm<z.infer<typeof genericItemSchema>>({
     resolver: zodResolver(genericItemSchema),
     defaultValues: { name: '' },
   });
@@ -127,12 +99,6 @@ export default function AdminSettingsPage() {
     addDocumentNonBlocking(collection(firestore, 'user_departments'), values);
     toast({ title: 'Success', description: 'New Department added.' });
     departmentForm.reset();
-  };
-
-  const onExpenseCategorySubmit = (values: z.infer<typeof genericItemSchema>) => {
-    addDocumentNonBlocking(collection(firestore, 'expense_categories'), values);
-    toast({ title: 'Success', description: 'New Expense Category added.' });
-    expenseCategoryForm.reset();
   };
 
   const deleteItem = (coll: string, id: string) => {
@@ -159,10 +125,9 @@ export default function AdminSettingsPage() {
       </div>
 
       <Tabs defaultValue="org" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8 rounded-sm max-w-xl">
+        <TabsList className="grid w-full grid-cols-2 mb-8 rounded-sm max-w-md">
           <TabsTrigger value="org" className="flex items-center gap-2 rounded-sm"><Building2 className="h-4 w-4" /> Organization</TabsTrigger>
           <TabsTrigger value="configuration" className="flex items-center gap-2 rounded-sm"><SlidersHorizontal className="h-4 w-4" /> PTW Types</TabsTrigger>
-          <TabsTrigger value="expenses" className="flex items-center gap-2 rounded-sm"><Wallet className="h-4 w-4" /> Expenses</TabsTrigger>
         </TabsList>
 
         <TabsContent value="org" className="space-y-8 animate-in fade-in-50 duration-300">
@@ -285,51 +250,6 @@ export default function AdminSettingsPage() {
                         <TableCell className="font-medium">{type.name}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" className="rounded-sm" onClick={() => deleteItem('ptw_types', type.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="expenses" className="space-y-6 animate-in fade-in-50 duration-300">
-          <Card className="rounded-sm">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-primary" />
-                <CardTitle>Expense Categories</CardTitle>
-              </div>
-              <CardDescription>Define categories for expense reports (e.g., Fuel, Food, Stationery).</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Form {...expenseCategoryForm}>
-                <form onSubmit={expenseCategoryForm.handleSubmit(onExpenseCategorySubmit)} className="flex items-start gap-2 mb-4">
-                  <FormField
-                    control={expenseCategoryForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem className="flex-grow">
-                        <FormControl><Input placeholder="New Category" {...field} className="rounded-sm" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className="rounded-sm">Add Category</Button>
-                </form>
-              </Form>
-              <div className="rounded-sm border max-h-96 overflow-auto">
-                <Table>
-                  <TableBody>
-                    {expenseCategories?.map((cat) => (
-                      <TableRow key={cat.id}>
-                        <TableCell className="font-medium">{cat.name}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8" onClick={() => deleteItem('expense_categories', cat.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </TableCell>

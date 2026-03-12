@@ -22,14 +22,6 @@ service cloud.firestore {
       return isSignedIn() && (isSuperAdmin || hasAdminRole);
     }
 
-    function isHR() {
-      return isSignedIn() && getUserData().get('department', '') == 'Human Resource';
-    }
-
-    function isAccounts() {
-      return isSignedIn() && getUserData().get('department', '') == 'Account';
-    }
-
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
@@ -112,18 +104,6 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow delete: if isAdmin() || (isSignedIn() && resource.data.uploadedById == request.auth.uid);
-    }
-
-    match /expenses/{expenseId} {
-      allow read: if isSignedIn() && (isAdmin() || isHR() || isAccounts() || resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (isAdmin() || isHR() || isAccounts() || resource.data.userId == request.auth.uid);
-      allow delete: if isAdmin();
-    }
-
-    match /expense_categories/{catId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
     }
 
     match /lms_courses/{courseId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
