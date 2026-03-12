@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X, ZoomIn, ZoomOut, RotateCcw, Search, FilterX, ChevronLeft, ChevronRight } from "lucide-react";
+import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X, ZoomIn, ZoomOut, RotateCcw, Search, FilterX, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs, or, and, increment, getDoc } from "firebase/firestore";
@@ -463,6 +463,26 @@ export default function PtwListPage() {
                       <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Project Site</Label><p className="font-black text-lg leading-tight">{detailsPermit.siteName}</p></div>
                       <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Permit Type</Label><p className="font-bold text-lg leading-tight">{detailsPermit.ptwType}</p></div>
                     </div>
+                    
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Permit Raised By</Label>
+                        <p className="font-bold text-sm flex items-center gap-2">
+                          <User className="h-3 w-3 text-primary" />
+                          {detailsPermit.siteEngineerName || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Permit Approved By</Label>
+                        <p className="font-bold text-sm flex items-center gap-2">
+                          <ShieldCheck className="h-3 w-3 text-green-600" />
+                          {detailsPermit.timeline?.find(t => t.status === 'Approved')?.userName || 
+                           detailsPermit.timeline?.find(t => t.status === 'ManagerApproved')?.userName || 
+                           'Pending'}
+                        </p>
+                      </div>
+                    </div>
+
                     <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Work Description</Label><div className="p-4 bg-muted/20 border rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium">"{detailsPermit.descriptionOfWork}"</div></div>
                   </div>
                   <div className="space-y-8">
