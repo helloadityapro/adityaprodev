@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -11,7 +10,7 @@ import {
   updateDocumentNonBlocking,
   addDocumentNonBlocking
 } from '@/firebase';
-import { collection, query, where, doc, limit, serverTimestamp, or } from 'firebase/firestore';
+import { collection, query, where, doc, limit, serverTimestamp, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +29,6 @@ import {
   ExternalLink,
   Loader2,
   ShieldCheck,
-  IndianRupee,
   MessageCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -67,7 +65,7 @@ type ExpenseReport = {
   type: 'Site' | 'General';
   siteName: string;
   totalAmount: number;
-  status: 'Pending' | 'HR_Approved' | 'Approved' | 'Rejected' | 'Paid';
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Paid';
   items: ExpenseItem[];
   remarks?: string;
   createdAt: any;
@@ -89,17 +87,18 @@ export default function ManageExpensesPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
   
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
-  const isHR = userProfile?.department === 'Human Resource';
 
   const expensesQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'expenses');
     
-    if (isAdmin || isHR) {
+    // Admins see all expenses for management
+    if (isAdmin) {
       return query(colRef, orderBy('createdAt', 'desc'), limit(100));
     }
+    // Users see their own
     return query(colRef, where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(50));
-  }, [firestore, isAdmin, isHR, user, isProfileLoading]);
+  }, [firestore, isAdmin, user, isProfileLoading]);
 
   const { data: expenses, isLoading: isExpensesLoading } = useCollection<ExpenseReport>(expensesQuery);
 
@@ -112,7 +111,7 @@ export default function ManageExpensesPage() {
       updateDocumentNonBlocking(reportRef, {
         status: decisionState.targetStatus,
         remarks: remarks,
-        updatedAt: serverTimestamp(),
+        processedAt: serverTimestamp(),
         processedBy: user.uid,
         processedByName: userProfile.username || user.email
       });
@@ -120,8 +119,8 @@ export default function ManageExpensesPage() {
       // Notify User
       addDocumentNonBlocking(collection(firestore, 'notifications'), {
         userId: decisionState.report.userId,
-        title: `Expense Update: ${decisionState.targetStatus.replace('_', ' ')}`,
-        description: `Your report "${decisionState.report.title}" is now ${decisionState.targetStatus.replace('_', ' ')}. Note: ${remarks}`,
+        title: `Expense Status: ${decisionState.targetStatus}`,
+        description: `Your report "${decisionState.report.title}" has been ${decisionState.targetStatus.toLowerCase()}. Remarks: ${remarks}`,
         link: `/expenses/manage`,
         read: false,
         createdAt: serverTimestamp(),
@@ -159,9 +158,9 @@ export default function ManageExpensesPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-black tracking-tight uppercase">Audit & Manage Expenses</h1>
+            <h1 className="text-3xl font-black tracking-tight uppercase">{isAdmin ? "Manage All Expenses" : "My Expense History"}</h1>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Approval workflow for organizational expenditures.</p>
+          <p className="text-muted-foreground text-sm font-medium">Monitoring and authorization of organizational expenditures.</p>
         </div>
       </div>
 
@@ -182,11 +181,10 @@ export default function ManageExpensesPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all" className="text-xs font-bold">All Status</SelectItem>
-              <SelectItem value="Pending" className="text-xs font-bold">Pending HR</SelectItem>
-              <SelectItem value="HR_Approved" className="text-xs font-bold">HR Approved</SelectItem>
-              <SelectItem value="Approved" className="text-xs font-bold">Final Approved</SelectItem>
+              <SelectItem value="Pending" className="text-xs font-bold">Pending</SelectItem>
+              <SelectItem value="Approved" className="text-xs font-bold text-green-600">Approved</SelectItem>
               <SelectItem value="Rejected" className="text-xs font-bold text-red-600">Rejected</SelectItem>
-              <SelectItem value="Paid" className="text-xs font-bold text-green-600">Paid</SelectItem>
+              <SelectItem value="Paid" className="text-xs font-bold text-emerald-600">Paid</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }} className="h-10 w-10 text-muted-foreground rounded-sm">
@@ -238,12 +236,11 @@ export default function ManageExpensesPage() {
                       <Badge variant="outline" className={cn(
                         "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
                         expense.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                        expense.status === 'HR_Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
                         expense.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
                         expense.status === 'Paid' ? "bg-emerald-500 text-white border-none" :
                         "bg-red-50 text-red-700 border-red-200"
                       )}>
-                        {expense.status.replace('_', ' ')}
+                        {expense.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right px-6">
@@ -259,7 +256,7 @@ export default function ManageExpensesPage() {
         </CardContent>
       </Card>
 
-      {/* Decision Dialog */}
+      {/* Detail Audit Dialog */}
       <Dialog open={!!selectedReport} onOpenChange={(o) => !o && setSelectedReport(null)}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
@@ -271,7 +268,7 @@ export default function ManageExpensesPage() {
               </div>
             </div>
             {selectedReport && (
-              <Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-2 h-6">{selectedReport.status.replace('_', ' ')}</Badge>
+              <Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-2 h-6">{selectedReport.status}</Badge>
             )}
           </DialogHeader>
 
@@ -314,7 +311,7 @@ export default function ManageExpensesPage() {
                       </TableHeader>
                       <TableBody>
                         {selectedReport.items.map((item, idx) => (
-                          <TableRow key={idx} className="bg-background hover:bg-muted/5 transition-colors">
+                          <TableRow key={idx} className="bg-background">
                             <TableCell className="px-4">
                               <Badge variant="secondary" className="text-[8px] h-4 px-1 rounded-sm uppercase font-bold">{item.category}</Badge>
                             </TableCell>
@@ -347,26 +344,10 @@ export default function ManageExpensesPage() {
           </ScrollArea>
 
           <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0">
-            {selectedReport && selectedReport.status !== 'Paid' && (
+            {isAdmin && selectedReport?.status === 'Pending' && (
               <div className="flex gap-2 w-full justify-end">
-                {/* HR Approval Loop */}
-                {isHR && selectedReport.status === 'Pending' && (
-                  <>
-                    <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-blue-600 hover:bg-blue-700 px-6" onClick={() => setDecisionState({ report: selectedReport, targetStatus: 'HR_Approved' })}>HR Approve</Button>
-                    <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => setDecisionState({ report: selectedReport, targetStatus: 'Rejected' })}>Reject</Button>
-                  </>
-                )}
-                {/* Final Admin Approval Loop */}
-                {isAdmin && selectedReport.status === 'HR_Approved' && (
-                  <>
-                    <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => setDecisionState({ report: selectedReport, targetStatus: 'Approved' })}>Final Approve</Button>
-                    <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => setDecisionState({ report: selectedReport, targetStatus: 'Rejected' })}>Reject</Button>
-                  </>
-                )}
-                {/* Option for user to modify if rejected */}
-                {selectedReport.userId === user?.uid && selectedReport.status === 'Rejected' && (
-                  <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => router.push(`/expenses/submit?id=${selectedReport.id}`)}>Modify & Resubmit</Button>
-                )}
+                <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => setDecisionState({ report: selectedReport, targetStatus: 'Approved' })}>Approve</Button>
+                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => setDecisionState({ report: selectedReport, targetStatus: 'Rejected' })}>Reject</Button>
               </div>
             )}
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>
@@ -374,12 +355,12 @@ export default function ManageExpensesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Decision Remarks Modal */}
+      {/* Action Confirmation Dialog */}
       <Dialog open={!!decisionState} onOpenChange={() => setDecisionState(null)}>
         <DialogContent className="rounded-sm max-w-md">
           <DialogHeader>
-            <DialogTitle className="uppercase tracking-tight font-black">Audit Feedback</DialogTitle>
-            <DialogDescription>Provide remarks for the {decisionState?.targetStatus.replace('_', ' ')} decision.</DialogDescription>
+            <DialogTitle className="uppercase tracking-tight font-black">Confirm {decisionState?.targetStatus}</DialogTitle>
+            <DialogDescription>Provide feedback for this organizational expenditure audit.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
             <div className="space-y-2">
@@ -394,8 +375,7 @@ export default function ManageExpensesPage() {
               className={cn("rounded-sm font-black h-11 px-8 uppercase text-[10px] tracking-widest", decisionState?.targetStatus === 'Rejected' ? "bg-red-600 hover:bg-red-700" : "bg-primary hover:bg-primary/90")}
               onClick={() => {
                 const remarks = (document.getElementById('audit-remarks') as HTMLTextAreaElement)?.value || "";
-                if (remarks.trim()) handleDecision(remarks);
-                else toast({ variant: 'destructive', title: 'Remarks Required', description: 'Please provide feedback for the audit.' });
+                handleDecision(remarks);
               }}
             >
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm decision'}

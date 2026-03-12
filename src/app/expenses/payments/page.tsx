@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -24,11 +23,9 @@ import {
   Building2, 
   CheckCircle2, 
   ArrowRight,
-  IndianRupee,
   Loader2,
   Calendar,
-  Send,
-  Plus
+  Send
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -39,6 +36,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 
 type ExpenseReport = {
   id: string;
@@ -76,7 +74,7 @@ export default function AccountPaymentsPage() {
   const approvedQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'expenses');
-    // Only Account Dept or Admin can manage payments
+    // Any Admin or Account Department can see approved expenses awaiting payment
     if (!isAdmin && !isAccountDept) return null;
     return query(colRef, where('status', 'in', ['Approved', 'Paid']), orderBy('createdAt', 'desc'), limit(100));
   }, [firestore, isAdmin, isAccountDept, user, isProfileLoading]);

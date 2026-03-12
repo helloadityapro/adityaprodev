@@ -27,18 +27,14 @@ import {
   Trash2, 
   Loader2, 
   FileUp, 
-  Image as ImageIcon, 
   Search, 
   Check, 
   ChevronsUpDown, 
   Receipt,
   X,
   Building2,
-  Calendar as CalendarIcon,
   Send,
-  CheckCircle2,
-  MessageCircle,
-  IndianRupee
+  CheckCircle2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -46,9 +42,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 
 const expenseItemSchema = z.object({
   category: z.string().min(1, 'Category is required.'),
@@ -155,7 +148,7 @@ export default function SubmitExpensePage() {
       });
 
       setIsSuccess(true);
-      toast({ title: 'Expense Submitted', description: 'Your request is pending HR review.' });
+      toast({ title: 'Expense Submitted', description: 'Your request is pending administrative review.' });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
@@ -177,7 +170,7 @@ export default function SubmitExpensePage() {
             </div>
             <CardTitle className="text-2xl font-bold uppercase tracking-tight">Report Logged</CardTitle>
             <CardDescription className="text-base leading-relaxed">
-              Your expense report for <strong className="text-primary font-black">₹{totalAmount.toFixed(2)}</strong> has been received and is awaiting HR audit.
+              Your expense report for <strong className="text-primary font-black">₹{totalAmount.toFixed(2)}</strong> has been received and is awaiting audit.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -236,14 +229,14 @@ export default function SubmitExpensePage() {
                           defaultValue={field.value}
                           className="flex gap-6 h-11 items-center"
                         >
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl><RadioGroupItem value="Site" /></FormControl>
-                            <FormLabel className="font-bold cursor-pointer text-xs uppercase">Project Site</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl><RadioGroupItem value="General" /></FormControl>
-                            <FormLabel className="font-bold cursor-pointer text-xs uppercase">General Expense</FormLabel>
-                          </FormItem>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="Site" id="type-site" />
+                            <Label htmlFor="type-site" className="font-bold cursor-pointer text-xs uppercase">Project Site</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="General" id="type-general" />
+                            <Label htmlFor="type-general" className="font-bold cursor-pointer text-xs uppercase">General Expense</Label>
+                          </div>
                         </RadioGroup>
                       </FormControl>
                       <FormMessage />
