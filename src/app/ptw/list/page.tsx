@@ -651,7 +651,7 @@ export default function PtwListPage() {
           
           <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
             <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }} title="Zoom In">
-              <ZoomIn className="h-5 w-5" />
+              <ZoomIn className="h-4 w-4" />
             </Button>
             <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }} title="Zoom Out">
               <ZoomOut className="h-4 w-4" />

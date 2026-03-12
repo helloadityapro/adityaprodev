@@ -7,7 +7,7 @@ import { firebaseConfig } from './config';
 
 /**
  * Core initialization logic for Firebase SDKs.
- * Ensures services are only initialized once.
+ * Uses forced long polling to resolve connectivity issues in workstation and proxy environments.
  */
 export function getFirebaseServices() {
   let app: FirebaseApp;
@@ -24,11 +24,12 @@ export function getFirebaseServices() {
     app = getApp();
   }
 
-  // Use initializeFirestore with long polling to resolve connectivity issues in workstation environments
+  // Use forced long polling to ensure reliability in proxied environments
   let firestore: Firestore;
   try {
     firestore = initializeFirestore(app, {
-      experimentalAutoDetectLongPolling: true,
+      experimentalForceLongPolling: true,
+      useFetchStreams: false
     });
   } catch (e) {
     // Fallback if firestore was already initialized
