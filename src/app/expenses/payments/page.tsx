@@ -10,7 +10,7 @@ import {
   updateDocumentNonBlocking,
   addDocumentNonBlocking
 } from '@/firebase';
-import { collection, query, where, doc, limit, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc, limit, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -72,15 +72,25 @@ export default function AccountPaymentsPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isAccountDept = userProfile?.department === 'Account';
 
+  // Simplified query: Removed 'orderBy' to prevent "disappearing" results due to missing indices
   const approvedQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'expenses');
-    // Any Admin or Account Department can see approved expenses awaiting payment
     if (!isAdmin && !isAccountDept) return null;
-    return query(colRef, where('status', 'in', ['Approved', 'Paid']), orderBy('createdAt', 'desc'), limit(100));
+    return query(colRef, where('status', 'in', ['Approved', 'Paid']), limit(150));
   }, [firestore, isAdmin, isAccountDept, user, isProfileLoading]);
 
-  const { data: expenses, isLoading: isExpensesLoading } = useCollection<ExpenseReport>(approvedQuery);
+  const { data: rawExpenses, isLoading: isExpensesLoading } = useCollection<ExpenseReport>(approvedQuery);
+
+  // In-memory sorting for reliability
+  const expenses = React.useMemo(() => {
+    if (!rawExpenses) return [];
+    return [...rawExpenses].sort((a, b) => {
+      const da = a.createdAt?.toDate?.()?.getTime() || 0;
+      const db = b.createdAt?.toDate?.()?.getTime() || 0;
+      return db - da;
+    });
+  }, [rawExpenses]);
 
   const handleRecordPayment = async () => {
     if (!selectedReport || !transactionId || !user) return;
@@ -119,7 +129,6 @@ export default function AccountPaymentsPage() {
   };
 
   const filteredExpenses = React.useMemo(() => {
-    if (!expenses) return [];
     return expenses.filter(e => 
       e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -133,7 +142,7 @@ export default function AccountPaymentsPage() {
   }
 
   if (!isAdmin && !isAccountDept) {
-    return <div className="p-20 text-center text-destructive font-black uppercase">Unauthorized Access: Account Department Only</div>;
+    return <div className="p-20 text-center text-destructive font-black uppercase tracking-widest">Unauthorized Access: Account Department Credentials Required</div>;
   }
 
   return (

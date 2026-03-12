@@ -10,7 +10,7 @@ import {
   updateDocumentNonBlocking,
   addDocumentNonBlocking
 } from '@/firebase';
-import { collection, query, where, doc, limit, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, doc, limit, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -95,19 +95,28 @@ export default function ManageExpensesPage() {
   
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
+  // Simplified query: Removed 'orderBy' to prevent index requirement issues in prototypes
   const expensesQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'expenses');
     
-    // Admins see all expenses for management
     if (isAdmin) {
-      return query(colRef, orderBy('createdAt', 'desc'), limit(100));
+      return query(colRef, limit(150));
     }
-    // Users see their own
-    return query(colRef, where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(50));
+    return query(colRef, where('userId', '==', user.uid), limit(100));
   }, [firestore, isAdmin, user, isProfileLoading]);
 
-  const { data: expenses, isLoading: isExpensesLoading } = useCollection<ExpenseReport>(expensesQuery);
+  const { data: rawExpenses, isLoading: isExpensesLoading } = useCollection<ExpenseReport>(expensesQuery);
+
+  // In-memory sorting for robust results without manual composite index setup
+  const expenses = React.useMemo(() => {
+    if (!rawExpenses) return [];
+    return [...rawExpenses].sort((a, b) => {
+      const da = a.createdAt?.toDate?.()?.getTime() || 0;
+      const db = b.createdAt?.toDate?.()?.getTime() || 0;
+      return db - da;
+    });
+  }, [rawExpenses]);
 
   const handleDecision = async (remarks: string) => {
     if (!decisionState || !user) return;
@@ -126,7 +135,7 @@ export default function ManageExpensesPage() {
       // Notify User
       addDocumentNonBlocking(collection(firestore, 'notifications'), {
         userId: decisionState.report.userId,
-        title: `Expense Status: ${decisionState.targetStatus}`,
+        title: `Expense Status: ${decisionStatusToTitle(decisionState.targetStatus)}`,
         description: `Your report "${decisionState.report.title}" has been ${decisionState.targetStatus.toLowerCase()}. Remarks: ${remarks}`,
         link: `/expenses/manage`,
         read: false,
@@ -143,8 +152,13 @@ export default function ManageExpensesPage() {
     }
   };
 
+  const decisionStatusToTitle = (status: string) => {
+    if (status === 'Approved') return 'Authorized';
+    if (status === 'Rejected') return 'Returned';
+    return status;
+  };
+
   const filteredExpenses = React.useMemo(() => {
-    if (!expenses) return [];
     return expenses.filter(e => {
       const matchesSearch = e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
