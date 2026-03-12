@@ -24,7 +24,8 @@ export function getFirebaseServices() {
     app = getApp();
   }
 
-  // Use forced long polling to ensure reliability in proxied environments
+  // Use forced long polling to ensure reliability in proxied environments (e.g. Cloud Workstations)
+  // This prevents the "Could not reach Cloud Firestore backend" 10s timeout error.
   let firestore: Firestore;
   try {
     firestore = initializeFirestore(app, {

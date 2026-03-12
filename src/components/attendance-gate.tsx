@@ -7,7 +7,7 @@ import { format, isAfter, setHours, setMinutes, parseISO, addDays, startOfDay } 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useRouter, usePathname } from 'next/navigation';
-import { Clock, LogIn } from 'lucide-react';
+import { Clock, LogIn, AlertCircle } from 'lucide-react';
 
 /**
  * Global component to manage attendance compliance.

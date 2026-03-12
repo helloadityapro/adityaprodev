@@ -76,22 +76,25 @@ export default function AttendanceHistoryPage() {
     if (!user || !userProfile || isProfileLoading) return null;
     const colRef = collection(firestore, 'attendance');
     
+    // Admin sees all records globally
     if (isAdmin) {
-      return query(colRef, limit(100));
+      return query(colRef, limit(200));
     }
     
+    // Manager sees self + team
     if (isManager) {
       return query(
         colRef,
         or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid)),
-        limit(100)
+        limit(150)
       );
     }
     
+    // Regular personnel sees only their own history
     return query(
       colRef,
       where('userId', '==', user.uid),
-      limit(50)
+      limit(100)
     );
   }, [firestore, user, userProfile, isAdmin, isManager, isProfileLoading]);
 
@@ -144,63 +147,66 @@ export default function AttendanceHistoryPage() {
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4 max-w-5xl mx-auto"><Skeleton className="h-[500px] w-full" /></div>;
 
-  const headerTitle = isAdmin ? "Global Attendance Logs" : (isManager ? "Team Attendance Activity" : "My Attendance History");
+  const headerTitle = isAdmin ? "Global Attendance Audit" : (isManager ? "Team Attendance Log" : "My Workday History");
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto py-8 px-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2">
+          <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
             <History className="h-8 w-8" /> {headerTitle}
           </h1>
-          <p className="text-muted-foreground">Historical records with GPS and Photo verification.</p>
+          <p className="text-muted-foreground font-medium text-sm">Review workday sessions with GPS and profile verification.</p>
         </div>
-        <Input 
-          placeholder="Search by name or date..." 
-          className="w-full md:w-72 rounded-sm border-primary/20"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        <div className="relative w-full md:w-72">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search name or date..." 
+            className="pl-8 rounded-sm border-primary/20 h-10 bg-background"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
-      <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+      <Card className="rounded-sm shadow-xl border-primary/10 overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  {showPersonnelColumn && <TableHead>Personnel</TableHead>}
-                  <TableHead className="text-center">Entry (Photo/GPS)</TableHead>
-                  <TableHead className="text-center">Exit (Photo/GPS)</TableHead>
-                  <TableHead className="text-center">Duration</TableHead>
+                  <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest">Date</TableHead>
+                  {showPersonnelColumn && <TableHead className="font-black uppercase text-[10px] tracking-widest">Personnel</TableHead>}
+                  <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Entry (Photo/GPS)</TableHead>
+                  <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Exit (Photo/GPS)</TableHead>
+                  <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Duration</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredEntries.length > 0 ? filteredEntries.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="font-bold text-sm">{formatDate(entry.checkInTime)}</TableCell>
+                  <TableRow key={entry.id} className="hover:bg-primary/[0.02] transition-colors group">
+                    <TableCell className="px-6 font-bold text-sm">{formatDate(entry.checkInTime)}</TableCell>
                     {showPersonnelColumn && (
                       <TableCell>
-                        <div className="flex items-center gap-2 text-xs font-bold uppercase">
-                          <User className="h-3 w-3" /> {entry.userName}
+                        <div className="flex items-center gap-2 text-xs font-black uppercase text-foreground">
+                          <User className="h-3.5 w-3.5 text-primary" /> {entry.userName}
                         </div>
                       </TableCell>
                     )}
                     <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="flex flex-col items-center gap-1">
-                          <div className="flex items-center gap-1 text-xs font-bold text-emerald-700">
+                      <div className="flex items-center justify-center gap-3">
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
                             <LogIn className="h-3 w-3" /> {formatTime(entry.checkInTime)}
                           </div>
-                          <div className="flex gap-1">
+                          <div className="flex gap-1 items-center">
                             {entry.checkInSelfieUrl && (
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkInSelfieUrl!, entry)}>
-                                {isVideoUrl(entry.checkInSelfieUrl!) ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10 rounded-sm" onClick={() => openViewer(entry.checkInSelfieUrl!, entry)}>
+                                {isVideoUrl(entry.checkInSelfieUrl!) ? <Film className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
                               </Button>
                             )}
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
-                              <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkInLat},${entry.checkInLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted rounded-sm" asChild>
+                              <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkInLat},${entry.checkInLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3.5 w-3.5" /></a>
                             </Button>
                           </div>
                         </div>
@@ -208,37 +214,39 @@ export default function AttendanceHistoryPage() {
                     </TableCell>
                     <TableCell className="text-center">
                       {entry.checkOutTime ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <div className="flex flex-col items-center gap-1">
-                            <div className="flex items-center gap-1 text-xs font-bold text-slate-700">
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="flex flex-col items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 text-xs font-black text-slate-700">
                               <LogOut className="h-3 w-3" /> {formatTime(entry.checkOutTime)}
                               {entry.checkOutType === 'System CheckOut' && (
-                                <Badge variant="outline" className="ml-1 bg-red-50 text-red-600 border-red-100 text-[7px] h-3.5 px-1 font-black uppercase">System</Badge>
+                                <Badge variant="outline" className="ml-1 bg-red-50 text-red-600 border-red-100 text-[7px] h-4 px-1 font-black uppercase">System</Badge>
                               )}
                             </div>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1 items-center">
                               {entry.checkOutSelfieUrl && (
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkOutSelfieUrl!, entry)}>
-                                  {isVideoUrl(entry.checkOutSelfieUrl!) ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10 rounded-sm" onClick={() => openViewer(entry.checkOutSelfieUrl!, entry)}>
+                                  {isVideoUrl(entry.checkOutSelfieUrl!) ? <Film className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
                                 </Button>
                               )}
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
-                                <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted rounded-sm" asChild>
+                                <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3.5 w-3.5" /></a>
                               </Button>
                             </div>
                           </div>
                         </div>
                       ) : (
-                        <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm animate-pulse">Ongoing</Badge>
+                        <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm animate-pulse px-3 py-1">In Session</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-center font-black text-primary">
-                      <Timer className="h-3 w-3 inline mr-1" />
-                      {calculateDuration(entry.checkInTime, entry.checkOutTime)}
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1.5 font-black text-primary text-xs">
+                        <Timer className="h-3.5 w-3.5" />
+                        {calculateDuration(entry.checkInTime, entry.checkOutTime)}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={showPersonnelColumn ? 5 : 4} className="h-32 text-center text-muted-foreground italic">No records found.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={showPersonnelColumn ? 5 : 4} className="h-48 text-center text-muted-foreground italic font-medium uppercase text-[10px] tracking-widest opacity-40">No attendance records discovered.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -249,8 +257,8 @@ export default function AttendanceHistoryPage() {
       <Dialog open={!!viewUrl} onOpenChange={(o) => { if(!o) { setZoom(1); setViewUrl(null); setViewUrls([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 bg-black/95 border-none rounded-sm overflow-hidden flex flex-col items-center justify-center shadow-2xl">
           <DialogHeader className="sr-only">
-            <DialogTitle>Verification Media</DialogTitle>
-            <DialogDescription>Attendance check-in/out verification media.</DialogDescription>
+            <DialogTitle>Audit Verification Media</DialogTitle>
+            <DialogDescription>Verification media for attendance session.</DialogDescription>
           </DialogHeader>
           
           <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
@@ -284,8 +292,8 @@ export default function AttendanceHistoryPage() {
                 </Button>
               </div>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
-                <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
-                  {currentUrlIndex === 0 ? 'ENTRY' : 'EXIT'}
+                <Badge variant="outline" className="bg-black/40 text-white border-none px-4 py-1 rounded-full font-black text-[9px] tracking-widest">
+                  {currentUrlIndex === 0 ? 'ENTRY VERIFICATION' : 'EXIT VERIFICATION'}
                 </Badge>
               </div>
             </>
@@ -301,9 +309,9 @@ export default function AttendanceHistoryPage() {
             >
               {viewUrl && (
                 isVideoUrl(viewUrl) ? (
-                  <video src={viewUrl} controls autoPlay className="max-w-full max-h-[85vh] shadow-2xl" />
+                  <video src={viewUrl} controls autoPlay className="max-w-full max-h-[85vh] shadow-2xl rounded-sm" />
                 ) : (
-                  <img src={viewUrl} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Verification" />
+                  <img src={viewUrl} className="max-w-full max-h-[85vh] object-contain shadow-2xl rounded-sm" alt="Workday Profile" />
                 )
               )}
             </div>
