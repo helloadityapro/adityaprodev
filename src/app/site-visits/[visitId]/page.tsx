@@ -6,7 +6,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, Navigation, History, UserCheck, Timer, FileText, ImageIcon, Users, Maximize2, X, User, FolderArchive, ArrowLeft, Printer, ExternalLink, CheckCircle2, ZoomIn, ZoomOut, RotateCcw, Building2, ChevronLeft, ChevronRight } from "lucide-react";
+import { MapPin, Navigation, History, UserCheck, Timer, FileText, ImageIcon, Users, Maximize2, X, User, FolderArchive, ArrowLeft, Printer, ExternalLink, CheckCircle2, ZoomIn, ZoomOut, RotateCcw, Building2, ChevronLeft, ChevronRight, PlayCircle, Film } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,9 +66,10 @@ export default function SiteVisitDetailPage() {
   const visitId = params.visitId as string;
   const firestore = useFirestore();
   const router = useRouter();
-  const [enlargedImage, setEnlargedImage] = React.useState<string | null>(null);
-  const [enlargedImages, setEnlargedImages] = React.useState<string[]>([]);
-  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+  
+  const [viewUrl, setViewUrl] = React.useState<string | null>(null);
+  const [viewUrls, setViewUrls] = React.useState<string[]>([]);
+  const [currentUrlIndex, setCurrentUrlIndex] = React.useState(0);
   const [zoom, setZoom] = React.useState(1);
 
   const visitRef = useMemoFirebase(() => doc(firestore, 'site_visits', visitId), [firestore, visitId]);
@@ -80,29 +81,34 @@ export default function SiteVisitDetailPage() {
     }
   };
 
-  const openImageViewer = (url: string) => {
-    const images = [visit?.selfieUrl, ...(visit?.tasks?.map(t => t.photoUrl) || [])].filter(Boolean) as string[];
-    const index = images.indexOf(url);
-    setEnlargedImages(images);
-    setCurrentImageIndex(index >= 0 ? index : 0);
-    setEnlargedImage(url);
+  const openViewer = (url: string) => {
+    const urls = [visit?.selfieUrl, ...(visit?.tasks?.map(t => t.photoUrl) || [])].filter(Boolean) as string[];
+    const index = urls.indexOf(url);
+    setViewUrls(urls);
+    setCurrentUrlIndex(index >= 0 ? index : 0);
+    setViewUrl(url);
     setZoom(1);
   };
 
-  const nextImage = () => {
-    if (enlargedImages.length <= 1) return;
-    const nextIdx = (currentImageIndex + 1) % enlargedImages.length;
-    setCurrentImageIndex(nextIdx);
-    setEnlargedImage(enlargedImages[nextIdx]);
+  const nextUrl = () => {
+    if (viewUrls.length <= 1) return;
+    const nextIdx = (currentUrlIndex + 1) % viewUrls.length;
+    setCurrentUrlIndex(nextIdx);
+    setViewUrl(viewUrls[nextIdx]);
     setZoom(1);
   };
 
-  const prevImage = () => {
-    if (enlargedImages.length <= 1) return;
-    const prevIdx = (currentImageIndex - 1 + enlargedImages.length) % enlargedImages.length;
-    setCurrentImageIndex(prevIdx);
-    setEnlargedImage(enlargedImages[prevIdx]);
+  const prevUrl = () => {
+    if (viewUrls.length <= 1) return;
+    const prevIdx = (currentUrlIndex - 1 + viewUrls.length) % viewUrls.length;
+    setCurrentUrlIndex(prevIdx);
+    setViewUrl(viewUrls[prevIdx]);
     setZoom(1);
+  };
+
+  const isVideoUrl = (url: string) => {
+    const lowUrl = url.toLowerCase();
+    return lowUrl.includes('.mp4') || lowUrl.includes('.mov') || lowUrl.includes('.webm') || lowUrl.includes('.ogg');
   };
 
   if (isLoading) return (
@@ -189,13 +195,20 @@ export default function SiteVisitDetailPage() {
                   <UserCheck className="h-4 w-4" /> Presence Verification
                 </Label>
                 {visit.selfieUrl ? (
-                  <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/10 shadow-lg bg-muted group cursor-pointer" onClick={() => openImageViewer(visit.selfieUrl!)}>
-                    <img src={visit.selfieUrl} className="w-full h-full object-cover" alt="Verification Selfie" />
+                  <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/10 shadow-lg bg-muted group cursor-pointer" onClick={() => openViewer(visit.selfieUrl!)}>
+                    {isVideoUrl(visit.selfieUrl) ? (
+                      <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                        <Film className="h-12 w-12 text-white opacity-40" />
+                        <PlayCircle className="absolute h-12 w-12 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    ) : (
+                      <img src={visit.selfieUrl} className="w-full h-full object-cover" alt="Verification Selfie" />
+                    )}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
                       <Maximize2 className="h-8 w-8 text-white opacity-0 group-hover:opacity-100" />
                     </div>
                     <div className="absolute bottom-3 left-3 bg-black/60 text-white text-[9px] font-black uppercase px-2 py-1 rounded-sm backdrop-blur-sm">
-                      Face & Upper Body Audit Profile
+                      Audit Profile Media
                     </div>
                   </div>
                 ) : (
@@ -283,13 +296,20 @@ export default function SiteVisitDetailPage() {
                             <span className="text-sm font-bold leading-snug pt-0.5">{task.text}</span>
                           </div>
                           {task.photoUrl && (
-                            <div className="relative aspect-video w-full cursor-pointer group" onClick={() => openImageViewer(task.photoUrl!)}>
-                              <img src={task.photoUrl} className="w-full h-full object-cover" alt={`Proof for task ${i+1}`} />
+                            <div className="relative aspect-video w-full cursor-pointer group" onClick={() => openViewer(task.photoUrl!)}>
+                              {isVideoUrl(task.photoUrl) ? (
+                                <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                                  <Film className="h-12 w-12 text-white opacity-40" />
+                                  <PlayCircle className="absolute h-12 w-12 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </div>
+                              ) : (
+                                <img src={task.photoUrl} className="w-full h-full object-cover" alt={`Proof for task ${i+1}`} />
+                              )}
                               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
                                 <Maximize2 className="h-8 w-8 text-white opacity-0 group-hover:opacity-100" />
                               </div>
                               <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded-sm text-[8px] font-black text-white uppercase tracking-widest">
-                                Task Photo Proof
+                                Task Media Proof
                               </div>
                             </div>
                           )}
@@ -316,12 +336,12 @@ export default function SiteVisitDetailPage() {
         </CardFooter>
       </Card>
 
-      {/* Image Preview Overlay */}
-      <Dialog open={!!enlargedImage} onOpenChange={(o) => { if(!o) { setZoom(1); setEnlargedImage(null); setEnlargedImages([]); } }}>
+      {/* Media Preview Overlay */}
+      <Dialog open={!!viewUrl} onOpenChange={(o) => { if(!o) { setZoom(1); setViewUrl(null); setViewUrls([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
           <DialogHeader className="sr-only">
-            <DialogTitle>Audit Image Detail</DialogTitle>
-            <DialogDescription>Enlarged high-resolution view of site audit proof.</DialogDescription>
+            <DialogTitle>Audit Media Detail</DialogTitle>
+            <DialogDescription>Enlarged view of site audit proof.</DialogDescription>
           </DialogHeader>
           
           <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
@@ -337,26 +357,26 @@ export default function SiteVisitDetailPage() {
           </div>
 
           <div className="absolute top-4 right-4 z-50 no-print">
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setEnlargedImage(null)}>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setViewUrl(null)}>
               <X className="h-6 w-6" />
             </Button>
           </div>
 
-          {enlargedImages.length > 1 && (
+          {viewUrls.length > 1 && (
             <>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); prevImage(); }}>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); prevUrl(); }}>
                   <ChevronLeft className="h-8 w-8" />
                 </Button>
               </div>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); nextImage(); }}>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); nextUrl(); }}>
                   <ChevronRight className="h-8 w-8" />
                 </Button>
               </div>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
                 <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
-                  {currentImageIndex + 1} / {enlargedImages.length}
+                  {currentUrlIndex + 1} / {viewUrls.length}
                 </Badge>
               </div>
             </>
@@ -370,8 +390,12 @@ export default function SiteVisitDetailPage() {
               )}
               style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
             >
-              {enlargedImage && (
-                <img src={enlargedImage} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Audit Evidence" />
+              {viewUrl && (
+                isVideoUrl(viewUrl) ? (
+                  <video src={viewUrl} controls autoPlay className="max-w-full max-h-[85vh] shadow-2xl" />
+                ) : (
+                  <img src={viewUrl} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Audit Evidence" />
+                )
               )}
             </div>
           </div>

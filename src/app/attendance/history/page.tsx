@@ -6,7 +6,7 @@ import { collection, query, where, limit, doc, or } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, History, Search, User, Timer, LogIn, LogOut, ImageIcon, X, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
+import { MapPin, History, Search, User, Timer, LogIn, LogOut, ImageIcon, X, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, PlayCircle, Film } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,9 +60,9 @@ export default function AttendanceHistoryPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [viewImage, setViewImage] = React.useState<string | null>(null);
-  const [viewImages, setViewImages] = React.useState<string[]>([]);
-  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+  const [viewUrl, setViewUrl] = React.useState<string | null>(null);
+  const [viewUrls, setViewUrls] = React.useState<string[]>([]);
+  const [currentUrlIndex, setCurrentUrlIndex] = React.useState(0);
   const [zoom, setZoom] = React.useState(1);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -113,28 +113,33 @@ export default function AttendanceHistoryPage() {
   }, [entries, searchTerm]);
 
   const openViewer = (url: string, entry: AttendanceEntry) => {
-    const images = [entry.checkInSelfieUrl, entry.checkOutSelfieUrl].filter(Boolean) as string[];
-    const index = images.indexOf(url);
-    setViewImages(images);
-    setCurrentImageIndex(index >= 0 ? index : 0);
-    setViewImage(url);
+    const urls = [entry.checkInSelfieUrl, entry.checkOutSelfieUrl].filter(Boolean) as string[];
+    const index = urls.indexOf(url);
+    setViewUrls(urls);
+    setCurrentUrlIndex(index >= 0 ? index : 0);
+    setViewUrl(url);
     setZoom(1);
   };
 
-  const nextImage = () => {
-    if (viewImages.length <= 1) return;
-    const nextIdx = (currentImageIndex + 1) % viewImages.length;
-    setCurrentImageIndex(nextIdx);
-    setViewImage(viewImages[nextIdx]);
+  const nextUrl = () => {
+    if (viewUrls.length <= 1) return;
+    const nextIdx = (currentUrlIndex + 1) % viewUrls.length;
+    setCurrentUrlIndex(nextIdx);
+    setViewUrl(viewUrls[nextIdx]);
     setZoom(1);
   };
 
-  const prevImage = () => {
-    if (viewImages.length <= 1) return;
-    const prevIdx = (currentImageIndex - 1 + viewImages.length) % viewImages.length;
-    setCurrentImageIndex(prevIdx);
-    setViewImage(viewImages[prevIdx]);
+  const prevUrl = () => {
+    if (viewUrls.length <= 1) return;
+    const prevIdx = (currentUrlIndex - 1 + viewUrls.length) % viewUrls.length;
+    setCurrentUrlIndex(prevIdx);
+    setViewUrl(viewUrls[prevIdx]);
     setZoom(1);
+  };
+
+  const isVideoUrl = (url: string) => {
+    const lowUrl = url.toLowerCase();
+    return lowUrl.includes('.mp4') || lowUrl.includes('.mov') || lowUrl.includes('.webm') || lowUrl.includes('.ogg');
   };
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4 max-w-5xl mx-auto"><Skeleton className="h-[500px] w-full" /></div>;
@@ -142,7 +147,7 @@ export default function AttendanceHistoryPage() {
   const headerTitle = isAdmin ? "Global Attendance Logs" : (isManager ? "Team Attendance Activity" : "My Attendance History");
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto py-8">
+    <div className="space-y-8 max-w-5xl mx-auto py-8 px-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2">
@@ -190,7 +195,9 @@ export default function AttendanceHistoryPage() {
                           </div>
                           <div className="flex gap-1">
                             {entry.checkInSelfieUrl && (
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkInSelfieUrl!, entry)}><ImageIcon className="h-3 w-3" /></Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkInSelfieUrl!, entry)}>
+                                {isVideoUrl(entry.checkInSelfieUrl!) ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                              </Button>
                             )}
                             <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
                               <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkInLat},${entry.checkInLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
@@ -211,7 +218,9 @@ export default function AttendanceHistoryPage() {
                             </div>
                             <div className="flex gap-1">
                               {entry.checkOutSelfieUrl && (
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkOutSelfieUrl!, entry)}><ImageIcon className="h-3 w-3" /></Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkOutSelfieUrl!, entry)}>
+                                  {isVideoUrl(entry.checkOutSelfieUrl!) ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                                </Button>
                               )}
                               <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
                                 <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
@@ -237,11 +246,11 @@ export default function AttendanceHistoryPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!viewImage} onOpenChange={(o) => { if(!o) { setZoom(1); setViewImage(null); setViewImages([]); } }}>
+      <Dialog open={!!viewUrl} onOpenChange={(o) => { if(!o) { setZoom(1); setViewUrl(null); setViewUrls([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 bg-black/95 border-none rounded-sm overflow-hidden flex flex-col items-center justify-center shadow-2xl">
           <DialogHeader className="sr-only">
-            <DialogTitle>Verification Photo</DialogTitle>
-            <DialogDescription>Attendance check-in/out verification selfie.</DialogDescription>
+            <DialogTitle>Verification Media</DialogTitle>
+            <DialogDescription>Attendance check-in/out verification media.</DialogDescription>
           </DialogHeader>
           
           <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
@@ -257,26 +266,26 @@ export default function AttendanceHistoryPage() {
           </div>
 
           <div className="absolute top-4 right-4 z-50 no-print">
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setViewImage(null)}>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setViewUrl(null)}>
               <X className="h-6 w-6" />
             </Button>
           </div>
 
-          {viewImages.length > 1 && (
+          {viewUrls.length > 1 && (
             <>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); prevImage(); }}>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); prevUrl(); }}>
                   <ChevronLeft className="h-8 w-8" />
                 </Button>
               </div>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); nextImage(); }}>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); nextUrl(); }}>
                   <ChevronRight className="h-8 w-8" />
                 </Button>
               </div>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
                 <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
-                  {currentImageIndex === 0 ? 'ENTRY' : 'EXIT'}
+                  {currentUrlIndex === 0 ? 'ENTRY' : 'EXIT'}
                 </Badge>
               </div>
             </>
@@ -290,7 +299,13 @@ export default function AttendanceHistoryPage() {
               )}
               style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
             >
-              {viewImage && <img src={viewImage} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Verification" />}
+              {viewUrl && (
+                isVideoUrl(viewUrl) ? (
+                  <video src={viewUrl} controls autoPlay className="max-w-full max-h-[85vh] shadow-2xl" />
+                ) : (
+                  <img src={viewUrl} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Verification" />
+                )
+              )}
             </div>
           </div>
         </DialogContent>

@@ -89,7 +89,7 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
   };
   const config = statusConfig[permit.status] || statusConfig.Pending;
   return (
-    <Badge variant="outline" className={cn("flex items-center gap-1.5 text-[10px] font-bold whitespace-nowrap border rounded-sm h-5 px-2", config.className, className)}>
+    <Badge variant="outline" className={cn("flex items-center gap-1.5 text-[10px] font-semibold whitespace-nowrap border rounded-sm h-5 px-2", config.className, className)}>
       {config.label}
     </Badge>
   );
@@ -118,6 +118,18 @@ const formatTimestamp = (ts: any) => {
   return format(date, 'dd MMM yyyy HH:mm');
 };
 
+const isVideo = (file: Attachment) => {
+  if (file.contentType?.startsWith('video/')) return true;
+  const name = (file.name || "").toLowerCase();
+  return name.endsWith('.mp4') || name.endsWith('.mov') || name.endsWith('.webm') || name.endsWith('.ogg');
+};
+
+const isImage = (file: Attachment) => {
+  if (file.contentType?.startsWith('image/')) return true;
+  const name = (file.name || "").toLowerCase();
+  return name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.gif') || name.endsWith('.webp');
+};
+
 export default function PtwListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -130,9 +142,10 @@ export default function PtwListPage() {
   const [actionState, setActionState] = React.useState<{ permit: Permit, status: 'Approved' | 'Rejected' | 'ManagerApproved' } | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
-  const [enlargedImage, setEnlargedImage] = React.useState<string | null>(null);
-  const [enlargedImages, setEnlargedImages] = React.useState<string[]>([]);
-  const [currentImageIndex, setCurrentImageIndex] = React.useState(0);
+  
+  const [viewFile, setViewFile] = React.useState<Attachment | null>(null);
+  const [viewFiles, setViewFiles] = React.useState<Attachment[]>([]);
+  const [currentFileIndex, setCurrentFileIndex] = React.useState(0);
   const [zoom, setZoom] = React.useState(1);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -255,34 +268,29 @@ export default function PtwListPage() {
     };
   }, [permits]);
 
-  const isImage = (file: Attachment) => {
-    if (file.contentType?.startsWith('image/')) return true;
-    const name = (file.name || "").toLowerCase();
-    return name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.gif') || name.endsWith('.webp');
-  };
-
-  const openImageViewer = (url: string, attachments: Attachment[]) => {
-    const images = attachments.filter(isImage).map(a => a.url);
-    const index = images.indexOf(url);
-    setEnlargedImages(images);
-    setCurrentImageIndex(index >= 0 ? index : 0);
-    setEnlargedImage(url);
+  const openViewer = (file: Attachment, allAttachments: Attachment[]) => {
+    // Collect all media files (images and videos) for navigation
+    const mediaFiles = allAttachments.filter(a => isImage(a) || isVideo(a));
+    const index = mediaFiles.findIndex(a => a.url === file.url);
+    setViewFiles(mediaFiles);
+    setCurrentFileIndex(index >= 0 ? index : 0);
+    setViewFile(file);
     setZoom(1);
   };
 
-  const nextImage = () => {
-    if (enlargedImages.length <= 1) return;
-    const nextIdx = (currentImageIndex + 1) % enlargedImages.length;
-    setCurrentImageIndex(nextIdx);
-    setEnlargedImage(enlargedImages[nextIdx]);
+  const nextFile = () => {
+    if (viewFiles.length <= 1) return;
+    const nextIdx = (currentFileIndex + 1) % viewFiles.length;
+    setCurrentFileIndex(nextIdx);
+    setViewFile(viewFiles[nextIdx]);
     setZoom(1);
   };
 
-  const prevImage = () => {
-    if (enlargedImages.length <= 1) return;
-    const prevIdx = (currentImageIndex - 1 + enlargedImages.length) % enlargedImages.length;
-    setCurrentImageIndex(prevIdx);
-    setEnlargedImage(enlargedImages[prevIdx]);
+  const prevFile = () => {
+    if (viewFiles.length <= 1) return;
+    const prevIdx = (currentFileIndex - 1 + viewFiles.length) % viewFiles.length;
+    setCurrentFileIndex(prevIdx);
+    setViewFile(viewFiles[prevIdx]);
     setZoom(1);
   };
 
@@ -297,15 +305,15 @@ export default function PtwListPage() {
 
       <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
         <Card className="bg-primary/5 border-primary/10 rounded-sm">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Total</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Total</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0 font-black text-2xl">{stats.total}</CardContent>
         </Card>
         <Card className="bg-amber-500/5 border-amber-500/10 rounded-sm">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-amber-600 tracking-widest">Pending</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-bold uppercase text-amber-600 tracking-widest">Pending</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0 font-black text-2xl text-amber-700">{stats.pending}</CardContent>
         </Card>
         <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600 tracking-widest">Approved</CardTitle></CardHeader>
+          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-bold uppercase text-green-600 tracking-widest">Approved</CardTitle></CardHeader>
           <CardContent className="p-4 pt-0 font-black text-2xl text-green-700">{stats.approved}</CardContent>
         </Card>
       </div>
@@ -316,14 +324,20 @@ export default function PtwListPage() {
           <Input placeholder="Search by serial or site..." className="pl-9 h-10 rounded-sm bg-muted/20 border-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-print">
-          {['all', 'Pending', 'ManagerApproved', 'Approved', 'Rejected'].map(s => (
+          {[
+            { id: 'all', label: 'All Permits' },
+            { id: 'Pending', label: 'Pending Manager' },
+            { id: 'ManagerApproved', label: 'Pending Admin' },
+            { id: 'Approved', label: 'Approved' },
+            { id: 'Rejected', label: 'Rejected' }
+          ].map(s => (
             <Badge 
-              key={s} 
-              variant={statusFilter === s ? 'default' : 'outline'} 
+              key={s.id} 
+              variant={statusFilter === s.id ? 'default' : 'outline'} 
               className="cursor-pointer font-semibold text-xs h-8 px-4 rounded-sm whitespace-nowrap border-primary/20"
-              onClick={() => setStatusFilter(s)}
+              onClick={() => setStatusFilter(s.id)}
             >
-              {s === 'all' ? 'All Permits' : s === 'ManagerApproved' ? 'Pending Admin' : s}
+              {s.label}
             </Badge>
           ))}
         </div>
@@ -420,7 +434,7 @@ export default function PtwListPage() {
           <DialogFooter className="flex flex-col sm:flex-row gap-3">
             <DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-12 font-bold rounded-sm text-xs">Cancel</Button></DialogClose>
             <Button 
-              className={cn("w-full sm:flex-1 h-12 font-black rounded-sm text-xs", actionState?.status === 'Rejected' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700')}
+              className={cn("w-full sm:flex-1 h-12 font-bold rounded-sm text-xs", actionState?.status === 'Rejected' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white')}
               onClick={() => {
                 const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "";
                 if (remarks.trim()) {
@@ -460,20 +474,20 @@ export default function PtwListPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-8">
                     <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Project Site</Label><p className="font-black text-lg leading-tight">{detailsPermit.siteName}</p></div>
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Type</Label><p className="font-bold text-lg leading-tight">{detailsPermit.ptwType}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Project Site</Label><p className="font-black text-lg leading-tight">{detailsPermit.siteName}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Permit Type</Label><p className="font-bold text-lg leading-tight">{detailsPermit.ptwType}</p></div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Raised By</Label>
+                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Permit Raised By</Label>
                         <p className="font-bold text-sm flex items-center gap-2">
                           <User className="h-3 w-3 text-primary" />
                           {detailsPermit.siteEngineerName || 'N/A'}
                         </p>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Approved By</Label>
+                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Permit Approved By</Label>
                         <p className="font-bold text-sm flex items-center gap-2">
                           <ShieldCheck className="h-3 w-3 text-green-600" />
                           {detailsPermit.timeline?.find(t => t.status === 'Approved')?.userName || 
@@ -483,14 +497,14 @@ export default function PtwListPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-2"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Work Description</Label><div className="p-4 bg-muted/20 border rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium">"{detailsPermit.descriptionOfWork}"</div></div>
+                    <div className="space-y-2"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Work Description</Label><div className="p-4 bg-muted/20 border rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium">"{detailsPermit.descriptionOfWork}"</div></div>
                   </div>
                   <div className="space-y-8">
                     <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Submission</Label><p className="text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Submission</Label><p className="text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p></div>
                     </div>
-                    <div className="space-y-3"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest flex items-center gap-2 uppercase"><MapPin className="h-3.5 w-3.5" /> GPS Stamped Location</Label>
+                    <div className="space-y-3"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest flex items-center gap-2"><MapPin className="h-3.5 w-3.5" /> GPS Stamped Location</Label>
                       {detailsPermit.latitude ? (
                         <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between">
                           <span className="font-mono text-xs font-bold text-primary">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude?.toFixed(6)}</span>
@@ -507,7 +521,7 @@ export default function PtwListPage() {
                 <div className="space-y-6">
                   <div className="flex items-center gap-2">
                     <Paperclip className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-black uppercase tracking-widest">Documentation & Evidence</h3>
+                    <h3 className="text-sm font-bold uppercase tracking-widest">Documentation & Evidence</h3>
                   </div>
                   
                   {detailsPermit.attachments && detailsPermit.attachments.length > 0 ? (
@@ -520,22 +534,32 @@ export default function PtwListPage() {
                                 src={file.url} 
                                 alt={file.name} 
                                 className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105" 
-                                onClick={() => openImageViewer(file.url, detailsPermit.attachments!)}
+                                onClick={() => openViewer(file, detailsPermit.attachments!)}
                               />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                                 <Maximize2 className="h-6 w-6 text-white" />
                               </div>
-                              <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-black uppercase truncate text-center">
+                              <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">
                                 {file.name}
                               </div>
                             </>
+                          ) : isVideo(file) ? (
+                            <div className="relative w-full h-full bg-slate-900 flex flex-col items-center justify-center cursor-pointer group" onClick={() => openViewer(file, detailsPermit.attachments!)}>
+                              <Film className="h-10 w-10 text-white opacity-40" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <PlayCircle className="h-8 w-8 text-white" />
+                              </div>
+                              <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">
+                                VIDEO: {file.name}
+                              </div>
+                            </div>
                           ) : (
                             <div className="flex flex-col items-center justify-between p-3 h-full w-full bg-background border">
                               <div className="flex-1 flex flex-col items-center justify-center gap-2">
                                 <FileText className={cn("h-8 w-8", file.contentType?.includes('pdf') ? "text-red-500" : "text-blue-500")} />
                                 <span className="text-[8px] font-bold uppercase text-center line-clamp-2">{file.name}</span>
                               </div>
-                              <Button variant="secondary" size="sm" className="w-full h-6 text-[8px] font-black uppercase rounded-none mt-2" asChild>
+                              <Button variant="secondary" size="sm" className="w-full h-6 text-[8px] font-bold uppercase rounded-none mt-2" asChild>
                                 <a href={file.url} target="_blank" rel="noopener noreferrer">View File</a>
                               </Button>
                             </div>
@@ -554,14 +578,14 @@ export default function PtwListPage() {
                 <Separator />
 
                 <div className="space-y-6">
-                  <h3 className="text-sm font-black uppercase tracking-widest flex items-gap-2"><History className="h-4 w-4 text-primary" /> Lifecycle History</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-widest flex items-gap-2"><History className="h-4 w-4 text-primary" /> Lifecycle History</h3>
                   <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-8">
                     {[...(detailsPermit.timeline || [])].sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0)).map((entry, idx) => (
                       <div key={idx} className="relative">
                         <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
                         <div className="flex flex-col gap-1.5">
                           <div className="flex items-center justify-between gap-4">
-                            <span className="text-xs font-black uppercase tracking-tight text-primary">{entry.action} — {entry.userName}</span>
+                            <span className="text-xs font-bold uppercase tracking-tight text-primary">{entry.action} — {entry.userName}</span>
                             <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{formatTimestamp(entry.timestamp)}</span>
                           </div>
                           <p className="text-sm italic font-medium leading-relaxed opacity-80">"{entry.remarks}"</p>
@@ -578,7 +602,7 @@ export default function PtwListPage() {
             <div className="p-4 border-t bg-muted/5 grid grid-cols-2 gap-3 no-print">
               {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || isAdmin) && (
                 <>
-                  <Button className="h-12 rounded-sm font-bold text-sm bg-green-600 hover:bg-green-700 shadow-lg px-8" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
+                  <Button className="h-12 rounded-sm font-bold text-sm bg-green-600 hover:bg-green-700 text-white shadow-lg px-8" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
                     Approve
                   </Button>
                   <Button variant="destructive" className="h-12 rounded-sm font-bold text-sm shadow-lg px-8" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>
@@ -591,12 +615,12 @@ export default function PtwListPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Image Preview Overlay */}
-      <Dialog open={!!enlargedImage} onOpenChange={(o) => { if(!o) { setZoom(1); setEnlargedImage(null); setEnlargedImages([]); } }}>
+      {/* Media Preview Overlay */}
+      <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { setZoom(1); setViewFile(null); setViewFiles([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
           <DialogHeader className="sr-only">
-            <DialogTitle>Audit Image Detail</DialogTitle>
-            <DialogDescription>Enlarged high-resolution view of site audit proof.</DialogDescription>
+            <DialogTitle>Audit Media Detail</DialogTitle>
+            <DialogDescription>Enlarged view of site audit proof.</DialogDescription>
           </DialogHeader>
           
           <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
@@ -612,26 +636,26 @@ export default function PtwListPage() {
           </div>
 
           <div className="absolute top-4 right-4 z-50 no-print">
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setEnlargedImage(null)}>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setViewFile(null)}>
               <X className="h-6 w-6" />
             </Button>
           </div>
 
-          {enlargedImages.length > 1 && (
+          {viewFiles.length > 1 && (
             <>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); prevImage(); }}>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); prevFile(); }}>
                   <ChevronLeft className="h-8 w-8" />
                 </Button>
               </div>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); nextImage(); }}>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); nextFile(); }}>
                   <ChevronRight className="h-8 w-8" />
                 </Button>
               </div>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
                 <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
-                  {currentImageIndex + 1} / {enlargedImages.length}
+                  {currentFileIndex + 1} / {viewFiles.length}
                 </Badge>
               </div>
             </>
@@ -645,8 +669,21 @@ export default function PtwListPage() {
               )}
               style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
             >
-              {enlargedImage && (
-                <img src={enlargedImage} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Audit Evidence" />
+              {viewFile && (
+                isVideo(viewFile) ? (
+                  <video 
+                    src={viewFile.url} 
+                    controls 
+                    autoPlay 
+                    className="max-w-full max-h-[85vh] shadow-2xl"
+                  />
+                ) : (
+                  <img 
+                    src={viewFile.url} 
+                    className="max-w-full max-h-[85vh] object-contain shadow-2xl" 
+                    alt="Audit Evidence" 
+                  />
+                )
               )}
             </div>
           </div>
