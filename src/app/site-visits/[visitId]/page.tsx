@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -308,8 +307,14 @@ export default function SiteVisitDetailPage() {
               <RotateCcw className="h-5 w-5" />
             </Button>
           </div>
+
+          <div className="absolute top-4 right-4 z-50 no-print">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setEnlargedImage(null)}>
+              <X className="h-6 w-6" />
+            </Button>
+          </div>
           
-          <div className="relative w-full h-full flex overflow-auto p-4">
+          <div className="relative w-full h-full overflow-auto p-4 flex">
             <div 
               className="m-auto transition-transform duration-200 ease-out flex items-center justify-center" 
               style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}

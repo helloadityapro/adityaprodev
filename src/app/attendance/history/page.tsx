@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -212,13 +211,13 @@ export default function AttendanceHistoryPage() {
       </Card>
 
       <Dialog open={!!viewImage} onOpenChange={(o) => { if(!o) setZoom(1); setViewImage(null); }}>
-        <DialogContent className="max-w-[90vw] h-[85vh] p-0 bg-black border-none rounded-sm overflow-hidden flex flex-col items-center justify-center">
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 bg-black/95 border-none rounded-sm overflow-hidden flex flex-col items-center justify-center">
           <DialogHeader className="sr-only">
             <DialogTitle>Verification Photo</DialogTitle>
             <DialogDescription>Attendance check-in/out verification selfie.</DialogDescription>
           </DialogHeader>
           
-          <div className="absolute top-4 left-4 flex gap-2 z-50">
+          <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
             <Button variant="secondary" size="icon" className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.min(prev + 0.25, 4))} title="Zoom In">
               <ZoomIn className="h-4 w-4" />
             </Button>
@@ -230,12 +229,18 @@ export default function AttendanceHistoryPage() {
             </Button>
           </div>
 
-          <div className="relative w-full h-full flex overflow-auto p-4">
+          <div className="absolute top-4 right-4 z-50 no-print">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setViewImage(null)}>
+              <X className="h-6 w-6" />
+            </Button>
+          </div>
+
+          <div className="relative w-full h-full overflow-auto p-4 flex">
             <div 
               className="m-auto transition-transform duration-200 ease-out flex items-center justify-center" 
               style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
             >
-              {viewImage && <img src={viewImage} className="max-w-full max-h-[80vh] object-contain shadow-2xl" alt="Verification" />}
+              {viewImage && <img src={viewImage} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Verification" />}
             </div>
           </div>
         </DialogContent>

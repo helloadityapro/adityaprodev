@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -503,7 +502,7 @@ export default function PtwListPage() {
                 <Separator />
 
                 <div className="space-y-6">
-                  <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><History className="h-4 w-4 text-primary" /> Lifecycle History</h3>
+                  <h3 className="text-sm font-black uppercase tracking-widest flex items-gap-2"><History className="h-4 w-4 text-primary" /> Lifecycle History</h3>
                   <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-8">
                     {[...(detailsPermit.timeline || [])].sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0)).map((entry, idx) => (
                       <div key={idx} className="relative">
@@ -559,8 +558,14 @@ export default function PtwListPage() {
               <RotateCcw className="h-5 w-5" />
             </Button>
           </div>
+
+          <div className="absolute top-4 right-4 z-50 no-print">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setEnlargedImage(null)}>
+              <X className="h-6 w-6" />
+            </Button>
+          </div>
           
-          <div className="relative w-full h-full flex overflow-auto p-4">
+          <div className="relative w-full h-full overflow-auto p-4 flex">
             <div 
               className="m-auto transition-transform duration-200 ease-out flex items-center justify-center" 
               style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
