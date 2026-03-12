@@ -29,7 +29,9 @@ import {
   ExternalLink,
   Loader2,
   ShieldCheck,
-  MessageCircle
+  MessageCircle,
+  CreditCard,
+  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -69,6 +71,11 @@ type ExpenseReport = {
   items: ExpenseItem[];
   remarks?: string;
   createdAt: any;
+  paymentDetails?: {
+    transactionId: string;
+    paymentDate: any;
+    paidBy: string;
+  };
 };
 
 export default function ManageExpensesPage() {
@@ -268,7 +275,12 @@ export default function ManageExpensesPage() {
               </div>
             </div>
             {selectedReport && (
-              <Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-2 h-6">{selectedReport.status}</Badge>
+              <Badge variant="outline" className={cn(
+                "text-[9px] font-black uppercase rounded-sm px-2 h-6",
+                selectedReport.status === 'Paid' ? "bg-emerald-500 text-white border-none" : "border-primary/20"
+              )}>
+                {selectedReport.status}
+              </Badge>
             )}
           </DialogHeader>
 
@@ -332,6 +344,28 @@ export default function ManageExpensesPage() {
                     </Table>
                   </div>
                 </div>
+
+                {selectedReport.status === 'Paid' && selectedReport.paymentDetails && (
+                  <div className="p-6 bg-emerald-50 border-2 border-emerald-100 rounded-sm space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center gap-2 text-emerald-700">
+                      <CreditCard className="h-4 w-4" />
+                      <Label className="text-[10px] font-black uppercase tracking-widest">Payment Confirmation</Label>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-1">
+                        <p className="text-[8px] font-bold text-emerald-600/60 uppercase">Transaction ID / UTR No.</p>
+                        <p className="text-sm font-black font-mono text-emerald-900">{selectedReport.paymentDetails.transactionId}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[8px] font-bold text-emerald-600/60 uppercase">Payment Date</p>
+                        <p className="text-sm font-black text-emerald-900 flex items-center gap-2">
+                          <Clock className="h-3.5 w-3.5" />
+                          {selectedReport.paymentDetails.paymentDate ? format(selectedReport.paymentDetails.paymentDate.toDate(), 'dd MMMM yyyy') : '—'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {selectedReport.remarks && (
                   <div className="p-6 bg-red-50 border-2 border-red-100 rounded-sm space-y-2">
