@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -45,6 +44,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -282,6 +282,7 @@ export default function SubmitExpensePage() {
                                 className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
                                 value={siteSearchQuery}
                                 onChange={(e) => setSiteSearchQuery(e.target.value)}
+                                onKeyDown={(e) => e.stopPropagation()}
                               />
                             </div>
                             <ScrollArea className="h-[200px]">
@@ -341,7 +342,7 @@ export default function SubmitExpensePage() {
                           className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm"
                           onClick={() => remove(index)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}
 
