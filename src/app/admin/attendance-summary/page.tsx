@@ -382,7 +382,7 @@ export default function AttendanceSummaryPage() {
                     <div className="flex items-center gap-2 text-xs font-mono font-bold">
                       <Clock className="h-3 w-3 text-muted-foreground" />
                       {item.record?.checkOutTime ? format(item.record.checkOutTime.toDate(), 'HH:mm') : (item.status === 'ongoing' ? 'Active' : '—')}
-                      {item.record?.checkOutType === 'System Check Out' && (
+                      {item.record?.checkOutType === 'System CheckOut' && (
                         <Badge variant="outline" className="bg-red-50 text-red-600 border-red-100 text-[7px] h-3.5 px-1 font-black uppercase">System</Badge>
                       )}
                     </div>

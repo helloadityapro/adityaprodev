@@ -1,21 +1,20 @@
-
 'use client';
 
 import * as React from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, doc, serverTimestamp, limit } from 'firebase/firestore';
-import { format, isAfter, setHours, setMinutes } from 'date-fns';
+import { collection, query, where, doc, serverTimestamp, limit, Timestamp } from 'firebase/firestore';
+import { format, isAfter, setHours, setMinutes, parseISO, addDays, startOfDay } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useRouter, usePathname } from 'next/navigation';
-import { Clock, LogIn, ShieldAlert } from 'lucide-react';
+import { Clock, LogIn } from 'lucide-react';
 
 /**
  * Global component to manage attendance compliance.
  * Handles:
  * 1. Forced check-in redirect if no session exists for today.
  * 2. Check-out reminders after 7:00 PM.
- * 3. Daily 12 AM system reset for stale sessions (Marked as System Check Out).
+ * 3. Daily 12 AM system reset for stale sessions (Marked as System CheckOut).
  */
 export function AttendanceGate() {
   const { user } = useUser();
@@ -74,13 +73,19 @@ export function AttendanceGate() {
     // If we find an "ongoing" session where the date is NOT today, it means it's a leftover from yesterday.
     if (activeSession && activeSession.date !== todayStr) {
       const ref = doc(firestore, 'attendance', activeSession.id);
+      
+      // The user failed to check out yesterday. 
+      // We set the checkout time to exactly 12:00 AM of the next day (midnight transition).
+      const sessionDate = parseISO(activeSession.date);
+      const nextDayMidnight = startOfDay(addDays(sessionDate, 1));
+
       updateDocumentNonBlocking(ref, {
         status: 'completed',
-        checkOutTime: serverTimestamp(),
+        checkOutTime: Timestamp.fromDate(nextDayMidnight),
         checkOutLat: activeSession.checkInLat, // Best effort fallback
         checkOutLng: activeSession.checkInLng,
-        checkOutType: 'System Check Out',
-        remarks: 'System Check Out: Session automatically closed at 12:00 AM reset.'
+        checkOutType: 'System CheckOut',
+        remarks: 'System CheckOut: Session automatically closed at 12:00 AM reset.'
       });
       return;
     }

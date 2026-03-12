@@ -212,7 +212,7 @@ export default function AttendanceHistoryPage() {
                           <div className="flex flex-col items-center gap-1">
                             <div className="flex items-center gap-1 text-xs font-bold text-slate-700">
                               <LogOut className="h-3 w-3" /> {formatTime(entry.checkOutTime)}
-                              {entry.checkOutType === 'System Check Out' && (
+                              {entry.checkOutType === 'System CheckOut' && (
                                 <Badge variant="outline" className="ml-1 bg-red-50 text-red-600 border-red-100 text-[7px] h-3.5 px-1 font-black uppercase">System</Badge>
                               )}
                             </div>

@@ -5,36 +5,35 @@ import { usePathname } from "next/navigation"
 import {
   FilePlus,
   List,
-  Users,
-  LayoutDashboard,
-  SlidersHorizontal,
-  Workflow,
-  MapPin,
+  ChevronDown,
+  CalendarCheck,
+  Clock,
   History,
+  FolderOpen,
+  GraduationCap,
+  Trophy,
+  Fuel,
+  MapPinned,
+  Car,
+  Navigation,
+  Activity,
+  CheckSquare,
+  ListTodo,
   FileText,
   Table as TableIcon,
   Package,
   ClipboardList,
   ArrowLeftRight,
-  ListTodo,
-  CheckSquare,
-  FolderOpen,
-  Trophy,
-  GraduationCap,
-  BarChart3,
+  FileBarChart,
+  CalendarDays,
+  BookOpen,
+  LayoutDashboard,
+  MapPin,
   Coins,
   Truck,
-  Navigation,
-  Activity,
-  CalendarCheck,
-  Clock,
-  ChevronDown,
-  CalendarDays,
-  FileBarChart,
-  Car,
-  MapPinned,
-  Fuel,
-  BookOpen
+  Workflow,
+  Users,
+  SlidersHorizontal
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -62,7 +61,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Reports" isActive={pathname === '/reports'} className="rounded-sm">
               <Link href="/reports">
-                <BarChart3 className="h-4 w-4" />
+                <FileBarChart className="h-4 w-4" />
                 <span className="font-medium">Reports</span>
               </Link>
             </SidebarMenuButton>
