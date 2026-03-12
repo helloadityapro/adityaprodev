@@ -6,10 +6,39 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CircleCheck, Clock, CircleX, Eye, FilePen, ArrowUpDown, ArrowUp, ArrowDown, History, User, ExternalLink, CalendarDays, Printer, FileText, MessageCircle, Paperclip, ImageIcon, Film, Layers, MapPin, Maximize2, X, ZoomIn, ZoomOut, RotateCcw, Search, FilterX, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
+import { 
+  CircleCheck, 
+  Clock, 
+  CircleX, 
+  Eye, 
+  ArrowUpDown, 
+  ArrowUp, 
+  ArrowDown, 
+  History, 
+  User, 
+  ExternalLink, 
+  Printer, 
+  FileText, 
+  MessageCircle, 
+  Paperclip, 
+  ImageIcon, 
+  Film, 
+  MapPin, 
+  Maximize2, 
+  X, 
+  ZoomIn, 
+  ZoomOut, 
+  RotateCcw, 
+  Search, 
+  ChevronLeft, 
+  ChevronRight, 
+  ShieldCheck, 
+  PlayCircle,
+  FileCheck
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, limit, serverTimestamp, arrayUnion, getDocs, or, and, increment, getDoc } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, arrayUnion, getDoc, increment, or, and } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -76,16 +105,14 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
   const statusConfig = {
     Pending: { 
       label: managerProfile ? `With ${managerProfile.username}` : 'Pending Manager', 
-      icon: Clock, 
       className: 'bg-yellow-50 text-yellow-700 border-yellow-200' 
     },
     ManagerApproved: { 
       label: 'Pending Admin', 
-      icon: Clock, 
       className: 'bg-blue-50 text-blue-700 border-blue-200' 
     },
-    Approved: { label: 'Approved', icon: CircleCheck, className: 'bg-green-50 text-green-700 border-green-200' },
-    Rejected: { label: 'Rejected', icon: CircleX, className: 'bg-red-50 text-red-700 border-red-200' },
+    Approved: { label: 'Approved', className: 'bg-green-50 text-green-700 border-green-200' },
+    Rejected: { label: 'Rejected', className: 'bg-red-50 text-red-700 border-red-200' },
   };
   const config = statusConfig[permit.status] || statusConfig.Pending;
   return (
@@ -221,7 +248,7 @@ export default function PtwListPage() {
       createdAt: serverTimestamp(),
     });
 
-    toast({ title: "Updated", description: `Permit set to ${targetStatus}.` });
+    toast({ title: "Updated", description: `Permit status set to ${targetStatus}.` });
   };
 
   const handleSort = (key: SortKey) => {
@@ -269,7 +296,6 @@ export default function PtwListPage() {
   }, [permits]);
 
   const openViewer = (file: Attachment, allAttachments: Attachment[]) => {
-    // Collect all media files (images and videos) for navigation
     const mediaFiles = allAttachments.filter(a => isImage(a) || isVideo(a));
     const index = mediaFiles.findIndex(a => a.url === file.url);
     setViewFiles(mediaFiles);
@@ -458,7 +484,7 @@ export default function PtwListPage() {
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><FileText className="h-5 w-5 text-primary" /></div>
               <div>
-                <DialogTitle className="text-lg font-black tracking-tight uppercase">Permit Audit Log</DialogTitle>
+                <DialogTitle className="text-lg font-black tracking-tight">Permit Audit Log</DialogTitle>
                 <DialogDescription className="text-[10px] font-bold text-muted-foreground">{detailsPermit?.serialNumber}</DialogDescription>
               </div>
             </div>
@@ -474,22 +500,22 @@ export default function PtwListPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-8">
                     <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Project Site</Label><p className="font-black text-lg leading-tight">{detailsPermit.siteName}</p></div>
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Permit Type</Label><p className="font-bold text-lg leading-tight">{detailsPermit.ptwType}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Project Site</Label><p className="font-black text-lg leading-tight">{detailsPermit.siteName}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Type</Label><p className="font-bold text-lg leading-tight">{detailsPermit.ptwType}</p></div>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Permit Raised By</Label>
+                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Raised By</Label>
                         <p className="font-bold text-sm flex items-center gap-2">
-                          <User className="h-3 w-3 text-primary" />
+                          <User className="h-3.5 w-3.5 text-primary" />
                           {detailsPermit.siteEngineerName || 'N/A'}
                         </p>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Permit Approved By</Label>
+                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Approved By</Label>
                         <p className="font-bold text-sm flex items-center gap-2">
-                          <ShieldCheck className="h-3 w-3 text-green-600" />
+                          <ShieldCheck className="h-3.5 w-3.5 text-green-600" />
                           {detailsPermit.timeline?.find(t => t.status === 'Approved')?.userName || 
                            detailsPermit.timeline?.find(t => t.status === 'ManagerApproved')?.userName || 
                            'Pending'}
@@ -497,14 +523,14 @@ export default function PtwListPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-2"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Work Description</Label><div className="p-4 bg-muted/20 border rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium">"{detailsPermit.descriptionOfWork}"</div></div>
+                    <div className="space-y-2"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Work Description</Label><div className="p-4 bg-muted/20 border rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium">"{detailsPermit.descriptionOfWork}"</div></div>
                   </div>
                   <div className="space-y-8">
                     <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest">Submission</Label><p className="text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
+                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Submission</Label><p className="text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p></div>
                     </div>
-                    <div className="space-y-3"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest flex items-center gap-2"><MapPin className="h-3.5 w-3.5" /> GPS Stamped Location</Label>
+                    <div className="space-y-3"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest flex items-center gap-2 uppercase"><MapPin className="h-3.5 w-3.5" /> GPS Stamped Location</Label>
                       {detailsPermit.latitude ? (
                         <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between">
                           <span className="font-mono text-xs font-bold text-primary">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude?.toFixed(6)}</span>
@@ -550,7 +576,7 @@ export default function PtwListPage() {
                                 <PlayCircle className="h-8 w-8 text-white" />
                               </div>
                               <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">
-                                VIDEO: {file.name}
+                                Video: {file.name}
                               </div>
                             </div>
                           ) : (
@@ -578,7 +604,7 @@ export default function PtwListPage() {
                 <Separator />
 
                 <div className="space-y-6">
-                  <h3 className="text-sm font-bold uppercase tracking-widest flex items-gap-2"><History className="h-4 w-4 text-primary" /> Lifecycle History</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><History className="h-4 w-4 text-primary" /> Lifecycle History</h3>
                   <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-8">
                     {[...(detailsPermit.timeline || [])].sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0)).map((entry, idx) => (
                       <div key={idx} className="relative">
@@ -628,7 +654,7 @@ export default function PtwListPage() {
               <ZoomIn className="h-5 w-5" />
             </Button>
             <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }} title="Zoom Out">
-              <ZoomOut className="h-5 w-5" />
+              <ZoomOut className="h-4 w-4" />
             </Button>
             <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }} title="Reset Zoom">
               <RotateCcw className="h-5 w-5" />
@@ -675,7 +701,7 @@ export default function PtwListPage() {
                     src={viewFile.url} 
                     controls 
                     autoPlay 
-                    className="max-w-full max-h-[85vh] shadow-2xl"
+                    className="max-w-full max-h-[85vh] shadow-2xl" 
                   />
                 ) : (
                   <img 
