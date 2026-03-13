@@ -58,35 +58,47 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.managerId == request.auth.uid);
     }
 
     match /permits_to_work/{permitId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && (resource.data.siteEngineerId == request.auth.uid || resource.data.siteManagerId == request.auth.uid));
     }
 
     match /dprs/{dprId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn() && (
+        request.auth.uid == resource.data.userId || 
+        request.auth.uid == resource.data.siteManagerId || 
+        isAdmin()
+      );
     }
 
     match /requirements/{reqId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn() && (
+        request.auth.uid == resource.data.userId || 
+        request.auth.uid == resource.data.siteManagerId || 
+        isAdmin()
+      );
     }
 
     match /material_movements/{movementId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow delete: if isSignedIn() && (
+        request.auth.uid == resource.data.userId || 
+        request.auth.uid == resource.data.siteManagerId || 
+        isAdmin()
+      );
     }
 
     match /tasks/{taskId} {
