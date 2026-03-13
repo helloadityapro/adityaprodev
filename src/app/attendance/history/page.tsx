@@ -169,90 +169,154 @@ export default function AttendanceHistoryPage() {
         </div>
       </div>
 
-      <Card className="rounded-sm shadow-xl border-primary/10 overflow-hidden">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest">Date</TableHead>
-                  {showPersonnelColumn && <TableHead className="font-black uppercase text-[10px] tracking-widest">Personnel</TableHead>}
-                  <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Entry (Photo/GPS)</TableHead>
-                  <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Exit (Photo/GPS)</TableHead>
-                  <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Duration</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEntries.length > 0 ? filteredEntries.map((entry) => (
-                  <TableRow key={entry.id} className="hover:bg-primary/[0.02] transition-colors group">
-                    <TableCell className="px-6 font-bold text-sm">{formatDate(entry.checkInTime)}</TableCell>
-                    {showPersonnelColumn && (
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-xs font-black uppercase text-foreground">
-                          <User className="h-3.5 w-3.5 text-primary" /> {entry.userName}
-                        </div>
-                      </TableCell>
-                    )}
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-3">
-                        <div className="flex flex-col items-center gap-1.5">
-                          <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
-                            <LogIn className="h-3 w-3" /> {formatTime(entry.checkInTime)}
-                          </div>
-                          <div className="flex gap-1 items-center">
-                            {entry.checkInSelfieUrl && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10 rounded-sm" onClick={() => openViewer(entry.checkInSelfieUrl!, entry)}>
-                                {isVideoUrl(entry.checkInSelfieUrl!) ? <Film className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
-                              </Button>
-                            )}
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted rounded-sm" asChild>
-                              <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkInLat},${entry.checkInLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3.5 w-3.5" /></a>
-                            </Button>
-                          </div>
-                        </div>
+      {/* Mobile Card List */}
+      <div className="md:hidden space-y-4">
+        {filteredEntries.length > 0 ? filteredEntries.map((entry) => (
+          <Card key={entry.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex justify-between items-start">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">{formatDate(entry.checkInTime)}</span>
+                  {showPersonnelColumn && <h3 className="font-bold text-sm flex items-center gap-1.5"><User className="h-3 w-3 text-primary" /> {entry.userName}</h3>}
+                </div>
+                <div className="flex items-center gap-1.5 font-black text-primary text-xs">
+                  <Timer className="h-3 w-3" />
+                  {calculateDuration(entry.checkInTime, entry.checkOutTime)}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Entry</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-emerald-700">{formatTime(entry.checkInTime)}</span>
+                    <div className="flex gap-1">
+                      {entry.checkInSelfieUrl && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkInSelfieUrl!, entry)}>
+                          {isVideoUrl(entry.checkInSelfieUrl!) ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
+                        <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkInLat},${entry.checkInLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Exit</p>
+                  {entry.checkOutTime ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-700">{formatTime(entry.checkOutTime)}</span>
+                      <div className="flex gap-1">
+                        {entry.checkOutSelfieUrl && (
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkOutSelfieUrl!, entry)}>
+                            {isVideoUrl(entry.checkOutSelfieUrl!) ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
+                          <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
+                        </Button>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {entry.checkOutTime ? (
+                    </div>
+                  ) : (
+                    <Badge variant="secondary" className="text-[8px] font-black uppercase rounded-sm h-5">In Session</Badge>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )) : (
+          <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
+            No attendance records discovered.
+          </div>
+        )}
+      </div>
+
+      {/* Desktop View */}
+      <div className="hidden md:block">
+        <Card className="rounded-sm shadow-xl border-primary/10 overflow-hidden">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest">Date</TableHead>
+                    {showPersonnelColumn && <TableHead className="font-black uppercase text-[10px] tracking-widest">Personnel</TableHead>}
+                    <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Entry (Photo/GPS)</TableHead>
+                    <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Exit (Photo/GPS)</TableHead>
+                    <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Duration</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredEntries.map((entry) => (
+                    <TableRow key={entry.id} className="hover:bg-primary/[0.02] transition-colors group">
+                      <TableCell className="px-6 font-bold text-sm">{formatDate(entry.checkInTime)}</TableCell>
+                      {showPersonnelColumn && (
+                        <TableCell>
+                          <div className="flex items-center gap-2 text-xs font-black uppercase text-foreground">
+                            <User className="h-3.5 w-3.5 text-primary" /> {entry.userName}
+                          </div>
+                        </TableCell>
+                      )}
+                      <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-3">
                           <div className="flex flex-col items-center gap-1.5">
-                            <div className="flex items-center gap-1.5 text-xs font-black text-slate-700">
-                              <LogOut className="h-3 w-3" /> {formatTime(entry.checkOutTime)}
-                              {entry.checkOutType === 'System CheckOut' && (
-                                <Badge variant="outline" className="ml-1 bg-red-50 text-red-600 border-red-100 text-[7px] h-4 px-1 font-black uppercase">System</Badge>
-                              )}
+                            <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
+                              <LogIn className="h-3 w-3" /> {formatTime(entry.checkInTime)}
                             </div>
                             <div className="flex gap-1 items-center">
-                              {entry.checkOutSelfieUrl && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10 rounded-sm" onClick={() => openViewer(entry.checkOutSelfieUrl!, entry)}>
-                                  {isVideoUrl(entry.checkOutSelfieUrl!) ? <Film className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                              {entry.checkInSelfieUrl && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10 rounded-sm" onClick={() => openViewer(entry.checkInSelfieUrl!, entry)}>
+                                  {isVideoUrl(entry.checkInSelfieUrl!) ? <Film className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
                                 </Button>
                               )}
                               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted rounded-sm" asChild>
-                                <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3.5 w-3.5" /></a>
+                                <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkInLat},${entry.checkInLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3.5 w-3.5" /></a>
                               </Button>
                             </div>
                           </div>
                         </div>
-                      ) : (
-                        <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm animate-pulse px-3 py-1">In Session</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1.5 font-black text-primary text-xs">
-                        <Timer className="h-3.5 w-3.5" />
-                        {calculateDuration(entry.checkInTime, entry.checkOutTime)}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )) : (
-                  <TableRow><TableCell colSpan={showPersonnelColumn ? 5 : 4} className="h-48 text-center text-muted-foreground italic font-medium uppercase text-[10px] tracking-widest opacity-40">No attendance records discovered.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {entry.checkOutTime ? (
+                          <div className="flex items-center justify-center gap-3">
+                            <div className="flex flex-col items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 text-xs font-black text-slate-700">
+                                <LogOut className="h-3 w-3" /> {formatTime(entry.checkOutTime)}
+                                {entry.checkOutType === 'System CheckOut' && (
+                                  <Badge variant="outline" className="ml-1 bg-red-50 text-red-600 border-red-100 text-[7px] h-4 px-1 font-black uppercase">System</Badge>
+                                )}
+                              </div>
+                              <div className="flex gap-1 items-center">
+                                {entry.checkOutSelfieUrl && (
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:bg-primary/10 rounded-sm" onClick={() => openViewer(entry.checkOutSelfieUrl!, entry)}>
+                                    {isVideoUrl(entry.checkOutSelfieUrl!) ? <Film className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
+                                  </Button>
+                                )}
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:bg-muted rounded-sm" asChild>
+                                  <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3.5 w-3.5" /></a>
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm animate-pulse px-3 py-1">In Session</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1.5 font-black text-primary text-xs">
+                          <Timer className="h-3.5 w-3.5" />
+                          {calculateDuration(entry.checkInTime, entry.checkOutTime)}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={!!viewUrl} onOpenChange={(o) => { if(!o) { setZoom(1); setViewUrl(null); setViewUrls([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 bg-black/95 border-none rounded-sm overflow-hidden flex flex-col items-center justify-center shadow-2xl">

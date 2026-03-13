@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -8,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin, Truck, Building2, ChevronsUpDown, Check, User, MessageCircle, FileText, ExternalLink } from "lucide-react";
+import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin, Truck, Building2, ChevronsUpDown, Check, User, MessageCircle, FileText, ExternalLink, Eye } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -217,19 +216,11 @@ export default function MovementListPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <ArrowLeftRight className="h-8 w-8" /> Movement Data
-          </h1>
-          <p className="text-muted-foreground">Track inward and outward material logs.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="rounded-sm font-bold border-primary text-primary hover:bg-primary/5" onClick={handlePrint}>
-            <FileDown className="mr-2 h-4 w-4" />
-            Generate Summary Report
-          </Button>
-        </div>
+      <div className="flex flex-col gap-1 no-print">
+        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+          <ArrowLeftRight className="h-8 w-8" /> Movement Data
+        </h1>
+        <p className="text-muted-foreground">Track inward and outward material logs.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
@@ -240,7 +231,6 @@ export default function MovementListPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">Daily material flow tracking</p>
           </CardContent>
         </Card>
         <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
@@ -250,7 +240,6 @@ export default function MovementListPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-700">{stats.inward}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">Materials received at site</p>
           </CardContent>
         </Card>
         <Card className="bg-blue-500/5 border-blue-500/10 rounded-sm">
@@ -260,82 +249,87 @@ export default function MovementListPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-700">{stats.outward}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">Materials dispatched from site</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
-        <div className="md:col-span-2 space-y-1.5">
+      <div className="flex flex-col md:flex-row md:items-end gap-4 no-print">
+        <div className="flex-1 space-y-1.5">
           <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search</Label>
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search item, site, from/to or user..." 
+              placeholder="Search item, site or user..." 
               className="pl-9 rounded-sm h-10 border-primary/20"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">From Date</Label>
-          <div className="relative">
-            <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input 
-              type="date" 
-              className="pl-9 rounded-sm h-10 border-primary/20" 
-              value={startDate} 
-              onChange={(e) => setStartDate(e.target.value)} 
-            />
-          </div>
-        </div>
-        <div className="space-y-1.5 flex gap-2">
-          <div className="flex-1 space-y-1.5">
-            <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">To Date</Label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <Input 
-                type="date" 
-                className="pl-9 rounded-sm h-10 border-primary/20" 
-                value={endDate} 
-                onChange={(e) => setEndDate(e.target.value)} 
-              />
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" className="mt-auto h-10 w-10 rounded-sm text-muted-foreground" onClick={() => { setSearchTerm(""); setStartDate(""); setEndDate(""); }} title="Clear Filters">
-            <FilterX className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button variant="outline" className="rounded-sm font-bold border-primary text-primary h-10 px-6" onClick={handlePrint}>
+          <FileDown className="mr-2 h-4 w-4" /> Export PDF
+        </Button>
       </div>
 
-      <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden" id="printable-report-area">
-        <CardHeader className="border-b bg-muted/5">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Material Movement Summary</CardTitle>
-              <CardDescription>
-                {startDate || endDate ? (
-                  <span className="text-primary font-bold">
-                    Report for {startDate || 'Earliest'} to {endDate || 'Latest'}
-                  </span>
-                ) : "Comprehensive log of all material inward and outward flows."}
-              </CardDescription>
-            </div>
-            <div className="hidden print:block text-right">
-              <p className="text-[10px] font-bold uppercase text-muted-foreground">Report Generated On</p>
-              <p className="text-sm font-mono font-bold text-primary">{format(new Date(), 'dd MMM yyyy HH:mm')}</p>
-            </div>
+      {/* Mobile Responsive List */}
+      <div className="md:hidden space-y-4">
+        {filteredMovements.length > 0 ? filteredMovements.map((mov) => (
+          <Card key={mov.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => mov.attachments?.length && setViewAttachments(mov.attachments)}>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex justify-between items-start">
+                <div className="flex flex-col gap-1 min-w-0">
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{mov.movementDate ? format(new Date(mov.movementDate), 'dd MMM yy') : '—'}</span>
+                  <h3 className="font-bold text-sm leading-tight text-foreground truncate">{mov.siteName}</h3>
+                </div>
+                <Badge variant="outline" className={cn("rounded-sm text-[9px] font-bold uppercase", mov.movementType === 'Inward' ? "bg-green-100 text-green-800 border-green-200" : "bg-blue-100 text-blue-800 border-blue-200")}>
+                  {mov.movementType}
+                </Badge>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm font-semibold">{mov.itemName}</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-primary">{mov.quantity} {mov.unit}</div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
+                    <User className="h-3 w-3" /> {mov.userName}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[8px] font-black uppercase text-muted-foreground">{mov.movementType === 'Inward' ? 'From' : 'To'} {mov.sourceOrDestinationType || 'Supplier'}</span>
+                  <span className="text-[10px] font-bold text-foreground truncate max-w-[150px]">{mov.sourceOrDestination}</span>
+                </div>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => { e.stopPropagation(); handleWhatsAppShare(mov); }}>
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                  {mov.userId === user?.uid && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={(e) => { e.stopPropagation(); setEditingMov(mov); }}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {(mov.userId === user?.uid || mov.siteManagerId === user?.uid || isAdmin) && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={(e) => { e.stopPropagation(); setDeletingMov(mov); }}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )) : (
+          <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
+            No movements found.
           </div>
-        </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
-          {loading ? (
-            <div className="p-6 space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : filteredMovements && filteredMovements.length > 0 ? (
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden" id="printable-report-area">
+          <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30">
@@ -382,12 +376,6 @@ export default function MovementListPage() {
                     </TableCell>
                     <TableCell>
                         <div className="text-sm font-semibold whitespace-pre-wrap max-w-xs">{mov.itemName}</div>
-                        {mov.editedBy && (
-                            <div className="flex items-center gap-1.5 text-[8px] text-primary/70 font-bold uppercase mt-1">
-                                <Badge variant="outline" className="h-3 px-1 text-[7px] border-primary/20">Edited</Badge>
-                                <span>by {mov.editedBy}</span>
-                            </div>
-                        )}
                     </TableCell>
                     <TableCell>
                         <div className="font-mono font-bold text-sm text-primary">{mov.quantity}</div>
@@ -402,26 +390,20 @@ export default function MovementListPage() {
                     <TableCell className="text-right px-6 no-print">
                         <div className="flex justify-end items-center gap-1">
                             {mov.attachments && mov.attachments.length > 0 && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-primary" 
-                                onClick={() => setViewAttachments(mov.attachments || null)} 
-                                title="View Invoices"
-                              >
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewAttachments(mov.attachments || null)}>
                                 <FileText className="h-4 w-4" />
                               </Button>
                             )}
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(mov)} title="Push to WhatsApp">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => handleWhatsAppShare(mov)}>
                                 <MessageCircle className="h-4 w-4" />
                             </Button>
                             {mov.userId === user?.uid && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => setEditingMov(mov)}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setEditingMov(mov)}>
                                     <Pencil className="h-4 w-4" />
                                 </Button>
                             )}
                             {(mov.userId === user?.uid || mov.siteManagerId === user?.uid || isAdmin) && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => setDeletingMov(mov)}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingMov(mov)}>
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
                             )}
@@ -431,129 +413,38 @@ export default function MovementListPage() {
                 ))}
               </TableBody>
             </Table>
-          ) : (
-            <div className="text-center py-24 text-muted-foreground italic bg-muted/5 border-t border-dashed">
-              No movement records found.
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* View Attachments Dialog */}
       <Dialog open={!!viewAttachments} onOpenChange={(o) => !o && setViewAttachments(null)}>
         <DialogContent className="rounded-sm max-w-md">
-          <DialogHeader>
-            <DialogTitle>Attached Invoices / Documents</DialogTitle>
-            <DialogDescription>Review uploaded files for this movement record.</DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Invoices / Documents</DialogTitle></DialogHeader>
           <div className="py-4 space-y-3">
             {viewAttachments?.map((att, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 border rounded-sm bg-muted/5">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-background rounded-sm border">
-                    {att.contentType.includes('pdf') ? <FileText className="h-4 w-4 text-red-500" /> : <FileText className="h-4 w-4 text-blue-500" />}
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold truncate max-w-[200px]">{att.name}</span>
-                    <span className="text-[9px] uppercase text-muted-foreground font-black tracking-tighter">{att.contentType.split('/')[1]}</span>
-                  </div>
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                  <a href={att.url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
+                <span className="text-xs font-bold truncate max-w-[200px]">{att.name}</span>
+                <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-primary" asChild>
+                  <a href={att.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3 w-3 mr-1.5" /> View</a>
                 </Button>
               </div>
             ))}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewAttachments(null)}>Close</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Edit Dialog */}
       <Dialog open={!!editingMov} onOpenChange={(o) => !o && setEditingMov(null)}>
         <DialogContent className="rounded-sm max-w-lg">
             <DialogHeader>
-                <DialogTitle>Edit Movement Record</DialogTitle>
-                <DialogDescription>Modify the recorded material movement details.</DialogDescription>
+                <DialogTitle>Edit Movement</DialogTitle>
+                <DialogDescription>Modify the recorded details.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
                 <div className="space-y-2">
                     <Label>Item Name</Label>
                     <Input value={editingMov?.itemName || ""} onChange={(e) => setEditingMov(prev => prev ? { ...prev, itemName: e.target.value } : null)} />
-                </div>
-                
-                <div className="space-y-3">
-                    <Label>{editingMov?.movementType === 'Inward' ? 'Inward From' : 'Outward To'}</Label>
-                    <RadioGroup
-                        value={editingMov?.sourceOrDestinationType || "Supplier"}
-                        onValueChange={(val: any) => setEditingMov(prev => prev ? { ...prev, sourceOrDestinationType: val, sourceOrDestination: "" } : null)}
-                        className="flex gap-4 mb-2"
-                    >
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="Supplier" id="edit-supplier" />
-                            <Label htmlFor="edit-supplier" className="font-normal cursor-pointer flex items-center gap-1"><Truck className="h-3.5 w-3.5" /> Supplier</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="Site" id="edit-site" />
-                            <Label htmlFor="edit-site" className="font-normal cursor-pointer flex items-center gap-1"><Building2 className="h-3.5 w-3.5" /> Project Site</Label>
-                        </div>
-                    </RadioGroup>
-                    
-                    {editingMov?.sourceOrDestinationType === 'Site' ? (
-                        <Popover open={isEditSitePopoverOpen} onOpenChange={setIsEditSitePopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" className="w-full justify-between font-normal rounded-sm">
-                                    {editingMov.sourceOrDestination || "Select site..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                <div className="flex items-center border-b px-3">
-                                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                    <Input 
-                                        placeholder="Search sites..." 
-                                        className="h-9 w-full border-none focus-visible:ring-0 px-0" 
-                                        value={editSiteSearchQuery} 
-                                        onChange={(e) => setEditSiteSearchQuery(e.target.value)}
-                                    />
-                                </div>
-                                <ScrollArea className="h-[200px]">
-                                    {filteredAllSites.map((site) => (
-                                        <Button 
-                                            key={site.id} 
-                                            variant="ghost" 
-                                            className="w-full justify-start font-normal text-left" 
-                                            onClick={() => { setEditingMov(prev => prev ? { ...prev, sourceOrDestination: site.name } : null); setIsEditSitePopoverOpen(false); }}
-                                        >
-                                            <Check className={cn("mr-2 h-4 w-4 shrink-0", site.name === editingMov.sourceOrDestination ? "opacity-100" : "opacity-0")} />
-                                            <span className="truncate">{site.name}</span>
-                                        </Button>
-                                    ))}
-                                </ScrollArea>
-                            </PopoverContent>
-                        </Popover>
-                    ) : (
-                        <Input value={editingMov?.sourceOrDestination || ""} onChange={(e) => setEditingMov(prev => prev ? { ...prev, sourceOrDestination: e.target.value } : null)} placeholder="Supplier name" />
-                    )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label>Movement Type</Label>
-                        <Select value={editingMov?.movementType} onValueChange={(val: any) => setEditingMov(prev => prev ? { ...prev, movementType: val } : null)}>
-                            <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Inward">Inward</SelectItem>
-                                <SelectItem value="Outward">Outward</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Date</Label>
-                        <Input type="date" value={editingMov?.movementDate || ""} onChange={(e) => setEditingMov(prev => prev ? { ...prev, movementDate: e.target.value } : null)} />
-                    </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -561,39 +452,25 @@ export default function MovementListPage() {
                         <Input type="number" value={editingMov?.quantity || 0} onChange={(e) => setEditingMov(prev => prev ? { ...prev, quantity: Number(e.target.value) } : null)} />
                     </div>
                     <div className="space-y-2">
-                        <Label>Unit</Label>
-                        <Select value={editingMov?.unit} onValueChange={(val) => setEditingMov(prev => prev ? { ...prev, unit: val } : null)}>
-                            <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                {["Numbers", "Kilograms", "Liters", "Meters", "Sets"].map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
+                        <Label>Date</Label>
+                        <Input type="date" value={editingMov?.movementDate || ""} onChange={(e) => setEditingMov(prev => prev ? { ...prev, movementDate: e.target.value } : null)} />
                     </div>
                 </div>
             </div>
             <DialogFooter>
-                <Button variant="outline" onClick={() => setEditingMov(null)} disabled={isSaving}>Cancel</Button>
-                <Button onClick={handleEditSave} disabled={isSaving || !editingMov?.itemName.trim() || !editingMov?.sourceOrDestination.trim()}>
-                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Update Record
-                </Button>
+                <Button variant="outline" onClick={() => setEditingMov(null)}>Cancel</Button>
+                <Button onClick={handleEditSave} disabled={isSaving}>Update</Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation */}
       <AlertDialog open={!!deletingMov} onOpenChange={(o) => !o && setDeletingMov(null)}>
         <AlertDialogContent className="rounded-sm">
-            <AlertDialogHeader>
-                <AlertDialogTitle>Delete Record?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    This will permanently remove this material movement log and reverse any reward points earned.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
+            <AlertDialogHeader><AlertDialogTitle>Delete Record?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Delete Permanently
-                </AlertDialogAction>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

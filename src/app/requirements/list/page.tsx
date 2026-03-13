@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ClipboardList, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, AlertCircle, CheckCircle2, History, User, MoreHorizontal, CircleCheck, CircleX } from "lucide-react";
+import { ClipboardList, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, AlertCircle, CheckCircle2, History, User, MoreHorizontal, CircleCheck, CircleX, Building2, Eye } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -216,19 +216,11 @@ export default function RequirementListPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <ClipboardList className="h-8 w-8" /> Requirement Data
-          </h1>
-          <p className="text-muted-foreground">Monitor and track site material requests.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="rounded-sm font-bold border-primary text-primary hover:bg-primary/5" onClick={handlePrint}>
-            <FileDown className="mr-2 h-4 w-4" />
-            Generate Summary Report
-          </Button>
-        </div>
+      <div className="flex flex-col gap-1 no-print">
+        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2 uppercase">
+          <ClipboardList className="h-8 w-8" /> Requirement Data
+        </h1>
+        <p className="text-muted-foreground">Monitor and track site material requests.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
@@ -239,9 +231,6 @@ export default function RequirementListPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              <span className="text-red-600 font-bold">{stats.high} High Urgency</span> items pending
-            </p>
           </CardContent>
         </Card>
         <Card className="bg-yellow-500/5 border-yellow-500/10 rounded-sm">
@@ -251,7 +240,6 @@ export default function RequirementListPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-700">{stats.pending}</div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium">Awaiting approvals</p>
           </CardContent>
         </Card>
         <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
@@ -261,13 +249,12 @@ export default function RequirementListPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-700">{stats.delivered}</div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium">Delivered to site</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
-        <div className="md:col-span-2 space-y-1.5">
+      <div className="flex flex-col md:flex-row md:items-end gap-4 no-print">
+        <div className="flex-1 space-y-1.5">
           <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search</Label>
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -279,58 +266,71 @@ export default function RequirementListPage() {
             />
           </div>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">From Expected Date</Label>
-          <div className="relative">
-            <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input 
-              type="date" 
-              className="pl-9 rounded-sm h-10 border-primary/20" 
-              value={startDate} 
-              onChange={(e) => setStartDate(e.target.value)} 
-            />
-          </div>
-        </div>
-        <div className="space-y-1.5 flex gap-2">
-          <div className="flex-1 space-y-1.5">
-            <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">To Expected Date</Label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <Input 
-                type="date" 
-                className="pl-9 rounded-sm h-10 border-primary/20" 
-                value={endDate} 
-                onChange={(e) => setEndDate(e.target.value)} 
-              />
-            </div>
-          </div>
-          <Button variant="ghost" size="icon" className="mt-auto h-10 w-10 rounded-sm text-muted-foreground" onClick={() => { setSearchTerm(""); setStartDate(""); setEndDate(""); }} title="Clear Filters">
-            <FilterX className="h-4 w-4" />
-          </Button>
-        </div>
+        <Button variant="outline" className="rounded-sm font-bold border-primary text-primary h-10 px-6" onClick={handlePrint}>
+          <FileDown className="mr-2 h-4 w-4" /> Export PDF
+        </Button>
       </div>
 
-      <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden" id="printable-report-area">
-        <CardHeader className="border-b bg-muted/5">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Daily Site Requirements Summary</CardTitle>
-              <CardDescription>Approval workflow and status tracking for site material requests.</CardDescription>
-            </div>
-            <div className="hidden print:block text-right">
-              <p className="text-[10px] font-bold uppercase text-muted-foreground">Report Generated On</p>
-              <p className="text-sm font-mono font-bold text-primary">{format(new Date(), 'dd MMM yyyy HH:mm')}</p>
-            </div>
+      {/* Mobile-Responsive Card List */}
+      <div className="md:hidden space-y-4">
+        {sortedAndFilteredReqs.length > 0 ? sortedAndFilteredReqs.map((req) => (
+          <Card key={req.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setHistoryReq(req)}>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex flex-col gap-1 min-w-0">
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">Expected {req.expectedDate ? format(new Date(req.expectedDate), 'dd MMM yy') : '—'}</span>
+                  <h3 className="font-bold text-sm leading-tight text-foreground truncate">{req.itemName}</h3>
+                </div>
+                <Badge variant="outline" className={cn("rounded-sm text-[9px] font-bold uppercase", urgencyConfig[req.urgency] || urgencyConfig.Medium)}>
+                  {req.urgency}
+                </Badge>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
+                  <Building2 className="h-3 w-3 text-primary/60" />
+                  <span>{req.siteName}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-primary">{req.quantity} {req.unit}</span>
+                  <StatusBadge status={req.status} />
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <User className="h-3 w-3 text-primary" />
+                  <span className="text-[10px] font-bold text-muted-foreground">{req.userName}</span>
+                </div>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={(e) => { e.stopPropagation(); setHistoryReq(req); }}>
+                    <History className="h-4 w-4" />
+                  </Button>
+                  {(isAdmin || isManager) && req.status === 'Pending' && (
+                    <>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => { e.stopPropagation(); setActionState({ req, targetStatus: isManager ? 'ManagerApproved' : 'Approved' }); }}>
+                        <CircleCheck className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={(e) => { e.stopPropagation(); setActionState({ req, targetStatus: 'Rejected' }); }}>
+                        <CircleX className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )) : (
+          <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
+            No requirements found.
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {reqsLoading ? (
-            <div className="p-6 space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : sortedAndFilteredReqs && sortedAndFilteredReqs.length > 0 ? (
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden" id="printable-report-area">
+          <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30">
@@ -358,12 +358,6 @@ export default function RequirementListPage() {
                       </TableCell>
                       <TableCell>
                           <div className="text-sm font-semibold whitespace-pre-wrap max-w-xs">{req.itemName}</div>
-                          {req.editedBy && (
-                              <div className="flex items-center gap-1.5 text-[8px] text-primary/70 font-bold uppercase mt-1">
-                                  <Badge variant="outline" className="h-3 px-1 text-[7px] border-primary/20">Edited</Badge>
-                                  <span>by {req.editedBy}</span>
-                              </div>
-                          )}
                       </TableCell>
                       <TableCell>
                           <Badge variant="outline" className={cn("rounded-sm text-[10px] font-bold uppercase", urgencyConfig[req.urgency] || urgencyConfig.Medium)}>
@@ -405,12 +399,9 @@ export default function RequirementListPage() {
                       </TableCell>
                       <TableCell className="text-right px-6 no-print">
                           <div className="flex justify-end items-center gap-1">
-                              {/* History/Timeline Button */}
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setHistoryReq(req)} title="View Timeline">
                                   <History className="h-4 w-4" />
                               </Button>
-
-                              {/* Approval Buttons */}
                               {(canManagerAct || canAdminAct) && (
                                 <>
                                   <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve">
@@ -421,7 +412,6 @@ export default function RequirementListPage() {
                                   </Button>
                                 </>
                               )}
-
                               {isOwner && req.status === 'Pending' && (
                                   <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingReq(req)}>
                                       <Trash2 className="h-4 w-4" />
@@ -434,78 +424,56 @@ export default function RequirementListPage() {
                 })}
               </TableBody>
             </Table>
-          ) : (
-            <div className="text-center py-24 text-muted-foreground italic bg-muted/5 border-t border-dashed">
-              No requirements found matching your criteria.
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Action Dialog (Remarks for Approve/Reject/Logistics) */}
+      {/* Action Dialog */}
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent className="rounded-sm">
           <DialogHeader>
-            <DialogTitle>Update Requirement Status</DialogTitle>
-            <DialogDescription>Setting status to <strong>{actionState?.targetStatus}</strong> for {actionState?.req?.itemName}.</DialogDescription>
+            <DialogTitle>Update Status</DialogTitle>
+            <DialogDescription>Setting status to <strong>{actionState?.targetStatus}</strong>.</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-2">
-            <Label>Remarks / Internal Notes</Label>
-            <Textarea id="action-remarks" placeholder="Explain the reason for this status update..." className="min-h-[100px] rounded-sm" />
+            <Label>Remarks</Label>
+            <Textarea id="action-remarks" placeholder="Provide reason..." className="min-h-[100px] rounded-sm" />
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
-            <Button className="rounded-sm" onClick={() => {
-              const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "";
-              handleAction(remarks);
-            }}>Confirm Status Change</Button>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={() => handleAction((document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "")}>Confirm</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Timeline / History Dialog */}
+      {/* History Dialog */}
       <Dialog open={!!historyReq} onOpenChange={(o) => !o && setHistoryReq(null)}>
         <DialogContent className="rounded-sm max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" /> Requirement Lifecycle</DialogTitle>
-            <DialogDescription>Full tracking log for {historyReq?.itemName}.</DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[400px] pr-4">
+          <DialogHeader><DialogTitle>Requirement Lifecycle</DialogTitle></DialogHeader>
+          <ScrollArea className="max-h-[400px]">
             <div className="space-y-6 relative border-l-2 border-muted ml-3 pl-6 py-2">
               {historyReq?.timeline?.map((entry, idx) => (
                 <div key={idx} className="relative">
-                  <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-primary">{entry.action} — {entry.userName}</span>
-                      <span className="text-[10px] font-mono text-muted-foreground">{entry.timestamp ? format(new Date(entry.timestamp), 'dd MMM HH:mm') : 'N/A'}</span>
-                    </div>
-                    <p className="text-sm italic text-foreground/80 leading-relaxed">"{entry.remarks}"</p>
-                    <div className="mt-1"><StatusBadge status={entry.status} className="h-4 py-0" /></div>
+                  <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="text-xs font-bold text-primary">{entry.action} — {entry.userName}</span>
+                    <p className="text-sm italic">{entry.remarks}</p>
+                    <StatusBadge status={entry.status} className="w-fit" />
                   </div>
                 </div>
               ))}
-              {!historyReq?.timeline?.length && (
-                <p className="text-center text-sm text-muted-foreground py-8 italic">No detailed history recorded for this request.</p>
-              )}
             </div>
           </ScrollArea>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline" className="rounded-sm">Close Log</Button></DialogClose>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deletingReq} onOpenChange={(o) => !o && setDeletingReq(null)}>
         <AlertDialogContent className="rounded-sm">
-            <AlertDialogHeader>
-                <AlertDialogTitle>Delete Request?</AlertDialogTitle>
-                <AlertDialogDescription>This will permanently remove the material request for <strong>{deletingReq?.itemName}</strong>.</AlertDialogDescription>
-            </AlertDialogHeader>
+            <AlertDialogHeader><AlertDialogTitle>Delete Request?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete Permanently</AlertDialogAction>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

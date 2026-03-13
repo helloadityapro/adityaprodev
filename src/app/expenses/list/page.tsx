@@ -233,89 +233,141 @@ export default function ExpensesListPage() {
         </div>
       </div>
 
-      <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead className="px-6 min-w-[150px]">Date & Personnel</TableHead>
-                  <TableHead className="min-w-[200px]">Submission Summary</TableHead>
-                  <TableHead>Total Amount</TableHead>
-                  <TableHead>Site Context</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right px-6">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredExpenses.length > 0 ? filteredExpenses.map((expense) => (
-                  <TableRow key={expense.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setSelectedExpense(expense)}>
-                    <TableCell className="px-6 py-4">
-                      <div className="flex flex-col gap-1">
-                        <div className="text-[10px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-1.5">
-                          <Calendar className="h-3 w-3" />
-                          {expense.createdAt ? format(expense.createdAt.toDate(), 'dd MMM yyyy') : '—'}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <UserIcon className="h-3.5 w-3.5 text-primary" />
-                          <span className="font-bold text-sm text-foreground">{expense.userName}</span>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-bold text-sm leading-tight text-foreground">{expense.title}</span>
-                        <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">{expense.items.length} Items Logged</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-black text-primary text-sm font-mono">
-                      ₹{expense.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                        <Building2 className="h-3.5 w-3.5" />
-                        {expense.siteName}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn(
-                        "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                        expense.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                        expense.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                        "bg-red-50 text-red-700 border-red-200"
-                      )}>
-                        {expense.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right px-6">
-                      <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => triggerWhatsApp(expense)} title="Push to WhatsApp">
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                        {isAdmin && expense.status === 'Pending' && (
-                          <div className="flex gap-1">
-                            <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3" onClick={() => setActionState({ expense, type: 'Approved' })}>
-                              Approve
-                            </Button>
-                            <Button size="sm" variant="destructive" className="h-8 rounded-sm font-bold px-3" onClick={() => setActionState({ expense, type: 'Rejected' })}>
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setSelectedExpense(expense)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )) : (
-                  <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No expense submissions found.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
+      {/* Mobile-Responsive Card List */}
+      <div className="md:hidden space-y-4">
+        {filteredExpenses.length > 0 ? filteredExpenses.map((expense) => (
+          <Card key={expense.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setSelectedExpense(expense)}>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex flex-col gap-1 min-w-0">
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{expense.createdAt ? format(expense.createdAt.toDate(), 'dd MMM yyyy') : '—'}</span>
+                  <h3 className="font-bold text-sm leading-tight text-foreground truncate">{expense.title}</h3>
+                </div>
+                <Badge variant="outline" className={cn(
+                  "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                  expense.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                  expense.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                  "bg-red-50 text-red-700 border-red-200"
+                )}>
+                  {expense.status}
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <Building2 className="h-3.5 w-3.5" />
+                  {expense.siteName}
+                </div>
+                <span className="font-black text-primary text-sm font-mono">₹{expense.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+
+              <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserIcon className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-bold text-muted-foreground">{expense.userName}</span>
+                </div>
+                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => triggerWhatsApp(expense)}>
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setSelectedExpense(expense)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )) : (
+          <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
+            No expense submissions found.
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="px-6 min-w-[150px]">Date & Personnel</TableHead>
+                    <TableHead className="min-w-[200px]">Submission Summary</TableHead>
+                    <TableHead>Total Amount</TableHead>
+                    <TableHead>Site Context</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right px-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredExpenses.map((expense) => (
+                    <TableRow key={expense.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setSelectedExpense(expense)}>
+                      <TableCell className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <div className="text-[10px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                            <Calendar className="h-3 w-3" />
+                            {expense.createdAt ? format(expense.createdAt.toDate(), 'dd MMM yyyy') : '—'}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <UserIcon className="h-3.5 w-3.5 text-primary" />
+                            <span className="font-bold text-sm text-foreground">{expense.userName}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-bold text-sm leading-tight text-foreground">{expense.title}</span>
+                          <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">{expense.items.length} Items Logged</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-black text-primary text-sm font-mono">
+                        ₹{expense.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                          <Building2 className="h-3.5 w-3.5" />
+                          {expense.siteName}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn(
+                          "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                          expense.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                          expense.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                          "bg-red-50 text-red-700 border-red-200"
+                        )}>
+                          {expense.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => triggerWhatsApp(expense)} title="Push to WhatsApp">
+                            <MessageCircle className="h-4 w-4" />
+                          </Button>
+                          {isAdmin && expense.status === 'Pending' && (
+                            <div className="flex gap-1">
+                              <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3" onClick={() => setActionState({ expense, type: 'Approved' })}>
+                                Approve
+                              </Button>
+                              <Button size="sm" variant="destructive" className="h-8 rounded-sm font-bold px-3" onClick={() => setActionState({ expense, type: 'Rejected' })}>
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setSelectedExpense(expense)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Detail Modal */}
       <Dialog open={!!selectedExpense} onOpenChange={(o) => !o && handleCloseDetail()}>
@@ -358,7 +410,7 @@ export default function ExpensesListPage() {
                   </div>
                   
                   <div className="bg-primary/5 rounded-sm border-2 border-primary/10 p-6 flex flex-col justify-center items-center text-center shadow-inner">
-                    <span className="text-[10px] font-black uppercase text-primary tracking-widest leading-none mb-2">Aggregate Total</span>
+                    <span className="text-[10px] font-black uppercase text-primary tracking-widest mb-2">Aggregate Total</span>
                     <span className="text-4xl font-black tabular-nums text-primary">₹{selectedExpense.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>

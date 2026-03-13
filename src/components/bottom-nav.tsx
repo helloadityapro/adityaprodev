@@ -12,10 +12,10 @@ import {
   Package,
   CheckSquare,
   Navigation,
-  CalendarDays,
-  ListTodo,
-  FileCheck,
-  User
+  CalendarCheck2,
+  LayoutList,
+  ShieldCheck,
+  UserCircle2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -30,20 +30,19 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 /**
  * Bottom navigation bar for mobile devices.
- * Features a centralized "Quick Actions" hub for field operations.
- * Modern layout with labels for improved accessibility and task focus.
+ * Features a centralized "+" Quick Actions hub.
+ * Modern layout with icon-only focus for a minimal appearance.
  */
 export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // Navigation items updated as per user request: Attendance, My Tasks, My PtWs, Profile
   const navItems = [
-    { label: 'Attendance', href: '/attendance', icon: CalendarDays },
-    { label: 'My Tasks', href: '/tasks/list', icon: ListTodo },
+    { label: 'Attendance', href: '/attendance', icon: CalendarCheck2 },
+    { label: 'My Tasks', href: '/tasks/list', icon: LayoutList },
     // Center position is reserved for Quick Actions hub
-    { label: 'My PtWs', href: '/ptw/list', icon: FileCheck },
-    { label: 'Profile', href: '/profile', icon: User },
+    { label: 'My PtWs', href: '/ptw/list', icon: ShieldCheck },
+    { label: 'Profile', href: '/profile', icon: UserCircle2 },
   ];
 
   const quickActions = [
@@ -88,7 +87,7 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/80 backdrop-blur-xl pb-safe md:hidden shadow-[0_-4px_20px_0_rgba(0,0,0,0.05)]">
       <div className="flex h-16 items-center justify-around px-1">
-        {/* Left Side: Attendance & My Tasks */}
+        {/* Left Side Items */}
         {navItems.slice(0, 2).map((item) => {
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.href);
@@ -105,14 +104,8 @@ export function BottomNav() {
                 "p-1.5 rounded-lg transition-all duration-300",
                 isActive && "bg-primary/10"
               )}>
-                <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5px]")} />
+                <Icon className={cn("h-6 w-6", isActive && "stroke-[2.5px]")} />
               </div>
-              <span className={cn(
-                "text-[9px] font-bold uppercase tracking-tighter mt-0.5",
-                isActive ? "text-primary" : "text-muted-foreground"
-              )}>
-                {item.label}
-              </span>
             </Link>
           );
         })}
@@ -121,19 +114,18 @@ export function BottomNav() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <div className="flex flex-col items-center justify-center w-full h-full cursor-pointer group">
-              <div className="bg-primary text-primary-foreground p-3 rounded-full shadow-xl shadow-primary/30 -mt-8 border-[4px] border-background transition-all duration-300 group-active:scale-90">
-                <Plus className="h-5 w-5 stroke-[3.5px]" />
+              <div className="bg-primary text-primary-foreground p-3 rounded-full shadow-xl shadow-primary/30 -mt-8 border-[4px] border-background transition-all duration-300 group-active:scale-95">
+                <Plus className="h-6 w-6 stroke-[3.5px]" />
               </div>
-              <span className="text-[9px] font-black uppercase tracking-tighter mt-1 text-primary">Actions</span>
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent 
             side="top" 
             align="center" 
             sideOffset={15}
-            className="w-52 rounded-xl shadow-2xl border-primary/10 mb-2 p-1 bg-background/95 backdrop-blur-md"
+            className="w-56 rounded-xl shadow-2xl border-primary/10 mb-2 p-1 bg-background/95 backdrop-blur-md"
           >
-            <DropdownMenuLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 py-2.5 px-3 font-body">
+            <DropdownMenuLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 py-2.5 px-3">
               <Zap className="h-3 w-3 fill-amber-500 text-amber-500" /> 
               QUICKLY
             </DropdownMenuLabel>
@@ -144,7 +136,7 @@ export function BottomNav() {
                   <DropdownMenuItem
                     key={action.href}
                     onClick={() => router.push(action.href)}
-                    className="cursor-pointer py-2.5 px-3 focus:bg-primary/5 group rounded-lg mb-0.5 font-body"
+                    className="cursor-pointer py-2.5 px-3 focus:bg-primary/5 group rounded-lg mb-0.5"
                   >
                     <div className="flex items-center gap-3 w-full">
                       <div className="p-1.5 bg-muted/50 rounded-lg group-hover:bg-primary/10 transition-colors shrink-0">
@@ -166,7 +158,7 @@ export function BottomNav() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Right Side: My PtWs & Profile */}
+        {/* Right Side Items */}
         {navItems.slice(2).map((item) => {
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.href);
@@ -183,14 +175,8 @@ export function BottomNav() {
                 "p-1.5 rounded-lg transition-all duration-300",
                 isActive && "bg-primary/10"
               )}>
-                <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5px]")} />
+                <Icon className={cn("h-6 w-6", isActive && "stroke-[2.5px]")} />
               </div>
-              <span className={cn(
-                "text-[9px] font-bold uppercase tracking-tighter mt-0.5",
-                isActive ? "text-primary" : "text-muted-foreground"
-              )}>
-                {item.label}
-              </span>
             </Link>
           );
         })}

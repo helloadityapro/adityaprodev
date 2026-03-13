@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -233,10 +232,10 @@ export default function TaskListPage() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2 uppercase">
             <ListTodo className="h-8 w-8" /> Tasks Management
           </h1>
-          <p className="text-muted-foreground">Monitor and update site activity assignments.</p>
+          <p className="text-muted-foreground text-sm font-medium">Monitor and update site activity assignments.</p>
         </div>
         <Button onClick={() => router.push('/tasks/create')} className="rounded-sm font-bold">
           Assign New Task
@@ -308,9 +307,59 @@ export default function TaskListPage() {
           </div>
         </div>
 
-        <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden">
-          <CardContent className="p-0">
-            {filteredTasks.length > 0 ? (
+        {/* Mobile-Responsive Card List */}
+        <div className="md:hidden space-y-4">
+          {filteredTasks.length > 0 ? filteredTasks.map((task) => (
+            <Card key={task.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setActionTask(task)}>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Due {format(new Date(task.dueDate), 'dd MMM yy')}</span>
+                    <h3 className="font-bold text-sm leading-tight text-foreground truncate">{task.title}</h3>
+                  </div>
+                  <StatusBadge status={task.status} />
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
+                    <MapPin className="h-3 w-3 text-primary/60" />
+                    <span>{task.siteName}</span>
+                  </div>
+                  <PriorityBadge priority={task.priority} />
+                </div>
+
+                <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Assignee</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <User className="h-3 w-3 text-primary" />
+                      <span className="text-[11px] font-bold">{task.assignedToName}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                    {isAdmin && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={(e) => { e.stopPropagation(); setDeletingTask(task); }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )) : (
+            <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
+              No tasks found matching your criteria.
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block">
+          <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden">
+            <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30">
@@ -324,7 +373,7 @@ export default function TaskListPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredTasks.map((task) => (
-                    <TableRow key={task.id} className="hover:bg-muted/5 transition-colors">
+                    <TableRow key={task.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setActionTask(task)}>
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="text-xs font-bold text-muted-foreground uppercase tracking-tight">Due By</span>
@@ -351,18 +400,18 @@ export default function TaskListPage() {
                       </TableCell>
                       <TableCell><StatusBadge status={task.status} /></TableCell>
                       <TableCell className="text-right px-6">
-                        <div className="flex justify-end items-center gap-1">
+                        <div className="flex justify-end items-center gap-1" onClick={e => e.stopPropagation()}>
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-8 w-8 text-primary hover:bg-primary/10" 
+                            className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm" 
                             onClick={() => setActionTask(task)}
                             title="Update Status"
                           >
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                           {isAdmin && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingTask(task)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingTask(task)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           )}
@@ -372,13 +421,9 @@ export default function TaskListPage() {
                   ))}
                 </TableBody>
               </Table>
-            ) : (
-              <div className="text-center py-24 text-muted-foreground italic bg-muted/5">
-                No tasks found matching your filters.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Task Update Dialog */}
