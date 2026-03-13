@@ -430,63 +430,110 @@ export default function RewardsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="w-full">
-            <div className="min-w-full">
-              <Table>
-                <TableHeader className="bg-muted/30">
-                  <TableRow>
-                    <TableHead className="w-14 text-center px-2">Rank</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead className="text-right">Points</TableHead>
-                    <TableHead className="text-right px-4 hidden sm:table-cell">Value</TableHead>
-                    {isAdmin && <TableHead className="w-14 text-right pr-4"></TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredLeaders.map((leader, index) => {
-                    const actualRank = leaders?.findIndex(l => l.id === leader.id) ?? index;
-                    const isMe = leader.id === user?.uid;
-                    
-                    return (
-                      <TableRow key={leader.id} className={cn("hover:bg-muted/5 transition-colors", isMe && "bg-primary/[0.03]")}>
-                        <TableCell className="text-center px-2 font-black text-xs">
-                            {actualRank === 0 ? <Trophy className="h-5 w-5 text-amber-500 mx-auto" /> : 
-                             actualRank === 1 ? <Medal className="h-5 w-5 text-slate-400 mx-auto" /> :
-                             actualRank === 2 ? <Medal className="h-5 w-5 text-amber-700 mx-auto" /> :
-                             actualRank + 1}
-                        </TableCell>
-                        <TableCell className="max-w-[150px] md:max-w-none">
-                            <div className="flex items-center gap-3">
-                                <Avatar className="h-8 w-8 border shrink-0">
-                                    <AvatarFallback className="text-[10px] font-black uppercase">{leader.username?.charAt(0)}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex flex-col min-w-0">
-                                    <span className={cn("text-xs truncate", isMe ? "font-black" : "font-bold")}>{leader.username}</span>
-                                    <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tight truncate">{leader.role}</span>
-                                </div>
-                            </div>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums font-black text-xs text-primary">
-                            {leader.totalPoints?.toFixed(2) || '0.00'}
-                        </TableCell>
-                        <TableCell className="text-right font-black text-xs text-green-700 px-4 hidden sm:table-cell">
-                            ₹{((leader.totalPoints || 0) * pointValue).toLocaleString('en-IN')}
-                        </TableCell>
-                        {isAdmin && (
-                          <TableCell className="text-right pr-4">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setSelectedHistoryUser(leader)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
+          {/* Mobile Card List View */}
+          <div className="md:hidden divide-y divide-border/50">
+            {filteredLeaders.length > 0 ? filteredLeaders.map((leader, index) => {
+              const actualRank = leaders?.findIndex(l => l.id === leader.id) ?? index;
+              const isMe = leader.id === user?.uid;
+              
+              return (
+                <div 
+                  key={leader.id} 
+                  className={cn("p-4 flex items-center justify-between transition-colors", isMe && "bg-primary/[0.03]")}
+                  onClick={() => isAdmin && setSelectedHistoryUser(leader)}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 text-center font-black text-xs shrink-0">
+                      {actualRank === 0 ? <Trophy className="h-5 w-5 text-amber-500 mx-auto" /> : 
+                       actualRank === 1 ? <Medal className="h-5 w-5 text-slate-400 mx-auto" /> :
+                       actualRank === 2 ? <Medal className="h-5 w-5 text-amber-700 mx-auto" /> :
+                       actualRank + 1}
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Avatar className="h-8 w-8 border shrink-0">
+                        <AvatarFallback className="text-[10px] font-black uppercase">{leader.username?.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col min-w-0">
+                        <span className={cn("text-xs truncate font-bold", isMe && "text-primary")}>{leader.username}</span>
+                        <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tight truncate">{leader.role}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right flex flex-col shrink-0 ml-4">
+                    <span className="text-xs font-black text-primary tabular-nums">
+                      {leader.totalPoints?.toFixed(2) || '0.00'}
+                    </span>
+                    <span className="text-[10px] font-black text-green-700 leading-none mt-1">
+                      ₹{((leader.totalPoints || 0) * pointValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              );
+            }) : (
+              <div className="p-12 text-center text-muted-foreground italic text-sm">No results found.</div>
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <ScrollArea className="w-full">
+              <div className="min-w-full">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="w-14 text-center px-2">Rank</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead className="text-right">Points</TableHead>
+                      <TableHead className="text-right px-6">Value (INR)</TableHead>
+                      {isAdmin && <TableHead className="w-14 text-right pr-4"></TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredLeaders.map((leader, index) => {
+                      const actualRank = leaders?.findIndex(l => l.id === leader.id) ?? index;
+                      const isMe = leader.id === user?.uid;
+                      
+                      return (
+                        <TableRow key={leader.id} className={cn("hover:bg-muted/5 transition-colors", isMe && "bg-primary/[0.03]")}>
+                          <TableCell className="text-center px-2 font-black text-xs">
+                              {actualRank === 0 ? <Trophy className="h-5 w-5 text-amber-500 mx-auto" /> : 
+                               actualRank === 1 ? <Medal className="h-5 w-5 text-slate-400 mx-auto" /> :
+                               actualRank === 2 ? <Medal className="h-5 w-5 text-amber-700 mx-auto" /> :
+                               actualRank + 1}
                           </TableCell>
-                        )}
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+                          <TableCell className="max-w-[150px] md:max-w-none">
+                              <div className="flex items-center gap-3">
+                                  <Avatar className="h-8 w-8 border shrink-0">
+                                      <AvatarFallback className="text-[10px] font-black uppercase">{leader.username?.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex flex-col min-w-0">
+                                      <span className={cn("text-xs truncate", isMe ? "font-black" : "font-bold")}>{leader.username}</span>
+                                      <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tight truncate">{leader.role}</span>
+                                  </div>
+                              </div>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums font-black text-xs text-primary">
+                              {leader.totalPoints?.toFixed(2) || '0.00'}
+                          </TableCell>
+                          <TableCell className="text-right font-black text-xs text-green-700 px-6">
+                              ₹{((leader.totalPoints || 0) * pointValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          {isAdmin && (
+                            <TableCell className="text-right pr-4">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setSelectedHistoryUser(leader)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </div>
         </CardContent>
       </Card>
 
