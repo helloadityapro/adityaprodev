@@ -217,7 +217,7 @@ export default function RequirementListPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-1 no-print">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2 uppercase">
+        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <ClipboardList className="h-8 w-8" /> Requirement Data
         </h1>
         <p className="text-muted-foreground">Monitor and track site material requests.</p>
@@ -235,7 +235,7 @@ export default function RequirementListPage() {
         </Card>
         <Card className="bg-yellow-500/5 border-yellow-500/10 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Pending Action</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase text-yellow-600">Pending Action</CardTitle>
             <AlertCircle className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
@@ -244,7 +244,7 @@ export default function RequirementListPage() {
         </Card>
         <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Fulfilled</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase text-green-600">Fulfilled</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
@@ -309,7 +309,7 @@ export default function RequirementListPage() {
                   <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">Expected {req.expectedDate ? format(new Date(req.expectedDate), 'dd MMM yy') : '—'}</span>
                   <h3 className="font-bold text-sm leading-tight text-foreground truncate">{req.itemName}</h3>
                 </div>
-                <Badge variant="outline" className={cn("rounded-sm text-[9px] font-bold uppercase", urgencyConfig[req.urgency] || urgencyConfig.Medium)}>
+                <Badge variant="outline" className={cn("rounded-sm text-[9px] font-bold uppercase", (urgencyConfig as any)[req.urgency] || urgencyConfig.Medium)}>
                   {req.urgency}
                 </Badge>
               </div>
@@ -388,7 +388,7 @@ export default function RequirementListPage() {
                           <div className="text-sm font-semibold whitespace-pre-wrap max-w-xs">{req.itemName}</div>
                       </TableCell>
                       <TableCell>
-                          <Badge variant="outline" className={cn("rounded-sm text-[10px] font-bold uppercase", urgencyConfig[req.urgency] || urgencyConfig.Medium)}>
+                          <Badge variant="outline" className={cn("rounded-sm text-[10px] font-bold uppercase", (urgencyConfig as any)[req.urgency] || urgencyConfig.Medium)}>
                               {req.urgency}
                           </Badge>
                       </TableCell>

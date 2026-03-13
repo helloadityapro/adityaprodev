@@ -31,7 +31,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 /**
  * Bottom navigation bar for mobile devices.
  * Features a centralized "+" Quick Actions hub.
- * Modern layout with icon-only focus for a minimal appearance.
  */
 export function BottomNav() {
   const pathname = usePathname();
@@ -101,11 +100,17 @@ export function BottomNav() {
               )}
             >
               <div className={cn(
-                "p-1.5 rounded-lg transition-all duration-300",
+                "p-1 rounded-lg transition-all duration-300",
                 isActive && "bg-primary/10"
               )}>
-                <Icon className={cn("h-6 w-6", isActive && "stroke-[2.5px]")} />
+                <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5px]")} />
               </div>
+              <span className={cn(
+                "text-[9px] font-bold mt-0.5 tracking-tight",
+                isActive ? "text-primary" : "text-muted-foreground"
+              )}>
+                {item.label}
+              </span>
             </Link>
           );
         })}
@@ -172,11 +177,17 @@ export function BottomNav() {
               )}
             >
               <div className={cn(
-                "p-1.5 rounded-lg transition-all duration-300",
+                "p-1 rounded-lg transition-all duration-300",
                 isActive && "bg-primary/10"
               )}>
-                <Icon className={cn("h-6 w-6", isActive && "stroke-[2.5px]")} />
+                <Icon className={cn("h-5 w-5", isActive && "stroke-[2.5px]")} />
               </div>
+              <span className={cn(
+                "text-[9px] font-bold mt-0.5 tracking-tight",
+                isActive ? "text-primary" : "text-muted-foreground"
+              )}>
+                {item.label}
+              </span>
             </Link>
           );
         })}

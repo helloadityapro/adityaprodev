@@ -44,7 +44,7 @@ import { collection, doc, query, where, serverTimestamp, arrayUnion, getDoc, inc
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -117,7 +117,7 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
     Approved: { label: 'Approved', className: 'bg-green-50 text-green-700 border-green-200' },
     Rejected: { label: 'Rejected', className: 'bg-red-50 text-red-700 border-red-200' },
   };
-  const config = statusConfig[permit.status] || statusConfig.Pending;
+  const config = (statusConfig as any)[permit.status] || statusConfig.Pending;
   return (
     <Badge variant="outline" className={cn("flex items-center gap-1.5 text-[10px] font-semibold whitespace-nowrap border rounded-sm h-5 px-2", config.className, className)}>
       {config.label}
@@ -164,6 +164,7 @@ export default function PtwListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
@@ -460,16 +461,16 @@ export default function PtwListPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30">
-                      <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('serialNumber')}>
+                      <TableHead className="cursor-pointer hover:bg-muted/5 transition-colors" onClick={() => handleSort('serialNumber')}>
                         <div className="flex items-center">Serial & Site <SortIcon column="serialNumber" /></div>
                       </TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('ptwType')}>
+                      <TableHead className="cursor-pointer hover:bg-muted/5 transition-colors" onClick={() => handleSort('ptwType')}>
                         <div className="flex items-center">Type <SortIcon column="ptwType" /></div>
                       </TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('status')}>
+                      <TableHead className="cursor-pointer hover:bg-muted/5 transition-colors" onClick={() => handleSort('status')}>
                         <div className="flex items-center">Status <SortIcon column="status" /></div>
                       </TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('requestDate')}>
+                      <TableHead className="cursor-pointer hover:bg-muted/5 transition-colors" onClick={() => handleSort('requestDate')}>
                         <div className="flex items-center">Request Date <SortIcon column="requestDate" /></div>
                       </TableHead>
                       <TableHead className="text-right px-6">Action</TableHead>
@@ -596,46 +597,84 @@ export default function PtwListPage() {
           <ScrollArea className="flex-1 bg-background">
             {detailsPermit && (
               <div id="printable-permit-area" className="p-6 md:p-10 space-y-12 pb-20">
+                {/* Consolidate Header Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/20 border rounded-sm">
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Site Name</Label>
+                    <p className="text-xs font-bold truncate">{detailsPermit.siteName}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">PtW Type</Label>
+                    <p className="text-xs font-bold">{detailsPermit.ptwType}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Status</Label>
+                    <div><StatusBadge permit={detailsPermit} /></div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Submitted</Label>
+                    <p className="text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                   <div className="space-y-8">
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Project Site</Label><p className="font-black text-lg leading-tight">{detailsPermit.siteName}</p></div>
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Type</Label><p className="font-bold text-lg leading-tight">{detailsPermit.ptwType}</p></div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Raised By</Label>
-                        <p className="font-bold text-sm flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 text-primary" />
-                          {detailsPermit.siteEngineerName || 'N/A'}
-                        </p>
+                    {/* Standardized Personnel Blocks */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-full text-primary"><User className="h-4 w-4" /></div>
+                        <div className="flex flex-col">
+                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Raised By</Label>
+                          <p className="text-xs font-black">{detailsPermit.siteEngineerName || 'N/A'}</p>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Permit Approved By</Label>
-                        <p className="font-bold text-sm flex items-center gap-2">
-                          <ShieldCheck className="h-3.5 w-3.5 text-green-600" />
-                          {detailsPermit.timeline?.find(t => t.status === 'Approved')?.userName || 
-                           detailsPermit.timeline?.find(t => t.status === 'ManagerApproved')?.userName || 
-                           'Pending'}
-                        </p>
+                      <div className="p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3">
+                        <div className="p-2 bg-green-500/10 rounded-full text-green-600"><ShieldCheck className="h-4 w-4" /></div>
+                        <div className="flex flex-col">
+                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Approved By</Label>
+                          <p className="text-xs font-black">
+                            {detailsPermit.timeline?.find(t => t.status === 'Approved')?.userName || 
+                             detailsPermit.timeline?.find(t => t.status === 'ManagerApproved')?.userName || 
+                             'Awaiting'}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="space-y-2"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Work Description</Label><div className="p-4 bg-muted/20 border rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium">"{detailsPermit.descriptionOfWork}"</div></div>
-                  </div>
-                  <div className="space-y-8">
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
-                      <div className="space-y-1"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Submission</Label><p className="text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p></div>
+                    {/* Enhanced Narrative Styling */}
+                    <div className="space-y-3">
+                      <Label className="text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-center gap-2">
+                        <FileText className="h-3.5 w-3.5" /> Work Description
+                      </Label>
+                      <div className="p-6 bg-primary/[0.02] border-2 border-primary/5 rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium italic shadow-inner">
+                        "{detailsPermit.descriptionOfWork}"
+                      </div>
                     </div>
-                    <div className="space-y-3"><Label className="text-[10px] font-bold text-muted-foreground tracking-widest flex items-center gap-2 uppercase"><MapPin className="h-3.5 w-3.5" /> GPS Stamped Location</Label>
+                  </div>
+
+                  <div className="space-y-8">
+                    {/* Verified GPS Widget */}
+                    <div className="space-y-3">
+                      <Label className="text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5" /> Verified GPS Coordinates
+                      </Label>
                       {detailsPermit.latitude ? (
-                        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between">
-                          <span className="font-mono text-xs font-bold text-primary">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude?.toFixed(6)}</span>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm no-print" asChild><a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>
+                        <div className="p-4 bg-primary/5 border-2 border-primary/10 rounded-sm flex items-center justify-between shadow-sm group hover:border-primary/30 transition-all">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-tighter">Site Position Stamped</span>
+                            <span className="font-mono text-xs font-black text-primary">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude?.toFixed(6)}</span>
+                          </div>
+                          <Button variant="outline" size="icon" className="h-9 w-9 rounded-sm no-print border-primary/20 bg-white text-primary" asChild>
+                            <a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </Button>
                         </div>
-                      ) : <p className="text-xs italic text-muted-foreground">Location not available</p>}
+                      ) : (
+                        <div className="p-4 bg-muted/20 border border-dashed rounded-sm text-center">
+                          <p className="text-xs italic text-muted-foreground font-medium">GPS location data not attached.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -646,7 +685,7 @@ export default function PtwListPage() {
                 <div className="space-y-6">
                   <div className="flex items-center gap-2">
                     <Paperclip className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-bold uppercase tracking-widest">Documentation & Evidence</h3>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Documentation & Evidence</h3>
                   </div>
                   
                   {detailsPermit.attachments && detailsPermit.attachments.length > 0 ? (
@@ -703,7 +742,7 @@ export default function PtwListPage() {
                 <Separator />
 
                 <div className="space-y-6">
-                  <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><History className="h-4 w-4 text-primary" /> Lifecycle History</h3>
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2"><History className="h-4 w-4 text-primary" /> Lifecycle History</h3>
                   <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-8">
                     {[...(detailsPermit.timeline || [])].sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0)).map((entry, idx) => (
                       <div key={idx} className="relative">

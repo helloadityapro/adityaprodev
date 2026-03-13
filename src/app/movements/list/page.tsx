@@ -202,22 +202,13 @@ export default function MovementListPage() {
     window.open(url, '_blank');
   };
 
-  const handlePrint = () => {
-    if (typeof window !== "undefined") {
-      const originalTitle = document.title;
-      document.title = `AdityaPro_Movement_Summary`;
-      window.print();
-      document.title = originalTitle;
-    }
-  };
-
   const allSitesList = allSites ? Array.from(new Map(allSites.map(s => [s.name, s])).values()) : [];
   const filteredAllSites = allSitesList.filter(s => s.name.toLowerCase().includes(editSiteSearchQuery.toLowerCase()));
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-1 no-print">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <ArrowLeftRight className="h-8 w-8" /> Movement Data
         </h1>
         <p className="text-muted-foreground">Track inward and outward material logs.</p>
@@ -226,7 +217,7 @@ export default function MovementListPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
         <Card className="bg-primary/5 border-primary/10 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Total Movements</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Total Logs</CardTitle>
             <TrendingUp className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
@@ -319,7 +310,7 @@ export default function MovementListPage() {
                 <div className="flex items-center justify-between">
                   <div className="text-xs font-bold text-primary">{mov.quantity} {mov.unit}</div>
                   <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
-                    <User className="h-3 w-3" /> {mov.userName}
+                    <User className="h-3 w-3 text-primary" /> {mov.userName}
                   </div>
                 </div>
               </div>
