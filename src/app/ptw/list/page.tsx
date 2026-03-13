@@ -414,9 +414,9 @@ export default function PtwListPage() {
                           <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
                             {canResubmit && (
                               <Button 
-                                variant="default" 
+                                variant="outline" 
                                 size="sm" 
-                                className="h-8 rounded-sm font-black text-[10px] uppercase bg-slate-900 text-white hover:bg-black border-none px-4"
+                                className="h-7 px-2.5 rounded-sm font-black text-[9px] uppercase bg-white text-black border-slate-200 hover:bg-slate-50 shadow-sm"
                                 onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}
                               >
                                 <RefreshCw className="h-3 w-3 mr-1.5" /> Re-Submit
