@@ -124,9 +124,9 @@ export function BottomNav() {
             side="top" 
             align="center" 
             sideOffset={20}
-            className="w-[calc(100vw-2rem)] max-w-sm rounded-xl shadow-2xl border-primary/10 mb-2 p-1 bg-background/95 backdrop-blur-md"
+            className="w-64 rounded-xl shadow-2xl border-primary/10 mb-2 p-1 bg-background/95 backdrop-blur-md"
           >
-            <DropdownMenuLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 py-2.5 px-3">
+            <DropdownMenuLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 py-2.5 px-3 font-body">
               <Zap className="h-3 w-3 fill-amber-500 text-amber-500" /> 
               QUICK HUB
             </DropdownMenuLabel>
@@ -137,7 +137,7 @@ export function BottomNav() {
                   <DropdownMenuItem
                     key={action.href}
                     onClick={() => router.push(action.href)}
-                    className="cursor-pointer py-3 px-3 focus:bg-primary/5 group rounded-lg mb-0.5"
+                    className="cursor-pointer py-3 px-3 focus:bg-primary/5 group rounded-lg mb-0.5 font-body"
                   >
                     <div className="flex items-center gap-3 w-full">
                       <div className="p-2 bg-muted/50 rounded-lg group-hover:bg-primary/10 transition-colors shrink-0">
