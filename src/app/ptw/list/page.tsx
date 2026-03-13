@@ -419,7 +419,7 @@ export default function PtwListPage() {
                                 className="h-8 rounded-sm font-bold text-[10px] uppercase border-amber-500 text-amber-700 hover:bg-amber-50"
                                 onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}
                               >
-                                <RefreshCw className="h-3 w-3 mr-1.5" /> Correct
+                                <RefreshCw className="h-3 w-3 mr-1.5" /> Re-Submit
                               </Button>
                             )}
                             {(canManagerAct || canAdminAct) && (
