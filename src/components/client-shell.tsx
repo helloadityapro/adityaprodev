@@ -20,6 +20,7 @@ import { UserNotifications } from "@/components/user-notifications";
 import { GlobalSearch } from "@/components/global-search";
 import { AttendanceGate } from "@/components/attendance-gate";
 import { BottomNav } from "@/components/bottom-nav";
+import { QuickActions } from "@/components/quick-actions";
 import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
@@ -270,6 +271,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             <GlobalSearch />
           </div>
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            <div className="hidden md:flex">
+              <QuickActions />
+            </div>
             <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full h-8 w-8">
               {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </Button>
