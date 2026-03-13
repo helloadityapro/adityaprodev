@@ -3,11 +3,11 @@
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, or, serverTimestamp, increment, getDoc } from "firebase/firestore";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, Printer, FilterX, FileDown, MessageCircle, User } from "lucide-react";
+import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, MessageCircle, User } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
 type DPR = {
@@ -104,7 +103,7 @@ export default function DPRListPage() {
 
     return result.sort((a, b) => {
         const dateA = new Date(a.reportDate || (a.createdAt?.toDate?.() || 0)).getTime();
-        const dateB = b.reportDate || (b.createdAt?.toDate?.() || 0)).getTime();
+        const dateB = new Date(b.reportDate || (b.createdAt?.toDate?.() || 0)).getTime();
         return dateB - dateA;
     });
   }, [dprs, searchTerm, startDate, endDate]);
@@ -271,11 +270,11 @@ export default function DPRListPage() {
                 {sortedAndFilteredDprs.map((dpr) => (
                   <div key={dpr.id} className="p-4 space-y-3 bg-card hover:bg-muted/5 transition-colors">
                     <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1 min-w-0">
                         <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
                           {dpr.reportDate ? format(new Date(dpr.reportDate), 'dd MMM yyyy') : '—'}
                         </span>
-                        <h3 className="font-bold text-sm leading-tight text-foreground">{dpr.siteName}</h3>
+                        <h3 className="font-bold text-sm leading-tight text-foreground truncate">{dpr.siteName}</h3>
                       </div>
                       <Badge variant="outline" className="text-[8px] font-black uppercase rounded-sm border-primary/20 text-primary">
                         DPR
@@ -289,7 +288,7 @@ export default function DPRListPage() {
 
                     <div className="space-y-2">
                       {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx) => (
-                        <p key={pIdx} className="text-xs italic text-muted-foreground leading-relaxed">
+                        <p key={pIdx} className="text-xs italic text-muted-foreground leading-relaxed line-clamp-3">
                           "{para.trim()}"
                         </p>
                       ))}
@@ -441,7 +440,7 @@ export default function DPRListPage() {
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                     Delete Permanently
                 </AlertDialogAction>
