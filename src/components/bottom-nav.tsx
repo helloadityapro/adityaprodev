@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button';
 /**
  * Bottom navigation bar for mobile devices.
  * Features a centralized "Quick Actions" hub for field operations.
+ * Animation: Popping circular wipe-up from the center action button.
  */
 export function BottomNav() {
   const pathname = usePathname();
@@ -116,8 +117,11 @@ export function BottomNav() {
               <span className="text-[10px] font-black uppercase tracking-tighter leading-none mt-1 text-primary">Actions</span>
             </div>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md p-0 border-none rounded-t-xl rounded-b-none bottom-0 top-auto translate-y-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom duration-300">
-            <div className="bg-background p-6 space-y-6">
+          <DialogContent 
+            className="sm:max-w-md p-0 border-none rounded-t-[2rem] rounded-b-none bottom-0 top-auto translate-y-0 data-[state=open]:animate-reveal-up data-[state=closed]:animate-hide-down origin-bottom transition-all"
+          >
+            <div className="bg-background p-6 space-y-6 pb-10">
+              <div className="mx-auto w-12 h-1.5 bg-muted rounded-full mb-2 opacity-50" />
               <DialogHeader className="flex flex-row items-center justify-between space-y-0">
                 <div className="space-y-1">
                   <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
@@ -126,7 +130,7 @@ export function BottomNav() {
                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest">Site Operations</p>
                 </div>
                 <DialogClose asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                  <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 bg-muted/50 hover:bg-muted">
                     <X className="h-5 w-5" />
                   </Button>
                 </DialogClose>
@@ -142,7 +146,7 @@ export function BottomNav() {
                         `duration-${(idx + 1) * 100}`
                       )}
                     >
-                      <div className="p-2 bg-white rounded-sm shadow-sm">
+                      <div className="p-2.5 bg-white rounded-sm shadow-sm ring-1 ring-black/5">
                         {action.icon}
                       </div>
                       <div className="flex flex-col">
