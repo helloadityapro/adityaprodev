@@ -5,7 +5,7 @@ import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from "@
 import { collection, doc, query, where, or } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { History, Clock, User, MapPin, FileText, ArrowRight, Eye, Search, Calendar, FilterX } from "lucide-react";
+import { History, Clock, User, MapPin, FileText, ArrowRight, Eye, Search, Calendar, FilterX, FileCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -143,8 +143,8 @@ export default function PtwActivitiesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight">PtW Activities</h1>
-        <p className="text-muted-foreground">Historical log of all permit-related actions and status changes.</p>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground uppercase">PtW Activities</h1>
+        <p className="text-muted-foreground text-sm font-medium">Historical log of all permit-related actions and status changes.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
@@ -193,63 +193,113 @@ export default function PtwActivitiesPage() {
         </div>
       </div>
 
-      <Card className="rounded-sm overflow-hidden">
+      <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
         <CardContent className="p-0">
           {filteredActivities.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date & Time</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Permit ID</TableHead>
-                  <TableHead>Site</TableHead>
-                  <TableHead className="max-w-[200px]">Remarks</TableHead>
-                  <TableHead className="text-right">View</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Mobile Card List View */}
+              <div className="md:hidden divide-y divide-border/50">
                 {filteredActivities.map((activity, index) => (
-                  <TableRow key={`${activity.permitId}-${index}`} className="hover:bg-muted/50 transition-colors">
-                    <TableCell className="text-xs font-medium whitespace-nowrap">
-                      {formatTimestamp(activity.timestamp)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="font-semibold text-sm">{activity.userName}</span>
+                  <div key={`${activity.permitId}-${index}`} className="p-4 space-y-3 bg-card hover:bg-muted/5 transition-colors">
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
+                          {formatTimestamp(activity.timestamp)}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[8px] font-black uppercase rounded-sm border-primary/20 bg-primary/5 text-primary whitespace-nowrap">
+                            {activity.action}
+                          </Badge>
+                          <Link 
+                            href={`/ptw/list?view=${activity.permitId}`}
+                            className="font-mono text-[10px] font-bold text-primary hover:underline truncate"
+                          >
+                            {activity.serialNumber}
+                          </Link>
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-[10px] font-bold uppercase rounded-sm border-primary/20 bg-primary/5 text-primary whitespace-nowrap">
-                        {activity.action}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Link 
-                        href={`/ptw/list?view=${activity.permitId}`}
-                        className="font-mono text-xs text-primary hover:underline"
-                      >
-                        {activity.serialNumber}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-xs max-w-[150px] truncate">
-                      {activity.siteName}
-                    </TableCell>
-                    <TableCell className="text-xs italic text-muted-foreground max-w-[200px] truncate">
-                      {activity.remarks || "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm" asChild title="View Details">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm -mr-2 shrink-0" asChild>
                         <Link href={`/ptw/list?view=${activity.permitId}`}>
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4 text-primary" />
                         </Link>
                       </Button>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h3 className="font-bold text-sm text-foreground leading-tight line-clamp-2">{activity.siteName}</h3>
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
+                        <User className="h-3 w-3 text-primary" />
+                        <span>{activity.userName}</span>
+                      </div>
+                    </div>
+
+                    {activity.remarks && (
+                      <p className="text-xs italic text-muted-foreground leading-relaxed bg-muted/30 p-2 rounded-sm border border-primary/5">
+                        "{activity.remarks}"
+                      </p>
+                    )}
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest">Date & Time</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest">User</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest">Action</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest">Permit ID</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest">Site</TableHead>
+                      <TableHead className="max-w-[200px] font-black uppercase text-[10px] tracking-widest">Remarks</TableHead>
+                      <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">View</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredActivities.map((activity, index) => (
+                      <TableRow key={`${activity.permitId}-${index}`} className="hover:bg-muted/50 transition-colors">
+                        <TableCell className="px-6 text-xs font-medium whitespace-nowrap">
+                          {formatTimestamp(activity.timestamp)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <User className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="font-semibold text-sm">{activity.userName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px] font-bold uppercase rounded-sm border-primary/20 bg-primary/5 text-primary whitespace-nowrap">
+                            {activity.action}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Link 
+                            href={`/ptw/list?view=${activity.permitId}`}
+                            className="font-mono text-xs text-primary hover:underline"
+                          >
+                            {activity.serialNumber}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-xs max-w-[150px] truncate font-medium">
+                          {activity.siteName}
+                        </TableCell>
+                        <TableCell className="text-xs italic text-muted-foreground max-w-[200px] truncate">
+                          {activity.remarks || "—"}
+                        </TableCell>
+                        <TableCell className="text-right px-6">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm" asChild title="View Details">
+                            <Link href={`/ptw/list?view=${activity.permitId}`}>
+                              <Eye className="h-4 w-4 text-primary" />
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <History className="h-12 w-12 text-muted-foreground/30 mb-4" />
