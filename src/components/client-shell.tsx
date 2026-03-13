@@ -17,7 +17,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { UserNotifications } from "@/components/user-notifications";
-import { QuickActions } from "@/components/quick-actions";
 import { GlobalSearch } from "@/components/global-search";
 import { AttendanceGate } from "@/components/attendance-gate";
 import { BottomNav } from "@/components/bottom-nav";
@@ -271,8 +270,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             <GlobalSearch />
           </div>
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            <QuickActions />
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full h-8 w-8 hidden xs:flex">
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full h-8 w-8">
               {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             </Button>
             <UserNotifications />
