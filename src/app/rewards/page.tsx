@@ -361,7 +361,7 @@ export default function RewardsPage() {
                     <Info className="h-5 w-5" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-[calc(100vw-2rem)] xs:w-80 rounded-sm border-primary/10 bg-muted/5 shadow-xl">
+                <PopoverContent align="end" className="w-[calc(100vw-2rem)] xs:w-80 rounded-sm border-primary/10 bg-white shadow-xl">
                   <div className="space-y-2">
                     <p className="text-sm font-bold text-muted-foreground flex items-center gap-2">
                       <AlertCircle className="h-4 w-4" /> Redemption Threshold
