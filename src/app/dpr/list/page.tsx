@@ -193,47 +193,49 @@ export default function DPRListPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
-        <div className="md:col-span-2 space-y-1.5">
-          <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search</Label>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+        <div className="md:col-span-2 space-y-1">
+          <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search</Label>
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search by site, user, or activity..." 
-              className="pl-9 rounded-sm h-10 border-primary/20"
+              placeholder="Search..." 
+              className="pl-8 h-9 md:h-10 rounded-sm border-primary/20 text-xs md:text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">From Date</Label>
-          <div className="relative">
-            <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input 
-              type="date" 
-              className="pl-9 rounded-sm h-10 border-primary/20" 
-              value={startDate} 
-              onChange={(e) => setStartDate(e.target.value)} 
-            />
-          </div>
-        </div>
-        <div className="space-y-1.5 flex gap-2">
-          <div className="flex-1 space-y-1.5">
-            <Label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">To Date</Label>
+        <div className="grid grid-cols-2 md:contents gap-2">
+          <div className="space-y-1">
+            <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">From Date</Label>
             <div className="relative">
-              <Calendar className="absolute left-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Calendar className="absolute left-2 top-2.5 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground pointer-events-none" />
               <Input 
                 type="date" 
-                className="pl-9 rounded-sm h-10 border-primary/20" 
-                value={endDate} 
-                onChange={(e) => setEndDate(e.target.value)} 
+                className="pl-8 h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" 
+                value={startDate} 
+                onChange={(e) => setStartDate(e.target.value)} 
               />
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="mt-auto h-10 w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
-            <FilterX className="h-4 w-4" />
-          </Button>
+          <div className="space-y-1 flex gap-1.5 items-end">
+            <div className="flex-1 space-y-1">
+              <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">To Date</Label>
+              <div className="relative">
+                <Calendar className="absolute left-2 top-2.5 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground pointer-events-none" />
+                <Input 
+                  type="date" 
+                  className="pl-8 h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" 
+                  value={endDate} 
+                  onChange={(e) => setEndDate(e.target.value)} 
+                />
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
+              <FilterX className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
