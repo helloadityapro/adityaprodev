@@ -15,24 +15,23 @@ import {
   ArrowLeftRight,
   Package,
   CheckSquare,
-  Navigation,
-  X
+  Navigation
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose,
-} from "@/components/ui/dialog";
-import { Button } from '@/components/ui/button';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 /**
  * Bottom navigation bar for mobile devices.
  * Features a centralized "Quick Actions" hub for field operations.
- * Animation: Popping circular wipe-up from the center action button.
+ * Now uses a compact DropdownMenu for a smaller, faster UI.
  */
 export function BottomNav() {
   const pathname = usePathname();
@@ -41,7 +40,7 @@ export function BottomNav() {
   const navItems = [
     { label: 'Reports', href: '/reports', icon: FileBarChart },
     { label: 'Attendance', href: '/attendance', icon: CalendarCheck },
-    // Center is Quick Actions (handled separately below)
+    // Center is Quick Actions
     { label: 'Rewards', href: '/rewards', icon: Trophy },
     { label: 'Profile', href: '/profile', icon: UserCircle },
   ];
@@ -49,37 +48,37 @@ export function BottomNav() {
   const quickActions = [
     {
       label: 'Start Site Visit',
-      icon: <Navigation className="h-5 w-5 text-indigo-500" />,
+      icon: <Navigation className="h-4 w-4 text-indigo-500" />,
       href: '/site-visits/start',
       description: 'Check-in to a project site',
     },
     {
       label: 'Raise PtW',
-      icon: <FilePlus className="h-5 w-5 text-blue-500" />,
+      icon: <FilePlus className="h-4 w-4 text-blue-500" />,
       href: '/ptw/raise',
-      description: 'Create a new Permit to Work',
+      description: 'Create a new Permit',
     },
     {
       label: 'Submit DPR',
-      icon: <TableIcon className="h-5 w-5 text-amber-500" />,
+      icon: <TableIcon className="h-4 w-4 text-amber-500" />,
       href: '/dpr/submit',
       description: 'Log daily site progress',
     },
     {
       label: 'Record Movement',
-      icon: <ArrowLeftRight className="h-5 w-5 text-emerald-500" />,
+      icon: <ArrowLeftRight className="h-4 w-4 text-emerald-500" />,
       href: '/movements/record',
       description: 'Log material flow',
     },
     {
       label: 'Submit Requirement',
-      icon: <Package className="h-5 w-5 text-purple-500" />,
+      icon: <Package className="h-4 w-4 text-purple-500" />,
       href: '/requirements/submit',
       description: 'Request site materials',
     },
     {
       label: 'Assign Task',
-      icon: <CheckSquare className="h-5 w-5 text-slate-500" />,
+      icon: <CheckSquare className="h-4 w-4 text-slate-500" />,
       href: '/tasks/create',
       description: 'Delegate a new task',
     },
@@ -88,7 +87,7 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/80 backdrop-blur-lg pb-safe md:hidden">
       <div className="flex h-16 items-center justify-around px-2">
-        {/* First 2 Items */}
+        {/* Reports & Attendance */}
         {navItems.slice(0, 2).map((item) => {
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.href);
@@ -108,60 +107,55 @@ export function BottomNav() {
         })}
 
         {/* Quick Actions Central Button */}
-        <Dialog>
-          <DialogTrigger asChild>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <div className="flex flex-col items-center justify-center w-full h-full cursor-pointer group">
               <div className="bg-primary text-primary-foreground p-2 rounded-full shadow-lg shadow-primary/20 -mt-6 border-4 border-background transition-transform active:scale-90">
                 <Plus className="h-6 w-6" />
               </div>
               <span className="text-[10px] font-black uppercase tracking-tighter leading-none mt-1 text-primary">Actions</span>
             </div>
-          </DialogTrigger>
-          <DialogContent 
-            className="sm:max-w-md p-0 border-none rounded-t-[2rem] rounded-b-none bottom-0 top-auto translate-y-0 data-[state=open]:animate-reveal-up data-[state=closed]:animate-hide-down origin-bottom transition-all"
+          </DropdownMenuTrigger>
+          <DropdownMenuContent 
+            side="top" 
+            align="center" 
+            sideOffset={20}
+            className="w-64 rounded-sm shadow-2xl border-primary/10 mb-2 p-1 bg-background/95 backdrop-blur-sm"
           >
-            <div className="bg-background p-6 space-y-6 pb-10">
-              <div className="mx-auto w-12 h-1.5 bg-muted rounded-full mb-2 opacity-50" />
-              <DialogHeader className="flex flex-row items-center justify-between space-y-0">
-                <div className="space-y-1">
-                  <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                    <Zap className="h-5 w-5 fill-amber-500 text-amber-500" /> Quick Hub
-                  </DialogTitle>
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest">Site Operations</p>
-                </div>
-                <DialogClose asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full h-10 w-10 bg-muted/50 hover:bg-muted">
-                    <X className="h-5 w-5" />
-                  </Button>
-                </DialogClose>
-              </DialogHeader>
-
-              <div className="grid grid-cols-1 gap-3">
-                {quickActions.map((action, idx) => (
-                  <DialogClose key={action.href} asChild>
-                    <button
-                      onClick={() => router.push(action.href)}
-                      className={cn(
-                        "flex items-center gap-4 p-4 w-full rounded-sm bg-muted/30 hover:bg-primary/5 border border-transparent hover:border-primary/10 transition-all text-left animate-in fade-in slide-in-from-bottom-2",
-                        `duration-${(idx + 1) * 100}`
-                      )}
-                    >
-                      <div className="p-2.5 bg-white rounded-sm shadow-sm ring-1 ring-black/5">
+            <DropdownMenuLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground py-2 px-3">
+              <Zap className="h-3 w-3 fill-amber-500 text-amber-500" /> 
+              QUICK HUB
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <ScrollArea className="max-h-[350px]">
+              <div className="p-1">
+                {quickActions.map((action) => (
+                  <DropdownMenuItem
+                    key={action.href}
+                    onClick={() => router.push(action.href)}
+                    className="cursor-pointer py-3 px-3 focus:bg-primary/5 group rounded-sm"
+                  >
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="p-2 bg-muted rounded-sm group-hover:bg-primary/10 transition-colors shrink-0">
                         {action.icon}
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-black uppercase tracking-tight leading-none mb-1">{action.label}</span>
-                        <span className="text-[10px] text-muted-foreground font-medium">{action.description}</span>
+                      <div className="flex flex-col overflow-hidden">
+                        <span className="text-xs font-black uppercase tracking-tight leading-none mb-1 group-hover:text-primary transition-colors">
+                          {action.label}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-tighter truncate">
+                          {action.description}
+                        </span>
                       </div>
-                    </button>
-                  </DialogClose>
+                    </div>
+                  </DropdownMenuItem>
                 ))}
               </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </ScrollArea>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        {/* Last 2 Items */}
+        {/* Rewards & Profile */}
         {navItems.slice(2).map((item) => {
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.href);

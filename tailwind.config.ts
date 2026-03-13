@@ -93,38 +93,12 @@ export default {
           to: {
             transform: 'rotate(360deg)',
           },
-        },
-        'circle-reveal': {
-          '0%': {
-            clipPath: 'circle(0% at 50% 100%)',
-            opacity: '0',
-            transform: 'translateY(20px) scale(0.9)',
-          },
-          '100%': {
-            clipPath: 'circle(150% at 50% 100%)',
-            opacity: '1',
-            transform: 'translateY(0) scale(1)',
-          },
-        },
-        'circle-hide': {
-          '0%': {
-            clipPath: 'circle(150% at 50% 100%)',
-            opacity: '1',
-            transform: 'translateY(0) scale(1)',
-          },
-          '100%': {
-            clipPath: 'circle(0% at 50% 100%)',
-            opacity: '0',
-            transform: 'translateY(20px) scale(0.9)',
-          },
-        },
+        }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        spin: 'spin 1s linear infinite',
-        'reveal-up': 'circle-reveal 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
-        'hide-down': 'circle-hide 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+        spin: 'spin 1s linear infinite'
       },
     },
   },
