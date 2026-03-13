@@ -20,6 +20,7 @@ import { UserNotifications } from "@/components/user-notifications";
 import { QuickActions } from "@/components/quick-actions";
 import { GlobalSearch } from "@/components/global-search";
 import { AttendanceGate } from "@/components/attendance-gate";
+import { BottomNav } from "@/components/bottom-nav";
 import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 
@@ -279,11 +280,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/40">
-          <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6 min-h-full pb-safe">
+          <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6 min-h-full pb-20 md:pb-6">
             <AttendanceGate />
             {children}
           </div>
         </div>
+        <BottomNav />
       </SidebarInset>
     </SidebarProvider>
   );
