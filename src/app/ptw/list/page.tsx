@@ -34,7 +34,8 @@ import {
   ChevronRight, 
   ShieldCheck, 
   PlayCircle,
-  FileCheck
+  FileCheck,
+  RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
@@ -50,6 +51,7 @@ import { Separator } from "@/components/ui/separator";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 
 type Attachment = { 
   url: string; 
@@ -395,6 +397,7 @@ export default function PtwListPage() {
                   {filteredPermits.map(permit => {
                     const canManagerAct = userRole === 'Site Manager' && permit.status === 'Pending' && permit.siteManagerId === user?.uid;
                     const canAdminAct = isAdmin && permit.status === 'ManagerApproved';
+                    const canResubmit = permit.status === 'Rejected' && permit.siteEngineerId === user?.uid;
                     
                     return (
                       <TableRow key={permit.id} className="hover:bg-muted/5 cursor-pointer" onClick={() => setDetailsPermit(permit)}>
@@ -409,6 +412,16 @@ export default function PtwListPage() {
                         <TableCell className="text-[10px] font-bold text-muted-foreground">{formatTimestamp(permit.requestDate)}</TableCell>
                         <TableCell className="text-right px-6">
                           <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                            {canResubmit && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 rounded-sm font-bold text-[10px] uppercase border-amber-500 text-amber-700 hover:bg-amber-50"
+                                onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}
+                              >
+                                <RefreshCw className="h-3 w-3 mr-1.5" /> Correct
+                              </Button>
+                            )}
                             {(canManagerAct || canAdminAct) && (
                               <>
                                 <Button 
