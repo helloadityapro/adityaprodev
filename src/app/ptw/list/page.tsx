@@ -35,7 +35,8 @@ import {
   ShieldCheck, 
   PlayCircle,
   FileCheck,
-  RefreshCw
+  RefreshCw,
+  Calendar
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
@@ -371,93 +372,175 @@ export default function PtwListPage() {
         </div>
       </div>
 
-      <Card className="rounded-sm overflow-hidden border-primary/10">
-        <CardContent className="p-0">
-          <ScrollArea className="w-full">
-            <div className="min-w-[800px]">
-              <Table>
-                <TableHeader className="bg-muted/30">
-                  <TableRow>
-                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('serialNumber')}>
-                      <div className="flex items-center">Serial & Site <SortIcon column="serialNumber" /></div>
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('ptwType')}>
-                      <div className="flex items-center">Type <SortIcon column="ptwType" /></div>
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('status')}>
-                      <div className="flex items-center">Status <SortIcon column="status" /></div>
-                    </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('requestDate')}>
-                      <div className="flex items-center">Request Date <SortIcon column="requestDate" /></div>
-                    </TableHead>
-                    <TableHead className="text-right px-6">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredPermits.map(permit => {
-                    const canManagerAct = userRole === 'Site Manager' && permit.status === 'Pending' && permit.siteManagerId === user?.uid;
-                    const canAdminAct = isAdmin && permit.status === 'ManagerApproved';
-                    const canResubmit = permit.status === 'Rejected' && permit.siteEngineerId === user?.uid;
-                    
-                    return (
-                      <TableRow key={permit.id} className="hover:bg-muted/5 cursor-pointer" onClick={() => setDetailsPermit(permit)}>
-                        <TableCell>
-                          <div className="flex flex-col gap-0.5">
-                            <span className="font-mono text-[10px] font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</span>
-                            <span className="font-bold text-sm truncate max-w-[180px]">{permit.siteName}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs font-semibold">{permit.ptwType}</TableCell>
-                        <TableCell><StatusBadge permit={permit} /></TableCell>
-                        <TableCell className="text-[10px] font-bold text-muted-foreground">{formatTimestamp(permit.requestDate)}</TableCell>
-                        <TableCell className="text-right px-6">
-                          <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                            {canResubmit && (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-7 px-2.5 rounded-sm font-black text-[9px] uppercase bg-white text-black border-slate-200 hover:bg-slate-50 shadow-sm"
-                                onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}
-                              >
-                                <RefreshCw className="h-3 w-3 mr-1.5" /> Re-Submit
-                              </Button>
-                            )}
-                            {(canManagerAct || canAdminAct) && (
-                              <>
+      {/* Mobile Card List */}
+      <div className="md:hidden space-y-4">
+        {filteredPermits.length > 0 ? filteredPermits.map(permit => {
+          const canManagerAct = userRole === 'Site Manager' && permit.status === 'Pending' && permit.siteManagerId === user?.uid;
+          const canAdminAct = isAdmin && permit.status === 'ManagerApproved';
+          const canResubmit = permit.status === 'Rejected' && permit.siteEngineerId === user?.uid;
+
+          return (
+            <Card key={permit.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setDetailsPermit(permit)}>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="font-mono text-[10px] font-bold text-primary truncate">{permit.serialNumber || permit.id.slice(0, 8)}</span>
+                    <h3 className="font-bold text-sm leading-tight text-foreground line-clamp-2">{permit.siteName}</h3>
+                  </div>
+                  <StatusBadge permit={permit} className="shrink-0" />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <ShieldCheck className="h-3.5 w-3.5 text-primary/60" />
+                    <span>{permit.ptwType}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {formatTimestamp(permit.requestDate)}
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-between border-t border-primary/5">
+                  <div className="flex items-center gap-1">
+                    {(canManagerAct || canAdminAct) && (
+                      <>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-green-600 rounded-sm" 
+                          onClick={(e) => { e.stopPropagation(); setActionState({ permit, status: isAdmin ? 'Approved' : 'ManagerApproved' }); }}
+                        >
+                          <CircleCheck className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-red-600 rounded-sm" 
+                          onClick={(e) => { e.stopPropagation(); setActionState({ permit, status: 'Rejected' }); }}
+                        >
+                          <CircleX className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                    {(isAdmin || userProfile?.role === 'Site Manager') && <WhatsAppUpdateEngineer permit={permit} />}
+                  </div>
+                  <div className="flex gap-2">
+                    {canResubmit && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 px-2.5 rounded-sm font-black text-[9px] uppercase bg-white text-black border-slate-200"
+                        onClick={(e) => { e.stopPropagation(); router.push(`/ptw/raise?correct=${permit.id}`); }}
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1.5" /> Re-Submit
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        }) : (
+          <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
+            No permit requests discovered.
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <Card className="rounded-sm overflow-hidden border-primary/10">
+          <CardContent className="p-0">
+            <ScrollArea className="w-full">
+              <div className="min-w-[800px]">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('serialNumber')}>
+                        <div className="flex items-center">Serial & Site <SortIcon column="serialNumber" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('ptwType')}>
+                        <div className="flex items-center">Type <SortIcon column="ptwType" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('status')}>
+                        <div className="flex items-center">Status <SortIcon column="status" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('requestDate')}>
+                        <div className="flex items-center">Request Date <SortIcon column="requestDate" /></div>
+                      </TableHead>
+                      <TableHead className="text-right px-6">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPermits.map(permit => {
+                      const canManagerAct = userRole === 'Site Manager' && permit.status === 'Pending' && permit.siteManagerId === user?.uid;
+                      const canAdminAct = isAdmin && permit.status === 'ManagerApproved';
+                      const canResubmit = permit.status === 'Rejected' && permit.siteEngineerId === user?.uid;
+                      
+                      return (
+                        <TableRow key={permit.id} className="hover:bg-muted/5 cursor-pointer" onClick={() => setDetailsPermit(permit)}>
+                          <TableCell>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-mono text-[10px] font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</span>
+                              <span className="font-bold text-sm truncate max-w-[180px]">{permit.siteName}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs font-semibold">{permit.ptwType}</TableCell>
+                          <TableCell><StatusBadge permit={permit} /></TableCell>
+                          <TableCell className="text-[10px] font-bold text-muted-foreground">{formatTimestamp(permit.requestDate)}</TableCell>
+                          <TableCell className="text-right px-6">
+                            <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                              {canResubmit && (
                                 <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" 
-                                  onClick={() => setActionState({ permit, status: isAdmin ? 'Approved' : 'ManagerApproved' })}
-                                  title="Approve"
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-7 px-2.5 rounded-sm font-black text-[9px] uppercase bg-white text-black border-slate-200 hover:bg-slate-50 shadow-sm"
+                                  onClick={() => router.push(`/ptw/raise?correct=${permit.id}`)}
                                 >
-                                  <CircleCheck className="h-4 w-4" />
+                                  <RefreshCw className="h-3 w-3 mr-1.5" /> Re-Submit
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" 
-                                  onClick={() => setActionState({ permit, status: 'Rejected' })}
-                                  title="Reject"
-                                >
-                                  <CircleX className="h-4 w-4" />
-                                </Button>
-                              </>
-                            )}
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
-                            {(isAdmin || userProfile?.role === 'Site Manager') && <WhatsAppUpdateEngineer permit={permit} />}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </CardContent>
-      </Card>
+                              )}
+                              {(canManagerAct || canAdminAct) && (
+                                <>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" 
+                                    onClick={() => setActionState({ permit, status: isAdmin ? 'Approved' : 'ManagerApproved' })}
+                                    title="Approve"
+                                  >
+                                    <CircleCheck className="h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" 
+                                    onClick={() => setActionState({ permit, status: 'Rejected' })}
+                                    title="Reject"
+                                  >
+                                    <CircleX className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button>
+                              {(isAdmin || userProfile?.role === 'Site Manager') && <WhatsAppUpdateEngineer permit={permit} />}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Decision Dialog */}
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
