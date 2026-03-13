@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -14,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Check, ChevronsUpDown, Loader2, FilePlus, Calendar, Plus, Trash2, MessageCircle, CheckCircle2, ArrowRight } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, FilePlus, Calendar, Plus, Trash2, MessageCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
@@ -128,8 +129,9 @@ export default function SubmitDPRPage() {
         totalPoints: increment(engineerPoints)
       });
 
-      // 2. Award Manager
-      if (userProfile?.siteManagerId) {
+      // 2. Award Manager (Inheritance)
+      // Only trigger if manager exists and is NOT the same as the current user
+      if (userProfile?.siteManagerId && userProfile.siteManagerId !== user.uid) {
         updateDocumentNonBlocking(doc(firestore, 'users', userProfile.siteManagerId), {
             totalPoints: increment(0.25)
         });
@@ -141,7 +143,7 @@ export default function SubmitDPRPage() {
         description: combinedDescription
       });
       setIsSubmitted(true);
-      toast({ title: "Success", description: "DPR submitted. Points awarded to you and your manager." });
+      toast({ title: "Success", description: "DPR submitted. Points awarded successfully." });
       form.reset({ siteName: "", reportDate: format(new Date(), 'yyyy-MM-dd'), updates: [{ value: "" }] });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
