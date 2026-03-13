@@ -101,7 +101,7 @@ export function BottomNav() {
               )}
             >
               <Icon className={cn("h-5 w-5", isActive && "fill-primary/10")} />
-              <span className="text-[10px] uppercase tracking-tighter leading-none">{item.label}</span>
+              <span className="text-[10px] tracking-tighter leading-none">{item.label}</span>
             </Link>
           );
         })}
@@ -113,7 +113,7 @@ export function BottomNav() {
               <div className="bg-primary text-primary-foreground p-2 rounded-full shadow-lg shadow-primary/20 -mt-6 border-4 border-background transition-transform active:scale-90">
                 <Plus className="h-6 w-6" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-tighter leading-none mt-1 text-primary">Actions</span>
+              <span className="text-[10px] font-semibold tracking-tighter leading-none mt-1 text-primary">Actions</span>
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent 
@@ -122,7 +122,7 @@ export function BottomNav() {
             sideOffset={20}
             className="w-64 rounded-sm shadow-2xl border-primary/10 mb-2 p-1 bg-background/95 backdrop-blur-sm"
           >
-            <DropdownMenuLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground py-2 px-3">
+            <DropdownMenuLabel className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground py-2 px-3">
               <Zap className="h-3 w-3 fill-amber-500 text-amber-500" /> 
               QUICK HUB
             </DropdownMenuLabel>
@@ -140,10 +140,10 @@ export function BottomNav() {
                         {action.icon}
                       </div>
                       <div className="flex flex-col overflow-hidden">
-                        <span className="text-xs font-black uppercase tracking-tight leading-none mb-1 group-hover:text-primary transition-colors">
+                        <span className="text-sm font-semibold tracking-tight leading-none mb-1 group-hover:text-primary transition-colors">
                           {action.label}
                         </span>
-                        <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-tighter truncate">
+                        <span className="text-xs text-muted-foreground font-normal tracking-tight truncate">
                           {action.description}
                         </span>
                       </div>
@@ -169,7 +169,7 @@ export function BottomNav() {
               )}
             >
               <Icon className={cn("h-5 w-5", isActive && "fill-primary/10")} />
-              <span className="text-[10px] uppercase tracking-tighter leading-none">{item.label}</span>
+              <span className="text-[10px] tracking-tighter leading-none">{item.label}</span>
             </Link>
           );
         })}
