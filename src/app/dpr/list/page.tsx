@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -8,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, Printer, FilterX, FileDown, MessageCircle } from "lucide-react";
+import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, Printer, FilterX, FileDown, MessageCircle, User } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 type DPR = {
   id: string;
@@ -104,7 +104,7 @@ export default function DPRListPage() {
 
     return result.sort((a, b) => {
         const dateA = new Date(a.reportDate || (a.createdAt?.toDate?.() || 0)).getTime();
-        const dateB = new Date(b.reportDate || (b.createdAt?.toDate?.() || 0)).getTime();
+        const dateB = b.reportDate || (b.createdAt?.toDate?.() || 0)).getTime();
         return dateB - dateA;
     });
   }, [dprs, searchTerm, startDate, endDate]);
@@ -113,21 +113,17 @@ export default function DPRListPage() {
     if (!deletingDpr || !firestore) return;
 
     try {
-        // Point Deduction Logic (Reversing 1.0 for Engineer, 0.25 for Manager)
         const engineerId = deletingDpr.userId;
         const managerId = deletingDpr.siteManagerId;
 
-        // Fetch current multiplier for accurate deduction
         const engRef = doc(firestore, 'users', engineerId);
         const engDoc = await getDoc(engRef);
         const multiplier = engDoc.exists() ? engDoc.data()?.pointsMultiplier || 1 : 1;
         
-        // 1. Deduct from Engineer (base 1.0 * X-Factor)
         updateDocumentNonBlocking(engRef, {
             totalPoints: increment(-(1.0 * multiplier))
         });
 
-        // 2. Deduct from Manager (base 0.25)
         if (managerId) {
             updateDocumentNonBlocking(doc(firestore, 'users', managerId), {
                 totalPoints: increment(-0.25)
@@ -269,73 +265,133 @@ export default function DPRListPage() {
               <Skeleton className="h-10 w-full" />
             </div>
           ) : sortedAndFilteredDprs && sortedAndFilteredDprs.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="w-32">Date</TableHead>
-                  <TableHead>Site</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead className="min-w-[300px]">Update & Activity</TableHead>
-                  <TableHead className="text-right px-6 no-print">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Mobile Card Layout */}
+              <div className="md:hidden divide-y">
                 {sortedAndFilteredDprs.map((dpr) => (
-                  <TableRow key={dpr.id} className="hover:bg-muted/5">
-                    <TableCell className="font-medium whitespace-nowrap">
-                        {dpr.reportDate ? format(new Date(dpr.reportDate), 'dd MMM yyyy') : '—'}
-                    </TableCell>
-                    <TableCell className="font-semibold">{dpr.siteName}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      <div className="font-medium text-foreground">{dpr.userName || '—'}</div>
-                    </TableCell>
-                    <TableCell className="max-w-md py-4">
-                        <div className="space-y-3 mb-3">
-                            {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx, arr) => (
-                                <React.Fragment key={pIdx}>
-                                    <p className="text-sm italic text-muted-foreground leading-relaxed">
-                                        "{para.trim()}"
-                                    </p>
-                                    {pIdx < arr.length - 1 && (
-                                        <div className="h-px bg-primary/10 my-2" />
+                  <div key={dpr.id} className="p-4 space-y-3 bg-card hover:bg-muted/5 transition-colors">
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
+                          {dpr.reportDate ? format(new Date(dpr.reportDate), 'dd MMM yyyy') : '—'}
+                        </span>
+                        <h3 className="font-bold text-sm leading-tight text-foreground">{dpr.siteName}</h3>
+                      </div>
+                      <Badge variant="outline" className="text-[8px] font-black uppercase rounded-sm border-primary/20 text-primary">
+                        DPR
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
+                      <User className="h-3 w-3 text-primary" />
+                      <span>{dpr.userName}</span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx) => (
+                        <p key={pIdx} className="text-xs italic text-muted-foreground leading-relaxed">
+                          "{para.trim()}"
+                        </p>
+                      ))}
+                    </div>
+
+                    {dpr.editedBy && (
+                      <div className="flex items-center gap-1.5 text-[9px] text-primary/70 font-medium bg-primary/5 p-1.5 rounded-sm">
+                        <Clock className="h-2.5 w-2.5" />
+                        <span>Edited by {dpr.editedBy} on {dpr.editedAt ? format(dpr.editedAt.toDate(), 'dd MMM HH:mm') : '—'}</span>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t flex justify-end items-center gap-2">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(dpr)} title="Push to WhatsApp">
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                      {dpr.userId === user?.uid && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingDpr(dpr)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {(dpr.userId === user?.uid || dpr.siteManagerId === user?.uid || isAdmin) && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingDpr(dpr)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="w-32">Date</TableHead>
+                      <TableHead>Site</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead className="min-w-[300px]">Update & Activity</TableHead>
+                      <TableHead className="text-right px-6 no-print">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedAndFilteredDprs.map((dpr) => (
+                      <TableRow key={dpr.id} className="hover:bg-muted/5">
+                        <TableCell className="font-medium whitespace-nowrap">
+                            {dpr.reportDate ? format(new Date(dpr.reportDate), 'dd MMM yyyy') : '—'}
+                        </TableCell>
+                        <TableCell className="font-semibold">{dpr.siteName}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          <div className="font-medium text-foreground">{dpr.userName || '—'}</div>
+                        </TableCell>
+                        <TableCell className="max-w-md py-4">
+                            <div className="space-y-3 mb-3">
+                                {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx, arr) => (
+                                    <React.Fragment key={pIdx}>
+                                        <p className="text-sm italic text-muted-foreground leading-relaxed">
+                                            "{para.trim()}"
+                                        </p>
+                                        {pIdx < arr.length - 1 && (
+                                            <div className="h-px bg-primary/10 my-2" />
+                                        )}
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                            {dpr.editedBy && (
+                                <div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-medium border-t border-primary/5 pt-2">
+                                    <span className="bg-primary/10 px-1 rounded">Edited</span>
+                                    <span>by {dpr.editedBy}</span>
+                                    {dpr.editedAt && (
+                                        <span className="text-muted-foreground/60 flex items-center gap-1">
+                                            <Clock className="h-2.5 w-2.5" />
+                                            {format(dpr.editedAt.toDate(), 'dd MMM HH:mm')}
+                                        </span>
                                     )}
-                                </React.Fragment>
-                            ))}
-                        </div>
-                        {dpr.editedBy && (
-                            <div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-medium border-t border-primary/5 pt-2">
-                                <span className="bg-primary/10 px-1 rounded">Edited</span>
-                                <span>by {dpr.editedBy}</span>
-                                {dpr.editedAt && (
-                                    <span className="text-muted-foreground/60 flex items-center gap-1">
-                                        <Clock className="h-2.5 w-2.5" />
-                                        {format(dpr.editedAt.toDate(), 'dd MMM HH:mm')}
-                                    </span>
+                                </div>
+                            )}
+                        </TableCell>
+                        <TableCell className="text-right px-6 no-print">
+                            <div className="flex justify-end items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(dpr)} title="Push to WhatsApp">
+                                    <MessageCircle className="h-4 w-4" />
+                                </Button>
+                                {dpr.userId === user?.uid && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setEditingDpr(dpr)}>
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+                                )}
+                                {(dpr.userId === user?.uid || dpr.siteManagerId === user?.uid || isAdmin) && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingDpr(dpr)}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
                                 )}
                             </div>
-                        )}
-                    </TableCell>
-                    <TableCell className="text-right px-6 no-print">
-                        <div className="flex justify-end items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(dpr)} title="Push to WhatsApp">
-                                <MessageCircle className="h-4 w-4" />
-                            </Button>
-                            {dpr.userId === user?.uid && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setEditingDpr(dpr)}>
-                                    <Pencil className="h-4 w-4" />
-                                </Button>
-                            )}
-                            {(dpr.userId === user?.uid || dpr.siteManagerId === user?.uid || isAdmin) && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingDpr(dpr)}>
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            )}
-                        </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           ) : (
             <div className="text-center py-24 text-muted-foreground italic bg-muted/5">
               {searchTerm || startDate || endDate ? "No results found matching your filters." : "No reports found matching your criteria."}
