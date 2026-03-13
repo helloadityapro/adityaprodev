@@ -458,8 +458,8 @@ export default function PtwListPage() {
             <ScrollArea className="w-full">
               <div className="min-w-[800px]">
                 <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
                       <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort('serialNumber')}>
                         <div className="flex items-center">Serial & Site <SortIcon column="serialNumber" /></div>
                       </TableHead>
@@ -574,7 +574,14 @@ export default function PtwListPage() {
       </Dialog>
 
       {/* Detailed View Overlay */}
-      <Dialog open={!!detailsPermit} onOpenChange={(o) => !o && setDetailsPermit(null)}>
+      <Dialog open={!!detailsPermit} onOpenChange={(o) => {
+        if (!o) {
+          const params = new URLSearchParams(searchParams.toString());
+          params.delete('view');
+          const queryStr = params.toString();
+          router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
+        }
+      }}>
         <DialogContent className="max-w-4xl w-[98vw] h-[95vh] p-0 border-none rounded-sm overflow-hidden flex flex-col shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
@@ -583,10 +590,6 @@ export default function PtwListPage() {
                 <DialogTitle className="text-lg font-black tracking-tight">Permit Audit Log</DialogTitle>
                 <DialogDescription className="text-[10px] font-bold text-muted-foreground">{detailsPermit?.serialNumber}</DialogDescription>
               </div>
-            </div>
-            <div className="flex items-center gap-2 no-print">
-              <Button variant="outline" size="icon" className="h-9 w-9 rounded-sm border-primary/20 text-primary" onClick={() => window.print()}><Printer className="h-4 w-4" /></Button>
-              <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-sm"><X className="h-5 w-5" /></Button></DialogClose>
             </div>
           </DialogHeader>
 

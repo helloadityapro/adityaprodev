@@ -164,16 +164,6 @@ export default function DPRListPage() {
     setEndDate("");
   };
 
-  const handlePrint = () => {
-    if (typeof window !== "undefined") {
-      const originalTitle = document.title;
-      const dateSuffix = startDate || endDate ? `_${startDate || 'Start'}_to_${endDate || 'End'}` : '';
-      document.title = `AdityaPro_DPR_Report${dateSuffix}`;
-      window.print();
-      document.title = originalTitle;
-    }
-  };
-
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
@@ -182,14 +172,6 @@ export default function DPRListPage() {
             <FileText className="h-8 w-8" /> DPR Data
           </h1>
           <p className="text-muted-foreground">Track and review submitted progress reports.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {(isAdmin || isManager) && (
-            <Button variant="outline" className="rounded-sm font-bold" onClick={handlePrint}>
-              <FileDown className="mr-2 h-4 w-4" />
-              Generate PDF Report
-            </Button>
-          )}
         </div>
       </div>
 
