@@ -25,7 +25,13 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Allow users to update their own profile OR allow anyone to update 'totalPoints' (for inheritance rewards)
+      // Restricted fields like 'role' or 'department' remain protected via the affectedKeys check
+      allow update: if isSignedIn() && (
+        request.auth.uid == userId || 
+        isAdmin() || 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints']))
+      );
       allow delete: if isAdmin();
     }
 
