@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -207,7 +206,7 @@ export default function CreateTaskPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Button 
-              className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm" 
+              className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm shadow-md" 
               onClick={() => triggerWhatsApp(submittedTask.title, submittedTask.siteName, submittedTask.assigneeMobile)}
             >
               <MessageCircle className="mr-2 h-5 w-5" />
@@ -234,7 +233,7 @@ export default function CreateTaskPage() {
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+        <h1 className="flex items-center gap-2">
           <CheckSquare className="h-8 w-8" /> Assign New Task
         </h1>
         <p className="text-muted-foreground">Create and delegate work items to site personnel.</p>

@@ -87,8 +87,8 @@ export default function DocumentsExplorerPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-          <FolderIcon className="h-8 w-8" /> Documents Explorer
+        <h1 className="flex items-center gap-2">
+          <FolderIcon className="h-8 w-8 text-primary" /> Documents Explorer
         </h1>
         <p className="text-muted-foreground">Access and manage files for your authorized project sites.</p>
       </div>
@@ -132,7 +132,7 @@ export default function DocumentsExplorerPage() {
         <div className="flex flex-col items-center justify-center py-24 text-center bg-card border border-dashed rounded-sm border-primary/20">
           <FolderIcon className="h-12 w-12 text-muted-foreground/30 mb-4" />
           <h3 className="text-lg font-semibold">No Site Folders Found</h3>
-          <p className="text-muted-foreground max-w-sm mx-auto">
+          <p className="text-muted-foreground max-sm mx-auto">
             {searchTerm ? "No sites match your search criteria." : "You currently don't have access to any site document folders. Please contact Admin for assignment."}
           </p>
         </div>

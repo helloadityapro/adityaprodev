@@ -196,7 +196,7 @@ export default function ExpensesListPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Wallet className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-black tracking-tight uppercase">{isAdmin ? "Organization Expenses" : "My Expense History"}</h1>
+            <h1>{isAdmin ? "Organization Expenses" : "My Expense History"}</h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">Tracking and auditing organizational payments and purchases.</p>
         </div>

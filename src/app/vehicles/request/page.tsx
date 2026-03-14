@@ -313,7 +313,7 @@ export default function RequestVehiclePage() {
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2">
+        <h1 className="flex items-center gap-2">
           <Fuel className="h-8 w-8" /> Request Vehicle Allotment
         </h1>
         <p className="text-muted-foreground font-medium">Specify route and trip details for administrative review.</p>

@@ -150,7 +150,7 @@ export default function DashboardPage() {
   return (
     <>
       <div className="flex items-center">
-        <h1 className="text-3xl font-bold tracking-tight">Site Projects</h1>
+        <h1>Site Projects</h1>
       </div>
       <Card>
         <CardHeader>

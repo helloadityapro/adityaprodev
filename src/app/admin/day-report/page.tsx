@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -241,7 +240,7 @@ export default function AdminDayReportPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <FileText className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-black tracking-tight uppercase">Daily Activity Audit</h1>
+            <h1>Daily Activity Audit</h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">Consolidated timeline of personnel site presence and documentation.</p>
         </div>
@@ -366,8 +365,7 @@ export default function AdminDayReportPage() {
                             )}
                           </div>
                           <div className="flex items-center gap-1 mt-2 text-slate-500 font-mono text-[10px] font-bold">
-                            <MapPin className="h-3 w-3" />
-                            {reportData.attendance.checkOutLat ? `${reportData.attendance.checkOutLat.toFixed(5)}, ${reportData.attendance.checkOutLng?.toFixed(5)}` : 'N/A'}
+                            <MapPin className="h-3 w-3" /> {reportData.attendance.checkOutLat ? `${reportData.attendance.checkOutLat.toFixed(5)}, ${reportData.attendance.checkOutLng?.toFixed(5)}` : 'N/A'}
                           </div>
                         </div>
                       </div>

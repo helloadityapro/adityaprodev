@@ -272,7 +272,7 @@ export default function ManageAllTripsPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <MapPinned className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-black tracking-tight uppercase">Manage Trips</h1>
+            <h1>Manage Trips</h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">Trip life-cycle monitoring, resource allotment and coordination hub.</p>
         </div>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -228,7 +227,7 @@ export default function TaskListPage() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+          <h1 className="flex items-center gap-2">
             <ListTodo className="h-8 w-8" /> Tasks Audit
           </h1>
           <p className="text-muted-foreground text-sm font-medium">Monitor and update site activity assignments.</p>

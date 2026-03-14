@@ -189,7 +189,7 @@ export default function SubmitExpensePage() {
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-20">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+        <h1 className="flex items-center gap-2">
           <Wallet className="h-8 w-8" /> New Expense Submission
         </h1>
         <p className="text-muted-foreground font-medium">Log official purchases or payments for organizational audit.</p>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -368,7 +367,7 @@ export default function PtwListPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-foreground uppercase">PtW Audit</h1>
+        <h1>PtW Audit</h1>
         <p className="text-muted-foreground text-sm font-medium">Compliance monitoring and permit authorization hub.</p>
       </div>
 

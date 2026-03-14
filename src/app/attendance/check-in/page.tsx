@@ -129,7 +129,7 @@ export default function CheckInPage() {
     <div className="space-y-6 max-w-2xl mx-auto pb-10">
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-black tracking-tight text-foreground uppercase flex items-center gap-2">
+          <h1 className="flex items-center gap-2">
             <CalendarCheck className="h-6 w-6 text-primary" /> Check-in
           </h1>
           <p className="text-muted-foreground text-xs font-medium">Verify your site presence.</p>

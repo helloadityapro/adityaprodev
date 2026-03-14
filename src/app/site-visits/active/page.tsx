@@ -81,7 +81,7 @@ export default function ActiveSiteVisitsPage() {
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+        <h1 className="flex items-center gap-2">
           <Navigation className="h-8 w-8" /> {isAdmin ? "Global Active Presence" : (isManager ? "Team Active Presence" : "My Active Site Presence")}
         </h1>
         <p className="text-muted-foreground">

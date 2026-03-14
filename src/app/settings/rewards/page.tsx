@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -9,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat, Settings2, RotateCcw, Plus, Minus, ShieldCheck, History, CheckCircle2, XCircle, LayoutGrid, Zap, RefreshCcw, CreditCard } from "lucide-react";
+import { Coins, UserCog, Search, Save, TrendingUp, Star, Loader2, HardHat, Settings2, RotateCcw, Plus, Minus, ShieldCheck, History, CheckCircle2, XCircle, LayoutGrid, Zap, RefreshCcw, CreditCard, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
@@ -378,7 +377,10 @@ export default function AdminRewardsSettingsPage() {
   return (
     <div className="space-y-8 pb-20 max-w-5xl mx-auto">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={() => router.push('/settings')} className="w-fit mb-2 -ml-2">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Settings
+        </Button>
+        <h1 className="flex items-center gap-2 text-primary">
           <Coins className="h-8 w-8 text-amber-600" /> Rewards Setup
         </h1>
         <p className="text-muted-foreground">Manage reward economy, approve redemptions and adjust balances.</p>
@@ -488,7 +490,7 @@ export default function AdminRewardsSettingsPage() {
                   </Button>
                   {isSuperAdminUser && (
                     <Button onClick={handleRecalculateScoreboard} disabled={isSyncing} variant="outline" className="flex-1 rounded-sm font-bold border-amber-500 text-amber-700">
-                      {isSyncing ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
+                      {isSyncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCcw className="h-4 w-4 mr-2" />}
                       Sync Historical Records
                     </Button>
                   )}
@@ -715,7 +717,7 @@ export default function AdminRewardsSettingsPage() {
             </div>
             <div className="pt-4 border-t">
               <Button variant="outline" className="w-full rounded-sm font-bold border-destructive text-destructive hover:bg-destructive hover:text-white transition-all h-11" onClick={() => handleInitiateRequest('clear')} disabled={isSubmittingRequest}>
-                {isSubmittingRequest ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+                {isSubmittingRequest ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
                 Request Total Balance Reset
               </Button>
             </div>

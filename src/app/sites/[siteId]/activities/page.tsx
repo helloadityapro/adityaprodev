@@ -164,7 +164,7 @@ export default function SiteActivitiesPage() {
               <MapPin className="h-8 w-8 text-primary" />
             </div>
             <div>
-              <h1 className="text-4xl font-black tracking-tight text-foreground uppercase leading-none">{site.name}</h1>
+              <h1 className="leading-none">{site.name}</h1>
               <p className="text-muted-foreground font-bold flex items-center gap-2 mt-1">
                 <Building2 className="h-4 w-4 text-primary" /> {site.projectCompany}
               </p>

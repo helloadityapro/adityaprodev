@@ -290,7 +290,7 @@ export default function ManageSitesPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-primary">
             <MapPin className="h-8 w-8" /> Manage Project Sites
           </h1>
           <p className="text-muted-foreground">Define and organize project locations for organizational operations.</p>

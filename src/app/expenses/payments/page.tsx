@@ -148,8 +148,8 @@ export default function AccountPaymentsPage() {
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <Landmark className="h-8 w-8" /> Payment Disbursement
+        <h1 className="flex items-center gap-2">
+          <Landmark className="h-8 w-8 text-primary" /> Payment Disbursement
         </h1>
         <p className="text-muted-foreground text-sm font-medium">Record and track organizational reimbursements for approved reports.</p>
       </div>
@@ -255,9 +255,9 @@ export default function AccountPaymentsPage() {
             {selectedReport?.status === 'Approved' ? (
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Transaction Reference / UTR No.</Label>
-                <Input 
+                <input 
                   placeholder="Enter reference number..." 
-                  className="h-12 font-mono font-bold rounded-sm border-primary/20"
+                  className="flex h-12 w-full rounded-sm border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm font-mono font-bold"
                   value={transactionId}
                   onChange={(e) => setTransactionId(e.target.value)}
                 />

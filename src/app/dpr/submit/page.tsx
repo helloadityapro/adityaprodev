@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -213,8 +212,8 @@ export default function SubmitDPRPage() {
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-          <FilePlus className="h-8 w-8" /> Submit DPR
+        <h1 className="flex items-center gap-2">
+          <FilePlus className="h-8 w-8 text-primary" /> Submit DPR
         </h1>
         <p className="text-muted-foreground">Log today's site progress and updates.</p>
       </div>

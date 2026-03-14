@@ -143,7 +143,7 @@ export default function PtwActivitiesPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground uppercase">PtW Activities</h1>
+        <h1>PtW Activities</h1>
         <p className="text-muted-foreground text-sm font-medium">Historical log of all permit-related actions and status changes.</p>
       </div>
 

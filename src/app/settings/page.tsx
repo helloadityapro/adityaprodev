@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -21,6 +20,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -66,7 +66,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight uppercase">Settings</h1>
+        <h1>Settings</h1>
         <p className="text-muted-foreground font-medium">Personal preferences and system administration.</p>
       </div>
 

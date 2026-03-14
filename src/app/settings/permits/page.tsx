@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, AlertCircle, Loader2, Eye, FilterX, Search, ShieldAlert, History } from 'lucide-react';
+import { Trash2, AlertCircle, Loader2, Eye, FilterX, Search, ShieldAlert, History, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -177,7 +177,10 @@ export default function PermitManagementPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+        <Button variant="ghost" size="sm" onClick={() => router.push('/settings')} className="w-fit mb-2 -ml-2">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Settings
+        </Button>
+        <h1 className="flex items-center gap-2 text-primary">
           <ShieldAlert className="h-8 w-8" /> Permit Management
         </h1>
         <p className="text-muted-foreground font-medium">Cleanup permit requests and manage database health. Points are automatically reversed on permanent deletion.</p>

@@ -179,7 +179,7 @@ export default function ManageExpensesPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-black tracking-tight uppercase">{isAdmin ? "Manage All Expenses" : "My Expense History"}</h1>
+            <h1>{isAdmin ? "Manage All Expenses" : "My Expense History"}</h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">Monitoring and authorization of organizational expenditures.</p>
         </div>

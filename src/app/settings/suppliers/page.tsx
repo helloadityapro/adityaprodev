@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, Hash, CheckCircle2, FileDown, FileUp, AlertCircle } from 'lucide-react';
+import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, Hash, CheckCircle2, FileDown, FileUp, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -210,7 +210,10 @@ export default function SuppliersManagementPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => router.push('/settings')} className="w-fit mb-2 -ml-2">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Settings
+          </Button>
+          <h1 className="flex items-center gap-2 text-primary">
             <Truck className="h-8 w-8" /> Supplier Registry
           </h1>
           <p className="text-muted-foreground">Manage organizational material suppliers and their credentials.</p>

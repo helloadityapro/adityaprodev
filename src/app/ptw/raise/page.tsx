@@ -449,7 +449,7 @@ export default function RaisePtwPage() {
       )}
 
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight">{isCorrectionMode ? "Resubmit PtW Request" : "Raise a Permit to Work"}</h1>
+        <h1>{isCorrectionMode ? "Resubmit PtW Request" : "Raise a Permit to Work"}</h1>
         <p className="text-muted-foreground">Detailed site documentation is required for approval.</p>
       </div>
 

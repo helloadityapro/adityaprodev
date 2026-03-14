@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -120,7 +119,7 @@ export default function StartSiteVisitPage() {
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+        <h1 className="flex items-center gap-2">
           <Navigation className="h-8 w-8" /> Start Site Visit
         </h1>
         <p className="text-muted-foreground">Initiate a formal site visit report. Your location and time will be captured.</p>
@@ -159,6 +158,7 @@ export default function StartSiteVisitPage() {
                   {filteredSites.length > 0 ? filteredSites.map((site) => (
                     <Button 
                         key={site.id} 
+                        type="button" 
                         variant="ghost" 
                         className="w-full justify-start font-normal text-left" 
                         onClick={() => { setSelectedSite(site); setIsSitePopoverOpen(false); }}

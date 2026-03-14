@@ -145,8 +145,8 @@ export default function CheckOutPage() {
   return (
     <div className="space-y-8 max-w-2xl mx-auto py-8 px-4">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2">
-          <CalendarCheck className="h-8 w-8" /> Workday In Progress
+        <h1 className="flex items-center gap-2">
+          <CalendarCheck className="h-8 w-8 text-primary" /> Workday In Progress
         </h1>
         <p className="text-muted-foreground">Session started {formatDistanceToNow(currentEntry.checkInTime?.toDate() || new Date(), { addSuffix: true })}.</p>
       </div>

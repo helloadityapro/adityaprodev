@@ -105,8 +105,8 @@ export default function SiteVisitsHistoryPage() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <History className="h-8 w-8" /> {headerTitle}
+          <h1 className="flex items-center gap-2">
+            <History className="h-8 w-8 text-primary" /> {headerTitle}
           </h1>
           <p className="text-muted-foreground">Historical records of site presence and audit reports.</p>
         </div>

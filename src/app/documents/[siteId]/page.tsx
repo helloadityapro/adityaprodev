@@ -181,8 +181,8 @@ export default function SiteDocumentsPage() {
         <Button variant="ghost" size="sm" className="w-fit mb-2 -ml-2" onClick={() => router.push('/documents')}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Explorer
         </Button>
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-          <FileIcon className="h-8 w-8" /> {site.name} Documents
+        <h1 className="flex items-center gap-2">
+          <FileIcon className="h-8 w-8 text-primary" /> {site.name} Documents
         </h1>
         <p className="text-muted-foreground">Shared files and documentation for this project site.</p>
       </div>

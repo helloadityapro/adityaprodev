@@ -78,6 +78,9 @@
     @apply bg-background text-foreground scroll-smooth overflow-x-hidden selection:bg-primary/20;
     -webkit-tap-highlight-color: transparent;
   }
+  h1 {
+    @apply text-2xl font-bold tracking-tight text-foreground capitalize;
+  }
 }
 
 @layer utilities {

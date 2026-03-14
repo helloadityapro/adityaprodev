@@ -168,8 +168,8 @@ export default function DPRListPage() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
-            <FileText className="h-8 w-8" /> DPR Data
+          <h1 className="flex items-center gap-2">
+            <FileText className="h-8 w-8 text-primary" /> DPR Data
           </h1>
           <p className="text-muted-foreground">Track and review submitted progress reports.</p>
         </div>

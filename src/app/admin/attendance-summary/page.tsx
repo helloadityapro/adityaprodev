@@ -192,7 +192,7 @@ export default function AttendanceSummaryPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-black tracking-tight uppercase">Daily Attendance Summary</h1>
+            <h1>Daily Attendance Summary</h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">Cross-organizational overview of personnel presence.</p>
         </div>
@@ -319,7 +319,7 @@ export default function AttendanceSummaryPage() {
             <TableHeader className="bg-muted/30">
               <TableRow>
                 <TableHead 
-                  className="px-6 min-w-[200px] cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="px-6 min-w-[200px] cursor-pointer hover:bg-muted/5 transition-colors"
                   onClick={() => handleSort('personnel')}
                 >
                   <div className="flex items-center">
@@ -327,7 +327,7 @@ export default function AttendanceSummaryPage() {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="cursor-pointer hover:bg-muted/5 transition-colors"
                   onClick={() => handleSort('status')}
                 >
                   <div className="flex items-center">
@@ -335,7 +335,7 @@ export default function AttendanceSummaryPage() {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="cursor-pointer hover:bg-muted/5 transition-colors"
                   onClick={() => handleSort('checkIn')}
                 >
                   <div className="flex items-center">
@@ -343,7 +343,7 @@ export default function AttendanceSummaryPage() {
                   </div>
                 </TableHead>
                 <TableHead 
-                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="cursor-pointer hover:bg-muted/5 transition-colors"
                   onClick={() => handleSort('checkOut')}
                 >
                   <div className="flex items-center">

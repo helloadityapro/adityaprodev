@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowUpCircle, MapPin, Truck, Building2, ChevronsUpDown, Check, User, MessageCircle, FileText, ExternalLink, Eye } from "lucide-react";
+import { ArrowLeftRight, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, ArrowDownCircle, ArrowDown, ArrowUp, ArrowUpCircle, MapPin, Truck, Building2, ChevronsUpDown, Check, User, MessageCircle, FileText, ExternalLink, Eye, ArrowUpDown } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -214,8 +214,8 @@ export default function MovementListPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-1 no-print">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <ArrowLeftRight className="h-8 w-8" /> Movement Data
+        <h1 className="flex items-center gap-2">
+          <ArrowLeftRight className="h-8 w-8 text-primary" /> Movement Data
         </h1>
         <p className="text-muted-foreground">Track inward and outward material logs.</p>
       </div>

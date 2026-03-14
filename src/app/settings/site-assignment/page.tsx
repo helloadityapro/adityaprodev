@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { Trash2, Loader2, PlusCircle, Search, ChevronsUpDown, Check } from 'lucide-react';
+import { Trash2, Loader2, PlusCircle, Search, ChevronsUpDown, Check, ArrowLeft } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -174,7 +174,10 @@ export default function SiteAssignmentPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight">Assign Sites</h1>
+        <Button variant="ghost" size="sm" onClick={() => router.push('/settings')} className="w-fit mb-2 -ml-2">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Settings
+        </Button>
+        <h1>Assign Sites</h1>
         <p className="text-muted-foreground">Manage which sites are accessible to specific users. Engineer assignments automatically sync to Managers.</p>
       </div>
 

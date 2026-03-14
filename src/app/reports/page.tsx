@@ -323,7 +323,7 @@ export default function ReportsDashboard() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-black tracking-tight uppercase">Operational Reports</h1>
+            <h1>Operational Reports</h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">
             Operational summaries and performance data analytics.

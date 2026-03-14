@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -70,7 +69,7 @@ export default function AddVehiclePage() {
         <Button variant="ghost" size="sm" onClick={() => router.back()} className="w-fit mb-2 -ml-2">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2">
+        <h1 className="flex items-center gap-2">
           <Car className="h-8 w-8" /> Register New Vehicle
         </h1>
         <p className="text-muted-foreground font-medium">Add a new owned or rented vehicle to the organizational registry.</p>

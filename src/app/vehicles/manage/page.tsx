@@ -132,7 +132,7 @@ export default function ManageVehiclesPage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Car className="h-6 w-6 text-primary" />
-            <h1 className="text-3xl font-black tracking-tight uppercase">Fleet Registry</h1>
+            <h1>Fleet Registry</h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">Organizational asset management and availability audit.</p>
         </div>
