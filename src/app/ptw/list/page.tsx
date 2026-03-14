@@ -202,7 +202,13 @@ export default function PtwListPage() {
     const viewId = searchParams.get('view');
     if (viewId && permits && permits.length > 0) {
       const permit = permits.find(p => p.id === viewId);
-      if (permit) setDetailsPermit(permit);
+      if (permit) {
+        setDetailsPermit(permit);
+      } else {
+        setDetailsPermit(null);
+      }
+    } else if (!viewId) {
+      setDetailsPermit(null);
     }
   }, [searchParams, permits]);
 
@@ -588,10 +594,15 @@ export default function PtwListPage() {
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><FileText className="h-5 w-5 text-primary" /></div>
               <div>
-                <DialogTitle className="text-lg font-black tracking-tight">Permit Audit Log</DialogTitle>
+                <DialogTitle className="text-lg font-black tracking-tight text-foreground">Permit Audit Log</DialogTitle>
                 <DialogDescription className="text-[10px] font-bold text-muted-foreground">{detailsPermit?.serialNumber}</DialogDescription>
               </div>
             </div>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogClose>
           </DialogHeader>
 
           <ScrollArea className="flex-1 bg-background">
@@ -762,20 +773,27 @@ export default function PtwListPage() {
             )}
           </ScrollArea>
 
-          {detailsPermit && detailsPermit.status !== 'Approved' && detailsPermit.status !== 'Rejected' && (
-            <div className="p-4 border-t bg-muted/5 grid grid-cols-2 gap-3 no-print">
-              {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || isAdmin) && (
-                <>
-                  <Button className="h-12 rounded-sm font-bold text-sm bg-green-600 hover:bg-green-700 text-white shadow-lg px-8" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
-                    Approve
-                  </Button>
-                  <Button variant="destructive" className="h-12 rounded-sm font-bold text-sm shadow-lg px-8" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>
-                    Reject
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 no-print">
+            <DialogClose asChild>
+              <Button variant="outline" className="h-12 rounded-sm font-black uppercase text-xs flex-1 tracking-widest">
+                Close Audit
+              </Button>
+            </DialogClose>
+            {detailsPermit && detailsPermit.status !== 'Approved' && detailsPermit.status !== 'Rejected' && (
+              <>
+                {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || isAdmin) && (
+                  <div className="flex-1 flex gap-2">
+                    <Button className="flex-1 h-12 rounded-sm font-bold text-xs bg-green-600 hover:bg-green-700 text-white shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
+                      Approve
+                    </Button>
+                    <Button variant="destructive" className="flex-1 h-12 rounded-sm font-bold text-xs shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>
+                      Reject
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
