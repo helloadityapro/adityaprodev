@@ -35,6 +35,7 @@ import {
   Workflow,
   Users,
   SlidersHorizontal,
+  FileCheck
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -363,6 +364,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <Link href="/admin/dashboard">
                       <LayoutDashboard className="h-4 w-4" />
                       <span className="font-medium">Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Permit Management" isActive={pathname === '/settings/permits'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/settings/permits">
+                      <FileCheck className="h-4 w-4 text-primary" />
+                      <span className="font-bold">Permit Management</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
