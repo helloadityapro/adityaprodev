@@ -198,7 +198,7 @@ export default function CheckOutPage() {
           </div>
 
           <Button 
-            className="w-full h-16 text-xl font-black rounded-sm shadow-xl bg-slate-900" 
+            className="w-full h-16 text-xl font-black rounded-sm shadow-xl bg-red-600 hover:bg-red-700 text-white transition-colors" 
             onClick={handleCheckOut}
             disabled={isProcessing || !selfie}
           >
