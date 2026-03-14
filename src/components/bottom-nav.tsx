@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -27,6 +28,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 /**
  * Bottom navigation bar for mobile devices.
@@ -35,6 +38,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 export function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile } = useDoc(userProfileRef);
+  const isDriver = userProfile?.role === 'Driver';
 
   const navItems = [
     { label: 'Attendance', href: '/attendance', icon: CalendarCheck2 },
@@ -115,58 +124,69 @@ export function BottomNav() {
           );
         })}
 
-        {/* Center: Quick Actions Floating Button */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <div className="flex flex-col items-center justify-center w-full h-full cursor-pointer group">
-              <div className="bg-primary text-primary-foreground p-3 rounded-full shadow-xl shadow-primary/30 -mt-8 border-[4px] border-background transition-all duration-300 group-active:scale-95">
-                <Plus className="h-6 w-6 stroke-[3.5px]" />
+        {/* Center: Quick Actions Floating Button (Disabled for Drivers) */}
+        {!isDriver ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div className="flex flex-col items-center justify-center w-full h-full cursor-pointer group">
+                <div className="bg-primary text-primary-foreground p-3 rounded-full shadow-xl shadow-primary/30 -mt-8 border-[4px] border-background transition-all duration-300 group-active:scale-95">
+                  <Plus className="h-6 w-6 stroke-[3.5px]" />
+                </div>
               </div>
-            </div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent 
-            side="top" 
-            align="center" 
-            sideOffset={15}
-            className="w-56 rounded-xl shadow-2xl border-primary/10 mb-2 p-1 bg-background/95 backdrop-blur-md"
-          >
-            <DropdownMenuLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 py-2.5 px-3">
-              <Zap className="h-3 w-3 fill-amber-500 text-amber-500" /> 
-              QUICKLY
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-primary/5" />
-            <ScrollArea className="max-h-[60vh]">
-              <div className="p-1">
-                {quickActions.map((action) => (
-                  <DropdownMenuItem
-                    key={action.href}
-                    onClick={() => router.push(action.href)}
-                    className="cursor-pointer py-2.5 px-3 focus:bg-primary/5 group rounded-lg mb-0.5"
-                  >
-                    <div className="flex items-center gap-3 w-full">
-                      <div className="p-1.5 bg-muted/50 rounded-lg group-hover:bg-primary/10 transition-colors shrink-0">
-                        {action.icon}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent 
+              side="top" 
+              align="center" 
+              sideOffset={15}
+              className="w-56 rounded-xl shadow-2xl border-primary/10 mb-2 p-1 bg-background/95 backdrop-blur-md"
+            >
+              <DropdownMenuLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 py-2.5 px-3">
+                <Zap className="h-3 w-3 fill-amber-500 text-amber-500" /> 
+                QUICKLY
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-primary/5" />
+              <ScrollArea className="max-h-[60vh]">
+                <div className="p-1">
+                  {quickActions.map((action) => (
+                    <DropdownMenuItem
+                      key={action.label}
+                      onClick={() => router.push(action.href)}
+                      className="cursor-pointer py-2.5 px-3 focus:bg-primary/5 group rounded-lg mb-0.5"
+                    >
+                      <div className="flex items-center gap-3 w-full">
+                        <div className="p-1.5 bg-muted/50 rounded-lg group-hover:bg-primary/10 transition-colors shrink-0">
+                          {action.icon}
+                        </div>
+                        <div className="flex flex-col overflow-hidden">
+                          <span className="text-xs font-bold tracking-tight leading-none mb-1 group-hover:text-primary transition-colors">
+                            {action.label}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground font-medium tracking-tight truncate">
+                            {action.description}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex flex-col overflow-hidden">
-                        <span className="text-xs font-bold tracking-tight leading-none mb-1 group-hover:text-primary transition-colors">
-                          {action.label}
-                        </span>
-                        <span className="text-[9px] text-muted-foreground font-medium tracking-tight truncate">
-                          {action.description}
-                        </span>
-                      </div>
-                    </div>
-                  </DropdownMenuItem>
-                ))}
-              </div>
-            </ScrollArea>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                    </DropdownMenuItem>
+                  ))}
+                </div>
+              </ScrollArea>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <div className="w-full flex items-center justify-center">
+            {/* Empty space or a simple separator for drivers */}
+            <div className="h-8 w-px bg-border/50" />
+          </div>
+        )}
 
         {/* Right Side Items */}
         {navItems.slice(2).map((item) => {
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.href);
+          
+          // Hide PtWs for Drivers in bottom nav
+          if (isDriver && item.label === 'My PtWs') return null;
+
           return (
             <Link
               key={item.href}
