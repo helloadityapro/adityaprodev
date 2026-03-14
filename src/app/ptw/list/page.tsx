@@ -347,18 +347,18 @@ export default function PtwListPage() {
         <p className="text-muted-foreground text-sm font-medium">Compliance monitoring and permit authorization hub.</p>
       </div>
 
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+      <div className="grid gap-2 grid-cols-3 sm:gap-4">
         <Card className="bg-primary/5 border-primary/10 rounded-sm">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Total</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 font-black text-2xl">{stats.total}</CardContent>
+          <CardHeader className="p-2 sm:p-4 pb-1 sm:pb-2"><CardTitle className="text-[8px] sm:text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Total</CardTitle></CardHeader>
+          <CardContent className="p-2 sm:p-4 pt-0 font-black text-base sm:text-2xl">{stats.total}</CardContent>
         </Card>
         <Card className="bg-amber-500/5 border-amber-500/10 rounded-sm">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-bold uppercase text-amber-600 tracking-widest">Pending</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 font-black text-2xl text-amber-700">{stats.pending}</CardContent>
+          <CardHeader className="p-2 sm:p-4 pb-1 sm:pb-2"><CardTitle className="text-[8px] sm:text-[10px] font-bold uppercase text-amber-600 tracking-widest">Pending</CardTitle></CardHeader>
+          <CardContent className="p-2 sm:p-4 pt-0 font-black text-base sm:text-2xl text-amber-700">{stats.pending}</CardContent>
         </Card>
         <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-bold uppercase text-green-600 tracking-widest">Approved</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 font-black text-2xl text-green-700">{stats.approved}</CardContent>
+          <CardHeader className="p-2 sm:p-4 pb-1 sm:pb-2"><CardTitle className="text-[8px] sm:text-[10px] font-bold uppercase text-green-600 tracking-widest">Approved</CardTitle></CardHeader>
+          <CardContent className="p-2 sm:p-4 pt-0 font-black text-base sm:text-2xl text-green-700">{stats.approved}</CardContent>
         </Card>
       </div>
 
