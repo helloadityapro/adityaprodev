@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -157,6 +158,13 @@ export default function TaskListPage() {
     if (!actionTask) return;
     setIsUpdating(true);
     
+    // Guard against double points
+    if (actionTask.status === 'Completed' && nextStatus === 'Completed') {
+        setActionTask(null);
+        setIsUpdating(false);
+        return;
+    }
+
     const taskRef = doc(firestore, 'tasks', actionTask.id);
     updateDocumentNonBlocking(taskRef, {
         status: nextStatus,
@@ -165,14 +173,15 @@ export default function TaskListPage() {
     });
 
     if (nextStatus === 'Completed' && actionTask.status !== 'Completed') {
-        const assigneeDoc = await getDoc(doc(firestore, 'users', actionTask.assignedToId));
+        const assigneeRef = doc(firestore, 'users', actionTask.assignedToId);
+        const assigneeDoc = await getDoc(assigneeRef);
         if (assigneeDoc.exists()) {
             const assigneeData = assigneeDoc.data();
             const multiplier = assigneeData.pointsMultiplier || 1;
-            const rate = rewardSettings?.taskCompletion ?? 0.1;
+            const rate = rewardSettings?.taskCompletion ?? 0.25;
             const pointsToAdd = rate * multiplier;
             
-            updateDocumentNonBlocking(doc(firestore, 'users', actionTask.assignedToId), {
+            updateDocumentNonBlocking(assigneeRef, {
                 totalPoints: increment(pointsToAdd)
             });
             
@@ -286,7 +295,7 @@ export default function TaskListPage() {
               </SelectContent>
             </Select>
             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-sm" onClick={clearFilters} title="Clear Filters">
-              <FilterX className="h-4 w-4" />
+              <FilterX className="h-3.5 w-3.5 md:h-4 md:w-4" />
             </Button>
           </div>
         </div>
@@ -335,7 +344,7 @@ export default function TaskListPage() {
             </Card>
           )) : (
             <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-              No tasks found matching criteria.
+              No tasks found.
             </div>
           )}
         </div>
@@ -432,10 +441,7 @@ export default function TaskListPage() {
               </div>
               <div className="space-y-2">
                 <Label>Set New Status</Label>
-                <Select defaultValue={actionTask?.status} onValueChange={(val: any) => {
-                  const remarks = (document.getElementById('task-remarks') as HTMLTextAreaElement)?.value || "";
-                  handleUpdateStatus(remarks, val);
-                }}>
+                <Select value={actionTask?.status} onValueChange={(val: any) => setActionTask(prev => prev ? {...prev, status: val} : null)}>
                   <SelectTrigger className="rounded-sm h-9">
                     <SelectValue />
                   </SelectTrigger>

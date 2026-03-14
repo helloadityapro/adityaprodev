@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -99,6 +100,7 @@ type Permit = {
 };
 
 type RewardSettings = {
+  pointValueInRs?: number;
   ptwNoCorrection?: number;
   ptwWithCorrection?: number;
 };
@@ -227,7 +229,18 @@ export default function PtwListPage() {
 
   const handleAction = async (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
     if (!user || !userProfile) return;
+    
+    // Guard against redundant actions if already processed
     const permitRef = doc(firestore, "permits_to_work", permit.id);
+    const pSnap = await getDoc(permitRef);
+    if (!pSnap.exists()) return;
+    const freshPermitData = pSnap.data() as Permit;
+    
+    if (freshPermitData.status === 'Approved' || freshPermitData.status === 'Rejected') {
+        toast({ variant: 'destructive', title: 'Action Invalid', description: 'This permit has already been finalized.' });
+        return;
+    }
+
     const currentSubmission = Math.max(1, ...(permit.attachments?.map(a => a.submissionIndex || 0) || []));
 
     const timelineEntry: TimelineEntry = {
@@ -249,15 +262,22 @@ export default function PtwListPage() {
       ...(isAdmin ? { adminId: user.uid } : {})
     });
 
+    // Reward Logic: Only award when finally 'Approved'
     if (targetStatus === 'Approved') {
-        const engineerDoc = await getDoc(doc(firestore, 'users', permit.siteEngineerId));
+        const engineerRef = doc(firestore, 'users', permit.siteEngineerId);
+        const engineerDoc = await getDoc(engineerRef);
         if (engineerDoc.exists()) {
             const multiplier = engineerDoc.data()?.pointsMultiplier || 1;
             const hasRejection = (permit.timeline || []).some(t => t.status === 'Rejected');
-            const basePoints = hasRejection ? (rewardSettings?.ptwWithCorrection ?? 0.5) : (rewardSettings?.ptwNoCorrection ?? 1.0);
-            updateDocumentNonBlocking(doc(firestore, 'users', permit.siteEngineerId), { totalPoints: increment(basePoints * multiplier) });
+            const baseRate = hasRejection ? (rewardSettings?.ptwWithCorrection ?? 0.5) : (rewardSettings?.ptwNoCorrection ?? 1.0);
+            
+            // 1. Award Engineer
+            updateDocumentNonBlocking(engineerRef, { totalPoints: increment(baseRate * multiplier) });
+            
+            // 2. Award Manager (Inheritance: 50% of base)
             if (permit.siteManagerId) {
-                updateDocumentNonBlocking(doc(firestore, 'users', permit.siteManagerId), { totalPoints: increment(basePoints * 0.5) });
+                const managerRef = doc(firestore, 'users', permit.siteManagerId);
+                updateDocumentNonBlocking(managerRef, { totalPoints: increment(baseRate * 0.5) });
             }
         }
     }
@@ -466,7 +486,7 @@ export default function PtwListPage() {
           );
         }) : (
           <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-            No attendance records discovered.
+            No records found.
           </div>
         )}
       </div>
@@ -770,7 +790,7 @@ export default function PtwListPage() {
                             <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{formatTimestamp(entry.timestamp)}</span>
                           </div>
                           <p className="text-sm italic font-medium leading-relaxed opacity-80">
-                            "{entry.remarks === "Initial permit creation." ? detailsPermit.descriptionOfWork : entry.remarks}"
+                            "{entry.remarks}"
                           </p>
                         </div>
                       </div>

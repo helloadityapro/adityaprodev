@@ -43,6 +43,11 @@ type UserProfile = {
   pointsMultiplier?: number;
 };
 
+type RewardSettings = {
+  dprEngineer?: number;
+  dprManager?: number;
+};
+
 export default function SubmitDPRPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -54,6 +59,9 @@ export default function SubmitDPRPage() {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
+
+  const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
+  const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -121,19 +129,20 @@ export default function SubmitDPRPage() {
         createdAt: serverTimestamp(),
       });
 
-      // Reward Points Logic for DPR (Engineer 1.0, Manager 0.25)
-      const engineerPoints = 1.0 * (userProfile?.pointsMultiplier || 1);
+      // Reward Points Logic for DPR
+      const rateEngineer = rewardSettings?.dprEngineer ?? 1.0;
+      const rateManager = rewardSettings?.dprManager ?? 0.25;
+      const multiplier = userProfile.pointsMultiplier || 1;
       
       // 1. Award Engineer
       updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
-        totalPoints: increment(engineerPoints)
+        totalPoints: increment(rateEngineer * multiplier)
       });
 
       // 2. Award Manager (Inheritance)
-      // Only trigger if manager exists and is NOT the same as the current user
       if (userProfile?.siteManagerId && userProfile.siteManagerId !== user.uid) {
         updateDocumentNonBlocking(doc(firestore, 'users', userProfile.siteManagerId), {
-            totalPoints: increment(0.25)
+            totalPoints: increment(rateManager)
         });
       }
       

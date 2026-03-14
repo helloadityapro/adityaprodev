@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -155,7 +156,7 @@ export default function CreateTaskPage() {
       addDocumentNonBlocking(collection(firestore, 'tasks'), taskData);
 
       // Reward Points Logic for Assigner
-      const rate = rewardSettings?.taskAssignment ?? 0.1;
+      const rate = rewardSettings?.taskAssignment ?? 0.25;
       const multiplier = userProfile.pointsMultiplier || 1;
       updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
         totalPoints: increment(rate * multiplier)

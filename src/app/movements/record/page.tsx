@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -70,6 +71,7 @@ type UserProfile = {
 
 type RewardSettings = {
   movementEngineer?: number;
+  movementManager?: number;
 };
 
 const formatCapacity = (val: any) => {
@@ -238,6 +240,7 @@ export default function RecordMovementPage() {
       await Promise.all(promises);
 
       const rateEngineer = rewardSettings?.movementEngineer ?? 0.1;
+      const rateManager = rewardSettings?.movementManager ?? 0.05;
       const multiplier = userProfile.pointsMultiplier || 1;
       
       const engineerPoints = rateEngineer * values.items.length * multiplier;
@@ -245,8 +248,8 @@ export default function RecordMovementPage() {
         totalPoints: increment(engineerPoints)
       });
 
-      if (userProfile.siteManagerId) {
-        const managerPoints = (rateEngineer * 0.5) * values.items.length;
+      if (userProfile.siteManagerId && userProfile.siteManagerId !== user.uid) {
+        const managerPoints = rateManager * values.items.length;
         updateDocumentNonBlocking(doc(firestore, 'users', userProfile.siteManagerId), {
             totalPoints: increment(managerPoints)
         });
@@ -331,7 +334,7 @@ export default function RecordMovementPage() {
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2 uppercase">
           <ArrowLeftRight className="h-8 w-8" /> Record Movement
         </h1>
         <p className="text-muted-foreground">Log inward or outward material movement at site.</p>
