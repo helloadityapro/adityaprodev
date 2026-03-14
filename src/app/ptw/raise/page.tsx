@@ -291,7 +291,7 @@ export default function RaisePtwPage() {
         userId: user.uid,
         userName: userProfile.username || user.email || 'User',
         userRole: userProfile.role,
-        remarks: values.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with corrections." : "Initial permit creation."),
+        remarks: values.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with corrections." : values.descriptionOfWork),
         action: isCorrectionMode ? "Resubmitted" : "Created",
         submissionIndex: currentSubmissionIndex
       };

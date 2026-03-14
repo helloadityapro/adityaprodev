@@ -466,7 +466,7 @@ export default function PtwListPage() {
           );
         }) : (
           <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-            No permit requests discovered.
+            No attendance records discovered.
           </div>
         )}
       </div>
@@ -769,7 +769,9 @@ export default function PtwListPage() {
                             <span className="text-xs font-bold uppercase tracking-tight text-primary">{entry.action} — {entry.userName}</span>
                             <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{formatTimestamp(entry.timestamp)}</span>
                           </div>
-                          <p className="text-sm italic font-medium leading-relaxed opacity-80">"{entry.remarks}"</p>
+                          <p className="text-sm italic font-medium leading-relaxed opacity-80">
+                            "{entry.remarks === "Initial permit creation." ? detailsPermit.descriptionOfWork : entry.remarks}"
+                          </p>
                         </div>
                       </div>
                     ))}
