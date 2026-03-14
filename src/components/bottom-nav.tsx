@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -104,7 +103,7 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center w-full h-full transition-all duration-300",
+                "flex flex-col items-center justify-center w-full h-full transition-all duration-300 active:scale-90",
                 isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -151,7 +150,7 @@ export function BottomNav() {
                     <DropdownMenuItem
                       key={action.label}
                       onClick={() => router.push(action.href)}
-                      className="cursor-pointer py-2.5 px-3 focus:bg-primary/5 group rounded-lg mb-0.5"
+                      className="cursor-pointer py-2.5 px-3 focus:bg-primary/5 group rounded-lg mb-0.5 active:scale-95 transition-transform"
                     >
                       <div className="flex items-center gap-3 w-full">
                         <div className="p-1.5 bg-muted/50 rounded-lg group-hover:bg-primary/10 transition-colors shrink-0">
@@ -192,7 +191,7 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center justify-center w-full h-full transition-all duration-300",
+                "flex flex-col items-center justify-center w-full h-full transition-all duration-300 active:scale-90",
                 isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}
             >
