@@ -67,7 +67,7 @@ export default function ForgotPasswordPage() {
   if (!mounted || user) return null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 py-12">
       <Card className="mx-auto w-full max-w-sm animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="text-center">
           <div className="mb-4 flex justify-center">

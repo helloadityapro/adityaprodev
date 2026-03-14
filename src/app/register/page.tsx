@@ -122,7 +122,7 @@ export default function RegisterPage() {
 
   if (isSuccess) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 py-12">
         <Card className="mx-auto w-full max-w-md text-center py-10 shadow-xl border-primary/10 rounded-sm">
           <CardHeader>
             <div className="flex justify-center mb-4">
@@ -147,7 +147,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 py-12">
       <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="text-center pb-8 pt-10">
           <CardTitle className="text-3xl font-bold tracking-tight text-primary">Aditya Pro</CardTitle>

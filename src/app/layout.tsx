@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="antialiased font-sans h-full overflow-hidden">
+      <body className="antialiased font-sans min-h-screen">
         <FirebaseClientProvider>
           <FirebaseErrorListener />
           <ClientShell>{children}</ClientShell>

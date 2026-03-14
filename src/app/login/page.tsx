@@ -76,7 +76,7 @@ export default function LoginPage() {
   if (!mounted || user) return null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 py-12">
       <Card className="mx-auto w-full max-w-sm animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="text-center pb-8 pt-10">
           <CardTitle className="text-3xl font-bold tracking-tight text-primary">Aditya Pro</CardTitle>
