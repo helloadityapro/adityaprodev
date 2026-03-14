@@ -23,15 +23,41 @@ import { BottomNav } from "@/components/bottom-nav";
 import { QuickActions } from "@/components/quick-actions";
 import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { motion, AnimatePresence } from "framer-motion";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
+
+/**
+ * Global top-loading progress indicator.
+ * Shown during page transitions to provide visual feedback.
+ */
+function TopLoadingBar({ isVisible }: { isVisible: boolean }) {
+  return (
+    <AnimatePresence>
+      {isVisible && (
+        <motion.div
+          initial={{ scaleX: 0, opacity: 0 }}
+          animate={{ scaleX: 1, opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="fixed top-0 left-0 right-0 z-[100] h-1 bg-primary origin-left"
+        />
+      )}
+    </AnimatePresence>
+  );
+}
 
 function FullPageLoader() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background animate-in fade-in duration-300">
       <div className="flex flex-col items-center gap-4">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-sm font-medium text-muted-foreground tracking-widest uppercase">Initializing Aditya Pro</p>
+        <div className="relative">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="h-2 w-2 rounded-full bg-primary animate-ping" />
+          </div>
+        </div>
+        <p className="text-xs font-black text-muted-foreground tracking-[0.3em] uppercase">Aditya Pro Hub</p>
       </div>
     </div>
   );
@@ -45,8 +71,16 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
+  const [isNavigating, setIsNavigating] = React.useState(false);
 
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
+
+  // Handle route change state for top loader
+  React.useEffect(() => {
+    setIsNavigating(true);
+    const timer = setTimeout(() => setIsNavigating(false), 400);
+    return () => clearTimeout(timer);
+  }, [pathname]);
 
   React.useEffect(() => {
     const syncThemeState = () => {
@@ -220,7 +254,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <div className="bg-destructive/10 p-6 rounded-full mb-6">
           <UserX className="h-16 w-16 text-destructive opacity-80" />
         </div>
-        <h1 className="mb-2 text-3xl font-black uppercase tracking-tight text-destructive">Profile Not Found</h1>
+        <h1 className="mb-2">Profile Not Found</h1>
         <p className="mb-8 max-w-md text-muted-foreground text-lg leading-relaxed">
           Your account is authenticated, but your professional profile could not be found in the database.
         </p>
@@ -253,6 +287,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider className="h-full overflow-hidden">
+      <TopLoadingBar isVisible={isNavigating} />
       <Sidebar>
         <SidebarHeader className="px-6 py-4 border-b">
           <div className="flex items-baseline gap-0.5">
@@ -264,7 +299,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <MainNav userRole={userRole} pendingPtwCount={pendingPtwCount} />
         </SidebarContent>
       </Sidebar>
-      <SidebarInset className="flex flex-col h-full overflow-hidden">
+      <SidebarInset className="flex flex-col h-full overflow-hidden relative">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-3 lg:px-6 z-10 sticky top-0">
           <SidebarTrigger className="h-9 w-9" />
           <div className="flex-1 min-w-0">
@@ -282,7 +317,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/40">
-          <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6 min-h-full pb-20 md:pb-6">
+          <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6 min-h-full pb-20 md:pb-6 relative">
             <AttendanceGate />
             {children}
           </div>
