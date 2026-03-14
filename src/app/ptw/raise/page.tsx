@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { TriangleAlert, Loader2, Search, ChevronsUpDown, Check, FileUp, MessageCircle, CheckCircle2 } from "lucide-react"
+import { TriangleAlert, Loader2, Search, ChevronsUpDown, Check, FileUp, MessageCircle, CheckCircle2, X, FileText, FileImage } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, setDocumentNonBlocking, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp, doc, arrayUnion, getDoc, query, where, getDocs, Timestamp, runTransaction } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -26,6 +26,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { Badge } from "@/components/ui/badge";
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -183,6 +184,14 @@ export default function RaisePtwPage() {
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     });
+  };
+
+  const removeFile = (index: number, type: 'files' | 'refs') => {
+    if (type === 'files') {
+      setFiles(prev => prev.filter((_, i) => i !== index));
+    } else {
+      setReferenceDocs(prev => prev.filter((_, i) => i !== index));
+    }
   };
 
   const triggerWhatsApp = (serial: string, site: string, permitId: string, mobile?: string) => {
@@ -561,11 +570,62 @@ export default function RaisePtwPage() {
               <div className="space-y-6">
                 <div className="space-y-3">
                   <Label className="flex items-center gap-2 font-semibold"><FileUp className="h-4 w-4 text-primary" /> Reference documents</Label>
-                  <Input type="file" multiple onChange={(e) => setReferenceDocs(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
+                  <Input 
+                    type="file" 
+                    multiple 
+                    onChange={(e) => setReferenceDocs(prev => [...prev, ...Array.from(e.target.files || [])])} 
+                    disabled={isProcessing || isSubmitted} 
+                    className={FILE_INPUT_STYLES} 
+                  />
+                  {referenceDocs.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {referenceDocs.map((file, idx) => (
+                        <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1 h-8 rounded-sm gap-2 flex items-center font-bold text-xs bg-muted/50 border animate-in fade-in zoom-in-95">
+                          <FileText className="h-3 w-3 text-primary opacity-60" />
+                          <span className="truncate max-w-[120px]">{file.name}</span>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-5 w-5 hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
+                            onClick={() => removeFile(idx, 'refs')}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
+                
                 <div className="space-y-3">
                   <Label className="flex items-center gap-2 font-semibold"><FileUp className="h-4 w-4 text-primary" /> Work related files</Label>
-                  <Input type="file" multiple onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} disabled={isProcessing || isSubmitted} className={FILE_INPUT_STYLES} />
+                  <Input 
+                    type="file" 
+                    multiple 
+                    onChange={(e) => setFiles(prev => [...prev, ...Array.from(e.target.files || [])])} 
+                    disabled={isProcessing || isSubmitted} 
+                    className={FILE_INPUT_STYLES} 
+                  />
+                  {files.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {files.map((file, idx) => (
+                        <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1 h-8 rounded-sm gap-2 flex items-center font-bold text-xs bg-muted/50 border animate-in fade-in zoom-in-95">
+                          {file.type.startsWith('image/') ? <FileImage className="h-3 w-3 text-primary opacity-60" /> : <FileText className="h-3 w-3 text-primary opacity-60" />}
+                          <span className="truncate max-w-[120px]">{file.name}</span>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-5 w-5 hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
+                            onClick={() => removeFile(idx, 'files')}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
