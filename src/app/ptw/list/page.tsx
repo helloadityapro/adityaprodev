@@ -775,11 +775,6 @@ export default function PtwListPage() {
           </ScrollArea>
 
           <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 no-print">
-            <DialogClose asChild>
-              <Button variant="outline" className="h-12 rounded-sm font-black uppercase text-xs flex-1 tracking-widest">
-                Close Audit
-              </Button>
-            </DialogClose>
             {detailsPermit && detailsPermit.status !== 'Approved' && detailsPermit.status !== 'Rejected' && (
               <>
                 {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || isAdmin) && (
