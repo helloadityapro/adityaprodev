@@ -42,8 +42,9 @@ export default function CheckInPage() {
         videoRef.current.srcObject = stream;
       }
     } catch (error) {
+      console.error('Camera access error:', error);
       setHasCameraPermission(false);
-      toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable permissions to check in.' });
+      toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable permissions in your device settings to check in.' });
     }
   };
 
@@ -84,7 +85,7 @@ export default function CheckInPage() {
       navigator.geolocation.getCurrentPosition(
         (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
         () => {
-          toast({ variant: 'destructive', title: 'GPS Error', description: 'Location access required.' });
+          toast({ variant: 'destructive', title: 'GPS Error', description: 'Location access required for site attendance.' });
           resolve(null);
         },
         { enableHighAccuracy: true, timeout: 10000 }
@@ -146,6 +147,7 @@ export default function CheckInPage() {
         </CardHeader>
         <CardContent className="pt-6 space-y-6">
           <div className="flex flex-col items-center gap-4">
+            {/* Always keep video container in DOM to prevent race conditions with refs */}
             <div className={cn("relative w-full aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
               {facingMode === "user" && (
@@ -156,8 +158,8 @@ export default function CheckInPage() {
                 </div>
               )}
               <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
-                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-10 w-10 bg-black/40 border-white/20"><SwitchCamera className="h-5 w-5" /></Button>
-                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-2xl border-4 border-primary bg-white text-black"><Camera className="h-7 w-7" /></Button>
+                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-10 w-10 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
+                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-2xl border-4 border-primary bg-white text-black hover:bg-white/90 transition-transform active:scale-90"><Camera className="h-7 w-7" /></Button>
                 <div className="w-10" />
               </div>
             </div>
@@ -170,11 +172,11 @@ export default function CheckInPage() {
             )}
 
             {!selfie && !isCameraActive && (
-              <Button onClick={() => startCamera()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all text-primary border-primary/20">
-                <Camera className="h-10 w-10" />
+              <Button onClick={() => startCamera()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all text-primary border-primary/20 group">
+                <Camera className="h-10 w-10 group-hover:scale-110 transition-transform" />
                 <div className="flex flex-col gap-1 text-center">
                   <span className="font-black uppercase text-xs tracking-widest">Open Camera</span>
-                  <span className="text-[10px] text-muted-foreground font-bold">Audit selfie required</span>
+                  <span className="text-[10px] text-muted-foreground font-bold uppercase">Audit selfie required</span>
                 </div>
               </Button>
             )}
@@ -184,7 +186,7 @@ export default function CheckInPage() {
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Camera Required</AlertTitle>
-              <AlertDescription>Enable camera permissions in settings to continue.</AlertDescription>
+              <AlertDescription>Hardware access is mandatory for workday verification. Please enable camera permissions in your device settings.</AlertDescription>
             </Alert>
           )}
 

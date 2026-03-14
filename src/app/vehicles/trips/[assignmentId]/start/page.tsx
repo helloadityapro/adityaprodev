@@ -32,19 +32,25 @@ export default function StartTripPage() {
   const [photo, setPhoto] = React.useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = React.useState(false);
   const [facingMode, setFacingMode] = React.useState<"user" | "environment">("environment");
+  const [hasCameraPermission, setHasCameraPermission] = React.useState<boolean | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
 
   const startCamera = async (mode: "user" | "environment" = facingMode) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } } 
+      });
+      setHasCameraPermission(true);
       setIsCameraActive(true);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Camera Denied', description: 'Enable camera to verify reading.' });
+      console.error('Camera denied:', error);
+      setHasCameraPermission(false);
+      toast({ variant: 'destructive', title: 'Camera Denied', description: 'Enable camera permissions in your device settings to verify reading.' });
     }
   };
 
@@ -105,7 +111,7 @@ export default function StartTripPage() {
       });
 
       toast({ title: 'Trip Started', description: 'Safe driving. Your start time and reading are logged.' });
-      router.push('/vehicles/assigned');
+      router.push('/vehicles/trips/manage');
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
       setIsProcessing(false);
@@ -117,7 +123,7 @@ export default function StartTripPage() {
   return (
     <div className="space-y-8 max-w-2xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2">
+        <h1 className="text-2xl font-bold tracking-tight text-primary flex items-center gap-2">
           <PlayCircle className="h-8 w-8" /> Start Assigned Trip
         </h1>
         <p className="text-muted-foreground font-medium">Verify vehicle status at departure.</p>
@@ -144,8 +150,8 @@ export default function StartTripPage() {
             <div className={cn("relative w-full aspect-video bg-black rounded-sm overflow-hidden", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
               <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
-                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
-                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-2xl border-4 border-white/20 bg-white text-black hover:bg-white/90"><Camera className="h-7 w-7" /></Button>
+                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-10 w-10 p-0 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
+                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-2xl border-4 border-white/20 bg-white text-black hover:bg-white/90 transition-transform active:scale-90"><Camera className="h-7 w-7" /></Button>
                 <div className="w-10" />
               </div>
             </div>
@@ -153,15 +159,15 @@ export default function StartTripPage() {
             {photo && !isCameraActive && (
               <div className="relative w-full aspect-video group">
                 <img src={photo} className="w-full h-full object-cover rounded-sm border-2 border-primary shadow-md" alt="Audit" />
-                <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full opacity-0 group-hover:opacity-100" onClick={() => setPhoto(null)}><Trash2 className="h-4 w-4" /></Button>
+                <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setPhoto(null)}><Trash2 className="h-4 w-4" /></Button>
               </div>
             )}
 
             {!photo && !isCameraActive && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-                <Button onClick={() => startCamera()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all">
-                  <Camera className="h-10 w-10 text-primary" />
-                  <span className="font-black uppercase text-xs tracking-widest text-primary">Capture Live Photo</span>
+                <Button onClick={() => startCamera()} variant="outline" className="h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all text-primary group">
+                  <Camera className="h-10 w-10 group-hover:scale-110 transition-transform" />
+                  <span className="font-black uppercase text-xs tracking-widest">Capture Live Photo</span>
                 </Button>
 
                 <div className="relative">
@@ -172,17 +178,25 @@ export default function StartTripPage() {
                     ref={fileInputRef} 
                     onChange={handleGalleryUpload} 
                   />
-                  <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all">
-                    <ImagePlus className="h-10 w-10 text-primary" />
-                    <span className="font-black uppercase text-xs tracking-widest text-primary">Upload from Gallery</span>
+                  <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all text-primary group">
+                    <ImagePlus className="h-10 w-10 group-hover:scale-110 transition-transform" />
+                    <span className="font-black uppercase text-xs tracking-widest">Upload from Gallery</span>
                   </Button>
                 </div>
               </div>
             )}
+
+            {hasCameraPermission === false && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Camera Required</AlertTitle>
+                <AlertDescription>Hardware access is mandatory for odometer verification. Please enable camera permissions in your settings.</AlertDescription>
+              </Alert>
+            )}
           </div>
 
           <Button 
-            className="w-full h-16 text-xl font-black rounded-sm shadow-xl" 
+            className="w-full h-16 text-xl font-black rounded-sm shadow-xl transition-all active:scale-[0.98]" 
             onClick={handleStartTrip}
             disabled={isProcessing || !photo || !reading}
           >

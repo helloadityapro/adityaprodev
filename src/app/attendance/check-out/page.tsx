@@ -6,12 +6,13 @@ import { collection, doc, query, where, limit, serverTimestamp } from "firebase/
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, CalendarCheck, CheckCircle2, LogOut, Camera, Trash2, SwitchCamera } from "lucide-react";
+import { Loader2, CalendarCheck, CheckCircle2, LogOut, Camera, Trash2, SwitchCamera, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function CheckOutPage() {
   const firestore = useFirestore();
@@ -24,6 +25,7 @@ export default function CheckOutPage() {
   const [selfie, setSelfie] = React.useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = React.useState(false);
   const [facingMode, setFacingMode] = React.useState<"user" | "environment">("user");
+  const [hasCameraPermission, setHasCameraPermission] = React.useState<boolean | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
   const activeAttendanceQuery = useMemoFirebase(() => {
@@ -42,14 +44,17 @@ export default function CheckOutPage() {
   const startCamera = async (mode: "user" | "environment" = facingMode) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: mode } 
+        video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } } 
       });
+      setHasCameraPermission(true);
       setIsCameraActive(true);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Camera Error', description: 'Enable camera to check out.' });
+      console.error('Camera access error:', error);
+      setHasCameraPermission(false);
+      toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable hardware permissions to complete check-out.' });
     }
   };
 
@@ -89,7 +94,10 @@ export default function CheckOutPage() {
       }
       navigator.geolocation.getCurrentPosition(
         (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
-        () => resolve(null),
+        () => {
+          toast({ variant: 'destructive', title: 'GPS Error', description: 'Location access required for check-out audit.' });
+          resolve(null);
+        },
         { enableHighAccuracy: true, timeout: 10000 }
       );
     });
@@ -165,13 +173,13 @@ export default function CheckOutPage() {
                 <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-40">
                   <div className="w-24 h-24 rounded-full border-2 border-white mt-4" />
                   <div className="w-40 h-24 rounded-t-full border-2 border-t-2 border-x-2 border-white -mt-2" />
-                  <p className="text-white text-[8px] font-black uppercase mt-2 bg-black/20 px-2 rounded-full tracking-widest">Position face and shoulders here</p>
+                  <p className="text-white text-[8px] font-black uppercase mt-2 bg-black/20 px-2 rounded-full tracking-widest text-center">Position face and shoulders here</p>
                 </div>
               )}
 
               <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
-                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
-                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-lg border-4 border-white/20"><Camera className="h-7 w-7" /></Button>
+                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-10 w-10 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
+                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-lg border-4 border-white/20 bg-white text-black hover:bg-white/90 transition-transform active:scale-90"><Camera className="h-7 w-7" /></Button>
                 <div className="w-10" />
               </div>
             </div>
@@ -185,8 +193,8 @@ export default function CheckOutPage() {
             )}
 
             {!selfie && !isCameraActive && (
-              <Button onClick={() => startCamera()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-emerald-50/50 transition-all border-emerald-200 text-emerald-700">
-                <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
+              <Button onClick={() => startCamera()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-emerald-50/50 transition-all border-emerald-200 text-emerald-700 group">
+                <div className="p-3 bg-emerald-100 rounded-full text-emerald-600 group-hover:scale-110 transition-transform">
                   <Camera className="h-8 w-8" />
                 </div>
                 <div className="flex flex-col gap-1 text-center px-4">
@@ -196,6 +204,14 @@ export default function CheckOutPage() {
               </Button>
             )}
           </div>
+
+          {hasCameraPermission === false && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Camera Required</AlertTitle>
+              <AlertDescription>Hardware access is mandatory for site audit. Please enable camera permissions in settings to continue.</AlertDescription>
+            </Alert>
+          )}
 
           <Button 
             className="w-full h-16 text-xl font-black rounded-sm shadow-xl bg-red-600 hover:bg-red-700 text-white transition-colors" 

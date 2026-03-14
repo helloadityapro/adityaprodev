@@ -76,7 +76,7 @@ export default function FinishSiteVisitPage() {
       toast({
         variant: 'destructive',
         title: 'Camera Access Denied',
-        description: 'Please enable camera permissions to capture the mandatory verification selfie.',
+        description: 'Please enable camera permissions in your settings to capture the mandatory verification selfie.',
       });
     }
   };
@@ -142,7 +142,10 @@ export default function FinishSiteVisitPage() {
       }
       navigator.geolocation.getCurrentPosition(
         (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
-        () => resolve(null),
+        () => {
+          toast({ variant: 'destructive', title: 'GPS Error', description: 'Location access required for site audit.' });
+          resolve(null);
+        },
         { enableHighAccuracy: true, timeout: 5000 }
       );
     });
@@ -247,7 +250,7 @@ export default function FinishSiteVisitPage() {
   return (
     <div className="space-y-8 max-w-3xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+        <h1 className="text-2xl font-bold tracking-tight text-primary flex items-center gap-2">
           <CheckCircle2 className="h-8 w-8" /> Finalize Visit Report
         </h1>
         <p className="text-muted-foreground">Documenting presence and activities at <strong>{visit.siteName}</strong>.</p>
@@ -266,7 +269,6 @@ export default function FinishSiteVisitPage() {
               <div className={cn("relative w-full max-w-sm aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
                 <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
                 
-                {/* Silhouette Overlay - only for front camera */}
                 {facingMode === "user" && (
                   <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-40">
                     <div className="w-24 h-24 rounded-full border-2 border-white mt-4" />
@@ -277,7 +279,7 @@ export default function FinishSiteVisitPage() {
 
                 <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
                   <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-10 w-10 p-0 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
-                  <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 bg-white hover:bg-white/90 text-black border-4 border-primary shadow-xl" title="Capture">
+                  <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 bg-white hover:bg-white/90 text-black border-4 border-primary shadow-xl transition-transform active:scale-90" title="Capture">
                     <Camera className="h-6 w-6" />
                   </Button>
                   <div className="w-10" />
@@ -334,7 +336,7 @@ export default function FinishSiteVisitPage() {
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Camera Access Required</AlertTitle>
-                  <AlertDescription>Please enable camera permissions in your browser settings to verify your site presence with a profile selfie.</AlertDescription>
+                  <AlertDescription>Please enable camera permissions in your device settings to verify your site presence with a mandatory profile selfie.</AlertDescription>
                 </Alert>
               )}
             </div>
@@ -456,7 +458,7 @@ export default function FinishSiteVisitPage() {
           </CardContent>
           <CardFooter className="bg-muted/10 border-t p-6">
             <Button 
-              className="w-full h-14 text-xl font-black rounded-sm shadow-xl" 
+              className="w-full h-14 text-xl font-black rounded-sm shadow-xl transition-all active:scale-[0.98]" 
               onClick={onSubmit}
               disabled={isSubmitting || !selfie || !purpose || details.trim().length < 10}
             >
