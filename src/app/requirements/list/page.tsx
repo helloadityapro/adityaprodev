@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ClipboardList, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, TrendingUp, AlertCircle, CheckCircle2, History, User, MoreHorizontal, CircleCheck, CircleX, Building2, Eye } from "lucide-react";
+import { ClipboardList, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, TrendingUp, AlertCircle, CheckCircle2, History, User, MoreHorizontal, CircleCheck, CircleX, Building2, Eye } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -155,6 +155,12 @@ export default function RequirementListPage() {
     };
   }, [sortedAndFilteredReqs]);
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStartDate("");
+    setEndDate("");
+  };
+
   const handleDelete = () => {
     if (!deletingReq) return;
     deleteDocumentNonBlocking(doc(firestore, 'requirements', deletingReq.id));
@@ -197,15 +203,6 @@ export default function RequirementListPage() {
 
     toast({ title: "Updated", description: `Requirement is now ${targetStatus}.` });
     setActionState(null);
-  };
-
-  const handlePrint = () => {
-    if (typeof window !== "undefined") {
-      const originalTitle = document.title;
-      document.title = `AdityaPro_Requirements_Report`;
-      window.print();
-      document.title = originalTitle;
-    }
   };
 
   const urgencyConfig = {

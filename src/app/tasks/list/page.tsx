@@ -107,15 +107,10 @@ export default function TaskListPage() {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
-  // Tasks Query
   const tasksQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
     const colRef = collection(firestore, 'tasks');
-    
-    // Admins see all tasks regardless of assignment
     if (isAdmin) return colRef;
-    
-    // For Managers & Engineers, we use OR query to see tasks assigned TO or BY them
     return query(colRef, or(where('assignedToId', '==', user.uid), where('assignedById', '==', user.uid)));
   }, [firestore, user, userProfile, isAdmin]);
 
@@ -150,7 +145,6 @@ export default function TaskListPage() {
 
   const stats = React.useMemo(() => {
     if (!tasks) return { todo: 0, inProgress: 0, completed: 0 };
-    // For stats bar, we only count tasks assigned to the user
     const myTasks = tasks.filter(t => t.assignedToId === user?.uid);
     return {
       todo: myTasks.filter(t => t.status === 'To-do').length,
@@ -170,13 +164,11 @@ export default function TaskListPage() {
         updatedAt: serverTimestamp()
     });
 
-    // Reward Points Logic for Assignee on Completion
     if (nextStatus === 'Completed' && actionTask.status !== 'Completed') {
         const assigneeDoc = await getDoc(doc(firestore, 'users', actionTask.assignedToId));
         if (assigneeDoc.exists()) {
             const assigneeData = assigneeDoc.data();
             const multiplier = assigneeData.pointsMultiplier || 1;
-            
             const rate = rewardSettings?.taskCompletion ?? 0.1;
             const pointsToAdd = rate * multiplier;
             
@@ -184,7 +176,6 @@ export default function TaskListPage() {
                 totalPoints: increment(pointsToAdd)
             });
             
-            // Notify Assignee about points
             addDocumentNonBlocking(collection(firestore, 'notifications'), {
                 userId: actionTask.assignedToId,
                 title: "Points Earned!",
@@ -196,7 +187,6 @@ export default function TaskListPage() {
         }
     }
 
-    // Notify Assigner
     if (actionTask.assignedById !== user?.uid) {
         addDocumentNonBlocking(collection(firestore, 'notifications'), {
             userId: actionTask.assignedById,
@@ -215,95 +205,89 @@ export default function TaskListPage() {
 
   const handleDelete = async () => {
     if (!deletingTask || !firestore) return;
-
-    try {
-        deleteDocumentNonBlocking(doc(firestore, 'tasks', deletingTask.id));
-        toast({ title: "Deleted", description: "Task record removed." });
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to complete deletion.' });
-    } finally {
-        setDeletingTask(null);
-    }
+    deleteDocumentNonBlocking(doc(firestore, 'tasks', deletingTask.id));
+    toast({ title: "Deleted", description: "Task record removed." });
+    setDeletingTask(null);
   };
 
-  if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+  };
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2 uppercase">
-            <ListTodo className="h-8 w-8" /> Tasks Management
+          <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+            <ListTodo className="h-8 w-8" /> Tasks Audit
           </h1>
           <p className="text-muted-foreground text-sm font-medium">Monitor and update site activity assignments.</p>
         </div>
-        <Button onClick={() => router.push('/tasks/create')} className="rounded-sm font-bold">
+        <Button onClick={() => router.push('/tasks/create')} className="rounded-sm font-bold shadow-md">
           Assign New Task
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Card className="bg-slate-500/5 border-slate-500/10 rounded-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Personal Pending</CardTitle>
-            <Clock className="h-4 w-4 text-slate-500" />
+          <CardHeader className="p-2 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-[8px] sm:text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Pending</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.todo}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">Assigned to you</p>
+          <CardContent className="p-2 sm:p-4 pt-0">
+            <div className="text-base sm:text-2xl font-black">{stats.todo}</div>
           </CardContent>
         </Card>
         <Card className="bg-blue-500/5 border-blue-500/10 rounded-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">In Progress</CardTitle>
-            <Loader2 className="h-4 w-4 text-blue-500" />
+          <CardHeader className="p-2 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-[8px] sm:text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Ongoing</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-700">{stats.inProgress}</div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium">Assigned to you</p>
+          <CardContent className="p-2 sm:p-4 pt-0">
+            <div className="text-base sm:text-2xl font-black text-blue-700">{stats.inProgress}</div>
           </CardContent>
         </Card>
         <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Personal Finished</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
+          <CardHeader className="p-2 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-[8px] sm:text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Finished</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-700">{stats.completed}</div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-medium">Assigned to you</p>
+          <CardContent className="p-2 sm:p-4 pt-0">
+            <div className="text-base sm:text-2xl font-black text-green-700">{stats.completed}</div>
           </CardContent>
         </Card>
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-            <TabsList className="grid w-full grid-cols-3 md:w-[400px] rounded-sm bg-muted/50">
-              <TabsTrigger value="all" className="rounded-sm text-xs font-bold uppercase tracking-tight">All {isAdmin ? 'Records' : 'Accessible'}</TabsTrigger>
-              <TabsTrigger value="my-tasks" className="rounded-sm text-xs font-bold uppercase tracking-tight">Assigned To Me</TabsTrigger>
-              <TabsTrigger value="assigned-by-me" className="rounded-sm text-xs font-bold uppercase tracking-tight">Assigned By Me</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 md:w-[400px] rounded-sm bg-muted/50 h-9 p-1">
+              <TabsTrigger value="all" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">All Records</TabsTrigger>
+              <TabsTrigger value="my-tasks" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">Assigned To Me</TabsTrigger>
+              <TabsTrigger value="assigned-by-me" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">Assigned By Me</TabsTrigger>
             </TabsList>
           </Tabs>
 
           <div className="flex items-center gap-2">
-            <div className="relative w-full md:w-64">
+            <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Search tasks..." 
-                className="pl-9 rounded-sm h-10 border-primary/20"
+                placeholder="Search..." 
+                className="pl-9 h-9 rounded-sm border-primary/20 text-xs"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px] rounded-sm h-10 border-primary/20">
-                <SelectValue placeholder="All Status" />
+              <SelectTrigger className="w-[120px] rounded-sm h-9 border-primary/20 text-xs font-bold uppercase">
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                <SelectItem value="all" className="text-xs font-bold">All Status</SelectItem>
+                {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s} className="text-xs font-medium">{s}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-sm" onClick={clearFilters} title="Clear Filters">
+              <FilterX className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
@@ -351,7 +335,7 @@ export default function TaskListPage() {
             </Card>
           )) : (
             <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-              No tasks found matching your criteria.
+              No tasks found matching criteria.
             </div>
           )}
         </div>
