@@ -161,6 +161,14 @@ export default function ManageAllTripsPage() {
     }
   }, [searchParams, assignments]);
 
+  const handleCloseDetails = () => {
+    setDetailsAssignment(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    const queryStr = params.toString();
+    router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
+  };
+
   const stats = React.useMemo(() => {
     if (!assignments) return { total: 0, pending: 0, ongoing: 0, completed: 0 };
     return {
@@ -560,14 +568,7 @@ export default function ManageAllTripsPage() {
       </Dialog>
 
       {/* Trip Details Modal */}
-      <Dialog open={!!detailsAssignment} onOpenChange={(o) => {
-        if (!o) {
-          const params = new URLSearchParams(searchParams.toString());
-          params.delete('view');
-          const queryStr = params.toString();
-          router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
-        }
-      }}>
+      <Dialog open={!!detailsAssignment} onOpenChange={(o) => !o && handleCloseDetails()}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
             <div className="flex items-center gap-3">

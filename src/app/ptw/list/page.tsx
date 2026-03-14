@@ -212,6 +212,14 @@ export default function PtwListPage() {
     }
   }, [searchParams, permits]);
 
+  const handleCloseDetails = () => {
+    setDetailsPermit(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    const queryStr = params.toString();
+    router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
+  };
+
   const handleAction = async (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
     if (!user || !userProfile) return;
     const permitRef = doc(firestore, "permits_to_work", permit.id);
@@ -581,14 +589,7 @@ export default function PtwListPage() {
       </Dialog>
 
       {/* Detailed View Overlay */}
-      <Dialog open={!!detailsPermit} onOpenChange={(o) => {
-        if (!o) {
-          const params = new URLSearchParams(searchParams.toString());
-          params.delete('view');
-          const queryStr = params.toString();
-          router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
-        }
-      }}>
+      <Dialog open={!!detailsPermit} onOpenChange={(o) => !o && handleCloseDetails()}>
         <DialogContent className="max-w-4xl w-[98vw] h-[95vh] p-0 border-none rounded-sm overflow-hidden flex flex-col shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
