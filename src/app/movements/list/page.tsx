@@ -202,6 +202,12 @@ export default function MovementListPage() {
     window.open(url, '_blank');
   };
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStartDate("");
+    setEndDate("");
+  };
+
   const allSitesList = allSites ? Array.from(new Map(allSites.map(s => [s.name, s])).values()) : [];
   const filteredAllSites = allSitesList.filter(s => s.name.toLowerCase().includes(editSiteSearchQuery.toLowerCase()));
 
@@ -226,7 +232,7 @@ export default function MovementListPage() {
         </Card>
         <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Inward Items</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase text-green-600">Inward Items</CardTitle>
             <ArrowDownCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
@@ -235,7 +241,7 @@ export default function MovementListPage() {
         </Card>
         <Card className="bg-blue-500/5 border-blue-500/10 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Outward Items</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase text-blue-600">Outward Items</CardTitle>
             <ArrowUpCircle className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
