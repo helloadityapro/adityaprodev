@@ -36,7 +36,12 @@ import {
   PlayCircle,
   FileCheck,
   RefreshCw,
-  Calendar
+  Calendar,
+  Building2,
+  Navigation,
+  HardHat,
+  TrendingUp,
+  Fuel
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
@@ -367,7 +372,7 @@ export default function PtwListPage() {
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search by serial or site..." className="pl-9 h-10 rounded-sm bg-muted/20 border-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-print">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 no-print">
           {[
             { id: 'all', label: 'All Permits' },
             { id: 'Pending', label: 'Pending Manager' },
@@ -378,7 +383,7 @@ export default function PtwListPage() {
             <Badge 
               key={s.id} 
               variant={statusFilter === s.id ? 'default' : 'outline'} 
-              className="cursor-pointer font-semibold text-xs h-8 px-4 rounded-sm whitespace-nowrap border-primary/20"
+              className="cursor-pointer font-bold text-[10px] sm:text-xs h-7 sm:h-8 px-2.5 sm:px-4 rounded-sm whitespace-nowrap border-primary/20"
               onClick={() => setStatusFilter(s.id)}
             >
               {s.label}
