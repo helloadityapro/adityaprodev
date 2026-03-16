@@ -300,20 +300,22 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="flex flex-col h-full overflow-hidden relative">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 lg:px-6 z-30 sticky top-0">
-          <SidebarTrigger className="h-9 w-9" />
-          <div className="flex-1 min-w-0">
-            <GlobalSearch />
-          </div>
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            <div className="hidden md:flex">
-              <QuickActions />
+        <header className="flex flex-col shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-30 sticky top-0 pt-safe">
+          <div className="flex h-14 items-center gap-2 px-3 lg:px-6">
+            <SidebarTrigger className="h-9 w-9" />
+            <div className="flex-1 min-w-0">
+              <GlobalSearch />
             </div>
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full h-8 w-8">
-              {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            </Button>
-            <UserNotifications />
-            <UserNav />
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <div className="hidden md:flex">
+                <QuickActions />
+              </div>
+              <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full h-8 w-8">
+                {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              </Button>
+              <UserNotifications />
+              <UserNav />
+            </div>
           </div>
         </header>
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/40">
