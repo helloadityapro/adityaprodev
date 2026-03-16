@@ -57,7 +57,7 @@ function FullPageLoader() {
             <div className="h-2 w-2 rounded-full bg-primary animate-ping" />
           </div>
         </div>
-        <p className="text-xs font-black text-muted-foreground tracking-[0.3em] uppercase">Aditya Pro Hub</p>
+        <p className="text-xs font-black text-muted-foreground tracking-[0.3em] uppercase">Aditya Pro</p>
       </div>
     </div>
   );
