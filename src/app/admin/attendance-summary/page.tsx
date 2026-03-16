@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO, differenceInMinutes } from 'date-fns';
-import { CalendarDays, Search, FileDown, User, Clock, MapPin, CheckCircle2, XCircle, Timer, Loader2, ArrowUpDown, ArrowUp, ArrowDown, FilterX, Users } from 'lucide-react';
+import { CalendarDays, Search, FileDown, User, Clock, MapPin, CheckCircle2, XCircle, Timer, Loader2, ArrowUpDown, ArrowUp, ArrowDown, FilterX, Users, Building2 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
 import { Label } from '@/components/ui/label';
@@ -23,6 +23,7 @@ type UserProfile = {
   username: string;
   email: string;
   role: string;
+  department: string;
 };
 
 type AttendanceRecord = {
@@ -51,6 +52,7 @@ export default function AttendanceSummaryPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
+  const [deptFilter, setDeptFilter] = React.useState<string>("all");
   const [isExporting, setIsExporting] = React.useState(false);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'personnel', direction: 'asc' });
 
@@ -67,6 +69,9 @@ export default function AttendanceSummaryPage() {
 
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: isUsersLoading } = useCollection<UserProfile>(usersQuery);
+
+  const deptsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
+  const { data: allDepts } = useCollection<{ name: string }>(deptsQuery);
 
   const attendanceQuery = useMemoFirebase(() => {
     return query(collection(firestore, 'attendance'), where('date', '==', selectedDate));
@@ -91,8 +96,9 @@ export default function AttendanceSummaryPage() {
                              item.user.email?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
         const matchesRole = roleFilter === 'all' || item.user.role === roleFilter;
+        const matchesDept = deptFilter === 'all' || item.user.department === deptFilter;
         
-        return matchesSearch && matchesStatus && matchesRole;
+        return matchesSearch && matchesStatus && matchesRole && matchesDept;
       });
 
     return data.sort((a, b) => {
@@ -118,7 +124,7 @@ export default function AttendanceSummaryPage() {
       if (valA > valB) return direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [allUsers, attendanceRecords, searchTerm, statusFilter, roleFilter, sortConfig]);
+  }, [allUsers, attendanceRecords, searchTerm, statusFilter, roleFilter, deptFilter, sortConfig]);
 
   const stats = React.useMemo(() => {
     const total = summaryData.length;
@@ -139,6 +145,7 @@ export default function AttendanceSummaryPage() {
     setSearchTerm("");
     setStatusFilter("all");
     setRoleFilter("all");
+    setDeptFilter("all");
   };
 
   const SortIcon = ({ column }: { column: SortKey }) => {
@@ -154,6 +161,7 @@ export default function AttendanceSummaryPage() {
       'Name': item.user.username,
       'Email': item.user.email,
       'Role': item.user.role,
+      'Department': item.user.department || 'N/A',
       'Status': item.status === 'absent' ? 'Absent' : (item.status === 'ongoing' ? 'Ongoing' : 'Completed'),
       'Check-out Method': item.record?.checkOutType || 'Manual',
       'Check-in Time': item.record?.checkInTime ? format(item.record.checkInTime.toDate(), 'HH:mm') : '—',
@@ -290,6 +298,21 @@ export default function AttendanceSummaryPage() {
               </div>
 
               <div className="w-full md:w-48">
+                <Label className="text-[9px] font-black uppercase text-muted-foreground mb-1 block">Filter By Department</Label>
+                <Select value={deptFilter} onValueChange={setDeptFilter}>
+                  <SelectTrigger className="h-9 rounded-sm border-primary/20 text-xs font-bold uppercase tracking-tight">
+                    <SelectValue placeholder="All Depts" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs font-bold uppercase">All Depts</SelectItem>
+                    {allDepts?.map(dept => (
+                      <SelectItem key={dept.name} value={dept.name} className="text-xs font-bold uppercase">{dept.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="w-full md:w-48">
                 <Label className="text-[9px] font-black uppercase text-muted-foreground mb-1 block">Filter By Role</Label>
                 <Select value={roleFilter} onValueChange={setRoleFilter}>
                   <SelectTrigger className="h-9 rounded-sm border-primary/20 text-xs font-bold uppercase tracking-tight">
@@ -359,7 +382,12 @@ export default function AttendanceSummaryPage() {
                   <TableCell className="px-6 py-4">
                     <div className="flex flex-col">
                       <span className="font-bold text-sm text-foreground">{item.user.username}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase font-black tracking-tight">{item.user.role}</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] text-muted-foreground uppercase font-black tracking-tight">{item.user.role}</span>
+                        {item.user.department && (
+                          <Badge variant="outline" className="h-3.5 px-1 text-[7px] border-primary/10 text-primary/60 font-bold uppercase">{item.user.department}</Badge>
+                        )}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
