@@ -337,12 +337,6 @@ export default function AttendanceHistoryPage() {
             </Button>
           </div>
 
-          <div className="absolute top-4 right-4 z-50 no-print">
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setViewUrl(null)}>
-              <X className="h-6 w-6" />
-            </Button>
-          </div>
-
           {viewUrls.length > 1 && (
             <>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">

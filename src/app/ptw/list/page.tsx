@@ -627,11 +627,6 @@ export default function PtwListPage() {
                 <DialogDescription className="text-[10px] font-bold text-muted-foreground">{detailsPermit?.serialNumber}</DialogDescription>
               </div>
             </div>
-            <DialogClose asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogClose>
           </DialogHeader>
 
           <ScrollArea className="flex-1 bg-background">
@@ -740,7 +735,7 @@ export default function PtwListPage() {
                                 className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105" 
                                 onClick={() => openViewer(file, detailsPermit.attachments!)}
                               />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none">
                                 <Maximize2 className="h-6 w-6 text-white" />
                               </div>
                               <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">
@@ -840,12 +835,6 @@ export default function PtwListPage() {
             </Button>
             <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }} title="Reset Zoom">
               <RotateCcw className="h-5 w-5" />
-            </Button>
-          </div>
-
-          <div className="absolute top-4 right-4 z-50 no-print">
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={() => setViewFile(null)}>
-              <X className="h-6 w-6" />
             </Button>
           </div>
 
