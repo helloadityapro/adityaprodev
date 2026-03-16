@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * Standard Next.js error boundary for the application segment.
- * Handles network failures and unexpected runtime errors with a user-friendly UI.
+ * Handles network failures and unexpected runtime errors with requested specific messaging.
  */
 export default function Error({
   error,
@@ -28,7 +28,6 @@ export default function Error({
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // In a real app, we would log this to a service like Sentry or a logging endpoint
     console.error("Aditya Pro Runtime Error:", error);
 
     return () => {
@@ -37,12 +36,14 @@ export default function Error({
     };
   }, [error]);
 
+  const errorMessage = error.message?.toLowerCase() || '';
   const isNetworkRelated = 
     isOffline || 
-    error.message?.toLowerCase().includes('network') || 
-    error.message?.toLowerCase().includes('fetch') ||
-    error.message?.toLowerCase().includes('failed to load') ||
-    error.message?.toLowerCase().includes('not available');
+    errorMessage.includes('network') || 
+    errorMessage.includes('fetch') ||
+    errorMessage.includes('failed to load') ||
+    errorMessage.includes('not available') ||
+    errorMessage.includes('err_internet_disconnected');
 
   return (
     <div className="flex min-h-[80vh] flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">

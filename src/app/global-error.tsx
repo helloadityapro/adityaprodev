@@ -7,8 +7,7 @@ import { cn } from '@/lib/utils';
 
 /**
  * Ultimate fallback error boundary for the entire application.
- * Required by Next.js to handle errors within the root layout.
- * This page includes its own basic layout as it sits above the RootLayout.
+ * Specifically detects 'net::ERR_INTERNET_DISCONNECTED' and internal application errors.
  */
 export default function GlobalError({
   error,
@@ -31,12 +30,14 @@ export default function GlobalError({
     };
   }, []);
 
+  const errorMessage = error.message?.toLowerCase() || '';
   const isNetworkRelated = 
     isOffline || 
-    error.message?.toLowerCase().includes('network') || 
-    error.message?.toLowerCase().includes('fetch') ||
-    error.message?.toLowerCase().includes('failed to load') ||
-    error.message?.toLowerCase().includes('not available');
+    errorMessage.includes('network') || 
+    errorMessage.includes('fetch') ||
+    errorMessage.includes('failed to load') ||
+    errorMessage.includes('not available') ||
+    errorMessage.includes('err_internet_disconnected');
 
   return (
     <html lang="en">
