@@ -73,6 +73,9 @@ export default function AttendanceSummaryPage() {
   const deptsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
   const { data: allDepts } = useCollection<{ name: string }>(deptsQuery);
 
+  const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
+  const { data: allRoles } = useCollection<{ name: string }>(rolesQuery);
+
   const attendanceQuery = useMemoFirebase(() => {
     return query(collection(firestore, 'attendance'), where('date', '==', selectedDate));
   }, [firestore, selectedDate]);
@@ -320,8 +323,9 @@ export default function AttendanceSummaryPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all" className="text-xs font-bold uppercase">All Roles</SelectItem>
-                    <SelectItem value="Site Manager" className="text-xs font-bold uppercase">Site Manager</SelectItem>
-                    <SelectItem value="Site Engineer" className="text-xs font-bold uppercase">Site Engineer</SelectItem>
+                    {allRoles?.map(role => (
+                      <SelectItem key={role.name} value={role.name} className="text-xs font-bold uppercase">{role.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
