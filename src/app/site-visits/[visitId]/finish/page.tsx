@@ -320,7 +320,7 @@ export default function FinishSiteVisitPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-1">
                 <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                  <Plus className="h-4 w-4 text-primary" /> Action Items / Tasks
+                  <Plus className="h-4 w-4 text-primary" /> Action Items / Task Checklist
                 </CardTitle>
                 <CardDescription className="text-[10px] font-bold text-muted-foreground uppercase">Log current activities and findings</CardDescription>
               </div>
@@ -351,8 +351,7 @@ export default function FinishSiteVisitPage() {
                     <div className="relative h-20 w-32 rounded-sm overflow-hidden border shadow-sm group">
                       <img src={task.localPhoto || task.photoUrl!} className="h-full w-full object-cover" alt="Task proof" />
                       <Button 
-                        variant="destructive" 
-                        size="icon" 
+                        variant="destructive" size="icon" 
                         className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity" 
                         onClick={() => removeTaskPhoto(idx)}
                       >
@@ -371,7 +370,7 @@ export default function FinishSiteVisitPage() {
                       />
                       <Button variant="outline" size="sm" asChild className="h-9 sm:h-8 text-[10px] font-bold rounded-sm cursor-pointer border-primary/20 text-primary hover:bg-primary/5 w-full sm:w-auto">
                         <label htmlFor={`task-photo-${idx}`}>
-                          <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> ATTACH PHOTO PROOF
+                          <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Attach Photo
                         </label>
                       </Button>
                     </div>
@@ -389,7 +388,7 @@ export default function FinishSiteVisitPage() {
                 disabled={isSubmitting}
               >
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save & Continue Later
+                Save Progress & Continue Later
               </Button>
               {!isFinalizing && (
                 <Button 
@@ -397,7 +396,7 @@ export default function FinishSiteVisitPage() {
                   onClick={handleProceedToFinal}
                   disabled={isSubmitting || tasks.every(t => t.text.trim() === "")}
                 >
-                  Complete Site Visit <ArrowRight className="ml-2 h-4 w-4" />
+                  Complete Site Visit <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               )}
             </div>
