@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 type Site = {
   id: string;
@@ -27,7 +28,8 @@ export default function StartSiteVisitPage() {
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc(userProfileRef);
+  const { data: userProfile } = useDoc<any>(userProfileRef);
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -39,9 +41,12 @@ export default function StartSiteVisitPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
+    // Admins and Super Admins can visit any site in the registry
+    if (isAdmin) return allSites;
+    
     const assignedIds = userProfile.assignedProjectIds || [];
     return allSites.filter(s => assignedIds.includes(s.id));
-  }, [allSites, userProfile]);
+  }, [allSites, userProfile, isAdmin]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
@@ -75,7 +80,7 @@ export default function StartSiteVisitPage() {
     }
 
     try {
-      // Check for existing ongoing visits
+      // Check for existing ongoing visits for the current user
       const ongoingQuery = query(
         collection(firestore, 'site_visits'), 
         where('managerId', '==', user.uid), 
@@ -128,7 +133,9 @@ export default function StartSiteVisitPage() {
       <Card className="shadow-md border-primary/10 rounded-sm">
         <CardHeader>
           <CardTitle>Initiate Field Presence</CardTitle>
-          <CardDescription>Select your current location from your assigned project sites.</CardDescription>
+          <CardDescription>
+            Select your current location from {isAdmin ? "the organizational registry" : "your assigned project sites"}.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
@@ -167,7 +174,7 @@ export default function StartSiteVisitPage() {
                       <span className="truncate">{site.name}</span>
                     </Button>
                   )) : (
-                    <div className="p-4 text-center text-sm text-muted-foreground italic">No authorized sites found.</div>
+                    <div className="p-4 text-center text-sm text-muted-foreground italic">No {isAdmin ? "" : "authorized"} sites found.</div>
                   )}
                 </ScrollArea>
               </PopoverContent>
