@@ -24,8 +24,20 @@ import { QuickActions } from "@/components/quick-actions";
 import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
+
+type Notification = {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  link: string;
+  read: boolean;
+  createdAt: any;
+};
 
 /**
  * Global top-loading progress indicator.
@@ -208,6 +220,28 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const [displayedNotifIds, setDisplayedNotifIds] = React.useState<Set<string>>(new Set());
 
+  // Request native notification permissions
+  React.useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      LocalNotifications.requestPermissions();
+    }
+  }, []);
+
+  // Handle notification click routing
+  React.useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      const listener = LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
+        const link = action.notification.extra?.link;
+        if (link) {
+          router.push(link);
+        }
+      });
+      return () => {
+        listener.remove();
+      };
+    }
+  }, [router]);
+
   React.useEffect(() => {
     try {
       const raw = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
@@ -228,7 +262,29 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           let wasUpdated = false;
           notifications.forEach(notif => {
               if (!notif.read && !displayedNotifIds.has(notif.id)) {
-                  toast({ title: notif.title, description: notif.description, variant: notif.title.includes('Approved') ? 'success' : notif.title.includes('Rejected') ? 'destructive' : 'default' });
+                  // Show in-app toast
+                  toast({ 
+                    title: notif.title, 
+                    description: notif.description, 
+                    variant: notif.title.includes('Approved') ? 'success' : notif.title.includes('Rejected') ? 'destructive' : 'default' 
+                  });
+
+                  // Trigger native system notification if on mobile
+                  if (Capacitor.isNativePlatform()) {
+                    LocalNotifications.schedule({
+                      notifications: [
+                        {
+                          title: notif.title,
+                          body: notif.description,
+                          id: parseInt(notif.id.replace(/\D/g, '').slice(-8)) || Math.floor(Math.random() * 1000000),
+                          extra: {
+                            link: notif.link
+                          }
+                        }
+                      ]
+                    });
+                  }
+
                   newDisplayedIds.add(notif.id);
                   wasUpdated = true;
               }
