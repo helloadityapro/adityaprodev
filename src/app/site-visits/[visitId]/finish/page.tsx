@@ -304,43 +304,43 @@ export default function FinishSiteVisitPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-3xl mx-auto pb-20 px-4">
+    <div className="space-y-6 max-w-3xl mx-auto pb-20 px-2 sm:px-4">
       <div className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-2">
-          <Navigation className="h-8 w-8 text-primary" />
+        <h1 className="flex items-center gap-2 text-xl sm:text-2xl">
+          <Navigation className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
           Continue Site Visit
         </h1>
-        <p className="text-muted-foreground">Documenting presence and activities at <strong>{visit.siteName}</strong>.</p>
+        <p className="text-muted-foreground text-xs sm:text-sm">Documenting presence and activities at <strong>{visit.siteName}</strong>.</p>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-6">
         {/* Section 1: Action Items - ALWAYS VISIBLE */}
         <Card className="rounded-sm shadow-md border-primary/10 transition-all duration-300">
-          <CardHeader className="bg-primary/5 border-b py-4">
-            <div className="flex items-center justify-between">
+          <CardHeader className="bg-primary/5 border-b p-4 sm:py-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-1">
-                <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                  <Plus className="h-4 w-4 text-primary" /> Action Items / Task Checklist
+                <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-primary" /> Action Items / Tasks
                 </CardTitle>
                 <CardDescription className="text-[10px] font-bold text-muted-foreground uppercase">Log current activities and findings</CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={addTask} className="text-primary font-bold h-8 px-3 border-primary/20 bg-white">
+              <Button variant="outline" size="sm" onClick={addTask} className="text-primary font-bold h-9 sm:h-8 px-3 border-primary/20 bg-white w-full sm:w-auto">
                 <Plus className="h-3.5 w-3.5 mr-1" /> Add Action
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="pt-6 space-y-4">
+          <CardContent className="p-3 sm:p-6 space-y-4">
             {tasks.map((task, idx) => (
-              <div key={idx} className="space-y-3 p-4 border rounded-sm bg-muted/5 relative group animate-in slide-in-from-top-1">
+              <div key={idx} className="space-y-3 p-3 sm:p-4 border rounded-sm bg-muted/5 relative group animate-in slide-in-from-top-1">
                 <div className="flex gap-2">
                   <Input 
-                    placeholder={`Describe activity item #${idx + 1}`} 
+                    placeholder={`Activity item #${idx + 1}...`} 
                     value={task.text} 
                     onChange={e => updateTaskText(idx, e.target.value)}
-                    className="rounded-sm flex-1 bg-background"
+                    className="rounded-sm flex-1 bg-background h-10 sm:h-11"
                   />
                   {tasks.length > 1 && (
-                    <Button variant="ghost" size="icon" className="text-destructive shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeTask(idx)}>
+                    <Button variant="ghost" size="icon" className="text-destructive shrink-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeTask(idx)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
@@ -353,14 +353,14 @@ export default function FinishSiteVisitPage() {
                       <Button 
                         variant="destructive" 
                         size="icon" 
-                        className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" 
+                        className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity" 
                         onClick={() => removeTaskPhoto(idx)}
                       >
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
                   ) : (
-                    <div className="relative">
+                    <div className="relative w-full sm:w-auto">
                       <input 
                         type="file" 
                         accept="image/*" 
@@ -369,9 +369,9 @@ export default function FinishSiteVisitPage() {
                         id={`task-photo-${idx}`}
                         onChange={e => handleTaskPhotoChange(idx, e)}
                       />
-                      <Button variant="outline" size="sm" asChild className="h-8 text-[10px] font-bold rounded-sm cursor-pointer border-primary/20 text-primary hover:bg-primary/5">
+                      <Button variant="outline" size="sm" asChild className="h-9 sm:h-8 text-[10px] font-bold rounded-sm cursor-pointer border-primary/20 text-primary hover:bg-primary/5 w-full sm:w-auto">
                         <label htmlFor={`task-photo-${idx}`}>
-                          <ImageIcon className="h-3 w-3 mr-1.5" /> ATTACH PHOTO PROOF
+                          <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> ATTACH PHOTO PROOF
                         </label>
                       </Button>
                     </div>
@@ -380,25 +380,27 @@ export default function FinishSiteVisitPage() {
               </div>
             ))}
           </CardContent>
-          <CardFooter className="bg-muted/10 border-t p-6 flex flex-col sm:flex-row gap-4">
-            <Button 
-              variant="outline"
-              className="flex-1 h-14 text-lg font-bold rounded-sm border-primary text-primary hover:bg-primary/5" 
-              onClick={handleSaveProgress}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
-              Save Progress & Continue Later
-            </Button>
-            {!isFinalizing && (
+          <CardFooter className="bg-muted/10 border-t p-4 sm:p-6 flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 w-full">
               <Button 
-                className="flex-1 h-14 text-lg font-black rounded-sm shadow-xl" 
-                onClick={handleProceedToFinal}
-                disabled={isSubmitting || tasks.every(t => t.text.trim() === "")}
+                variant="outline"
+                className="flex-1 h-12 text-sm font-bold rounded-sm border-primary/30 text-primary hover:bg-primary/5" 
+                onClick={handleSaveProgress}
+                disabled={isSubmitting}
               >
-                Complete Site Visit <ArrowRight className="ml-2 h-5 w-5" />
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Save & Continue Later
               </Button>
-            )}
+              {!isFinalizing && (
+                <Button 
+                  className="flex-1 h-12 text-sm font-black rounded-sm shadow-xl" 
+                  onClick={handleProceedToFinal}
+                  disabled={isSubmitting || tasks.every(t => t.text.trim() === "")}
+                >
+                  Complete Site Visit <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </CardFooter>
         </Card>
 
@@ -410,23 +412,23 @@ export default function FinishSiteVisitPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="space-y-8 animate-in slide-in-from-bottom-4 duration-500"
+              className="space-y-6 animate-in slide-in-from-bottom-4 duration-500"
             >
               <div className="flex items-center justify-between px-1">
-                <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-amber-200 uppercase font-black px-3 h-7 rounded-sm">Final Submission Step</Badge>
-                <Button variant="ghost" onClick={() => { setIsFinalizing(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-muted-foreground font-bold h-7 px-3">
-                  <ArrowUp className="mr-2 h-3.5 w-3.5" /> Edit Action Items
+                <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-amber-200 uppercase font-black px-3 h-7 rounded-sm text-[9px]">Final Submission Required</Badge>
+                <Button variant="ghost" onClick={() => { setIsFinalizing(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-muted-foreground font-bold h-7 px-2 text-[10px] uppercase">
+                  <ArrowUp className="mr-1.5 h-3 w-3" /> Edit Tasks
                 </Button>
               </div>
 
               <Card className="rounded-sm shadow-md overflow-hidden border-primary/10">
-                <CardHeader className="bg-primary/5 py-4 border-b">
-                  <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                    <Camera className="h-4 w-4 text-primary" /> Audit Verification (Selfie)
+                <CardHeader className="bg-primary/5 py-4 border-b p-4">
+                  <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                    <Camera className="h-4 w-4 text-primary" /> Mandatory Selfie Audit
                   </CardTitle>
-                  <CardDescription className="text-[10px] font-bold text-amber-700 uppercase">Mandatory: Include face and upper body profile</CardDescription>
+                  <CardDescription className="text-[9px] font-bold text-amber-700 uppercase">Include face and upper body profile</CardDescription>
                 </CardHeader>
-                <CardContent className="pt-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex flex-col items-center gap-4">
                     <div className={cn("relative w-full max-w-sm aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
                       <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
@@ -438,16 +440,16 @@ export default function FinishSiteVisitPage() {
                     </div>
 
                     {selfie && !isCameraActive && (
-                      <div className="relative group">
-                        <img src={selfie} className="w-full max-w-sm aspect-video object-cover rounded-sm border-2 border-primary shadow-lg" alt="Verification" />
-                        <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setSelfie(null)}><Trash2 className="h-4 w-4" /></Button>
+                      <div className="relative group w-full max-w-sm">
+                        <img src={selfie} className="w-full aspect-video object-cover rounded-sm border-2 border-primary shadow-lg" alt="Verification" />
+                        <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full h-8 w-8" onClick={() => setSelfie(null)}><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     )}
 
                     {!selfie && !isCameraActive && (
                       <Button onClick={() => startCamera()} variant="outline" className="w-full max-w-sm h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all text-primary">
                         <Camera className="h-8 w-8" />
-                        <span className="font-bold uppercase text-xs">Open Camera</span>
+                        <span className="font-bold uppercase text-[10px] tracking-widest">Open Camera for Audit</span>
                       </Button>
                     )}
                   </div>
@@ -455,48 +457,48 @@ export default function FinishSiteVisitPage() {
               </Card>
 
               <Card className="rounded-sm shadow-md border-primary/10">
-                <CardHeader><CardTitle>Final Report Details</CardTitle></CardHeader>
-                <CardContent className="space-y-6">
+                <CardHeader className="p-4"><CardTitle className="text-sm uppercase font-bold tracking-widest">Final Report Metadata</CardTitle></CardHeader>
+                <CardContent className="p-4 sm:p-6 space-y-6">
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider">Purpose of Visit</Label>
+                    <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Purpose of Visit</Label>
                     <Select value={purpose} onValueChange={setPurpose}>
                       <SelectTrigger className="rounded-sm h-11"><SelectValue placeholder="Select purpose" /></SelectTrigger>
                       <SelectContent>
-                        {PURPOSES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                        {PURPOSES.map(p => <SelectItem key={p} value={p} className="text-sm">{p}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider">Narrative Summary</Label>
-                    <Textarea placeholder="Detail the progress, findings, or critical discussions..." rows={5} value={details} onChange={e => setDetails(e.target.value)} className="rounded-sm" />
+                    <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Detailed Narrative Summary</Label>
+                    <Textarea placeholder="Detail the progress, findings, or critical discussions..." rows={4} value={details} onChange={e => setDetails(e.target.value)} className="rounded-sm text-sm" />
                   </div>
 
                   <div className="space-y-4 p-4 bg-primary/[0.02] rounded-sm border border-primary/10">
-                    <Label className="text-xs font-bold uppercase tracking-wider flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Customer Availability</Label>
-                    <RadioGroup value={customerAvailable} onValueChange={setCustomerAvailable} className="flex gap-6 mt-2">
+                    <Label className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 text-primary"><Users className="h-4 w-4" /> Customer Available?</Label>
+                    <RadioGroup value={customerAvailable} onValueChange={setCustomerAvailable} className="flex gap-6 mt-1">
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="yes" id="c-yes" /><Label htmlFor="c-yes" className="font-bold cursor-pointer text-sm">Yes</Label>
+                        <RadioGroupItem value="yes" id="c-yes" /><Label htmlFor="c-yes" className="font-bold cursor-pointer text-xs">Yes</Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="no" id="c-no" /><Label htmlFor="c-no" className="font-bold cursor-pointer text-sm">No</Label>
+                        <RadioGroupItem value="no" id="c-no" /><Label htmlFor="c-no" className="font-bold cursor-pointer text-xs">No</Label>
                       </div>
                     </RadioGroup>
                     {customerAvailable === 'yes' && (
                       <div className="space-y-2 mt-4 animate-in fade-in duration-300">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Attendee Names</Label>
-                        <Input placeholder="Persons met during visit..." value={customerNames} onChange={e => setCustomerNames(e.target.value)} className="rounded-sm bg-background" />
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground">Persons met during visit</Label>
+                        <Input placeholder="Enter names..." value={customerNames} onChange={e => setCustomerNames(e.target.value)} className="rounded-sm bg-background h-10" />
                       </div>
                     )}
                   </div>
                 </CardContent>
-                <CardFooter className="bg-muted/10 border-t p-6">
+                <CardFooter className="bg-muted/10 border-t p-4 sm:p-6">
                   <Button 
-                    className="w-full h-16 text-xl font-black rounded-sm shadow-xl" 
+                    className="w-full h-14 text-base font-black rounded-sm shadow-xl tracking-tight" 
                     onClick={onSubmitFinalReport}
                     disabled={isSubmitting || !selfie || !purpose || details.trim().length < 10}
                   >
-                    {isSubmitting ? <><Loader2 className="mr-2 h-6 w-6 animate-spin" /> Publishing Report...</> : <><Send className="mr-2 h-5 w-5" /> Conclude & Submit Report</>}
+                    {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> CONCLUDE & PUBLISH REPORT</>}
                   </Button>
                 </CardFooter>
               </Card>
