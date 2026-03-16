@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -389,7 +388,7 @@ export default function FinishSiteVisitPage() {
               disabled={isSubmitting}
             >
               {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
-              Save Progress & Exit
+              Save Progress & Continue Later
             </Button>
             {!isFinalizing && (
               <Button 
