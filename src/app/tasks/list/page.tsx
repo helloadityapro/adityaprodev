@@ -321,14 +321,23 @@ export default function TaskListPage() {
                 </div>
 
                 <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter">Assignee</span>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <User className="h-3 w-3 text-primary" />
-                      <span className="text-[11px] font-bold">{task.assignedToName}</span>
+                  <div className="grid grid-cols-2 gap-4 flex-1">
+                    <div className="flex flex-col">
+                      <span className="text-[8px] text-muted-foreground uppercase font-black tracking-tighter">Assigned To</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <User className="h-2.5 w-2.5 text-primary" />
+                        <span className="text-[10px] font-bold truncate">{task.assignedToName}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col border-l pl-4 border-primary/5">
+                      <span className="text-[8px] text-muted-foreground uppercase font-black tracking-tighter">Assigned By</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <User className="h-2.5 w-2.5 text-muted-foreground" />
+                        <span className="text-[10px] font-bold truncate">{task.assignedByName}</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 shrink-0 ml-2">
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm">
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
