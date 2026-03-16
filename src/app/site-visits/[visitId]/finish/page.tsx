@@ -10,7 +10,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, MapPin, Loader2, Plus, Trash2, CheckCircle2, UserCheck, AlertCircle, Users, ImageIcon, X, Maximize2, UserCircle2, SwitchCamera, ImagePlus, ArrowLeft, Send, Flag } from "lucide-react";
+import { 
+  Camera, 
+  MapPin, 
+  Loader2, 
+  Plus, 
+  Trash2, 
+  CheckCircle2, 
+  UserCheck, 
+  AlertCircle, 
+  Users, 
+  ImageIcon, 
+  X, 
+  Maximize2, 
+  UserCircle2, 
+  SwitchCamera, 
+  ImagePlus, 
+  ArrowLeft, 
+  ArrowRight,
+  Send, 
+  Flag, 
+  Navigation,
+  Save
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -19,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
 
 const PURPOSES = ["Kick-off visit", "Regular visit", "Site team meetup", "Vendor meetup"];
 
@@ -285,8 +308,8 @@ export default function FinishSiteVisitPage() {
   return (
     <div className="space-y-8 max-w-3xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-primary flex items-center gap-2">
-          {isFinalizing ? <Flag className="h-8 w-8" /> : <Navigation className="h-8 w-8" />}
+        <h1 className="flex items-center gap-2">
+          {isFinalizing ? <Flag className="h-8 w-8 text-primary" /> : <Navigation className="h-8 w-8 text-primary" />}
           {isFinalizing ? 'Finalize Visit Report' : 'Continue Site Visit'}
         </h1>
         <p className="text-muted-foreground">Documenting presence and activities at <strong>{visit.siteName}</strong>.</p>
@@ -294,7 +317,13 @@ export default function FinishSiteVisitPage() {
 
       <AnimatePresence mode="wait">
         {!isFinalizing ? (
-          <div key="draft-view" className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-300">
+          <motion.div 
+            key="draft-view" 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="space-y-8"
+          >
             <Card className="rounded-sm shadow-md border-primary/10">
               <CardHeader className="bg-primary/5 border-b py-4">
                 <div className="flex items-center justify-between">
@@ -368,7 +397,7 @@ export default function FinishSiteVisitPage() {
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
-                  Save and Complete Later
+                  Save Progress & Exit
                 </Button>
                 <Button 
                   className="flex-1 h-14 text-lg font-black rounded-sm shadow-xl" 
@@ -379,9 +408,15 @@ export default function FinishSiteVisitPage() {
                 </Button>
               </CardFooter>
             </Card>
-          </div>
+          </motion.div>
         ) : (
-          <div key="final-view" className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+          <motion.div 
+            key="final-view" 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-8"
+          >
             <Button variant="ghost" onClick={() => setIsFinalizing(false)} className="w-fit -ml-2 text-muted-foreground">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Action Items
             </Button>
@@ -476,12 +511,9 @@ export default function FinishSiteVisitPage() {
                 </Button>
               </CardFooter>
             </Card>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
   );
 }
-
-import { AnimatePresence } from "framer-motion";
-import { Save } from "lucide-react";
