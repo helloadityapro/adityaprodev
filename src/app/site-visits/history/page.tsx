@@ -1,16 +1,39 @@
+
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
 import { collection, query, where, limit, doc, or } from "firebase/firestore";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
-import { History, Timer, FileText, Search, User, ArrowRight, Building2, Calendar, Clock } from "lucide-react";
+import { 
+  History, 
+  Timer, 
+  FileText, 
+  Search, 
+  User, 
+  ArrowRight, 
+  Building2, 
+  Calendar, 
+  Clock, 
+  ArrowUpDown, 
+  ArrowUp, 
+  ArrowDown, 
+  FilterX, 
+  ListFilter 
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -28,18 +51,24 @@ type SiteVisit = {
   status: 'ongoing' | 'completed';
 };
 
+type SortKey = 'startTime' | 'siteName' | 'managerName' | 'duration' | 'status';
+
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
   const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
   return format(date, 'dd MMM yyyy HH:mm');
 };
 
-const calculateDuration = (start: any, end: any) => {
-  if (!start || !end) return '—';
+const calculateDurationMins = (start: any, end: any) => {
+  if (!start || !end) return 0;
   const s = start.toDate ? start.toDate() : new Date(start);
   const e = end.toDate ? end.toDate() : new Date(end);
-  const mins = differenceInMinutes(e, s);
-  
+  return differenceInMinutes(e, s);
+};
+
+const calculateDurationStr = (start: any, end: any) => {
+  const mins = calculateDurationMins(start, end);
+  if (mins === 0) return '—';
   if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
   const remMins = mins % 60;
@@ -49,7 +78,10 @@ const calculateDuration = (start: any, end: any) => {
 export default function SiteVisitsHistoryPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState("all");
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'startTime', direction: 'desc' });
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
@@ -60,44 +92,84 @@ export default function SiteVisitsHistoryPage() {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'site_visits');
     
-    // Removing orderBy to bypass index requirements
-    if (isAdmin) return query(colRef, limit(100));
+    if (isAdmin) return query(colRef, limit(200));
 
     if (isManager) {
         return query(
             colRef,
             or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid)),
-            limit(100)
+            limit(150)
         );
     }
     
     return query(
       colRef,
       where('managerId', '==', user.uid),
-      limit(50)
+      limit(100)
     );
   }, [firestore, user, isAdmin, isManager, isProfileLoading]);
 
   const { data: visits, isLoading } = useCollection<SiteVisit>(historyQuery);
 
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
+
   const filteredVisits = React.useMemo(() => {
     if (!visits) return [];
     
-    // Sort in memory: Latest visits first
-    const sorted = [...visits].sort((a, b) => {
-        const dateA = a.startTime?.toDate?.()?.getTime() || 0;
-        const dateB = b.startTime?.toDate?.()?.getTime() || 0;
-        return dateB - dateA;
+    const result = visits.filter(v => {
+      const matchesSearch = v.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (v.purpose || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (v.managerName || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
     });
 
-    return sorted.filter(v => 
-      v.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (v.purpose || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (v.managerName || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [visits, searchTerm]);
+    return result.sort((a, b) => {
+      const { key, direction } = sortConfig;
+      let valA: any = '';
+      let valB: any = '';
 
-  if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-48" /><Skeleton className="h-[500px] w-full" /></div>;
+      if (key === 'startTime') {
+        valA = a.startTime?.toDate?.()?.getTime() || 0;
+        valB = b.startTime?.toDate?.()?.getTime() || 0;
+      } else if (key === 'siteName') {
+        valA = a.siteName.toLowerCase();
+        valB = b.siteName.toLowerCase();
+      } else if (key === 'managerName') {
+        valA = a.managerName.toLowerCase();
+        valB = b.managerName.toLowerCase();
+      } else if (key === 'duration') {
+        valA = calculateDurationMins(a.startTime, a.endTime);
+        valB = calculateDurationMins(b.startTime, b.endTime);
+      } else if (key === 'status') {
+        valA = a.status;
+        valB = b.status;
+      }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [visits, searchTerm, statusFilter, sortConfig]);
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+  };
+
+  if (isLoading || isProfileLoading) return <div className="p-8 space-y-4 max-w-5xl mx-auto"><Skeleton className="h-12 w-48" /><Skeleton className="h-[500px] w-full" /></div>;
 
   const headerTitle = isAdmin ? "Organization Visit Logs" : (isManager ? "Team Visit Logs" : "My Site Visit Logs");
 
@@ -110,14 +182,35 @@ export default function SiteVisitsHistoryPage() {
           </h1>
           <p className="text-muted-foreground">Historical records of site presence and audit reports.</p>
         </div>
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      </div>
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border rounded-sm shadow-sm no-print">
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder="Search by site, name, or purpose..." 
-            className="pl-8 rounded-sm h-10 border-primary/20"
+            className="pl-10 h-10 rounded-sm border-primary/20 bg-background text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[160px] h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20">
+              <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Status Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs font-bold uppercase">All Visits</SelectItem>
+              <SelectItem value="ongoing" className="text-xs font-bold uppercase text-amber-600">Ongoing</SelectItem>
+              <SelectItem value="completed" className="text-xs font-bold uppercase text-emerald-600">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground rounded-sm" title="Clear Filters">
+            <FilterX className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -146,7 +239,7 @@ export default function SiteVisitsHistoryPage() {
                   </Badge>
                   <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
                     <Timer className="h-3 w-3" />
-                    {calculateDuration(visit.startTime, visit.endTime)}
+                    {calculateDurationStr(visit.startTime, visit.endTime)}
                   </div>
                 </div>
                 
@@ -179,7 +272,7 @@ export default function SiteVisitsHistoryPage() {
           </Card>
         )) : (
           <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-            No visit records found.
+            No visit records found matching current filters.
           </div>
         )}
       </div>
@@ -192,12 +285,39 @@ export default function SiteVisitsHistoryPage() {
               <Table>
                 <TableHeader className="bg-muted/30">
                   <TableRow>
-                    <TableHead>Start Date & Time</TableHead>
-                    <TableHead>Project Site</TableHead>
-                    {(isAdmin || isManager) && <TableHead>Personnel</TableHead>}
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort('startTime')}
+                    >
+                      <div className="flex items-center">Start Date & Time <SortIcon column="startTime" /></div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort('siteName')}
+                    >
+                      <div className="flex items-center">Project Site <SortIcon column="siteName" /></div>
+                    </TableHead>
+                    {(isAdmin || isManager) && (
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleSort('managerName')}
+                      >
+                        <div className="flex items-center">Personnel <SortIcon column="managerName" /></div>
+                      </TableHead>
+                    )}
                     <TableHead>Purpose</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort('duration')}
+                    >
+                      <div className="flex items-center">Duration <SortIcon column="duration" /></div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleSort('status')}
+                    >
+                      <div className="flex items-center">Status <SortIcon column="status" /></div>
+                    </TableHead>
                     <TableHead className="text-right px-6">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -231,7 +351,7 @@ export default function SiteVisitsHistoryPage() {
                       <TableCell>
                         <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
                           <Timer className="h-3 w-3" />
-                          {calculateDuration(visit.startTime, visit.endTime)}
+                          {calculateDurationStr(visit.startTime, visit.endTime)}
                         </div>
                       </TableCell>
                       <TableCell>
