@@ -84,7 +84,7 @@ export default function ActiveSiteVisitsPage() {
         <h1 className="flex items-center gap-2">
           <Navigation className="h-8 w-8" /> {isAdmin ? "Global Active Presence" : (isManager ? "Team Active Presence" : "My Active Site Presence")}
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground text-sm font-medium">
           {isAdmin ? "Monitoring all ongoing site visits across the organization." : (isManager ? "Ongoing site activities for you and your assigned engineering team." : "Manage your current ongoing site visit.")}
         </p>
       </div>
@@ -144,7 +144,7 @@ export default function ActiveSiteVisitsPage() {
                     <HardHat className="h-8 w-8 text-primary/40" />
                     <p className="text-xs text-muted-foreground italic font-medium leading-relaxed">
                       {visit.managerId === user?.uid 
-                        ? "Please finish the visit report before leaving the site premises to capture end coordinates correctly."
+                        ? "Continue documenting your site activities. You can save progress multiple times."
                         : `Personnel is currently performing site activities at ${visit.siteName}.`}
                     </p>
                   </div>
@@ -156,7 +156,7 @@ export default function ActiveSiteVisitsPage() {
                     className="w-full h-12 text-lg font-black rounded-sm shadow-md" 
                     onClick={() => router.push(`/site-visits/${visit.id}/finish`)}
                   >
-                    Complete Visit Report <ArrowRight className="ml-2 h-5 w-5" />
+                    Continue Site Visit <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </CardFooter>
               )}
