@@ -219,7 +219,7 @@ export default function PtwListPage() {
   }, [searchParams, permits]);
 
   const handleCloseDetails = () => {
-    setDetailsPermit(null);
+    setDetailsAssignment(null);
     const params = new URLSearchParams(searchParams.toString());
     params.delete('view');
     const queryStr = params.toString();
@@ -437,6 +437,10 @@ export default function PtwListPage() {
                   <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
                     <Calendar className="h-3.5 w-3.5" />
                     {formatTimestamp(permit.requestDate)}
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
+                    <User className="h-3.5 w-3.5 text-primary/60" />
+                    <span>Raised by: {permit.siteEngineerName || 'N/A'}</span>
                   </div>
                 </div>
 
