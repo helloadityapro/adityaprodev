@@ -219,7 +219,7 @@ export default function PtwListPage() {
   }, [searchParams, permits]);
 
   const handleCloseDetails = () => {
-    setDetailsAssignment(null);
+    setDetailsPermit(null);
     const params = new URLSearchParams(searchParams.toString());
     params.delete('view');
     const queryStr = params.toString();
