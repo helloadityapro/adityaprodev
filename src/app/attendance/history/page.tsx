@@ -65,6 +65,8 @@ export default function AttendanceHistoryPage() {
   const [currentUrlIndex, setCurrentUrlIndex] = React.useState(0);
   const [zoom, setZoom] = React.useState(1);
 
+  const viewerRef = React.useRef<HTMLDivElement>(null);
+
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
   
@@ -99,6 +101,53 @@ export default function AttendanceHistoryPage() {
   }, [firestore, user, userProfile, isAdmin, isManager, isProfileLoading]);
 
   const { data: entries, isLoading } = useCollection<AttendanceEntry>(attendanceQuery);
+
+  // Zoom logic for media preview
+  React.useEffect(() => {
+    const el = viewerRef.current;
+    if (!el || !viewUrl) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setZoom(prev => {
+        const delta = e.deltaY > 0 ? -0.2 : 0.2;
+        return Math.min(Math.max(prev + delta, 0.5), 4);
+      });
+    };
+
+    let initialDist = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        initialDist = Math.hypot(
+          e.touches[0].pageX - e.touches[1].pageX,
+          e.touches[0].pageY - e.touches[1].pageY
+        );
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const dist = Math.hypot(
+          e.touches[0].pageX - e.touches[1].pageX,
+          e.touches[0].pageY - e.touches[1].pageY
+        );
+        const delta = (dist - initialDist) / 100;
+        setZoom(prev => Math.min(Math.max(prev + delta, 0.5), 4));
+        initialDist = dist;
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart);
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+    };
+  }, [viewUrl]);
 
   const filteredEntries = React.useMemo(() => {
     if (!entries) return [];
@@ -359,6 +408,7 @@ export default function AttendanceHistoryPage() {
 
           <div className="relative w-full h-full overflow-auto p-4 flex">
             <div 
+              ref={viewerRef}
               className={cn(
                 "m-auto transition-transform duration-200 ease-out flex items-center justify-center",
                 zoom > 1 ? "cursor-move" : "cursor-default"
