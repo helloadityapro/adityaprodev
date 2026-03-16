@@ -72,7 +72,6 @@ export default function FinishSiteVisitPage() {
   const [facingMode, setFacingMode] = React.useState<"user" | "environment">("user");
   const [hasCameraPermission, setHasCameraPermission] = React.useState<boolean | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const finalFormRef = React.useRef<HTMLDivElement>(null);
   
   const [purpose, setPurpose] = React.useState("");
@@ -158,17 +157,6 @@ export default function FinishSiteVisitPage() {
       }
     } else {
       toast({ variant: 'destructive', title: 'Camera Not Ready', description: 'Please wait for the video feed to initialize.' });
-    }
-  };
-
-  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setSelfie(event.target?.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -311,7 +299,7 @@ export default function FinishSiteVisitPage() {
         <CheckCircle2 className="h-16 w-16 text-green-500" />
         <h2 className="text-2xl font-bold">Visit Completed</h2>
         <p className="text-muted-foreground">The visit report for {visit.siteName} has already been published.</p>
-        <Button onClick={() => router.push('/site-visits/history')} className="rounded-sm font-bold">View History</Button>
+        <Button onClick={() => router.push('/site-visits/history')} className="rounded-sm font-bold shadow-md">View History</Button>
       </div>
     );
   }
@@ -458,19 +446,10 @@ export default function FinishSiteVisitPage() {
                     )}
 
                     {!selfie && !isCameraActive && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-                        <Button onClick={() => startCamera()} variant="outline" className="h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all text-primary">
-                          <Camera className="h-8 w-8" />
-                          <span className="font-bold uppercase text-xs">Open Camera</span>
-                        </Button>
-                        <div className="relative">
-                          <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleGalleryUpload} />
-                          <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all text-primary">
-                            <ImagePlus className="h-8 w-8" />
-                            <span className="font-bold uppercase text-xs">Upload Photo</span>
-                          </Button>
-                        </div>
-                      </div>
+                      <Button onClick={() => startCamera()} variant="outline" className="w-full max-w-sm h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all text-primary">
+                        <Camera className="h-8 w-8" />
+                        <span className="font-bold uppercase text-xs">Open Camera</span>
+                      </Button>
                     )}
                   </div>
                 </CardContent>
