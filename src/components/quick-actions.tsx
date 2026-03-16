@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -23,6 +22,7 @@ import {
   Navigation
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { motion } from 'framer-motion';
 
 export function QuickActions() {
   const router = useRouter();
@@ -72,10 +72,12 @@ export function QuickActions() {
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button variant="default" size="icon" className="relative h-8 w-8 rounded-full shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 border-none">
-                <Plus className="h-5 w-5" />
-                <span className="sr-only">Quick Actions</span>
-              </Button>
+              <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                <Button variant="default" size="icon" className="relative h-8 w-8 rounded-full shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 border-none">
+                  <Plus className="h-5 w-5" />
+                  <span className="sr-only">Quick Actions</span>
+                </Button>
+              </motion.div>
             </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent side="bottom">Quick Actions</TooltipContent>

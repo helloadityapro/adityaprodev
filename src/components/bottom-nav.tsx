@@ -29,6 +29,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
+import { motion } from 'framer-motion';
 
 /**
  * Bottom navigation bar for mobile devices.
@@ -127,11 +128,15 @@ export function BottomNav() {
         {!isDriver ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <div className="flex flex-col items-center justify-center w-full h-full cursor-pointer group">
-                <div className="bg-primary text-primary-foreground p-3 rounded-full shadow-xl shadow-primary/30 -mt-8 border-[4px] border-background transition-all duration-300 group-active:scale-95">
+              <motion.div 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.9 }}
+                className="flex flex-col items-center justify-center w-full h-full cursor-pointer group outline-none"
+              >
+                <div className="bg-primary text-primary-foreground p-3 rounded-full shadow-xl shadow-primary/30 -mt-8 border-[4px] border-background transition-all duration-300">
                   <Plus className="h-6 w-6 stroke-[3.5px]" />
                 </div>
-              </div>
+              </motion.div>
             </DropdownMenuTrigger>
             <DropdownMenuContent 
               side="top" 
