@@ -6,7 +6,36 @@ import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { format, differenceInMinutes } from "date-fns";
-import { MapPin, Navigation, History, UserCheck, Timer, FileText, ImageIcon, Users, Maximize2, X, User, FolderArchive, ArrowLeft, Printer, ExternalLink, CheckCircle2, ZoomIn, ZoomOut, RotateCcw, Building2, ChevronLeft, ChevronRight, PlayCircle, Film } from "lucide-react";
+import { 
+  MapPin, 
+  Navigation, 
+  History, 
+  UserCheck, 
+  Timer, 
+  FileText, 
+  ImageIcon, 
+  Users, 
+  Maximize2, 
+  X, 
+  User, 
+  FolderArchive, 
+  ArrowLeft, 
+  Printer, 
+  ExternalLink, 
+  CheckCircle2, 
+  ZoomIn, 
+  ZoomOut, 
+  RotateCcw, 
+  Building2, 
+  ChevronLeft, 
+  ChevronRight, 
+  PlayCircle, 
+  Film,
+  Calendar,
+  Clock,
+  ShieldCheck,
+  Activity
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -137,46 +166,45 @@ export default function SiteVisitDetailPage() {
         <Button variant="ghost" size="sm" onClick={() => router.push('/site-visits/history')} className="w-fit -ml-2 text-muted-foreground hover:text-primary">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to History
         </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrint} className="rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
-            <Printer className="mr-2 h-4 w-4" /> Print Report
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" onClick={handlePrint} className="rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+          <Printer className="mr-2 h-4 w-4" /> Print Report
+        </Button>
       </div>
 
       <Card id="printable-report-area" className="rounded-sm shadow-xl overflow-hidden border-primary/10">
-        <CardHeader className="bg-primary/5 border-b p-8">
+        <CardHeader className="bg-primary/5 border-b p-6 md:p-8">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                {visit.department && (
-                  <Badge variant="secondary" className="text-[9px] h-6 font-black uppercase rounded-sm border-none bg-primary text-white flex items-center gap-1.5 px-3">
-                    <Building2 className="h-3 w-3" /> {visit.department}
-                  </Badge>
-                )}
-                <Badge className={cn("h-6 text-[10px] uppercase font-black px-3 rounded-sm border-none", visit.status === 'ongoing' ? "bg-amber-500 text-white" : "bg-green-600 text-white")}>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className={cn("h-6 text-[10px] uppercase font-black px-3 rounded-sm border-none shadow-sm", visit.status === 'ongoing' ? "bg-amber-500 text-white" : "bg-green-600 text-white")}>
                   {visit.status}
                 </Badge>
-                <div className="flex items-center gap-1.5 text-[9px] font-black text-muted-foreground uppercase bg-white/50 px-2 py-0.5 rounded-sm border border-primary/10">
-                  <FolderArchive className="h-3 w-3" /> site_visits/{visit.managerId}
+                <div className="flex items-center gap-1.5 text-[9px] font-black text-muted-foreground uppercase bg-white/50 px-2.5 py-1 rounded-sm border border-primary/10">
+                  <FolderArchive className="h-3 w-3" /> Audit ID: {visit.id.slice(0, 8)}
                 </div>
               </div>
-              <CardTitle className="text-4xl font-black tracking-tight text-foreground leading-none">{visit.siteName}</CardTitle>
-              <div className="flex flex-col gap-1.5 pt-2">
+              <h1 className="text-3xl md:text-4xl font-black tracking-tight text-foreground leading-none">{visit.siteName}</h1>
+              
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
                 <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground">
                   <User className="h-4 w-4 text-primary" />
-                  Visit Logged by {visit.managerName}
+                  {visit.managerName}
+                  {visit.department && (
+                    <Badge variant="outline" className="ml-1 text-[8px] h-4 font-black uppercase border-primary/20 text-primary bg-primary/5 px-1.5">
+                      {visit.department}
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground font-semibold">
-                  <History className="h-4 w-4" />
-                  Started on {formatTimestamp(visit.startTime)}
+                  <Calendar className="h-4 w-4 text-primary" />
+                  {formatTimestamp(visit.startTime)}
                 </div>
               </div>
             </div>
             
-            <div className="flex flex-col md:items-end gap-4">
+            <div className="flex flex-col md:items-end gap-2 shrink-0">
               <div className="p-4 bg-white/80 backdrop-blur rounded-sm border border-primary/10 shadow-sm text-center min-w-[160px]">
-                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Total Duration</p>
+                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Trip Duration</p>
                 <div className="flex items-center justify-center gap-2 text-primary font-black text-2xl">
                   <Timer className="h-6 w-6" />
                   {calculateDuration(visit.startTime, visit.endTime)}
@@ -186,153 +214,161 @@ export default function SiteVisitDetailPage() {
           </div>
         </CardHeader>
 
-        <CardContent className="p-8 space-y-12">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            {/* Left Column: Verification & GPS */}
-            <div className="space-y-10">
-              <section className="space-y-4">
-                <Label className="text-xs font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                  <UserCheck className="h-4 w-4" /> Presence Verification
-                </Label>
+        <CardContent className="p-6 md:p-10 space-y-12">
+          {/* Top Grid: Critical Verification Data */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            {/* Presence Audit */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <UserCheck className="h-4 w-4 text-primary" />
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Personnel Verification</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {visit.selfieUrl ? (
-                  <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/10 shadow-lg bg-muted group cursor-pointer" onClick={() => openViewer(visit.selfieUrl!)}>
-                    {isVideoUrl(visit.selfieUrl) ? (
-                      <div className="w-full h-full bg-slate-900 flex items-center justify-center">
-                        <Film className="h-12 w-12 text-white opacity-40" />
-                        <PlayCircle className="absolute h-12 w-12 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="space-y-2">
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Verification Selfie</Label>
+                    <div className="relative aspect-square sm:aspect-[4/3] rounded-sm overflow-hidden border-2 border-primary/5 shadow-md bg-muted group cursor-pointer" onClick={() => openViewer(visit.selfieUrl!)}>
+                      {isVideoUrl(visit.selfieUrl) ? (
+                        <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                          <Film className="h-10 w-10 text-white opacity-40" />
+                          <PlayCircle className="absolute h-10 w-10 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      ) : (
+                        <img src={visit.selfieUrl} className="w-full h-full object-cover" alt="Audit Selfie" />
+                      )}
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
+                        <Maximize2 className="h-6 w-6 text-white opacity-0 group-hover:opacity-100" />
                       </div>
-                    ) : (
-                      <img src={visit.selfieUrl} className="w-full h-full object-cover" alt="Verification Selfie" />
-                    )}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
-                      <Maximize2 className="h-8 w-8 text-white opacity-0 group-hover:opacity-100" />
-                    </div>
-                    <div className="absolute bottom-3 left-3 bg-black/60 text-white text-[9px] font-black uppercase px-2 py-1 rounded-sm backdrop-blur-sm">
-                      Audit Profile Media
                     </div>
                   </div>
                 ) : (
-                  <div className="aspect-video bg-muted/30 rounded-sm border-2 border-dashed border-muted-foreground/20 flex flex-col items-center justify-center text-muted-foreground">
-                    <ImageIcon className="h-10 w-10 opacity-20 mb-3" />
-                    <p className="text-[10px] font-black uppercase tracking-widest">Selfie Not Captured</p>
+                  <div className="p-6 border-2 border-dashed rounded-sm bg-muted/5 flex flex-col items-center justify-center text-center opacity-40">
+                    <ImageIcon className="h-8 w-8 mb-2" />
+                    <p className="text-[10px] font-black uppercase">No Media</p>
                   </div>
                 )}
-              </section>
 
-              <section className="space-y-4">
-                <Label className="text-xs font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                  <MapPin className="h-4 w-4" /> GPS Audit Logs
-                </Label>
-                <div className="grid gap-3">
-                  <div className="p-4 bg-muted/20 border rounded-sm flex items-center justify-between group">
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Entry Coordinates</p>
-                      <p className="font-mono text-xs font-bold mt-1">{visit.startLat.toFixed(6)}, {visit.startLng.toFixed(6)}</p>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-primary hover:bg-primary/10 rounded-sm no-print" asChild>
-                      <a href={`https://www.google.com/maps/search/?api=1&query=${visit.startLat},${visit.startLng}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
-                    </Button>
-                  </div>
-                  {visit.endLat && (
-                    <div className="p-4 bg-muted/20 border rounded-sm flex items-center justify-between group">
-                      <div>
-                        <p className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Exit Coordinates</p>
-                        <p className="font-mono text-xs font-bold mt-1">{visit.endLat.toFixed(6)}, {visit.endLng.toFixed(6)}</p>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">GPS Coordinates</Label>
+                    <div className="space-y-2">
+                      <div className="p-3 bg-muted/20 border rounded-sm flex items-center justify-between group text-[11px] font-mono font-bold">
+                        <span>Entry: {visit.startLat.toFixed(5)}, {visit.startLng.toFixed(5)}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-primary no-print" asChild>
+                          <a href={`https://www.google.com/maps/search/?api=1&query=${visit.startLat},${visit.startLng}`} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-9 w-9 text-primary hover:bg-primary/10 rounded-sm no-print" asChild>
-                        <a href={`https://www.google.com/maps/search/?api=1&query=${visit.endLat},${visit.endLng}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
-                      </Button>
+                      {visit.endLat && (
+                        <div className="p-3 bg-muted/20 border rounded-sm flex items-center justify-between group text-[11px] font-mono font-bold">
+                          <span>Exit: {visit.endLat.toFixed(5)}, {visit.endLng.toFixed(5)}</span>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-primary no-print" asChild>
+                            <a href={`https://www.google.com/maps/search/?api=1&query=${visit.endLat},${visit.endLng}`} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {visit.customerAvailable && (
+                    <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-sm">
+                      <Label className="text-[9px] font-black uppercase text-emerald-700 block mb-1">Customer Present</Label>
+                      <p className="text-xs font-black text-emerald-900 leading-tight">{visit.customerNames || 'Confirmed'}</p>
                     </div>
                   )}
                 </div>
-              </section>
-
-              {visit.customerAvailable && (
-                <section className="p-6 bg-green-50 border-2 border-green-100 rounded-sm animate-in fade-in slide-in-from-top-2">
-                  <Label className="text-[10px] font-black uppercase text-green-700 mb-3 flex items-center gap-2">
-                    <Users className="h-4 w-4" /> Client Engagement Recorded
-                  </Label>
-                  <p className="text-base font-black text-green-900 leading-tight">
-                    {visit.customerNames || 'Customer representative present'}
-                  </p>
-                  <p className="text-[10px] text-green-600 mt-2 font-bold uppercase tracking-tight italic">Verified through site presence audit</p>
-                </section>
-              )}
+              </div>
             </div>
 
-            {/* Right Column: Narrative & Observations */}
-            <div className="space-y-10">
-              <section className="space-y-4">
-                <Label className="text-xs font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                  <Navigation className="h-4 w-4" /> Visit Intent & Narrative
-                </Label>
-                <div className="space-y-4">
-                  <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm">
-                    <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-1">Declared Purpose</p>
-                    <p className="text-lg font-bold">{visit.purpose || 'General Field Management'}</p>
-                  </div>
-                  <div className="p-6 bg-card border rounded-sm shadow-sm space-y-2">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Site Narrative & Findings</p>
-                    <div className="text-base leading-relaxed text-foreground/90 whitespace-pre-wrap font-medium italic">
-                      "{visit.details || 'No narrative log provided for this visit.'}"
-                    </div>
+            {/* Visit Context */}
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <Navigation className="h-4 w-4 text-primary" />
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Visit Narrative</h3>
+              </div>
+              <div className="space-y-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Purpose of Visit</Label>
+                  <p className="text-sm font-black text-primary leading-tight uppercase">{visit.purpose || 'General Management'}</p>
+                </div>
+                <div className="p-5 bg-card border rounded-sm shadow-inner min-h-[120px]">
+                  <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest block mb-2 opacity-50">Narrative & Observations</Label>
+                  <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap font-medium italic">
+                    "{visit.details || 'No additional narrative logged.'}"
                   </div>
                 </div>
-              </section>
-
-              <section className="space-y-6">
-                <Label className="text-xs font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4" /> Action Items & Observations Proof
-                </Label>
-                {visit.tasks && visit.tasks.length > 0 ? (
-                  <div className="grid gap-6">
-                    {visit.tasks.map((task, i) => (
-                      <Card key={i} className="rounded-sm border-primary/5 bg-primary/[0.01] shadow-none overflow-hidden">
-                        <div className="flex flex-col">
-                          <div className="p-4 border-b bg-muted/10 flex items-start gap-4">
-                            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-black text-primary shrink-0 border border-primary/20">
-                              {i + 1}
-                            </div>
-                            <span className="text-sm font-bold leading-snug pt-0.5">{task.text}</span>
-                          </div>
-                          {task.photoUrl && (
-                            <div className="relative aspect-video w-full cursor-pointer group" onClick={() => openViewer(task.photoUrl!)}>
-                              {isVideoUrl(task.photoUrl) ? (
-                                <div className="w-full h-full bg-slate-900 flex items-center justify-center">
-                                  <Film className="h-12 w-12 text-white opacity-40" />
-                                  <PlayCircle className="absolute h-12 w-12 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </div>
-                              ) : (
-                                <img src={task.photoUrl} className="w-full h-full object-cover" alt={`Proof for task ${i+1}`} />
-                              )}
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
-                                <Maximize2 className="h-8 w-8 text-white opacity-0 group-hover:opacity-100" />
-                              </div>
-                              <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded-sm text-[8px] font-black text-white uppercase tracking-widest">
-                                Task Media Proof
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-12 text-center border-2 border-dashed rounded-sm bg-muted/5">
-                    <FileText className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
-                    <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">No specific action items documented</p>
-                  </div>
-                )}
-              </section>
+              </div>
             </div>
+          </div>
+
+          <Separator className="opacity-50" />
+
+          {/* Action Items Section - Grid Layout */}
+          <div className="space-y-8">
+            <div className="flex items-center justify-between gap-4 border-b pb-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Activity & Findings Proof</h3>
+              </div>
+              <Badge variant="secondary" className="rounded-full px-3 py-0.5 h-5 text-[10px] font-bold bg-muted text-muted-foreground border-none">
+                {visit.tasks?.length || 0} Items Logged
+              </Badge>
+            </div>
+
+            {visit.tasks && visit.tasks.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-10">
+                {visit.tasks.map((task, i) => (
+                  <div key={i} className="flex flex-col gap-4 animate-in fade-in duration-500">
+                    <div className="flex gap-3 items-start">
+                      <div className="h-6 w-6 rounded-sm bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary shrink-0 border border-primary/20">
+                        {i + 1}
+                      </div>
+                      <p className="text-sm font-bold leading-snug pt-0.5 text-foreground">{task.text}</p>
+                    </div>
+                    
+                    {task.photoUrl ? (
+                      <div className="relative w-full aspect-[16/10] rounded-sm overflow-hidden border border-primary/10 shadow-sm bg-muted group cursor-pointer" onClick={() => openViewer(task.photoUrl!)}>
+                        {isVideoUrl(task.photoUrl) ? (
+                          <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                            <Film className="h-8 w-8 text-white opacity-40" />
+                            <PlayCircle className="absolute h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        ) : (
+                          <img src={task.photoUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt={`Task Proof ${i+1}`} />
+                        )}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
+                          <Maximize2 className="h-6 w-6 text-white opacity-0 group-hover:opacity-100" />
+                        </div>
+                        <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded-sm text-[8px] font-black text-white uppercase tracking-widest opacity-80">
+                          Proof Attachment
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-20 bg-muted/10 border border-dashed rounded-sm flex items-center justify-center text-[9px] font-bold text-muted-foreground uppercase opacity-40">
+                        Documentation provided without visual proof
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-20 text-center border-2 border-dashed rounded-sm bg-muted/5">
+                <Activity className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">No specific action items documented</p>
+              </div>
+            )}
           </div>
         </CardContent>
         
-        <Separator />
+        <Separator className="opacity-50" />
         
         <CardFooter className="bg-muted/5 p-8 flex flex-col items-center justify-center text-center gap-2">
-          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em]">End of Site Visit Audit Report</p>
-          <p className="text-[8px] text-muted-foreground/60 font-mono">ID: {visit.id}</p>
+          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em]">End of Official Audit Record</p>
+          <p className="text-[8px] text-muted-foreground/40 font-mono">Digitally signed and time-stamped by Aditya Pro Engine</p>
         </CardFooter>
       </Card>
 
@@ -346,10 +382,10 @@ export default function SiteVisitDetailPage() {
           
           <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
             <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }} title="Zoom In">
-              <ZoomIn className="h-5 w-5" />
+              <ZoomIn className="h-4 w-4" />
             </Button>
             <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }} title="Zoom Out">
-              <ZoomOut className="h-5 w-5" />
+              <ZoomOut className="h-4 w-4" />
             </Button>
             <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }} title="Reset Zoom">
               <RotateCcw className="h-5 w-5" />
