@@ -58,13 +58,13 @@ export default function Error({
       </div>
       
       <h2 className="mb-2 text-2xl font-black uppercase tracking-tight">
-        {isNetworkRelated ? 'Connection Error' : 'Unexpected Error'}
+        {isNetworkRelated ? 'Connection Error' : 'Application Error'}
       </h2>
       
       <p className="mb-10 max-w-xs text-muted-foreground font-medium leading-relaxed">
         {isNetworkRelated 
           ? "Check your Internet connection and Try again."
-          : "An unexpected error occurred while processing your request. Our technical team has been notified."
+          : "We’re giving this a quick repair. Please try again after a short while."
         }
       </p>
 
