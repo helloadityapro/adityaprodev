@@ -195,7 +195,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (!user) return null;
     return query(collection(firestore, 'notifications'), where('userId', '==', user.uid));
   }, [user, firestore]);
-  const { data: unsortedNotifications } = useCollection(notificationsQuery);
+  const { data: unsortedNotifications } = useCollection<Notification>(notificationsQuery);
 
   const notifications = React.useMemo(() => {
     if (!unsortedNotifications) return null;
@@ -277,7 +277,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <ShieldAlert className="h-16 w-16 text-yellow-600 opacity-80" />
         </div>
         <h1 className="text-3xl font-black uppercase tracking-tight">Authorization Pending</h1>
-        <p className="text-muted-foreground max-w-sm text-lg leading-relaxed">Your account is awaiting administrative approval. You will be notified via email once your profile is verified.</p>
+        <p className="text-muted-foreground max-sm text-lg leading-relaxed">Your account is awaiting administrative approval. You will be notified via email once your profile is verified.</p>
         <div className="flex flex-col gap-3 w-full max-w-xs">
           <Button variant="outline" onClick={() => auth.signOut()} className="rounded-sm font-bold h-11">Sign Out & Exit</Button>
         </div>
@@ -286,7 +286,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SidebarProvider className="h-full overflow-hidden">
+    <SidebarProvider className="h-screen overflow-hidden">
       <TopLoadingBar isVisible={isNavigating} />
       <Sidebar>
         <SidebarHeader className="px-6 py-4 border-b">
@@ -300,7 +300,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="flex flex-col h-full overflow-hidden relative">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-3 lg:px-6 z-10 sticky top-0">
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 lg:px-6 z-30 sticky top-0">
           <SidebarTrigger className="h-9 w-9" />
           <div className="flex-1 min-w-0">
             <GlobalSearch />
