@@ -275,7 +275,7 @@ export default function ModuleLearningPage() {
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur border-t p-4 z-20 md:left-[16rem]">
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 bg-background/90 backdrop-blur border-t p-4 z-20 md:left-[16rem]">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
           <Button variant="ghost" disabled={!prevModule} asChild={!!prevModule} className="rounded-sm font-bold">
             {prevModule ? <Link href={`/lms/courses/${courseId}/learn/${prevModule.id}`}><ChevronLeft className="mr-2 h-4 w-4" /> Previous Module</Link> : <span><ChevronLeft className="mr-2 h-4 w-4" /> Previous</span>}
