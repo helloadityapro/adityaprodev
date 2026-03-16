@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -667,12 +668,12 @@ export default function PtwListPage() {
 
       {/* Detailed View Overlay */}
       <Dialog open={!!detailsPermit} onOpenChange={(o) => !o && handleCloseDetails()}>
-        <DialogContent className="max-w-4xl w-[98vw] h-[95vh] p-0 border-none rounded-sm overflow-hidden flex flex-col shadow-2xl bg-background">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+        <DialogContent className="max-w-4xl w-[98vw] h-[92vh] sm:h-[95vh] p-0 border-none rounded-sm overflow-hidden flex flex-col shadow-2xl bg-background">
+          <DialogHeader className="p-4 sm:p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><FileText className="h-5 w-5 text-primary" /></div>
               <div>
-                <DialogTitle className="text-lg font-black tracking-tight text-foreground">Permit Audit Log</DialogTitle>
+                <DialogTitle className="text-base sm:text-lg font-black tracking-tight text-foreground uppercase">Permit Audit Log</DialogTitle>
                 <DialogDescription className="text-[10px] font-bold text-muted-foreground">{detailsPermit?.serialNumber}</DialogDescription>
               </div>
             </div>
@@ -680,43 +681,43 @@ export default function PtwListPage() {
 
           <ScrollArea className="flex-1 bg-background">
             {detailsPermit && (
-              <div id="printable-permit-area" className="p-6 md:p-10 space-y-12 pb-20">
+              <div id="printable-permit-area" className="p-4 sm:p-8 space-y-8 sm:space-y-12 pb-20">
                 {/* Consolidate Header Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/20 border rounded-sm">
-                  <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Site Name</Label>
-                    <p className="text-xs font-bold truncate">{detailsPermit.siteName}</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 p-3 sm:p-4 bg-muted/20 border rounded-sm">
+                  <div className="space-y-1 min-w-0">
+                    <Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Site Name</Label>
+                    <p className="text-[11px] sm:text-xs font-bold truncate">{detailsPermit.siteName}</p>
+                  </div>
+                  <div className="space-y-1 min-w-0">
+                    <Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">PtW Type</Label>
+                    <p className="text-[11px] sm:text-xs font-bold truncate">{detailsPermit.ptwType}</p>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">PtW Type</Label>
-                    <p className="text-xs font-bold">{detailsPermit.ptwType}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Status</Label>
+                    <Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Status</Label>
                     <div><StatusBadge permit={detailsPermit} /></div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Submitted</Label>
-                    <p className="text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p>
+                    <Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Submitted</Label>
+                    <p className="text-[10px] sm:text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  <div className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10">
+                  <div className="space-y-6 sm:space-y-8">
                     {/* Standardized Personnel Blocks */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-full text-primary"><User className="h-4 w-4" /></div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div className="p-3 sm:p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-full text-primary"><User className="h-3.5 w-3.5" /></div>
                         <div className="flex flex-col">
-                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Raised By</Label>
-                          <p className="text-xs font-black">{detailsPermit.siteEngineerName || 'N/A'}</p>
+                          <Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Raised By</Label>
+                          <p className="text-[11px] sm:text-xs font-black">{detailsPermit.siteEngineerName || 'N/A'}</p>
                         </div>
                       </div>
-                      <div className="p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3">
-                        <div className="p-2 bg-green-500/10 rounded-full text-green-600"><ShieldCheck className="h-4 w-4" /></div>
+                      <div className="p-3 sm:p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3">
+                        <div className="p-2 bg-green-500/10 rounded-full text-green-600"><ShieldCheck className="h-3.5 w-3.5" /></div>
                         <div className="flex flex-col">
-                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Approved By</Label>
-                          <p className="text-xs font-black">
+                          <Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Approved By</Label>
+                          <p className="text-[11px] sm:text-xs font-black">
                             {detailsPermit.timeline?.find(t => t.status === 'Approved')?.userName || 
                              detailsPermit.timeline?.find(t => t.status === 'ManagerApproved')?.userName || 
                              'Awaiting'}
@@ -726,31 +727,31 @@ export default function PtwListPage() {
                     </div>
 
                     {/* Enhanced Narrative Styling */}
-                    <div className="space-y-3">
-                      <Label className="text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-center gap-2">
-                        <FileText className="h-3.5 w-3.5" /> Work Description
+                    <div className="space-y-2">
+                      <Label className="text-[8px] sm:text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-center gap-2">
+                        <FileText className="h-3 w-3" /> Work Description
                       </Label>
-                      <div className="p-6 bg-primary/[0.02] border-2 border-primary/5 rounded-sm text-sm leading-relaxed whitespace-pre-wrap font-medium italic shadow-inner">
+                      <div className="p-4 sm:p-6 bg-primary/[0.02] border-2 border-primary/5 rounded-sm text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-medium italic shadow-inner">
                         "{detailsPermit.descriptionOfWork}"
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-8">
+                  <div className="space-y-6 sm:space-y-8">
                     {/* Verified GPS Widget */}
-                    <div className="space-y-3">
-                      <Label className="text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-center gap-2">
-                        <MapPin className="h-3.5 w-3.5" /> Verified GPS Coordinates
+                    <div className="space-y-2">
+                      <Label className="text-[8px] sm:text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-center gap-2">
+                        <MapPin className="h-3 w-3" /> Verified GPS Coordinates
                       </Label>
                       {detailsPermit.latitude ? (
-                        <div className="p-4 bg-primary/5 border-2 border-primary/10 rounded-sm flex items-center justify-between shadow-sm group hover:border-primary/30 transition-all">
+                        <div className="p-3 sm:p-4 bg-primary/5 border-2 border-primary/10 rounded-sm flex items-center justify-between shadow-sm group hover:border-primary/30 transition-all">
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-tighter">Site Position Stamped</span>
-                            <span className="font-mono text-xs font-black text-primary">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude?.toFixed(6)}</span>
+                            <span className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-tighter">Site Position Stamped</span>
+                            <span className="font-mono text-[10px] sm:text-xs font-black text-primary">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude?.toFixed(6)}</span>
                           </div>
-                          <Button variant="outline" size="icon" className="h-9 w-9 rounded-sm no-print border-primary/20 bg-white text-primary" asChild>
+                          <Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 rounded-sm no-print border-primary/20 bg-white text-primary" asChild>
                             <a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-4 w-4" />
+                              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </a>
                           </Button>
                         </div>
@@ -766,14 +767,14 @@ export default function PtwListPage() {
                 <Separator />
 
                 {/* Attachments Section */}
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   <div className="flex items-center gap-2">
-                    <Paperclip className="h-4 w-4 text-primary" />
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Documentation & Evidence</h3>
+                    <Paperclip className="h-3.5 w-3.5 text-primary" />
+                    <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-foreground">Documentation & Evidence</h3>
                   </div>
                   
                   {detailsPermit.attachments && detailsPermit.attachments.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                       {detailsPermit.attachments.map((file, idx) => (
                         <div key={idx} className="group relative aspect-square rounded-sm overflow-hidden border bg-muted flex flex-col items-center justify-center">
                           {isImage(file) ? (
@@ -785,7 +786,7 @@ export default function PtwListPage() {
                                 onClick={() => openViewer(file, detailsPermit.attachments!)}
                               />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none">
-                                <Maximize2 className="h-6 w-6 text-white" />
+                                <Maximize2 className="h-5 w-5 text-white" />
                               </div>
                               <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">
                                 {file.name}
@@ -793,21 +794,21 @@ export default function PtwListPage() {
                             </>
                           ) : isVideo(file) ? (
                             <div className="relative w-full h-full bg-slate-900 flex flex-col items-center justify-center cursor-pointer group" onClick={() => openViewer(file, detailsPermit.attachments!)}>
-                              <Film className="h-10 w-10 text-white opacity-40" />
+                              <Film className="h-8 w-8 sm:h-10 sm:w-10 text-white opacity-40" />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <PlayCircle className="h-8 w-8 text-white" />
+                                <PlayCircle className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                               </div>
                               <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">
                                 Video: {file.name}
                               </div>
                             </div>
                           ) : (
-                            <div className="flex flex-col items-center justify-between p-3 h-full w-full bg-background border">
-                              <div className="flex-1 flex flex-col items-center justify-center gap-2">
-                                <FileText className={cn("h-8 w-8", file.contentType?.includes('pdf') ? "text-red-500" : "text-blue-500")} />
-                                <span className="text-[8px] font-bold uppercase text-center line-clamp-2">{file.name}</span>
+                            <div className="flex flex-col items-center justify-between p-2 h-full w-full bg-background border">
+                              <div className="flex-1 flex flex-col items-center justify-center gap-1.5">
+                                <FileText className={cn("h-6 w-6 sm:h-8 sm:w-8", file.contentType?.includes('pdf') ? "text-red-500" : "text-blue-500")} />
+                                <span className="text-[7px] sm:text-[8px] font-bold uppercase text-center line-clamp-2">{file.name}</span>
                               </div>
-                              <Button variant="secondary" size="sm" className="w-full h-6 text-[8px] font-bold uppercase rounded-none mt-2" asChild>
+                              <Button variant="secondary" size="sm" className="w-full h-5 sm:h-6 text-[7px] sm:text-[8px] font-bold uppercase rounded-none mt-1" asChild>
                                 <a href={file.url} target="_blank" rel="noopener noreferrer">View File</a>
                               </Button>
                             </div>
@@ -816,27 +817,27 @@ export default function PtwListPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="p-12 text-center border-2 border-dashed rounded-sm bg-muted/5">
-                      <ImageIcon className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
-                      <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest italic">No files attached to this permit.</p>
+                    <div className="p-8 sm:p-12 text-center border-2 border-dashed rounded-sm bg-muted/5">
+                      <ImageIcon className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/20 mx-auto mb-2 sm:mb-3" />
+                      <p className="text-[10px] sm:text-xs text-muted-foreground font-bold uppercase tracking-widest italic">No files attached to this permit.</p>
                     </div>
                   )}
                 </div>
 
                 <Separator />
 
-                <div className="space-y-6">
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2"><History className="h-4 w-4 text-primary" /> Lifecycle History</h3>
-                  <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-8">
+                <div className="space-y-4 sm:space-y-6">
+                  <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2"><History className="h-3 w-3 sm:h-4 sm:w-4 text-primary" /> Lifecycle History</h3>
+                  <div className="relative border-l-2 border-muted ml-3 pl-4 sm:pl-6 space-y-6 sm:space-y-8">
                     {[...(detailsPermit.timeline || [])].sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0)).map((entry, idx) => (
                       <div key={idx} className="relative">
-                        <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-xs font-bold uppercase tracking-tight text-primary">{entry.action} — {entry.userName}</span>
-                            <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{formatTimestamp(entry.timestamp)}</span>
+                        <div className="absolute -left-[25px] sm:-left-[31px] top-1 h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                        <div className="flex flex-col gap-1 sm:gap-1.5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4">
+                            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-tight text-primary leading-tight">{entry.action} — {entry.userName}</span>
+                            <span className="text-[8px] sm:text-[9px] font-mono font-bold text-muted-foreground uppercase">{formatTimestamp(entry.timestamp)}</span>
                           </div>
-                          <p className="text-sm italic font-medium leading-relaxed opacity-80">
+                          <p className="text-xs sm:text-sm italic font-medium leading-relaxed opacity-80">
                             "{entry.remarks}"
                           </p>
                         </div>
@@ -848,15 +849,15 @@ export default function PtwListPage() {
             )}
           </ScrollArea>
 
-          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 no-print">
+          <DialogFooter className="p-3 sm:p-4 bg-muted/5 border-t gap-2 sm:gap-3 shrink-0 no-print">
             {detailsPermit && detailsPermit.status !== 'Approved' && detailsPermit.status !== 'Rejected' && (
               <>
                 {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || isAdmin) && (
                   <div className="flex-1 flex gap-2">
-                    <Button className="flex-1 h-12 rounded-sm font-bold text-xs bg-green-600 hover:bg-green-700 text-white shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
+                    <Button className="flex-1 h-10 sm:h-12 rounded-sm font-bold text-[10px] sm:text-xs bg-green-600 hover:bg-green-700 text-white shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
                       Approve
                     </Button>
-                    <Button variant="destructive" className="flex-1 h-12 rounded-sm font-bold text-xs shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>
+                    <Button variant="destructive" className="flex-1 h-10 sm:h-12 rounded-sm font-bold text-[10px] sm:text-xs shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>
                       Reject
                     </Button>
                   </div>
