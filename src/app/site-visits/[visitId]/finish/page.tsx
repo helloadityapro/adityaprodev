@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -31,7 +32,9 @@ import {
   Send, 
   Flag, 
   Navigation,
-  Save
+  Save,
+  ChevronUp,
+  ArrowUp
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -70,6 +73,7 @@ export default function FinishSiteVisitPage() {
   const [hasCameraPermission, setHasCameraPermission] = React.useState<boolean | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const finalFormRef = React.useRef<HTMLDivElement>(null);
   
   const [purpose, setPurpose] = React.useState("");
   const [details, setDetails] = React.useState("");
@@ -238,11 +242,18 @@ export default function FinishSiteVisitPage() {
         updatedAt: serverTimestamp()
       });
       toast({ title: 'Draft Saved', description: 'Action items updated. Visit remains ongoing.' });
-      router.push('/dashboard');
+      router.push('/site-visits/active');
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Save Failed', description: e.message });
       setIsSubmitting(false);
     }
+  };
+
+  const handleProceedToFinal = () => {
+    setIsFinalizing(true);
+    setTimeout(() => {
+      finalFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const onSubmitFinalReport = async () => {
@@ -309,211 +320,212 @@ export default function FinishSiteVisitPage() {
     <div className="space-y-8 max-w-3xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2">
-          {isFinalizing ? <Flag className="h-8 w-8 text-primary" /> : <Navigation className="h-8 w-8 text-primary" />}
-          {isFinalizing ? 'Finalize Visit Report' : 'Continue Site Visit'}
+          <Navigation className="h-8 w-8 text-primary" />
+          Continue Site Visit
         </h1>
         <p className="text-muted-foreground">Documenting presence and activities at <strong>{visit.siteName}</strong>.</p>
       </div>
 
-      <AnimatePresence mode="wait">
-        {!isFinalizing ? (
-          <motion.div 
-            key="draft-view" 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="space-y-8"
-          >
-            <Card className="rounded-sm shadow-md border-primary/10">
-              <CardHeader className="bg-primary/5 border-b py-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                      <Plus className="h-4 w-4 text-primary" /> Action Items / Task Checklist
-                    </CardTitle>
-                    <CardDescription className="text-[10px] font-bold text-muted-foreground uppercase">Log current activities and findings</CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={addTask} className="text-primary font-bold h-8 px-3 border-primary/20 bg-white">
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Action
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4">
-                {tasks.map((task, idx) => (
-                  <div key={idx} className="space-y-3 p-4 border rounded-sm bg-muted/5 relative group animate-in slide-in-from-top-1">
-                    <div className="flex gap-2">
-                      <Input 
-                        placeholder={`Describe activity item #${idx + 1}`} 
-                        value={task.text} 
-                        onChange={e => updateTaskText(idx, e.target.value)}
-                        className="rounded-sm flex-1 bg-background"
-                      />
-                      {tasks.length > 1 && (
-                        <Button variant="ghost" size="icon" className="text-destructive shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeTask(idx)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-4">
-                      {(task.localPhoto || task.photoUrl) ? (
-                        <div className="relative h-20 w-32 rounded-sm overflow-hidden border shadow-sm group">
-                          <img src={task.localPhoto || task.photoUrl!} className="h-full w-full object-cover" alt="Task proof" />
-                          <Button 
-                            variant="destructive" 
-                            size="icon" 
-                            className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" 
-                            onClick={() => removeTaskPhoto(idx)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="relative">
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            capture="environment" 
-                            className="hidden" 
-                            id={`task-photo-${idx}`}
-                            onChange={e => handleTaskPhotoChange(idx, e)}
-                          />
-                          <Button variant="outline" size="sm" asChild className="h-8 text-[10px] font-bold rounded-sm cursor-pointer border-primary/20 text-primary hover:bg-primary/5">
-                            <label htmlFor={`task-photo-${idx}`}>
-                              <ImageIcon className="h-3 w-3 mr-1.5" /> ATTACH PHOTO PROOF
-                            </label>
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-              <CardFooter className="bg-muted/10 border-t p-6 flex flex-col sm:flex-row gap-4">
-                <Button 
-                  variant="outline"
-                  className="flex-1 h-14 text-lg font-bold rounded-sm border-primary text-primary hover:bg-primary/5" 
-                  onClick={handleSaveProgress}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
-                  Save Progress & Exit
-                </Button>
-                <Button 
-                  className="flex-1 h-14 text-lg font-black rounded-sm shadow-xl" 
-                  onClick={() => setIsFinalizing(true)}
-                  disabled={isSubmitting || tasks.every(t => t.text.trim() === "")}
-                >
-                  Complete Site Visit <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </CardFooter>
-            </Card>
-          </motion.div>
-        ) : (
-          <motion.div 
-            key="final-view" 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            className="space-y-8"
-          >
-            <Button variant="ghost" onClick={() => setIsFinalizing(false)} className="w-fit -ml-2 text-muted-foreground">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Action Items
-            </Button>
-
-            <Card className="rounded-sm shadow-md overflow-hidden border-primary/10">
-              <CardHeader className="bg-primary/5 py-4 border-b">
+      <div className="space-y-8">
+        {/* Section 1: Action Items - ALWAYS VISIBLE */}
+        <Card className="rounded-sm shadow-md border-primary/10 transition-all duration-300">
+          <CardHeader className="bg-primary/5 border-b py-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
                 <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                  <Camera className="h-4 w-4 text-primary" /> Audit Verification (Selfie)
+                  <Plus className="h-4 w-4 text-primary" /> Action Items / Task Checklist
                 </CardTitle>
-                <CardDescription className="text-[10px] font-bold text-amber-700 uppercase">Selfie must include face and upper body profile</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="flex flex-col items-center gap-4">
-                  <div className={cn("relative w-full max-w-sm aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
-                    <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-                    <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
-                      <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-10 w-10 p-0 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
-                      <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 bg-white hover:bg-white/90 text-black border-4 border-primary shadow-xl transition-transform active:scale-90"><Camera className="h-6 w-6" /></Button>
-                      <div className="w-10" />
+                <CardDescription className="text-[10px] font-bold text-muted-foreground uppercase">Log current activities and findings</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={addTask} className="text-primary font-bold h-8 px-3 border-primary/20 bg-white">
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Action
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-4">
+            {tasks.map((task, idx) => (
+              <div key={idx} className="space-y-3 p-4 border rounded-sm bg-muted/5 relative group animate-in slide-in-from-top-1">
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder={`Describe activity item #${idx + 1}`} 
+                    value={task.text} 
+                    onChange={e => updateTaskText(idx, e.target.value)}
+                    className="rounded-sm flex-1 bg-background"
+                  />
+                  {tasks.length > 1 && (
+                    <Button variant="ghost" size="icon" className="text-destructive shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeTask(idx)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  {(task.localPhoto || task.photoUrl) ? (
+                    <div className="relative h-20 w-32 rounded-sm overflow-hidden border shadow-sm group">
+                      <img src={task.localPhoto || task.photoUrl!} className="h-full w-full object-cover" alt="Task proof" />
+                      <Button 
+                        variant="destructive" 
+                        size="icon" 
+                        className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" 
+                        onClick={() => removeTaskPhoto(idx)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
                     </div>
-                  </div>
-
-                  {selfie && !isCameraActive && (
-                    <div className="relative group">
-                      <img src={selfie} className="w-full max-w-sm aspect-video object-cover rounded-sm border-2 border-primary shadow-lg" alt="Verification" />
-                      <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setSelfie(null)}><Trash2 className="h-4 w-4" /></Button>
+                  ) : (
+                    <div className="relative">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment" 
+                        className="hidden" 
+                        id={`task-photo-${idx}`}
+                        onChange={e => handleTaskPhotoChange(idx, e)}
+                      />
+                      <Button variant="outline" size="sm" asChild className="h-8 text-[10px] font-bold rounded-sm cursor-pointer border-primary/20 text-primary hover:bg-primary/5">
+                        <label htmlFor={`task-photo-${idx}`}>
+                          <ImageIcon className="h-3 w-3 mr-1.5" /> ATTACH PHOTO PROOF
+                        </label>
+                      </Button>
                     </div>
                   )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+          <CardFooter className="bg-muted/10 border-t p-6 flex flex-col sm:flex-row gap-4">
+            <Button 
+              variant="outline"
+              className="flex-1 h-14 text-lg font-bold rounded-sm border-primary text-primary hover:bg-primary/5" 
+              onClick={handleSaveProgress}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+              Save Progress & Exit
+            </Button>
+            {!isFinalizing && (
+              <Button 
+                className="flex-1 h-14 text-lg font-black rounded-sm shadow-xl" 
+                onClick={handleProceedToFinal}
+                disabled={isSubmitting || tasks.every(t => t.text.trim() === "")}
+              >
+                Complete Site Visit <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
 
-                  {!selfie && !isCameraActive && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-                      <Button onClick={() => startCamera()} variant="outline" className="h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all text-primary">
-                        <Camera className="h-8 w-8" />
-                        <span className="font-bold uppercase text-xs">Open Camera</span>
-                      </Button>
-                      <div className="relative">
-                        <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleGalleryUpload} />
-                        <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all text-primary">
-                          <ImagePlus className="h-8 w-8" />
-                          <span className="font-bold uppercase text-xs">Upload Photo</span>
-                        </Button>
+        {/* Section 2: Final Audit - VISIBLE WHEN isFinalizing is TRUE */}
+        <AnimatePresence>
+          {isFinalizing && (
+            <motion.div 
+              ref={finalFormRef}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="space-y-8 animate-in slide-in-from-bottom-4 duration-500"
+            >
+              <div className="flex items-center justify-between px-1">
+                <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-amber-200 uppercase font-black px-3 h-7 rounded-sm">Final Submission Step</Badge>
+                <Button variant="ghost" onClick={() => { setIsFinalizing(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-muted-foreground font-bold h-7 px-3">
+                  <ArrowUp className="mr-2 h-3.5 w-3.5" /> Edit Action Items
+                </Button>
+              </div>
+
+              <Card className="rounded-sm shadow-md overflow-hidden border-primary/10">
+                <CardHeader className="bg-primary/5 py-4 border-b">
+                  <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                    <Camera className="h-4 w-4 text-primary" /> Audit Verification (Selfie)
+                  </CardTitle>
+                  <CardDescription className="text-[10px] font-bold text-amber-700 uppercase">Mandatory: Include face and upper body profile</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className={cn("relative w-full max-w-sm aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
+                      <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                      <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
+                        <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-10 w-10 p-0 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
+                        <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 bg-white hover:bg-white/90 text-black border-4 border-primary shadow-xl transition-transform active:scale-90"><Camera className="h-6 w-6" /></Button>
+                        <div className="w-10" />
                       </div>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card className="rounded-sm shadow-md border-primary/10">
-              <CardHeader><CardTitle>Final Report Details</CardTitle></CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider">Purpose of Visit</Label>
-                  <Select value={purpose} onValueChange={setPurpose}>
-                    <SelectTrigger className="rounded-sm"><SelectValue placeholder="Select purpose" /></SelectTrigger>
-                    <SelectContent>
-                      {PURPOSES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    {selfie && !isCameraActive && (
+                      <div className="relative group">
+                        <img src={selfie} className="w-full max-w-sm aspect-video object-cover rounded-sm border-2 border-primary shadow-lg" alt="Verification" />
+                        <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setSelfie(null)}><Trash2 className="h-4 w-4" /></Button>
+                      </div>
+                    )}
 
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider">Narrative Summary</Label>
-                  <Textarea placeholder="Detail the progress, findings, or critical discussions..." rows={5} value={details} onChange={e => setDetails(e.target.value)} className="rounded-sm" />
-                </div>
+                    {!selfie && !isCameraActive && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                        <Button onClick={() => startCamera()} variant="outline" className="h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all text-primary">
+                          <Camera className="h-8 w-8" />
+                          <span className="font-bold uppercase text-xs">Open Camera</span>
+                        </Button>
+                        <div className="relative">
+                          <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleGalleryUpload} />
+                          <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all text-primary">
+                            <ImagePlus className="h-8 w-8" />
+                            <span className="font-bold uppercase text-xs">Upload Photo</span>
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
-                <div className="space-y-4 p-4 bg-primary/[0.02] rounded-sm border border-primary/10">
-                  <Label className="text-xs font-bold uppercase tracking-wider flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Customer Availability</Label>
-                  <RadioGroup value={customerAvailable} onValueChange={setCustomerAvailable} className="flex gap-6 mt-2">
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="yes" id="c-yes" /><Label htmlFor="c-yes" className="font-bold cursor-pointer text-sm">Yes</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="no" id="c-no" /><Label htmlFor="c-no" className="font-bold cursor-pointer text-sm">No</Label>
-                    </div>
-                  </RadioGroup>
-                  {customerAvailable === 'yes' && (
-                    <div className="space-y-2 mt-4 animate-in fade-in duration-300">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Attendee Names</Label>
-                      <Input placeholder="Persons met during visit..." value={customerNames} onChange={e => setCustomerNames(e.target.value)} className="rounded-sm bg-background" />
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-              <CardFooter className="bg-muted/10 border-t p-6">
-                <Button 
-                  className="w-full h-14 text-xl font-black rounded-sm shadow-xl" 
-                  onClick={onSubmitFinalReport}
-                  disabled={isSubmitting || !selfie || !purpose || details.trim().length < 10}
-                >
-                  {isSubmitting ? <><Loader2 className="mr-2 h-6 w-6 animate-spin" /> Publishing Report...</> : <><Send className="mr-2 h-5 w-5" /> Conclude & Submit Report</>}
-                </Button>
-              </CardFooter>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <Card className="rounded-sm shadow-md border-primary/10">
+                <CardHeader><CardTitle>Final Report Details</CardTitle></CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider">Purpose of Visit</Label>
+                    <Select value={purpose} onValueChange={setPurpose}>
+                      <SelectTrigger className="rounded-sm h-11"><SelectValue placeholder="Select purpose" /></SelectTrigger>
+                      <SelectContent>
+                        {PURPOSES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider">Narrative Summary</Label>
+                    <Textarea placeholder="Detail the progress, findings, or critical discussions..." rows={5} value={details} onChange={e => setDetails(e.target.value)} className="rounded-sm" />
+                  </div>
+
+                  <div className="space-y-4 p-4 bg-primary/[0.02] rounded-sm border border-primary/10">
+                    <Label className="text-xs font-bold uppercase tracking-wider flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Customer Availability</Label>
+                    <RadioGroup value={customerAvailable} onValueChange={setCustomerAvailable} className="flex gap-6 mt-2">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="yes" id="c-yes" /><Label htmlFor="c-yes" className="font-bold cursor-pointer text-sm">Yes</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="no" id="c-no" /><Label htmlFor="c-no" className="font-bold cursor-pointer text-sm">No</Label>
+                      </div>
+                    </RadioGroup>
+                    {customerAvailable === 'yes' && (
+                      <div className="space-y-2 mt-4 animate-in fade-in duration-300">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Attendee Names</Label>
+                        <Input placeholder="Persons met during visit..." value={customerNames} onChange={e => setCustomerNames(e.target.value)} className="rounded-sm bg-background" />
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+                <CardFooter className="bg-muted/10 border-t p-6">
+                  <Button 
+                    className="w-full h-16 text-xl font-black rounded-sm shadow-xl" 
+                    onClick={onSubmitFinalReport}
+                    disabled={isSubmitting || !selfie || !purpose || details.trim().length < 10}
+                  >
+                    {isSubmitting ? <><Loader2 className="mr-2 h-6 w-6 animate-spin" /> Publishing Report...</> : <><Send className="mr-2 h-5 w-5" /> Conclude & Submit Report</>}
+                  </Button>
+                </CardFooter>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
