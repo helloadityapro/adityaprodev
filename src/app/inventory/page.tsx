@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
@@ -21,7 +21,9 @@ import {
   Loader2, 
   Package, 
   Tag,
-  Settings2
+  Settings2,
+  Trash2,
+  Layers
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -53,6 +55,13 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
+import { Separator } from '@/components/ui/separator';
+
+const subItemSchema = z.object({
+  name: z.string().min(1, 'Part name is required.'),
+  quantityPerSet: z.coerce.number().min(0.01, 'Qty required.'),
+  unit: z.string().min(1, 'Unit required.'),
+});
 
 const itemSchema = z.object({
   name: z.string().min(1, 'Item Name is required.'),
@@ -60,6 +69,7 @@ const itemSchema = z.object({
   description: z.string().optional(),
   unit: z.string().min(1, 'Unit of Measurement is required.'),
   make: z.string().min(1, 'Make or OEM is required.'),
+  subItems: z.array(subItemSchema).optional(),
 });
 
 type MasterItem = {
@@ -69,6 +79,7 @@ type MasterItem = {
   description?: string;
   unit: string;
   make: string;
+  subItems?: { name: string; quantityPerSet: number; unit: string }[];
   createdAt: any;
 };
 
@@ -76,6 +87,8 @@ type Category = {
   id: string;
   name: string;
 };
+
+const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"];
 
 export default function MasterInventoryPage() {
   const firestore = useFirestore();
@@ -106,14 +119,25 @@ export default function MasterInventoryPage() {
 
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
-    defaultValues: { name: '', category: '', description: '', unit: '', make: '' },
+    defaultValues: { name: '', category: '', description: '', unit: '', make: '', subItems: [] },
   });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "subItems"
+  });
+
+  const watchUnit = form.watch('unit');
 
   const onSubmit = async (values: z.infer<typeof itemSchema>) => {
     setIsSubmitting(true);
     try {
+      // Only save subItems if unit is 'Sets'
+      const finalSubItems = watchUnit === 'Sets' ? values.subItems : [];
+
       await addDocumentNonBlocking(collection(firestore, 'master_inventory'), {
         ...values,
+        subItems: finalSubItems,
         createdAt: serverTimestamp(),
         createdBy: user?.uid,
         createdByName: userProfile?.username || user?.email
@@ -201,7 +225,7 @@ export default function MasterInventoryPage() {
                   <TableHead>Category</TableHead>
                   <TableHead>Make / OEM</TableHead>
                   <TableHead className="text-center">UoM</TableHead>
-                  <TableHead className="min-w-[300px]">Specification / Description</TableHead>
+                  <TableHead className="min-w-[300px]">Composition / Specs</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -228,8 +252,21 @@ export default function MasterInventoryPage() {
                     <TableCell className="text-center font-black text-[10px] text-muted-foreground uppercase tracking-widest">
                       {item.unit}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground leading-relaxed italic">
-                      {item.description || "No detailed description provided."}
+                    <TableCell className="text-xs text-muted-foreground leading-relaxed">
+                      {item.unit === 'Sets' && item.subItems && item.subItems.length > 0 ? (
+                        <div className="space-y-1">
+                          <p className="font-bold text-[10px] uppercase text-primary mb-1">Contains {item.subItems.length} Components:</p>
+                          <ul className="list-disc pl-4 space-y-0.5">
+                            {item.subItems.map((sub, idx) => (
+                              <li key={idx}>
+                                <span className="font-semibold text-foreground">{sub.name}</span>: {sub.quantityPerSet} {sub.unit}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <span className="italic">{item.description || "No detailed description provided."}</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 )) : (
@@ -249,7 +286,7 @@ export default function MasterInventoryPage() {
       </Card>
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-lg rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
+        <DialogContent className="sm:max-w-2xl rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Plus className="h-5 w-5 text-primary" /></div>
@@ -260,83 +297,161 @@ export default function MasterInventoryPage() {
             </div>
           </DialogHeader>
           
-          <div className="p-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-                <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Name of the Item</FormLabel>
-                    <FormControl><Input placeholder="e.g. Solar Module 540Wp" {...field} className="h-11 rounded-sm focus-visible:ring-primary/20" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+          <ScrollArea className="max-h-[70vh]">
+            <div className="p-6">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField control={form.control} name="name" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Name of the Item</FormLabel>
+                        <FormControl><Input placeholder="e.g. Solar Module 540Wp" {...field} className="h-11 rounded-sm focus-visible:ring-primary/20" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
 
-                <FormField control={form.control} name="category" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Item Category</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-11 rounded-sm focus-visible:ring-primary/20">
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories?.length ? categories.map(cat => (
-                          <SelectItem key={cat.id} value={cat.name} className="text-xs font-bold">{cat.name}</SelectItem>
-                        )) : (
-                          <div className="p-2 text-center text-[10px] uppercase font-bold text-muted-foreground">No categories defined</div>
+                    <FormField control={form.control} name="category" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Item Category</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-11 rounded-sm focus-visible:ring-primary/20">
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories?.length ? categories.map(cat => (
+                              <SelectItem key={cat.id} value={cat.name} className="text-xs font-bold">{cat.name}</SelectItem>
+                            )) : (
+                              <div className="p-2 text-center text-[10px] uppercase font-bold text-muted-foreground">No categories defined</div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField control={form.control} name="make" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Make or OEM</FormLabel>
+                        <FormControl><Input placeholder="e.g. Waaree, Adani" {...field} className="h-11 rounded-sm focus-visible:ring-primary/20" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="unit" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Unit of Measurement</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-11 rounded-sm focus-visible:ring-primary/20">
+                              <SelectValue placeholder="Select unit" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {UNITS.map(u => (
+                              <SelectItem key={u} value={u} className="text-xs font-bold">{u}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+
+                  {watchUnit === 'Sets' && (
+                    <div className="space-y-4 p-4 border rounded-sm bg-muted/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Layers className="h-4 w-4 text-primary" />
+                          <h3 className="text-xs font-black uppercase tracking-widest">Component Breakdown</h3>
+                        </div>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => append({ name: '', quantityPerSet: 1, unit: 'Numbers' })}
+                          className="h-8 rounded-sm font-bold border-primary text-primary"
+                        >
+                          <Plus className="h-3 w-3 mr-1" /> Add Component
+                        </Button>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {fields.map((field, index) => (
+                          <div key={field.id} className="flex gap-2 items-start">
+                            <FormField
+                              control={form.control}
+                              name={`subItems.${index}.name`}
+                              render={({ field }) => (
+                                <FormItem className="flex-1">
+                                  <FormControl><Input placeholder="Component Name" {...field} className="h-9 text-xs rounded-sm" /></FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`subItems.${index}.quantityPerSet`}
+                              render={({ field }) => (
+                                <FormItem className="w-24">
+                                  <FormControl><Input type="number" placeholder="Qty" {...field} className="h-9 text-xs rounded-sm font-mono" /></FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`subItems.${index}.unit`}
+                              render={({ field }) => (
+                                <FormItem className="w-28">
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="h-9 text-[10px] font-bold rounded-sm">
+                                        <SelectValue placeholder="Unit" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {UNITS.filter(u => u !== 'Sets').map(u => (
+                                        <SelectItem key={u} value={u} className="text-[10px] font-bold">{u}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => remove(index)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        {fields.length === 0 && (
+                          <p className="text-[10px] text-muted-foreground italic text-center py-4">Define components that make up one single Set.</p>
                         )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                      </div>
+                    </div>
+                  )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="make" render={({ field }) => (
+                  <FormField control={form.control} name="description" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Make or OEM</FormLabel>
-                      <FormControl><Input placeholder="e.g. Waaree, Adani" {...field} className="h-11 rounded-sm focus-visible:ring-primary/20" /></FormControl>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Additional Notes</FormLabel>
+                      <FormControl><Textarea placeholder="Technical specifications, dimensions, or material grade..." {...field} className="rounded-sm focus-visible:ring-primary/20 min-h-[80px]" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={form.control} name="unit" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Unit of Measurement</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="h-11 rounded-sm focus-visible:ring-primary/20">
-                            <SelectValue placeholder="Select unit" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"].map(u => (
-                            <SelectItem key={u} value={u} className="text-xs font-bold">{u}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
 
-                <FormField control={form.control} name="description" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Item Description</FormLabel>
-                    <FormControl><Textarea placeholder="Technical specifications, dimensions, or material grade..." {...field} className="rounded-sm focus-visible:ring-primary/20 min-h-[100px]" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                <DialogFooter className="pt-4 border-t gap-2">
-                  <DialogClose asChild><Button variant="outline" className="flex-1 h-11 rounded-sm font-bold uppercase text-[10px] tracking-widest">Cancel</Button></DialogClose>
-                  <Button type="submit" className="flex-1 h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-lg" disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Register Item"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </div>
+                  <DialogFooter className="pt-4 border-t gap-2">
+                    <DialogClose asChild><Button variant="outline" className="flex-1 h-11 rounded-sm font-bold uppercase text-[10px] tracking-widest">Cancel</Button></DialogClose>
+                    <Button type="submit" className="flex-1 h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-lg" disabled={isSubmitting}>
+                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Register Item"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </div>

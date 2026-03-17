@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -44,9 +45,21 @@
         "itemName": { "type": "string" },
         "specification": { "type": "string" },
         "plannedQuantity": { "type": "number" },
+        "approvedQuantity": { "type": "number" },
         "unit": { "type": "string" },
         "category": { "type": "string" },
-        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] }
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "subItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "quantityPerSet": { "type": "number" },
+              "unit": { "type": "string" }
+            }
+          }
+        }
       }
     },
     "PurchaseOrder": {
@@ -86,6 +99,17 @@
         "category": { "type": "string" },
         "unit": { "type": "string" },
         "make": { "type": "string" },
+        "subItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "quantityPerSet": { "type": "number" },
+              "unit": { "type": "string" }
+            }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "category", "unit", "make"]

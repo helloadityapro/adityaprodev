@@ -1,8 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp, orderBy, or } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -48,7 +49,10 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Pencil
+  Pencil,
+  Layers,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -112,6 +116,7 @@ type BoMItem = {
   processedByName?: string;
   processedAt?: any;
   remarks?: string;
+  subItems?: { name: string; quantityPerSet: number; unit: string }[];
 };
 
 type PurchaseOrder = {
@@ -140,6 +145,7 @@ type MasterItem = {
   make: string;
   unit: string;
   description?: string;
+  subItems?: { name: string; quantityPerSet: number; unit: string }[];
 };
 
 type POSortKey = 'poNumber' | 'supplier' | 'status' | 'date' | 'total';
@@ -180,6 +186,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   // BoM Logic
   const [bomActionState, setBomActionState] = React.useState<{ item: BoMItem, type: 'Approved' | 'Rejected' } | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
+  const [expandedBomRows, setExpandedBomRows] = React.useState<Set<string>>(new Set());
 
   // PO Management State
   const [poSearch, setPoSearch] = React.useState("");
@@ -332,6 +339,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       specification: selectedMasterItem.description || "",
       plannedQuantity: parseFloat(formData.get('qty') as string),
       unit: selectedMasterItem.unit,
+      subItems: selectedMasterItem.subItems || [], // Capture sub-item definitions
       status: 'Pending',
       createdAt: serverTimestamp()
     };
@@ -363,6 +371,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     
     setIsActionProcessing(false);
     setBomActionState(null);
+  };
+
+  const toggleBomRow = (id: string) => {
+    const newSet = new Set(expandedBomRows);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedBomRows(newSet);
   };
 
   const handleUpdateStock = async (itemId: string, newStock: number) => {
@@ -660,16 +675,30 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Technical Specifications (Automated)</Label>
-                        <Textarea 
-                          readOnly
-                          key={`spec-${selectedMasterItem?.id || 'none'}`}
-                          name="spec" 
-                          placeholder="Select an item to view its master specification..." 
-                          defaultValue={selectedMasterItem?.description || ""}
-                          className="min-h-[100px] rounded-sm bg-muted/10 border-primary/10 cursor-not-allowed resize-none text-sm leading-relaxed italic" 
-                        />
-                        <p className="text-[9px] text-muted-foreground font-medium italic px-1">Values are pulled directly from the Master Inventory registry to ensure audit compliance.</p>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Master Specification / Breakdown</Label>
+                        <div className="min-h-[100px] p-4 rounded-sm bg-muted/10 border border-primary/10 overflow-auto">
+                          {selectedMasterItem ? (
+                            <div className="space-y-2">
+                              {selectedMasterItem.unit === 'Sets' && selectedMasterItem.subItems && selectedMasterItem.subItems.length > 0 ? (
+                                <>
+                                  <p className="text-[10px] font-black text-primary uppercase mb-2">Composition Breakdown:</p>
+                                  <div className="grid gap-1.5">
+                                    {selectedMasterItem.subItems.map((sub, idx) => (
+                                      <div key={idx} className="flex items-center justify-between text-[11px] font-medium border-b border-border/50 pb-1">
+                                        <span>{sub.name}</span>
+                                        <span className="font-bold text-primary">{sub.quantityPerSet} {sub.unit} / Set</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </>
+                              ) : (
+                                <p className="text-sm italic text-muted-foreground leading-relaxed">"{selectedMasterItem.description || 'No additional specifications provided.'}"</p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground/40 italic">Select an item to view its details...</p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </form>
@@ -693,70 +722,102 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     </TableHeader>
                     <TableBody>
                       {bomItems && bomItems.length > 0 ? bomItems.map(item => (
-                        <TableRow key={item.id} className="hover:bg-muted/5">
-                          <TableCell className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-sm text-foreground">{item.itemName}</span>
-                              <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{item.specification}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="rounded-sm font-bold text-[9px] uppercase tracking-wider">
-                              {item.category || "Uncategorized"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <Badge variant="outline" className={cn(
-                                "w-fit rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
-                                item.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                                item.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                                "bg-yellow-50 text-yellow-700 border-yellow-200"
-                              )}>
-                                {item.status || 'Pending'}
-                              </Badge>
-                              {item.processedByName && (
-                                <div className="flex flex-col gap-0.5">
-                                  <span className="text-[8px] font-bold text-muted-foreground uppercase">By: {item.processedByName}</span>
-                                  {item.remarks && <span className="text-[9px] italic text-muted-foreground line-clamp-1">"{item.remarks}"</span>}
+                        <React.Fragment key={item.id}>
+                          <TableRow className="hover:bg-muted/5 group">
+                            <TableCell className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                {item.unit === 'Sets' && (
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => toggleBomRow(item.id)}>
+                                    {expandedBomRows.has(item.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                  </Button>
+                                )}
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-bold text-sm text-foreground truncate">{item.itemName}</span>
+                                  <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{item.specification}</span>
                                 </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="font-mono font-bold text-sm text-primary">{item.plannedQuantity}</div>
-                            <div className="text-[10px] text-muted-foreground uppercase font-medium">{item.unit}</div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {item.status === 'Approved' ? (
-                              <>
-                                <div className="font-mono font-bold text-sm text-emerald-700">{item.approvedQuantity || item.plannedQuantity}</div>
-                                <div className="text-[10px] text-emerald-600 uppercase font-medium">{item.unit}</div>
-                              </>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right px-6">
-                            <div className="flex justify-end items-center gap-1">
-                              {isAdmin && item.status === 'Pending' && (
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="rounded-sm font-bold text-[9px] uppercase tracking-wider">
+                                {item.category || "Uncategorized"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <Badge variant="outline" className={cn(
+                                  "w-fit rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
+                                  item.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                                  item.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                                  "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                )}>
+                                  {item.status || 'Pending'}
+                                </Badge>
+                                {item.processedByName && (
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="text-[8px] font-bold text-muted-foreground uppercase">By: {item.processedByName}</span>
+                                    {item.remarks && <span className="text-[9px] italic text-muted-foreground line-clamp-1">"{item.remarks}"</span>}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div className="font-mono font-bold text-sm text-primary">{item.plannedQuantity}</div>
+                              <div className="text-[10px] text-muted-foreground uppercase font-medium">{item.unit}</div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {item.status === 'Approved' ? (
                                 <>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Approved' })}>
-                                    <CheckCircle2 className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Rejected' })}>
-                                    <XCircle className="h-4 w-4" />
-                                  </Button>
+                                  <div className="font-mono font-bold text-sm text-emerald-700">{item.approvedQuantity || item.plannedQuantity}</div>
+                                  <div className="text-[10px] text-emerald-600 uppercase font-medium">{item.unit}</div>
                                 </>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
                               )}
-                              {(isAdmin || (isManager && item.status === 'Pending')) && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'project_boms', item.id))}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                            </TableCell>
+                            <TableCell className="text-right px-6">
+                              <div className="flex justify-end items-center gap-1">
+                                {isAdmin && item.status === 'Pending' && (
+                                  <>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Approved' })}>
+                                      <CheckCircle2 className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Rejected' })}>
+                                      <XCircle className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
+                                {(isAdmin || (isManager && item.status === 'Pending')) && (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'project_boms', item.id))}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {expandedBomRows.has(item.id) && item.subItems && (
+                            <TableRow className="bg-primary/[0.02]">
+                              <TableCell colSpan={6} className="p-0 border-b">
+                                <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Layers className="h-3.5 w-3.5 text-primary" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">Component Breakdown for {item.itemName}</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                    {item.subItems.map((sub, sIdx) => (
+                                      <div key={sIdx} className="p-3 bg-background border border-primary/5 rounded-sm flex flex-col gap-1">
+                                        <span className="text-xs font-bold">{sub.name}</span>
+                                        <div className="flex items-center justify-between text-[10px]">
+                                          <span className="text-muted-foreground uppercase font-medium">Per Set: {sub.quantityPerSet} {sub.unit}</span>
+                                          <span className="text-primary font-black uppercase">Total: {(sub.quantityPerSet * (item.approvedQuantity || item.plannedQuantity)).toFixed(2)} {sub.unit}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
                       )) : (
                         <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">Registry empty.</TableCell></TableRow>
                       )}
@@ -772,22 +833,23 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
               <CardHeader className="bg-muted/5 border-b py-4">
                 <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                  <Warehouse className="h-4 w-4 text-primary" /> Live On-Site Stock
+                  <Warehouse className="h-4 w-4 text-primary" /> Live On-Site Component Stock
                 </CardTitle>
+                <CardDescription>Individual tracking for materials and sub-components.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-muted/30">
                       <TableRow>
-                        <TableHead className="px-6 min-w-[200px]">Material</TableHead>
+                        <TableHead className="px-6 min-w-[200px]">Material / Component</TableHead>
                         <TableHead className="text-center">Availability</TableHead>
                         <TableHead>Last Audit</TableHead>
                         <TableHead className="text-right px-6">Manual Adjust</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {inventory && inventory.length > 0 ? inventory.map(item => (
+                      {inventory && inventory.length > 0 ? inventory.sort((a, b) => a.itemName.localeCompare(b.itemName)).map(item => (
                         <TableRow key={item.id} className="hover:bg-muted/5">
                           <TableCell className="px-6 py-4 font-bold text-sm">{item.itemName}</TableCell>
                           <TableCell className="text-center">
@@ -808,7 +870,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           </TableCell>
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">No stock data available.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">No stock data available. Component-level stock appears as material movements are recorded.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -854,10 +916,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <div className="flex items-center">Vendor <POSortIcon column="supplier" /></div>
                         </TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('date')}>
-                          <div className="flex items-center">Date <POSortIcon column="date" /></div>
+                          <div className="flex items-center">Date <SortIcon column="date" /></div>
                         </TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('status')}>
-                          <div className="flex items-center">Status <POSortIcon column="status" /></div>
+                          <div className="flex items-center">Status <SortIcon column="status" /></div>
                         </TableHead>
                         <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}>
                           <div className="flex items-center justify-end">Total Value <POSortIcon column="total" /></div>
@@ -1138,7 +1200,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               disabled={isActionProcessing} 
               className={cn("rounded-sm font-black h-11 px-8 uppercase text-[10px] tracking-widest", bomActionState?.type === 'Approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
               onClick={() => {
-                const remarks = (document.getElementById('bom-remarks') as HTMLTextAreaElement)?.value || "";
+                const remarks = (document.getElementById('audit-remarks') as HTMLTextAreaElement)?.value || "";
                 const approvedQty = bomActionState?.type === 'Approved' 
                   ? parseFloat((document.getElementById('bom-approved-qty') as HTMLInputElement)?.value || String(bomActionState.item.plannedQuantity))
                   : undefined;

@@ -10,14 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment, query, where, getDocs, setDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, MessageCircle, FileUp, FileText, X, MapPin, Hash, Smartphone } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, MessageCircle, FileUp, FileText, X, MapPin, Hash, Smartphone, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
@@ -29,7 +29,8 @@ import { useRouter } from "next/navigation";
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
   quantity: z.coerce.number().min(0.01, "Quantity must be greater than 0"),
-  unit: z.enum(["Numbers", "Kilograms", "Liters", "Meters", "Sets"], { required_error: "Unit is required" }),
+  unit: z.string().min(1, "Unit is required"),
+  parentSetName: z.string().optional(),
 });
 
 const movementSchema = z.object({
@@ -69,6 +70,20 @@ type UserProfile = {
   pointsMultiplier?: number;
 };
 
+type BoMItem = {
+  id: string;
+  itemName: string;
+  unit: string;
+  subItems?: { name: string; quantityPerSet: number; unit: string }[];
+};
+
+type MasterItem = {
+  id: string;
+  name: string;
+  unit: string;
+  subItems?: { name: string; quantityPerSet: number; unit: string }[];
+};
+
 type RewardSettings = {
   movementEngineer?: number;
   movementManager?: number;
@@ -98,34 +113,6 @@ export default function RecordMovementPage() {
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
 
-  const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
-  const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
-
-  // Fetch team members for managers to aggregate sites
-  const teamQuery = useMemoFirebase(() => {
-    if (!isManager || !user) return null;
-    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
-  }, [firestore, user, isManager]);
-  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
-
-  const accessibleSites = React.useMemo(() => {
-    if (!allSites || !userProfile) return [];
-    if (isAdmin) {
-        return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-    }
-    
-    // Aggregated site visibility for Managers
-    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
-    if (isManager && teamMembers) {
-      teamMembers.forEach(member => {
-        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
-      });
-    }
-
-    const filtered = allSites.filter(s => assignedIds.has(s.id));
-    return Array.from(new Map(filtered.map(s => [s.name, s])).values());
-  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
-
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   
@@ -137,9 +124,14 @@ export default function RecordMovementPage() {
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
-  const [submittedData, setSubmittedData] = React.useState<z.infer<typeof movementSchema> & { attachments?: any[] } | null>(null);
-  
+  const [submittedData, setSubmittedData] = React.useState<any>(null);
   const [invoiceFiles, setInvoiceFiles] = React.useState<File[]>([]);
+
+  // BoM and Master Items for lookup
+  const siteNameValue = React.useRef("");
+  const [bomItems, setBomItems] = React.useState<BoMItem[]>([]);
+  const masterItemsQuery = useMemoFirebase(() => collection(firestore, 'master_inventory'), [firestore]);
+  const { data: masterItems } = useCollection<MasterItem>(masterItemsQuery);
 
   const form = useForm<z.infer<typeof movementSchema>>({
     resolver: zodResolver(movementSchema),
@@ -161,112 +153,120 @@ export default function RecordMovementPage() {
   const movementType = form.watch("movementType");
   const sourceOrDestinationType = form.watch("sourceOrDestinationType");
   const sourceOrDestinationValue = form.watch("sourceOrDestination");
-  const siteNameValue = form.watch("siteName");
+  const currentSiteName = form.watch("siteName");
 
-  const selectedSite = React.useMemo(() => {
-    return accessibleSites.find(s => s.name === siteNameValue);
-  }, [accessibleSites, siteNameValue]);
-
-  const selectedTarget = React.useMemo(() => {
-    if (!sourceOrDestinationValue) return null;
-    if (sourceOrDestinationType === 'Site') {
-      return allSites?.find(s => s.name === sourceOrDestinationValue);
-    } else {
-      return allSuppliers?.find(s => s.name === sourceOrDestinationValue);
+  // Fetch BoM for current site to offer component selection
+  React.useEffect(() => {
+    if (currentSiteName && currentSiteName !== siteNameValue.current) {
+      siteNameValue.current = currentSiteName;
+      const fetchBom = async () => {
+        const q = query(collection(firestore, 'project_boms'), where('siteName', '==', currentSiteName));
+        const snap = await getDocs(q);
+        setBomItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as BoMItem)));
+      };
+      fetchBom();
     }
-  }, [sourceOrDestinationValue, sourceOrDestinationType, allSites, allSuppliers]);
+  }, [currentSiteName, firestore]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setInvoiceFiles(prev => [...prev, ...Array.from(e.target.files!)]);
-    }
-  };
+  const [openItemPopoverIndex, setOpenItemPopoverIndex] = React.useState<number | null>(null);
+  const [itemSearchQuery, setItemSearchQuery] = React.useState("");
 
-  const removeFile = (index: number) => {
-    setInvoiceFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const uploadFiles = async (userId: string): Promise<any[]> => {
-    const storage = getStorage(firebaseApp);
-    const results: any[] = [];
-    const timestamp = Date.now();
-
-    for (const file of invoiceFiles) {
-      const storagePath = `uploads/${userId}/movements/${timestamp}-${file.name.replace(/\s+/g, '_')}`;
-      const storageRef = ref(storage, storagePath);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-
-      const downloadUrl = await new Promise<string>((resolve, reject) => {
-        uploadTask.on('state_changed', null, reject, async () => {
-          const url = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve(url);
+  const filteredLookupItems = React.useMemo(() => {
+    const list: { name: string; unit: string; parentSet?: string }[] = [];
+    
+    // Add items from site BoM (including breakdown if it's a Set)
+    bomItems.forEach(item => {
+      if (item.subItems && item.subItems.length > 0) {
+        item.subItems.forEach(sub => {
+          list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, parentSet: item.itemName });
         });
-      });
+      } else {
+        list.push({ name: item.itemName, unit: item.unit });
+      }
+    });
 
-      results.push({
-        url: downloadUrl,
-        name: file.name,
-        contentType: file.type,
-        timestamp: new Date().toISOString()
-      });
-    }
-    return results;
-  };
+    // Add master items if not already in list
+    masterItems?.forEach(item => {
+      if (!list.find(l => l.name === item.name)) {
+        if (item.subItems && item.subItems.length > 0) {
+          item.subItems.forEach(sub => {
+            list.push({ name: `${item.name} - ${sub.name}`, unit: sub.unit, parentSet: item.name });
+          });
+        } else {
+          list.push({ name: item.name, unit: item.unit });
+        }
+      }
+    });
+
+    return list.filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
+  }, [bomItems, masterItems, itemSearchQuery]);
 
   const onSubmit = async (values: z.infer<typeof movementSchema>) => {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
     try {
-      const attachments = await uploadFiles(user.uid);
-      const siteId = accessibleSites.find(s => s.name === values.siteName)?.id;
+      const storage = getStorage(firebaseApp);
+      const attachments: any[] = [];
+      
+      // Upload invoices
+      for (const file of invoiceFiles) {
+        const path = `movements/${user.uid}/${Date.now()}_${file.name}`;
+        const sRef = ref(storage, path);
+        await uploadBytesResumable(sRef, file);
+        const url = await getDownloadURL(sRef);
+        attachments.push({ url, name: file.name, contentType: file.type });
+      }
 
-      const promises = values.items.map(item => {
-        return addDocumentNonBlocking(collection(firestore, 'material_movements'), {
-          siteId: siteId || null,
-          siteName: values.siteName,
-          movementType: values.movementType,
-          sourceOrDestinationType: values.sourceOrDestinationType,
-          sourceOrDestination: values.sourceOrDestination,
-          movementDate: values.movementDate,
-          ...item,
+      const siteId = allSites?.find(s => s.name === values.siteName)?.id;
+
+      // 1. Log each movement and update specific inventory components
+      for (const item of values.items) {
+        await addDocumentNonBlocking(collection(firestore, 'material_movements'), {
+          ...values,
+          itemName: item.itemName,
+          quantity: item.quantity,
+          unit: item.unit,
+          parentSetName: item.parentSetName || null,
+          items: [item], // Compatibility with list view
           attachments,
           userId: user.uid,
-          userName: userProfile?.username || user.email,
-          siteManagerId: userProfile?.siteManagerId || null,
-          createdAt: serverTimestamp(),
+          userName: userProfile.username,
+          siteId: siteId || null,
+          createdAt: serverTimestamp()
         });
-      });
 
-      await Promise.all(promises);
+        // 2. Update Component Inventory
+        const invQuery = query(
+          collection(firestore, 'project_inventory'),
+          where('siteId', '==', siteId),
+          where('itemName', '==', item.itemName)
+        );
+        const invSnap = await getDocs(invQuery);
+        const adjustment = values.movementType === 'Inward' ? item.quantity : -item.quantity;
 
-      const rateEngineer = rewardSettings?.movementEngineer ?? 0.1;
-      const rateManager = rewardSettings?.movementManager ?? 0.05;
-      const multiplier = userProfile.pointsMultiplier || 1;
-      
-      const engineerPoints = rateEngineer * values.items.length * multiplier;
-      updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
-        totalPoints: increment(engineerPoints)
-      });
-
-      if (userProfile.siteManagerId && userProfile.siteManagerId !== user.uid) {
-        const managerPoints = rateManager * values.items.length;
-        updateDocumentNonBlocking(doc(firestore, 'users', userProfile.siteManagerId), {
-            totalPoints: increment(managerPoints)
-        });
+        if (!invSnap.empty) {
+          const invDoc = invSnap.docs[0];
+          updateDocumentNonBlocking(doc(firestore, 'project_inventory', invDoc.id), {
+            stockLevel: increment(adjustment),
+            lastUpdated: serverTimestamp()
+          });
+        } else {
+          // Create new record for this component
+          const newInvRef = doc(collection(firestore, 'project_inventory'));
+          await setDoc(newInvRef, {
+            siteId,
+            siteName: values.siteName,
+            itemName: item.itemName,
+            stockLevel: Math.max(0, adjustment),
+            unit: item.unit,
+            lastUpdated: serverTimestamp()
+          });
+        }
       }
-      
+
       setSubmittedData({ ...values, attachments });
       setIsSubmitted(true);
-      toast({ title: "Success", description: `${values.items.length} movement logs recorded. Points updated.` });
-      form.reset({ 
-        siteName: "", 
-        movementType: values.movementType,
-        sourceOrDestinationType: "Supplier",
-        sourceOrDestination: "",
-        movementDate: format(new Date(), 'yyyy-MM-dd'),
-        items: [{ itemName: "", quantity: 0, unit: "Numbers" }] 
-      });
-      setInvoiceFiles([]);
+      toast({ title: "Movement Recorded", description: "Log entries generated and component stock updated." });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
@@ -274,20 +274,7 @@ export default function RecordMovementPage() {
     }
   };
 
-  const triggerWhatsApp = () => {
-    if (!submittedData) return;
-    const itemsList = submittedData.items.map(item => `- ${item.itemName}: ${item.quantity} ${item.unit}`).join('\n');
-    const sourceLabel = submittedData.movementType === 'Inward' ? 'From' : 'To';
-    const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${submittedData.siteName}\n*Date:* ${format(new Date(submittedData.movementDate), 'dd MMM yyyy')}\n*Type:* ${submittedData.movementType} (${sourceLabel} ${submittedData.sourceOrDestinationType}: ${submittedData.sourceOrDestination})\n*Submitted By:* ${userProfile?.username || user?.email}\n\n*Items Recorded:*\n${itemsList}${submittedData.attachments?.length ? `\n\n_Note: Invoices/Photos uploaded to system._` : ''}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
-  };
-
-  const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
-  
-  const allSitesList = allSites ? Array.from(new Map(allSites.map(s => [s.name, s])).values()) : [];
-  const filteredAllSites = allSitesList.filter(s => s.name.toLowerCase().includes(targetSiteSearchQuery.toLowerCase()));
-
+  const filteredSites = allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())) || [];
   const filteredSuppliers = allSuppliers?.filter(s => s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())) || [];
 
   if (isSubmitted && submittedData) {
@@ -300,31 +287,14 @@ export default function RecordMovementPage() {
                 <CheckCircle2 className="h-12 w-12 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold">Movement Recorded</CardTitle>
+            <CardTitle className="text-2xl font-bold">Log Generated</CardTitle>
             <CardDescription className="text-base">
-              {submittedData.items.length} item(s) logged for <strong className="text-primary">{submittedData.siteName}</strong>.
+              {submittedData.items.length} component(s) recorded at <strong>{submittedData.siteName}</strong>.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button 
-              className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm shadow-md" 
-              onClick={triggerWhatsApp}
-            >
-              <MessageCircle className="mr-2 h-5 w-5" />
-              Push to WhatsApp
-            </Button>
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-11 rounded-sm" onClick={() => router.push('/movements/list')}>
-                View Log Data
-              </Button>
-              <Button variant="secondary" className="h-11 rounded-sm" onClick={() => {
-                setIsSubmitted(false);
-                setSubmittedData(null);
-                form.reset();
-              }}>
-                Record New
-              </Button>
-            </div>
+            <Button variant="outline" className="w-full h-11" onClick={() => router.push('/movements/list')}>View Repository</Button>
+            <Button className="w-full h-11" onClick={() => { setIsSubmitted(false); form.reset(); setInvoiceFiles([]); }}>Record Another</Button>
           </CardContent>
         </Card>
       </div>
@@ -335,15 +305,15 @@ export default function RecordMovementPage() {
     <div className="space-y-8 max-w-4xl mx-auto">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2 uppercase">
-          <ArrowLeftRight className="h-8 w-8" /> Record Movement
+          <ArrowLeftRight className="h-8 w-8" /> Record Site Movement
         </h1>
-        <p className="text-muted-foreground">Log inward or outward material movement at site.</p>
+        <p className="text-muted-foreground">Log materials or set-components entering/leaving site.</p>
       </div>
 
       <Card className="shadow-md border-primary/10 rounded-sm">
         <CardHeader>
-          <CardTitle>Material Movement Form</CardTitle>
-          <CardDescription>Select site and record the movement details. You can also upload invoices.</CardDescription>
+          <CardTitle>Movement Entry Form</CardTitle>
+          <CardDescription>Select material components. If a set is delivered in parts, log the individual components here.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -351,15 +321,11 @@ export default function RecordMovementPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="siteName" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Current Site</FormLabel>
+                    <FormLabel>Project Site</FormLabel>
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button 
-                            variant="outline" 
-                            role="combobox" 
-                            className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}
-                          >
+                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
                             {field.value || "Select site..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -368,29 +334,15 @@ export default function RecordMovementPage() {
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input 
-                            placeholder="Search sites..." 
-                            className="h-9 w-full border-none focus-visible:ring-0 px-0" 
-                            value={siteSearchQuery} 
-                            onChange={(e) => setSiteSearchQuery(e.target.value)}
-                            onKeyDown={(e) => e.stopPropagation()}
-                          />
+                          <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} />
                         </div>
                         <ScrollArea className="h-[200px]">
-                          {filteredSites.length > 0 ? filteredSites.map((site) => (
-                            <Button 
-                                key={site.id} 
-                                type="button" 
-                                variant="ghost" 
-                                className="w-full justify-start font-normal text-left" 
-                                onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4 shrink-0", site.name === field.value ? "opacity-100" : "opacity-0")} />
-                              <span className="truncate">{site.name}</span>
+                          {filteredSites.map(site => (
+                            <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />
+                              {site.name}
                             </Button>
-                          )) : (
-                            <div className="p-4 text-center text-sm text-muted-foreground">No sites found.</div>
-                          )}
+                          ))}
                         </ScrollArea>
                       </PopoverContent>
                     </Popover>
@@ -401,12 +353,7 @@ export default function RecordMovementPage() {
                 <FormField control={form.control} name="movementDate" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Movement Date</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input type="date" {...field} className="rounded-sm pr-10" />
-                        <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      </div>
-                    </FormControl>
+                    <FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -415,14 +362,10 @@ export default function RecordMovementPage() {
                   <FormItem>
                     <FormLabel>Movement Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="rounded-sm">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                      </FormControl>
+                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="Inward">Inward (Stock Coming In)</SelectItem>
-                        <SelectItem value="Outward">Outward (Stock Going Out)</SelectItem>
+                        <SelectItem value="Inward">Inward (Entering Site)</SelectItem>
+                        <SelectItem value="Outward">Outward (Leaving Site)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -432,348 +375,155 @@ export default function RecordMovementPage() {
                 <div className="space-y-4">
                   <FormField control={form.control} name="sourceOrDestinationType" render={({ field }) => (
                     <FormItem className="space-y-3">
-                      <FormLabel>{movementType === 'Inward' ? 'Inward From' : 'Outward To'}</FormLabel>
+                      <FormLabel>{movementType === 'Inward' ? 'Received From' : 'Dispatched To'}</FormLabel>
                       <FormControl>
-                        <RadioGroup
-                          onValueChange={(val) => {
-                            field.onChange(val);
-                            form.setValue("sourceOrDestination", "");
-                          }}
-                          defaultValue={field.value}
-                          className="flex gap-4"
-                        >
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl><RadioGroupItem value="Supplier" /></FormControl>
-                            <FormLabel className="font-normal cursor-pointer flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Supplier</FormLabel>
-                          </FormItem>
-                          <FormItem className="flex items-center space-x-2 space-y-0">
-                            <FormControl><RadioGroupItem value="Site" /></FormControl>
-                            <FormLabel className="font-normal cursor-pointer flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Project Site</FormLabel>
-                          </FormItem>
+                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="Supplier" id="src-supp" /><Label htmlFor="src-supp">Supplier</Label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id="src-site" /><Label htmlFor="src-site">Project Site</Label></div>
                         </RadioGroup>
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )} />
 
                   <FormField control={form.control} name="sourceOrDestination" render={({ field }) => (
                     <FormItem>
-                      <FormControl>
-                        {sourceOrDestinationType === 'Site' ? (
-                          <Popover open={isTargetSitePopoverOpen} onOpenChange={setIsTargetSitePopoverOpen}>
-                            <PopoverTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                role="combobox" 
-                                className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}
-                              >
-                                {field.value || "Select target site..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                              <div className="flex items-center border-b px-3">
-                                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                <Input 
-                                  placeholder="Search sites..." 
-                                  className="h-9 w-full border-none focus-visible:ring-0 px-0" 
-                                  value={targetSiteSearchQuery} 
-                                  onChange={(e) => setTargetSiteSearchQuery(e.target.value)}
-                                  onKeyDown={(e) => e.stopPropagation()}
-                                />
-                              </div>
-                              <ScrollArea className="h-[200px]">
-                                {filteredAllSites.length > 0 ? filteredAllSites.map((site) => (
-                                  <Button 
-                                      key={site.id} 
-                                      type="button" 
-                                      variant="ghost" 
-                                      className="w-full justify-start font-normal text-left" 
-                                      onClick={() => { field.onChange(site.name); setIsTargetSitePopoverOpen(false); }}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4 shrink-0", site.name === field.value ? "opacity-100" : "opacity-0")} />
-                                    <span className="truncate">{site.name}</span>
-                                  </Button>
-                                )) : (
-                                  <div className="p-4 text-center text-sm text-muted-foreground">No sites found.</div>
-                                )}
-                              </ScrollArea>
-                            </PopoverContent>
-                          </Popover>
-                        ) : (
-                          <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
-                            <PopoverTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                role="combobox" 
-                                className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}
-                              >
+                      {sourceOrDestinationType === 'Supplier' ? (
+                        <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button variant="outline" className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>
                                 {field.value || "Select supplier..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                              <div className="flex items-center border-b px-3">
-                                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                <Input 
-                                  placeholder="Search suppliers..." 
-                                  className="h-9 w-full border-none focus-visible:ring-0 px-0" 
-                                  value={supplierSearchQuery} 
-                                  onChange={(e) => setSupplierSearchQuery(e.target.value)}
-                                  onKeyDown={(e) => e.stopPropagation()}
-                                />
-                              </div>
-                              <ScrollArea className="h-[200px]">
-                                {filteredSuppliers.length > 0 ? filteredSuppliers.map((supplier) => (
-                                  <Button 
-                                      key={supplier.id} 
-                                      type="button" 
-                                      variant="ghost" 
-                                      className="w-full justify-start font-normal text-left" 
-                                      onClick={() => { field.onChange(supplier.name); setIsSupplierPopoverOpen(false); }}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4 shrink-0", supplier.name === field.value ? "opacity-100" : "opacity-0")} />
-                                    <span className="truncate">{supplier.name}</span>
-                                  </Button>
-                                )) : (
-                                  <div className="p-4 text-center text-sm text-muted-foreground">No suppliers found.</div>
-                                )}
-                              </ScrollArea>
-                            </PopoverContent>
-                          </Popover>
-                        )}
-                      </FormControl>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            <div className="flex items-center border-b px-3">
+                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                              <Input placeholder="Search suppliers..." className="h-9 border-none" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
+                            </div>
+                            <ScrollArea className="h-[200px]">
+                              {filteredSuppliers.map(s => (
+                                <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}>
+                                  <Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />
+                                  {s.name}
+                                </Button>
+                              ))}
+                            </ScrollArea>
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <FormControl><Input placeholder="Site name or address..." {...field} className="h-11 rounded-sm" /></FormControl>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )} />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  {selectedSite ? (
-                    <div className="p-4 bg-primary/5 rounded-sm border border-primary/10 text-xs animate-in fade-in duration-300 h-full">
-                      <p className="font-bold text-primary uppercase tracking-widest text-[9px] mb-3 flex items-center gap-1.5">
-                        <MapPin className="h-3 w-3" /> {movementType === 'Inward' ? 'MOVEMENT TO' : 'MOVEMENT FROM'}
-                      </p>
-                      <div className="grid grid-cols-2 gap-y-3 gap-x-2">
-                        <div>
-                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Company</p>
-                          <p className="font-bold truncate" title={selectedSite.projectCompany}>{selectedSite.projectCompany}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Site ID</p>
-                          <p className="font-mono">{selectedSite.id.slice(0, 8)}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">AC Capacity (MW)</p>
-                          <p className="font-bold">{formatCapacity(selectedSite.acCapacity)}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">DC Capacity (MWp)</p>
-                          <p className="font-bold">{formatCapacity(selectedSite.dcCapacity)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="h-full border border-dashed rounded-sm flex items-center justify-center p-8 bg-muted/5">
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold text-center">Select current site to view details</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  {selectedTarget ? (
-                    <div className="p-4 bg-amber-500/5 rounded-sm border border-amber-500/10 text-xs animate-in fade-in duration-300 h-full">
-                      <p className="font-bold text-amber-700 uppercase tracking-widest text-[9px] mb-3 flex items-center gap-1.5">
-                        {sourceOrDestinationType === 'Supplier' ? <Truck className="h-3 w-3" /> : <Building2 className="h-3 w-3" />}
-                        {movementType === 'Inward' ? 'MOVEMENT FROM' : 'MOVEMENT TO'}
-                      </p>
-                      {sourceOrDestinationType === 'Supplier' ? (
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">GSTIN</p>
-                              <p className="font-mono font-bold flex items-center gap-1 uppercase"><Hash className="h-2.5 w-2.5" /> {(selectedTarget as Supplier).gstin.toUpperCase()}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Mobile</p>
-                              <p className="font-bold flex items-center gap-1"><Smartphone className="h-2.5 w-2.5" /> {(selectedTarget as Supplier).mobile}</p>
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Address</p>
-                            <p className="font-medium leading-relaxed">{(selectedTarget as Supplier).address}</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-y-3 gap-x-2">
-                          <div>
-                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Company</p>
-                            <p className="font-bold truncate">{(selectedTarget as Site).projectCompany}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">Site ID</p>
-                            <p className="font-mono">{(selectedTarget as Site).id.slice(0, 8)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">AC Capacity (MW)</p>
-                            <p className="font-bold">{formatCapacity((selectedTarget as Site).acCapacity)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground uppercase font-black text-[8px] tracking-tighter">DC Capacity (MWp)</p>
-                            <p className="font-bold">{formatCapacity((selectedTarget as Site).dcCapacity)}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="h-full border border-dashed rounded-sm flex items-center justify-center p-8 bg-muted/5">
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold text-center">
-                        Select {sourceOrDestinationType === 'Supplier' ? 'supplier' : 'target site'} to view info
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
               <div className="space-y-4">
-                <Label className="flex items-center gap-2 font-bold uppercase text-[10px] tracking-widest text-muted-foreground">
-                  <FileUp className="h-3 w-3" /> Invoice / Delivery Challan
+                <Label className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                  <FileUp className="h-4 w-4 text-primary" /> Invoice / Photo Evidence
                 </Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <input 
-                      type="file" 
-                      multiple 
-                      accept="image/*,application/pdf"
-                      onChange={handleFileChange}
-                      className="hidden"
-                      id="invoice-upload"
-                    />
-                    <Button 
-                      asChild 
-                      variant="outline" 
-                      className="w-full border-dashed h-20 flex flex-col items-center justify-center gap-2 hover:bg-primary/5 transition-all"
-                    >
-                      <label htmlFor="invoice-upload" className="cursor-pointer">
-                        <FileUp className="h-6 w-6 text-primary" />
-                        <span className="text-xs font-bold uppercase tracking-tight">Upload or Capture Invoice</span>
-                      </label>
-                    </Button>
+                <Input type="file" multiple accept="image/*,application/pdf" onChange={e => e.target.files && setInvoiceFiles(prev => [...prev, ...Array.from(e.target.files!)])} className="rounded-sm border-dashed" />
+                {invoiceFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {invoiceFiles.map((f, i) => (
+                      <Badge key={i} variant="secondary" className="gap-2 h-8 rounded-sm">
+                        <FileText className="h-3 w-3" /> {f.name}
+                        <X className="h-3 w-3 cursor-pointer" onClick={() => setInvoiceFiles(prev => prev.filter((_, idx) => idx !== i))} />
+                      </Badge>
+                    ))}
                   </div>
-                  
-                  {invoiceFiles.length > 0 && (
-                    <div className="border rounded-sm bg-muted/5 p-2 overflow-y-auto max-h-20 space-y-1">
-                      {invoiceFiles.map((file, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-background p-1.5 rounded-sm border text-[10px]">
-                          <div className="flex items-center gap-2 truncate">
-                            {file.type.includes('pdf') ? <FileText className="h-3 w-3 text-red-500" /> : <CheckCircle2 className="h-3 w-3 text-green-500" />}
-                            <span className="truncate">{file.name}</span>
-                          </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-5 w-5 text-destructive" 
-                            onClick={() => removeFile(idx)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
 
               <Separator />
 
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                        <ListPlus className="h-5 w-5 text-primary" /> Item List
-                    </h3>
-                    <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })}
-                        className="rounded-sm border-primary text-primary hover:bg-primary/5"
-                    >
-                        <Plus className="mr-2 h-4 w-4" /> Add Another Item
-                    </Button>
+                  <h3 className="text-lg font-semibold flex items-center gap-2"><ListPlus className="h-5 w-5 text-primary" /> Component List</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="rounded-sm border-primary text-primary">
+                    <Plus className="mr-2 h-4 w-4" /> Add Item
+                  </Button>
                 </div>
 
-                {fields.map((field, index) => (
-                  <Card key={field.id} className="relative bg-muted/10 border-dashed rounded-sm overflow-hidden">
-                    {fields.length > 1 && (
-                        <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="icon" 
-                            className="absolute top-2 right-2 h-8 w-8 text-destructive hover:bg-destructive/10"
-                            onClick={() => remove(index)}
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    )}
-                    <CardContent className="pt-6 space-y-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Badge variant="outline" className="rounded-sm font-mono text-[10px]">Item #{index + 1}</Badge>
-                        </div>
-                        
-                        <FormField control={form.control} name={`items.${index}.itemName`} render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Item Name</FormLabel>
+                <div className="space-y-4">
+                  {fields.map((field, index) => (
+                    <Card key={field.id} className="relative bg-muted/10 border-dashed rounded-sm">
+                      <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 text-destructive" onClick={() => remove(index)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <CardContent className="pt-6 space-y-4">
+                        <FormField control={form.control} name={`items.${index}.itemName`} render={({ field: itemField }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Select Component</FormLabel>
+                            <Popover open={openItemPopoverIndex === index} onOpenChange={o => setOpenItemPopoverIndex(o ? index : null)}>
+                              <PopoverTrigger asChild>
                                 <FormControl>
-                                    <Input 
-                                        placeholder="Enter item name..." 
-                                        {...field} 
-                                        className="rounded-sm bg-background" 
-                                    />
+                                  <Button variant="outline" className={cn("w-full justify-between h-10 bg-background", !itemField.value && "text-muted-foreground")}>
+                                    <span className="truncate">{itemField.value || "Select material or part..."}</span>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
                                 </FormControl>
-                                <FormMessage />
-                            </FormItem>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[400px] p-0" align="start">
+                                <div className="flex items-center border-b px-3">
+                                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                  <Input placeholder="Search inventory..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} />
+                                </div>
+                                <ScrollArea className="h-[250px]">
+                                  <div className="p-1">
+                                    {filteredLookupItems.map((lookup, lIdx) => (
+                                      <Button
+                                        key={lIdx}
+                                        type="button"
+                                        variant="ghost"
+                                        className="w-full justify-start h-12 text-xs mb-0.5"
+                                        onClick={() => {
+                                          itemField.onChange(lookup.name);
+                                          form.setValue(`items.${index}.unit`, lookup.unit);
+                                          form.setValue(`items.${index}.parentSetName`, lookup.parentSet || "");
+                                          setOpenItemPopoverIndex(null);
+                                          setItemSearchQuery("");
+                                        }}
+                                      >
+                                        <div className="flex flex-col items-start overflow-hidden text-left">
+                                          <span className="font-bold truncate w-full">{lookup.name}</span>
+                                          <span className="text-[10px] text-muted-foreground uppercase">{lookup.parentSet ? `Part of: ${lookup.parentSet}` : 'Primary Material'}</span>
+                                        </div>
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </ScrollArea>
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
                         )} />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Quantity</FormLabel>
-                                    <FormControl>
-                                        <Input type="number" step="0.01" placeholder="0.00" {...field} className="rounded-sm bg-background" />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-
-                            <FormField control={form.control} name={`items.${index}.unit`} render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Unit</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger className="rounded-sm bg-background">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {["Numbers", "Kilograms", "Liters", "Meters", "Sets"].map(u => (
-                                                <SelectItem key={u} value={u}>{u}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Quantity</FormLabel>
+                              <FormControl><Input type="number" step="0.01" {...field} className="h-10 bg-background font-mono" /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormItem>
+                            <FormLabel>Unit</FormLabel>
+                            <Input readOnly value={form.watch(`items.${index}.unit`) || "Numbers"} className="h-10 bg-muted/20 border-primary/10 cursor-not-allowed font-bold" />
+                          </FormItem>
                         </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
 
               <div className="flex justify-end gap-4 pt-6 border-t">
-                <Button type="submit" className="min-w-[200px] h-12 rounded-sm text-lg font-semibold" disabled={isSubmitting}>
-                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Recording...</> : "Record Movement"}
+                <Button type="submit" className="min-w-[200px] h-12 text-lg font-semibold" disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Recording...</> : "Record Logs"}
                 </Button>
               </div>
             </form>
