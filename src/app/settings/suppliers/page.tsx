@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -117,18 +118,18 @@ export default function SuppliersManagementPage() {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['Name', 'GSTIN', 'Mobile', 'Address', 'Email'];
-    const row = ['Sample Supplier Ltd', '27AAAAA0000A1Z5', '9876543210', '123 Solar Street, Pune', 'info@samplesolar.com'];
-    const csvContent = [headers.join(','), row.join(',')].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'supplier_import_template.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const ws = XLSX.utils.json_to_sheet([
+      { 
+        'Name': 'Sample Supplier Ltd', 
+        'GSTIN': '27AAAAA0000A1Z5', 
+        'Mobile': '9876543210', 
+        'Address': '123 Solar Street, Pune, Maharashtra', 
+        'Email': 'info@samplesolar.com' 
+      }
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "Supplier_Import_Template.xlsx");
   };
 
   const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,38 +140,40 @@ export default function SuppliersManagementPage() {
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const text = event.target?.result as string;
-        const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-        if (lines.length < 2) {
-          toast({ variant: 'destructive', title: 'Import Failed', description: 'The file is empty or missing data rows.' });
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+        if (json.length === 0) {
+          toast({ variant: 'destructive', title: 'Import Failed', description: 'The file is empty.' });
           return;
         }
 
-        const dataRows = lines.slice(1);
         const batch = writeBatch(firestore);
         let count = 0;
         let errors = 0;
 
-        dataRows.forEach((line) => {
-          const columns = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+        json.forEach((row) => {
+          const name = row['Name'] || row['name'];
+          const gstin = row['GSTIN'] || row['gstin'];
+          const mobile = row['Mobile'] || row['mobile'];
+          const address = row['Address'] || row['address'];
+          const email = row['Email'] || row['email'];
           
-          if (columns.length >= 4) {
-            const [name, gstin, mobile, address, email] = columns;
-            
-            if (name && gstin.length === 15 && mobile.length >= 10) {
-              const newDocRef = doc(collection(firestore, 'suppliers'));
-              batch.set(newDocRef, {
-                name,
-                gstin: gstin.toUpperCase(),
-                mobile,
-                address: address || 'N/A',
-                email: email || '',
-                createdAt: serverTimestamp(),
-              });
-              count++;
-            } else {
-              errors++;
-            }
+          // Basic validation for required fields
+          if (name && gstin && String(gstin).trim().length === 15) {
+            const newDocRef = doc(collection(firestore, 'suppliers'));
+            batch.set(newDocRef, {
+              name: String(name).trim(),
+              gstin: String(gstin).trim().toUpperCase(),
+              mobile: String(mobile || 'N/A').trim(),
+              address: String(address || 'N/A').trim(),
+              email: String(email || '').trim(),
+              createdAt: serverTimestamp(),
+            });
+            count++;
           } else {
             errors++;
           }
@@ -179,8 +182,9 @@ export default function SuppliersManagementPage() {
         if (count > 0) {
           await batch.commit();
           toast({ 
+            variant: 'success', 
             title: 'Import Successful', 
-            description: `Successfully imported ${count} suppliers. ${errors > 0 ? `${errors} rows skipped due to errors.` : ''}` 
+            description: `Successfully imported ${count} suppliers. ${errors > 0 ? `${errors} rows were invalid.` : ''}` 
           });
         } else {
           toast({ variant: 'destructive', title: 'Import Failed', description: 'No valid data rows found in the file.' });
@@ -192,7 +196,7 @@ export default function SuppliersManagementPage() {
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   };
 
   if (isUserLoading || isProfileLoading || suppliersLoading) {
@@ -225,7 +229,7 @@ export default function SuppliersManagementPage() {
           <div className="relative">
             <input 
               type="file" 
-              accept=".csv" 
+              accept=".xlsx,.xls,.csv" 
               className="hidden" 
               ref={fileInputRef} 
               onChange={handleBulkImport} 
