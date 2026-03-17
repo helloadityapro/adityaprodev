@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -55,7 +54,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
-import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const subItemSchema = z.object({
   name: z.string().min(1, 'Part name is required.'),
