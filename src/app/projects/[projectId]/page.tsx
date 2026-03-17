@@ -102,6 +102,7 @@ type MasterItem = {
   category: string;
   make: string;
   unit: string;
+  description?: string;
 };
 
 const formatTimestamp = (ts: any) => {
@@ -494,13 +495,20 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     </div>
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground">Specification</Label>
-                      <Input name="spec" placeholder="e.g. 540Wp Mono" className="h-10 rounded-sm bg-background border-primary/20" />
+                      <Input 
+                        key={`spec-${selectedMasterItem?.id || 'none'}`}
+                        name="spec" 
+                        placeholder="e.g. 540Wp Mono" 
+                        defaultValue={selectedMasterItem?.description || ""}
+                        className="h-10 rounded-sm bg-background border-primary/20" 
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground">Target Qty</Label>
                       <div className="flex gap-2">
                         <Input name="qty" type="number" required placeholder="0" className="h-10 rounded-sm bg-background border-primary/20" />
                         <Input 
+                          key={`unit-${selectedMasterItem?.id || 'none'}`}
                           name="unit" 
                           placeholder="Unit" 
                           defaultValue={selectedMasterItem?.unit || ""} 
