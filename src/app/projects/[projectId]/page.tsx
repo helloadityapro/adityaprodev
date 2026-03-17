@@ -451,14 +451,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <Popover open={isBomItemPopoverOpen} onOpenChange={setIsBomItemPopoverOpen}>
                           <PopoverTrigger asChild>
                             <Button variant="outline" className="w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/20">
-                              <div className="flex items-center gap-2 truncate">
-                                <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
-                                {selectedMasterItem && (
-                                  <Badge variant="secondary" className="text-[8px] h-4 rounded-sm px-1.5 font-bold uppercase tracking-tighter shrink-0">
-                                    {selectedMasterItem.category}
-                                  </Badge>
-                                )}
-                              </div>
+                              <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </PopoverTrigger>
@@ -524,17 +517,30 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       </Button>
                     </div>
                     
-                    <div className="md:col-span-8 space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Technical Specifications (Automated)</Label>
-                      <Textarea 
-                        readOnly
-                        key={`spec-${selectedMasterItem?.id || 'none'}`}
-                        name="spec" 
-                        placeholder="Select an item to view its master specification..." 
-                        defaultValue={selectedMasterItem?.description || ""}
-                        className="min-h-[160px] rounded-sm bg-muted/10 border-primary/10 cursor-not-allowed resize-none text-sm leading-relaxed italic" 
-                      />
-                      <p className="text-[9px] text-muted-foreground font-medium italic px-1">Values are pulled directly from the Master Inventory registry to ensure audit compliance.</p>
+                    <div className="md:col-span-8 space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Item Category (Automated)</Label>
+                        <Input 
+                          readOnly
+                          key={`cat-field-${selectedMasterItem?.id || 'none'}`}
+                          placeholder="Category will appear here..."
+                          defaultValue={selectedMasterItem?.category || ""}
+                          className="h-10 rounded-sm bg-muted/10 border-primary/10 cursor-not-allowed font-bold text-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Technical Specifications (Automated)</Label>
+                        <Textarea 
+                          readOnly
+                          key={`spec-${selectedMasterItem?.id || 'none'}`}
+                          name="spec" 
+                          placeholder="Select an item to view its master specification..." 
+                          defaultValue={selectedMasterItem?.description || ""}
+                          className="min-h-[100px] rounded-sm bg-muted/10 border-primary/10 cursor-not-allowed resize-none text-sm leading-relaxed italic" 
+                        />
+                        <p className="text-[9px] text-muted-foreground font-medium italic px-1">Values are pulled directly from the Master Inventory registry to ensure audit compliance.</p>
+                      </div>
                     </div>
                   </form>
                 </CardContent>
