@@ -771,7 +771,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <TableBody>
                       {bomItems && bomItems.length > 0 ? bomItems.map(item => (
                         <React.Fragment key={item.id}>
-                          <TableRow className="hover:bg-muted/5 group">
+                          <TableRow className="hover:bg-muted/5 transition-colors group">
                             <TableCell className="px-6 py-4">
                               <div className="flex items-center gap-2">
                                 {item.unit === 'Sets' && (
@@ -827,7 +827,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                 {isAdmin && item.status === 'Pending' && (
                                   <>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Approved' })}>
-                                      <CheckCircle2 className="h-4 w-4" />
+                                      <CircleCheck className="h-4 w-4" />
                                     </Button>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Rejected' })}>
                                       <XCircle className="h-4 w-4" />
@@ -993,7 +993,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="text-sm font-semibold text-foreground">{po.supplierName}</TableCell>
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                             <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{po.status}</Badge></TableCell>
-                            <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</TableCell>
+                            <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                             <TableCell className="text-right px-6">
                               <div className="flex justify-end gap-1">
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}>
@@ -1034,6 +1034,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                         </div>
                                       </div>
                                     ))}
+                                  </div>
+                                  <div className="flex justify-between items-center pt-2 border-t border-primary/10 mt-2">
+                                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Aggregate Total (Incl. GST)</span>
+                                    <span className="text-sm font-black text-primary">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                                   </div>
                                 </div>
                               </TableCell>
