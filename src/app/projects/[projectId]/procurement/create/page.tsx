@@ -533,10 +533,10 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
               </Button>
               <Button 
                 type="submit" 
-                disabled={isSubmitting || totalAmount <= 0} 
+                disabled={isSubmitting} 
                 className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95"
               >
-                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AUTHORIZING...</> : <><Send className="mr-2 h-5 w-5" /> GENERATE PURCHASE ORDER</>}
+                {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> AUTHORIZING...</> : <><Send className="mr-2 h-5 w-5" /> GENERATE PURCHASE ORDER</>}
               </Button>
             </div>
           </div>
