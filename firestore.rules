@@ -15,11 +15,17 @@ service cloud.firestore {
       let superAdminEmails = ['khalil@adityagreenenergy.com', 'prafulrana143@gmail.com'];
       let userEmail = request.auth.token.get('email', '').lower();
       let isSuperAdmin = userEmail in superAdminEmails;
+      
+      // If the user is a super admin by email, allow immediately without checking doc
+      if (isSuperAdmin) {
+        return true;
+      }
                          
-      let role = getUserData().get('role', '');
-      let hasAdminRole = role == 'Admin';
+      // Otherwise, check if the user document exists and has the Admin role
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      let hasAdminRole = exists(userDocPath) && get(userDocPath).data.get('role', '') == 'Admin';
                          
-      return isSignedIn() && (isSuperAdmin || hasAdminRole);
+      return isSignedIn() && hasAdminRole;
     }
 
     match /users/{userId} {
