@@ -451,7 +451,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <Popover open={isBomItemPopoverOpen} onOpenChange={setIsBomItemPopoverOpen}>
                           <PopoverTrigger asChild>
                             <Button variant="outline" className="w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/20">
-                              {selectedMasterItem ? selectedMasterItem.name : "Choose material..."}
+                              <div className="flex items-center gap-2 truncate">
+                                <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
+                                {selectedMasterItem && (
+                                  <Badge variant="secondary" className="text-[8px] h-4 rounded-sm px-1.5 font-bold uppercase tracking-tighter shrink-0">
+                                    {selectedMasterItem.category}
+                                  </Badge>
+                                )}
+                              </div>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </PopoverTrigger>
