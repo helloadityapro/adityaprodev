@@ -40,7 +40,8 @@ import {
   Search,
   ChevronsUpDown,
   Check,
-  XCircle
+  XCircle,
+  Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -53,6 +54,15 @@ import { useToast } from '@/hooks/use-toast';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 import Link from 'next/link';
 
 type Project = {
@@ -81,6 +91,9 @@ type BoMItem = {
   plannedQuantity: number;
   unit: string;
   status?: 'Pending' | 'Approved' | 'Rejected';
+  processedByName?: string;
+  processedAt?: any;
+  remarks?: string;
 };
 
 type PurchaseOrder = {
@@ -132,6 +145,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [selectedMasterItem, setSelectedMasterItem] = React.useState<MasterItem | null>(null);
   const [isBomItemPopoverOpen, setIsBomItemPopoverOpen] = React.useState(false);
   const [bomItemSearchQuery, setBomItemSearchQuery] = React.useState("");
+  
+  // State for BoM approval/rejection dialog
+  const [bomActionState, setBomActionState] = React.useState<{ item: BoMItem, type: 'Approved' | 'Rejected' } | null>(null);
+  const [isActionProcessing, setIsActionProcessing] = React.useState(false);
 
   // 1. Core Site Info
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
@@ -249,20 +266,26 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     (e.target as HTMLFormElement).reset();
   };
 
-  const handleApproveBoM = (itemId: string) => {
-    updateDocumentNonBlocking(doc(firestore, 'project_boms', itemId), {
-      status: 'Approved',
+  const handleProcessBoM = (remarks: string) => {
+    if (!bomActionState || !userProfile) return;
+    setIsActionProcessing(true);
+    
+    const bomRef = doc(firestore, 'project_boms', bomActionState.item.id);
+    updateDocumentNonBlocking(bomRef, {
+      status: bomActionState.type,
+      remarks: remarks,
+      processedByName: userProfile.username || user?.email || 'Admin',
+      processedAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
-    toast({ title: 'Item Approved', description: 'BoM entry authorized.' });
-  };
 
-  const handleRejectBoM = (itemId: string) => {
-    updateDocumentNonBlocking(doc(firestore, 'project_boms', itemId), {
-      status: 'Rejected',
-      updatedAt: serverTimestamp()
+    toast({ 
+      title: bomActionState.type === 'Approved' ? 'Item Authorized' : 'Item Rejected', 
+      description: `BoM record updated for ${bomActionState.item.itemName}.` 
     });
-    toast({ variant: 'destructive', title: 'Item Rejected', description: 'BoM entry declined.' });
+    
+    setIsActionProcessing(false);
+    setBomActionState(null);
   };
 
   const handleUpdateStock = async (itemId: string, newStock: number) => {
@@ -594,24 +617,32 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={cn(
-                              "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
-                              item.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                              item.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                              "bg-yellow-50 text-yellow-700 border-yellow-200"
-                            )}>
-                              {item.status || 'Pending'}
-                            </Badge>
+                            <div className="flex flex-col gap-1">
+                              <Badge variant="outline" className={cn(
+                                "w-fit rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
+                                item.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                                item.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                                "bg-yellow-50 text-yellow-700 border-yellow-200"
+                              )}>
+                                {item.status || 'Pending'}
+                              </Badge>
+                              {item.processedByName && (
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-[8px] font-bold text-muted-foreground uppercase">By: {item.processedByName}</span>
+                                  {item.remarks && <span className="text-[9px] italic text-muted-foreground line-clamp-1">"{item.remarks}"</span>}
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-center font-mono font-bold text-primary">{item.plannedQuantity} {item.unit}</TableCell>
                           <TableCell className="text-right px-6">
                             <div className="flex justify-end items-center gap-1">
                               {isAdmin && item.status === 'Pending' && (
                                 <>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleApproveBoM(item.id)}>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Approved' })}>
                                     <CheckCircle2 className="h-4 w-4" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => handleRejectBoM(item.id)}>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Rejected' })}>
                                     <XCircle className="h-4 w-4" />
                                   </Button>
                                 </>
@@ -922,6 +953,39 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* BoM Action Dialog */}
+      <Dialog open={!!bomActionState} onOpenChange={(o) => !o && setBomActionState(null)}>
+        <DialogContent className="rounded-sm max-w-md">
+          <DialogHeader>
+            <DialogTitle className="uppercase tracking-tight font-black">{bomActionState?.type} BoM Item</DialogTitle>
+            <DialogDescription>Setting status for "{bomActionState?.item.itemName}"</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase text-muted-foreground tracking-widest">Audit Remarks</Label>
+              <Textarea 
+                id="bom-remarks" 
+                placeholder="Provide reasoning or notes for site records..." 
+                className="min-h-[100px] rounded-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <DialogClose asChild><Button variant="ghost" className="rounded-sm font-bold h-11 px-6 uppercase text-[10px]">Cancel</Button></DialogClose>
+            <Button 
+              disabled={isActionProcessing} 
+              className={cn("rounded-sm font-black h-11 px-8 uppercase text-[10px] tracking-widest", bomActionState?.type === 'Approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+              onClick={() => {
+                const remarks = (document.getElementById('bom-remarks') as HTMLTextAreaElement)?.value || "";
+                handleProcessBoM(remarks);
+              }}
+            >
+              {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${bomActionState?.type}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
