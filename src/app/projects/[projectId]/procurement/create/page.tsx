@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -241,6 +242,14 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
         return sum + lineTotal;
       }, 0);
 
+      const historyEntry = {
+        action: 'Created',
+        userName: userProfile.username || user.email,
+        userId: user.uid,
+        timestamp: new Date(),
+        details: `Initial order generated for ₹${calculatedTotal.toLocaleString('en-IN')}`
+      };
+
       await addDocumentNonBlocking(collection(firestore, 'project_pos'), {
         siteId: projectId,
         siteName: site.name,
@@ -253,8 +262,8 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
         totalAmount: calculatedTotal,
         status: 'Open',
         createdAt: serverTimestamp(),
-        createdBy: user.uid,
-        createdByName: userProfile.username || user.email
+        createdByName: userProfile.username || user.email,
+        history: [historyEntry]
       });
 
       setFinalTotal(calculatedTotal);

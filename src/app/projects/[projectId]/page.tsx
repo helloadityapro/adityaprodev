@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -131,6 +132,14 @@ type POItem = {
   amount: number;
 };
 
+type POHistoryEntry = {
+  action: string;
+  userName: string;
+  userId: string;
+  timestamp: any;
+  details?: string;
+};
+
 type PurchaseOrder = {
   id: string;
   poNumber: string;
@@ -144,6 +153,7 @@ type PurchaseOrder = {
   createdByName?: string;
   updatedAt?: any;
   updatedByName?: string;
+  history?: POHistoryEntry[];
 };
 
 type InventoryItem = {
@@ -432,6 +442,34 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
     }
+  };
+
+  const getPOHistory = (po: PurchaseOrder) => {
+    if (po.history && po.history.length > 0) return po.history;
+    const fallback: POHistoryEntry[] = [];
+    if (po.createdAt) {
+      fallback.push({
+        action: 'Created',
+        userName: po.createdByName || 'Unknown',
+        userId: '',
+        timestamp: po.createdAt,
+        details: 'Initial order creation'
+      });
+    }
+    if (po.updatedAt) {
+      fallback.push({
+        action: 'Modified',
+        userName: po.updatedByName || 'Unknown',
+        userId: '',
+        timestamp: po.updatedAt,
+        details: 'Order details updated'
+      });
+    }
+    return fallback.sort((a, b) => {
+      const da = a.timestamp?.toDate?.()?.getTime() || 0;
+      const db = b.timestamp?.toDate?.()?.getTime() || 0;
+      return db - da;
+    });
   };
 
   if (projectLoading) return (
@@ -967,7 +1005,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}>
                           <div className="flex items-center justify-end">Total Value <POSortIcon column="total" /></div>
                         </TableHead>
-                        <TableHead className="px-6">Timeline</TableHead>
+                        <TableHead>Audit Log</TableHead>
                         <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -990,23 +1028,41 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                             <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{po.status}</Badge></TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                            <TableCell className="px-6">
-                              <div className="flex flex-col gap-1 text-[10px] min-w-[120px]">
-                                <div className="flex items-center gap-1 text-muted-foreground">
-                                  <Plus className="h-2.5 w-2.5" />
-                                  <span className="font-bold">Created:</span>
-                                  <span>{formatTimestamp(po.createdAt)}</span>
-                                  {po.createdByName && <span className="opacity-60 italic">({po.createdByName})</span>}
-                                </div>
-                                {po.updatedAt && (
-                                  <div className="flex items-center gap-1 text-primary/70">
-                                    <Pencil className="h-2.5 w-2.5" />
-                                    <span className="font-bold">Edited:</span>
-                                    <span>{formatTimestamp(po.updatedAt)}</span>
-                                    {po.updatedByName && <span className="opacity-60 italic">({po.updatedByName})</span>}
+                            <TableCell>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 rounded-sm font-bold text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary">
+                                    <History className="h-3.5 w-3.5 mr-1.5" /> View Log
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80 p-0 rounded-sm shadow-2xl border-primary/10">
+                                  <div className="p-3 border-b bg-muted/5">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-primary">Audit Log: {po.poNumber}</p>
                                   </div>
-                                )}
-                              </div>
+                                  <ScrollArea className="h-[250px]">
+                                    <div className="p-4 space-y-4">
+                                      {getPOHistory(po).map((entry, idx) => (
+                                        <div key={idx} className="relative pl-4 border-l border-primary/20 pb-4 last:pb-0">
+                                          <div className="absolute -left-[4.5px] top-1 h-2 w-2 rounded-full bg-primary" />
+                                          <div className="flex flex-col gap-0.5">
+                                            <p className="text-[10px] font-black uppercase text-primary leading-none">{entry.action}</p>
+                                            <p className="text-[9px] font-bold text-muted-foreground">{formatTimestamp(entry.timestamp)}</p>
+                                            <div className="flex items-center gap-1 mt-1">
+                                              <User className="h-2.5 w-2.5 text-muted-foreground/60" />
+                                              <span className="text-[9px] font-medium">{entry.userName}</span>
+                                            </div>
+                                            {entry.details && (
+                                              <p className="text-[9px] italic text-muted-foreground/80 mt-1 leading-tight border-t border-primary/5 pt-1">
+                                                {entry.details}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </ScrollArea>
+                                </PopoverContent>
+                              </Popover>
                             </TableCell>
                             <TableCell className="text-right px-6">
                               <div className="flex justify-end gap-1">

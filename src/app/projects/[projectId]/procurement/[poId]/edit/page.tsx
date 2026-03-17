@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -14,7 +15,8 @@ import {
   updateDocumentNonBlocking, 
   useFirebaseApp 
 } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, where, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -229,7 +231,7 @@ export default function EditPOPage({ params }: { params: Promise<{ projectId: st
   }, [approvedBomItems, consumedByOthers, bomSearch]);
 
   const onSubmit = async (values: z.infer<typeof poSchema>) => {
-    if (!user || !userProfile || !site) return;
+    if (!user || !userProfile || !site || !poData) return;
 
     const newOrderCounts: Record<string, number> = {};
     for (const item of values.items) {
@@ -252,6 +254,28 @@ export default function EditPOPage({ params }: { params: Promise<{ projectId: st
 
     setIsSubmitting(true);
     try {
+      // Detect changes for history
+      const changes: string[] = [];
+      if (values.poNumber !== poData.poNumber) changes.push(`PO Number changed from ${poData.poNumber}`);
+      if (values.supplierId !== poData.supplierId) changes.push(`Supplier changed to ${values.supplierName}`);
+      if (values.orderDate !== poData.orderDate) changes.push(`Order Date changed to ${values.orderDate}`);
+      if (values.items.length !== poData.items.length) {
+        changes.push(`Line items adjusted (${poData.items.length} to ${values.items.length})`);
+      } else {
+        const valueChanged = values.items.some((item, i) => 
+          item.quantity !== poData.items[i].quantity || item.rate !== poData.items[i].rate
+        );
+        if (valueChanged) changes.push("Material quantities or rates modified");
+      }
+
+      const historyEntry = {
+        action: 'Modified',
+        userName: userProfile.username || user.email,
+        userId: user.uid,
+        timestamp: new Date(),
+        details: changes.length > 0 ? changes.join(', ') : 'Order metadata updated'
+      };
+
       await updateDocumentNonBlocking(doc(firestore, 'project_pos', poId), {
         poNumber: values.poNumber,
         supplierId: values.supplierId,
@@ -262,7 +286,8 @@ export default function EditPOPage({ params }: { params: Promise<{ projectId: st
         totalAmount,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
-        updatedByName: userProfile.username || user.email
+        updatedByName: userProfile.username || user.email,
+        history: arrayUnion(historyEntry)
       });
 
       setFinalTotal(totalAmount);
