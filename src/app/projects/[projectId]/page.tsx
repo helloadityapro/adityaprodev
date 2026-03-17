@@ -823,7 +823,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               <div className="relative w-full md:w-80">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input 
-                  placeholder="Search PO or Vendor..." 
+                  placeholder="Search PO or Supplier" 
                   className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
                   value={poSearch}
                   onChange={e => setPoSearch(e.target.value)}
