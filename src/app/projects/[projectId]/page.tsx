@@ -142,6 +142,8 @@ type PurchaseOrder = {
   itemsCount?: number;
   createdAt: any;
   createdByName?: string;
+  updatedAt?: any;
+  updatedByName?: string;
 };
 
 type InventoryItem = {
@@ -959,6 +961,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}>
                           <div className="flex items-center justify-end">Total Value <POSortIcon column="total" /></div>
                         </TableHead>
+                        <TableHead className="px-6">Timeline</TableHead>
                         <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -981,6 +984,24 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                             <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{po.status}</Badge></TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                            <TableCell className="px-6">
+                              <div className="flex flex-col gap-1 text-[10px] min-w-[120px]">
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                  <Plus className="h-2.5 w-2.5" />
+                                  <span className="font-bold">Created:</span>
+                                  <span>{formatTimestamp(po.createdAt)}</span>
+                                  {po.createdByName && <span className="opacity-60 italic">({po.createdByName})</span>}
+                                </div>
+                                {po.updatedAt && (
+                                  <div className="flex items-center gap-1 text-primary/70">
+                                    <Pencil className="h-2.5 w-2.5" />
+                                    <span className="font-bold">Edited:</span>
+                                    <span>{formatTimestamp(po.updatedAt)}</span>
+                                    {po.updatedByName && <span className="opacity-60 italic">({po.updatedByName})</span>}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-right px-6">
                               <div className="flex justify-end gap-1">
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}>
@@ -1003,7 +1024,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           </TableRow>
                           {expandedPORows.has(po.id) && po.items && (
                             <TableRow className="bg-muted/30">
-                              <TableCell colSpan={6} className="p-0">
+                              <TableCell colSpan={7} className="p-0">
                                 <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200">
                                   <div className="flex items-center gap-2 mb-2">
                                     <Layers className="h-3.5 w-3.5 text-primary" />
@@ -1039,7 +1060,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           )}
                         </React.Fragment>
                       )) : (
-                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No POs found in project records.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic text-xs">No POs found in project records.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
