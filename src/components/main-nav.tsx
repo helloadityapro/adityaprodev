@@ -173,94 +173,98 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
 
       {/* SITE VISITS Group */}
       {!isDriver && (
-        <>
-          <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">SITE VISITS</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Start a Site Visit" isActive={pathname === '/site-visits/start'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/site-visits/start">
-                    <Navigation className="h-4 w-4" />
-                    <span className="font-medium">Start a Site Visit</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Active Visits" isActive={pathname === '/site-visits/active'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/site-visits/active">
-                    <Activity className="h-4 w-4" />
-                    <span className="font-medium">Ongoing Visits</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Visit History" isActive={pathname === '/site-visits/history'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/site-visits/history">
-                    <History className="h-4 w-4" />
-                    <span className="font-medium">Visit Archive</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">SITE VISITS</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Start a Site Visit" isActive={pathname === '/site-visits/start'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/site-visits/start">
+                  <Navigation className="h-4 w-4" />
+                  <span className="font-medium">Start a Site Visit</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Active Visits" isActive={pathname === '/site-visits/active'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/site-visits/active">
+                  <Activity className="h-4 w-4" />
+                  <span className="font-medium">Ongoing Visits</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Visit History" isActive={pathname === '/site-visits/history'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/site-visits/history">
+                  <History className="h-4 w-4" />
+                  <span className="font-medium">Visit Archive</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+      )}
 
-          <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">PERMIT TO WORK</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Raise a PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/ptw/raise">
-                    <FilePlus className="h-4 w-4" />
-                    <span className="font-medium">Raise a PtW</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="My PtWs" isActive={pathname === '/ptw/list'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/ptw/list">
-                    <List className="h-4 w-4" />
-                    <span className="font-medium">My PtWs</span>
-                  </Link>
-                </SidebarMenuButton>
+      {/* PERMIT TO WORK Group */}
+      {!isDriver && (
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">PERMIT TO WORK</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Raise a PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/ptw/raise">
+                  <FilePlus className="h-4 w-4" />
+                  <span className="font-medium">Raise a PtW</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="My PtWs" isActive={pathname === '/ptw/list'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/ptw/list">
+                  <List className="h-4 w-4" />
+                  <span className="font-medium">My PtWs</span>
+                </Link>
                 {(isAdmin || isManager) && pendingPtwCount > 0 && (
                   <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
                     {pendingPtwCount}
                   </SidebarMenuBadge>
                 )}
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="PtW Activities" isActive={pathname === '/ptw/activities'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/ptw/activities">
-                    <History className="h-4 w-4" />
-                    <span className="font-medium">PtW Activities</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="PtW Activities" isActive={pathname === '/ptw/activities'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/ptw/activities">
+                  <History className="h-4 w-4" />
+                  <span className="font-medium">PtW Activities</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+      )}
 
-          <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Documentation</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Submit DPR" isActive={pathname === '/dpr/submit'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/dpr/submit">
-                    <FilePlus className="h-4 w-4" />
-                    <span className="font-medium">Submit Daily Report</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="DPR Data" isActive={pathname === '/dpr/list'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/dpr/list">
-                    <TableIcon className="h-4 w-4" />
-                    <span className="font-medium">Report Repository</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-        </>
+      {/* Documentation Group */}
+      {!isDriver && (
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Documentation</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Submit DPR" isActive={pathname === '/dpr/submit'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/dpr/submit">
+                  <FilePlus className="h-4 w-4" />
+                  <span className="font-medium">Submit Daily Report</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="DPR Data" isActive={pathname === '/dpr/list'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/dpr/list">
+                  <TableIcon className="h-4 w-4" />
+                  <span className="font-medium">DPR Data</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
       )}
 
       {/* Requirement & Movement */}
@@ -283,7 +287,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <ClipboardList className="h-4 w-4" />
                     <span className="font-medium">Requirement Data</span>
                   </Link>
-                </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
@@ -305,7 +309,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <TableIcon className="h-4 w-4" />
                     <span className="font-medium">Movement Data</span>
                   </Link>
-                </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
