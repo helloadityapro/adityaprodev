@@ -176,10 +176,10 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Field Presence</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Start Site Visit" isActive={pathname === '/site-visits/start'} className="rounded-sm" onClick={handleMobileClose}>
+                <SidebarMenuButton asChild tooltip="Start a Site Visit" isActive={pathname === '/site-visits/start'} className="rounded-sm" onClick={handleMobileClose}>
                   <Link href="/site-visits/start">
                     <Navigation className="h-4 w-4" />
-                    <span className="font-medium">Initiate Visit</span>
+                    <span className="font-medium">Start a Site Visit</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
