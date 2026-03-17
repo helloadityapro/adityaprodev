@@ -36,7 +36,10 @@ import {
   User,
   Zap,
   ChevronRight,
-  Table as TableIcon
+  Table as TableIcon,
+  Search,
+  ChevronsUpDown,
+  Check
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -47,6 +50,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import Link from 'next/link';
 
 type Project = {
@@ -92,6 +96,14 @@ type InventoryItem = {
   lastUpdated: any;
 };
 
+type MasterItem = {
+  id: string;
+  name: string;
+  category: string;
+  make: string;
+  unit: string;
+};
+
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
   const date = ts.toDate ? ts.toDate() : new Date(ts);
@@ -112,6 +124,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const router = useRouter();
 
   const [activeTab, setActiveTab] = React.useState("dashboard");
+  const [selectedMasterItem, setSelectedMasterItem] = React.useState<MasterItem | null>(null);
+  const [isBomItemPopoverOpen, setIsBomItemPopoverOpen] = React.useState(false);
+  const [bomItemSearchQuery, setBomItemSearchQuery] = React.useState("");
 
   // 1. Core Site Info
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
@@ -123,7 +138,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const siteName = project?.name || "";
 
-  // 2. Registries (BoM, PO, Inv)
+  // 2. Registries (BoM, PO, Inv, Master Inventory)
   const bomQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_boms'), where('siteId', '==', projectId)), 
     [firestore, projectId]
@@ -141,6 +156,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     [firestore, projectId]
   );
   const { data: inventory } = useCollection<InventoryItem>(inventoryQuery);
+
+  const masterInventoryQuery = useMemoFirebase(() => collection(firestore, 'master_inventory'), [firestore]);
+  const { data: masterItems } = useCollection<MasterItem>(masterInventoryQuery);
 
   // 3. Field Activities
   const ptwQuery = useMemoFirebase(() => 
@@ -191,19 +209,36 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     });
   }, [allUsers, projectId]);
 
+  const filteredMasterItems = React.useMemo(() => {
+    if (!masterItems) return [];
+    return masterItems.filter(item => 
+      item.name.toLowerCase().includes(bomItemSearchQuery.toLowerCase()) ||
+      item.make.toLowerCase().includes(bomItemSearchQuery.toLowerCase())
+    );
+  }, [masterItems, bomItemSearchQuery]);
+
   const handleAddBoM = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const itemName = formData.get('itemName') as string;
+    
+    if (!itemName) {
+      toast({ variant: 'destructive', title: 'Selection Missing', description: 'Please select a material from the inventory list.' });
+      return;
+    }
+
     const item = {
       siteId: projectId,
-      itemName: formData.get('itemName') as string,
+      itemName: itemName,
       specification: formData.get('spec') as string,
       plannedQuantity: parseFloat(formData.get('qty') as string),
       unit: formData.get('unit') as string,
       createdAt: serverTimestamp()
     };
+    
     addDocumentNonBlocking(collection(firestore, 'project_boms'), item);
     toast({ title: 'Item Added' });
+    setSelectedMasterItem(null);
     (e.target as HTMLFormElement).reset();
   };
 
@@ -407,21 +442,73 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 <CardContent className="pt-6">
                   <form onSubmit={handleAddBoM} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                     <div className="space-y-2 col-span-1 md:col-span-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Material Name</Label>
-                      <Input name="itemName" required placeholder="Solar Module 540Wp" className="h-10 rounded-sm bg-background" />
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Select From Master Inventory</Label>
+                      <Popover open={isBomItemPopoverOpen} onOpenChange={setIsBomItemPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/20">
+                            {selectedMasterItem ? selectedMasterItem.name : "Choose material..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <div className="flex items-center border-b px-3">
+                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                            <Input 
+                              placeholder="Filter items..." 
+                              className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
+                              value={bomItemSearchQuery}
+                              onChange={(e) => setBomItemSearchQuery(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          <ScrollArea className="h-[200px]">
+                            <div className="p-1">
+                              {filteredMasterItems.length > 0 ? (
+                                filteredMasterItems.map((item) => (
+                                  <Button
+                                    key={item.id}
+                                    type="button"
+                                    variant="ghost"
+                                    className="w-full justify-start font-normal h-11 text-xs mb-0.5"
+                                    onClick={() => {
+                                      setSelectedMasterItem(item);
+                                      setIsBomItemPopoverOpen(false);
+                                      setBomItemSearchQuery("");
+                                    }}
+                                  >
+                                    <Check className={cn("mr-2 h-4 w-4 text-primary", selectedMasterItem?.id === item.id ? "opacity-100" : "opacity-0")} />
+                                    <div className="flex flex-col items-start min-w-0">
+                                      <span className="font-bold truncate w-full text-foreground">{item.name}</span>
+                                      <span className="text-[8px] uppercase text-muted-foreground">{item.make} • {item.category}</span>
+                                    </div>
+                                  </Button>
+                                ))
+                              ) : (
+                                <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground">No matches</p>
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </PopoverContent>
+                      </Popover>
+                      <input type="hidden" name="itemName" value={selectedMasterItem?.name || ""} />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground">Specification</Label>
-                      <Input name="spec" placeholder="Mono PERC" className="h-10 rounded-sm bg-background" />
+                      <Input name="spec" placeholder="e.g. 540Wp Mono" className="h-10 rounded-sm bg-background border-primary/20" />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase text-muted-foreground">Target Qty</Label>
                       <div className="flex gap-2">
-                        <Input name="qty" type="number" required className="h-10 rounded-sm bg-background" />
-                        <Input name="unit" placeholder="Unit" className="w-24 h-10 rounded-sm bg-background" />
+                        <Input name="qty" type="number" required placeholder="0" className="h-10 rounded-sm bg-background border-primary/20" />
+                        <Input 
+                          name="unit" 
+                          placeholder="Unit" 
+                          defaultValue={selectedMasterItem?.unit || ""} 
+                          className="w-24 h-10 rounded-sm bg-background border-primary/20 font-bold text-primary" 
+                        />
                       </div>
                     </div>
-                    <Button type="submit" className="rounded-sm h-10 font-bold w-full">
+                    <Button type="submit" className="rounded-sm h-10 font-bold w-full shadow-lg" disabled={!selectedMasterItem}>
                       <Plus className="h-4 w-4 mr-2" /> Add to BoM
                     </Button>
                   </form>
