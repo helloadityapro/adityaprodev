@@ -600,7 +600,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead className="px-6">Description</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="text-center">Quantity Audit</TableHead>
+                        <TableHead className="text-center">Required Qty</TableHead>
+                        <TableHead className="text-center">Approved Qty</TableHead>
                         <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -636,22 +637,19 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-center font-mono text-xs">
-                            <div className="flex items-center justify-center gap-4">
-                              <div className="flex flex-col items-center">
-                                <span className="text-[8px] text-muted-foreground uppercase font-black">Required</span>
-                                <span className="font-bold text-primary">{item.plannedQuantity} {item.unit}</span>
-                              </div>
-                              {item.status === 'Approved' && (
-                                <>
-                                  <div className="h-8 w-px bg-border" />
-                                  <div className="flex flex-col items-center">
-                                    <span className="text-[8px] text-emerald-600 uppercase font-black">Approved</span>
-                                    <span className="font-bold text-emerald-700">{item.approvedQuantity || item.plannedQuantity} {item.unit}</span>
-                                  </div>
-                                </>
-                              )}
-                            </div>
+                          <TableCell className="text-center">
+                            <div className="font-mono font-bold text-sm text-primary">{item.plannedQuantity}</div>
+                            <div className="text-[10px] text-muted-foreground uppercase font-medium">{item.unit}</div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {item.status === 'Approved' ? (
+                              <>
+                                <div className="font-mono font-bold text-sm text-emerald-700">{item.approvedQuantity || item.plannedQuantity}</div>
+                                <div className="text-[10px] text-emerald-600 uppercase font-medium">{item.unit}</div>
+                              </>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right px-6">
                             <div className="flex justify-end items-center gap-1">
@@ -674,7 +672,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           </TableCell>
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">Registry empty.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">Registry empty.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
