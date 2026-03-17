@@ -119,26 +119,33 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
     name: "items"
   });
 
-  const items = form.watch('items');
-  const totalAmount = React.useMemo(() => {
-    return items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  }, [items]);
+  const watchedItems = form.watch('items');
 
-  // Recalculate amounts whenever qty, rate, or gst changes
-  React.useEffect(() => {
-    items.forEach((item, index) => {
+  // Derive total amount immediately from watched input values
+  const totalAmount = React.useMemo(() => {
+    return watchedItems.reduce((sum, item) => {
       const qty = Number(item.quantity) || 0;
       const rate = Number(item.rate) || 0;
       const gst = Number(item.gstPercent) || 0;
-      const subtotal = qty * rate;
-      const tax = subtotal * (gst / 100);
-      const calculatedAmount = subtotal + tax;
+      const lineTotal = (qty * rate) * (1 + (gst / 100));
+      return sum + lineTotal;
+    }, 0);
+  }, [watchedItems]);
+
+  // Sync hidden 'amount' field in form state for submission and validation
+  React.useEffect(() => {
+    watchedItems.forEach((item, index) => {
+      const qty = Number(item.quantity) || 0;
+      const rate = Number(item.rate) || 0;
+      const gst = Number(item.gstPercent) || 0;
+      const calculatedAmount = (qty * rate) * (1 + (gst / 100));
       
+      // Update the form value only if it has changed to prevent unnecessary re-renders
       if (Math.abs(item.amount - calculatedAmount) > 0.01) {
         form.setValue(`items.${index}.amount`, calculatedAmount);
       }
     });
-  }, [items, form]);
+  }, [watchedItems, form]);
 
   const filteredSuppliers = allSuppliers?.filter(s => 
     s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
@@ -191,7 +198,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
             </div>
             <CardTitle className="text-2xl font-bold">PO Generated</CardTitle>
             <CardDescription className="text-base leading-relaxed">
-              Purchase Order for <strong className="text-primary font-black">₹{totalAmount.toLocaleString('en-IN')}</strong> has been recorded for {site?.name}.
+              Purchase Order for <strong className="text-primary font-black">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been recorded for {site?.name}.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -342,158 +349,165 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
             </div>
 
             <div className="space-y-4">
-              {fields.map((field, index) => (
-                <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2 duration-300">
-                  {fields.length > 1 && (
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="icon" 
-                      className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm"
-                      onClick={() => remove(index)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+              {fields.map((field, index) => {
+                const qty = Number(watchedItems[index]?.quantity) || 0;
+                const rate = Number(watchedItems[index]?.rate) || 0;
+                const gst = Number(watchedItems[index]?.gstPercent) || 0;
+                const lineTotal = (qty * rate) * (1 + (gst / 100));
 
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                    {/* Material Selection */}
-                    <div className="md:col-span-4">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.bomItemId`}
-                        render={({ field: bomField }) => (
-                          <FormItem className="flex flex-col">
-                            <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Approved Material</FormLabel>
-                            <Popover 
-                              open={openBomIndex === index} 
-                              onOpenChange={(o) => setOpenBomIndex(o ? index : null)}
-                            >
-                              <PopoverTrigger asChild>
-                                <FormControl>
-                                  <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    className={cn(
-                                      "w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10",
-                                      !bomField.value && "text-muted-foreground"
-                                    )}
-                                  >
-                                    <span className="truncate">{bomField.value ? approvedBomItems?.find(i => i.id === bomField.value)?.itemName : "Select Item..."}</span>
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </FormControl>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-[350px] p-0" align="start">
-                                <div className="flex items-center border-b px-3">
-                                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                  <Input
-                                    placeholder="Filter approved BoM..."
-                                    className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
-                                    value={bomSearch}
-                                    onChange={(e) => setBomSearch(e.target.value)}
-                                  />
-                                </div>
-                                <ScrollArea className="h-[200px]">
-                                  <div className="p-1">
-                                    {filteredBomItems.length > 0 ? filteredBomItems.map((item) => (
-                                      <Button
-                                        key={item.id}
-                                        type="button"
-                                        variant="ghost"
-                                        className="w-full justify-start font-normal h-11 text-xs"
-                                        onClick={() => {
-                                          bomField.onChange(item.id);
-                                          form.setValue(`items.${index}.itemName`, item.itemName);
-                                          setOpenBomIndex(null);
-                                          setBomSearch("");
-                                        }}
-                                      >
-                                        <Check className={cn("mr-2 h-4 w-4 text-primary", item.id === bomField.value ? "opacity-100" : "opacity-0")} />
-                                        <div className="flex flex-col items-start overflow-hidden">
-                                          <span className="font-bold truncate w-full">{item.itemName}</span>
-                                          <span className="text-[8px] font-black uppercase text-muted-foreground">Authorized: {item.approvedQuantity || item.plannedQuantity} {item.unit}</span>
-                                        </div>
-                                      </Button>
-                                    )) : (
-                                      <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic">No authorized materials found for this site.</div>
-                                    )}
+                return (
+                  <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2 duration-300">
+                    {fields.length > 1 && (
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm"
+                        onClick={() => remove(index)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                      {/* Material Selection */}
+                      <div className="md:col-span-4">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.bomItemId`}
+                          render={({ field: bomField }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Approved Material</FormLabel>
+                              <Popover 
+                                open={openBomIndex === index} 
+                                onOpenChange={(o) => setOpenBomIndex(o ? index : null)}
+                              >
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      role="combobox"
+                                      className={cn(
+                                        "w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10",
+                                        !bomField.value && "text-muted-foreground"
+                                      )}
+                                    >
+                                      <span className="truncate">{bomField.value ? approvedBomItems?.find(i => i.id === bomField.value)?.itemName : "Select Item..."}</span>
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[350px] p-0" align="start">
+                                  <div className="flex items-center border-b px-3">
+                                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                    <Input
+                                      placeholder="Filter approved BoM..."
+                                      className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
+                                      value={bomSearch}
+                                      onChange={(e) => setBomSearch(e.target.value)}
+                                    />
                                   </div>
-                                </ScrollArea>
-                              </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                                  <ScrollArea className="h-[200px]">
+                                    <div className="p-1">
+                                      {filteredBomItems.length > 0 ? filteredBomItems.map((item) => (
+                                        <Button
+                                          key={item.id}
+                                          type="button"
+                                          variant="ghost"
+                                          className="w-full justify-start font-normal h-11 text-xs"
+                                          onClick={() => {
+                                            bomField.onChange(item.id);
+                                            form.setValue(`items.${index}.itemName`, item.itemName);
+                                            setOpenBomIndex(null);
+                                            setBomSearch("");
+                                          }}
+                                        >
+                                          <Check className={cn("mr-2 h-4 w-4 text-primary", item.id === bomField.value ? "opacity-100" : "opacity-0")} />
+                                          <div className="flex flex-col items-start overflow-hidden">
+                                            <span className="font-bold truncate w-full">{item.itemName}</span>
+                                            <span className="text-[8px] font-black uppercase text-muted-foreground">Authorized: {item.approvedQuantity || item.plannedQuantity} {item.unit}</span>
+                                          </div>
+                                        </Button>
+                                      )) : (
+                                        <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic">No authorized materials found for this site.</div>
+                                      )}
+                                    </div>
+                                  </ScrollArea>
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
-                    {/* Qty */}
-                    <div className="md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.quantity`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Quantity</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                      {/* Qty */}
+                      <div className="md:col-span-2">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.quantity`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Quantity</FormLabel>
+                              <FormControl>
+                                <Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
-                    {/* Rate */}
-                    <div className="md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.rate`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                      {/* Rate */}
+                      <div className="md:col-span-2">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.rate`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel>
+                              <FormControl>
+                                <Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
-                    {/* GST % */}
-                    <div className="md:col-span-2">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.gstPercent`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">GST %</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold pr-8" />
-                                <span className="absolute right-3 top-2.5 text-[10px] font-bold text-muted-foreground">%</span>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                      {/* GST % */}
+                      <div className="md:col-span-2">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.gstPercent`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">GST %</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold pr-8" />
+                                  <span className="absolute right-3 top-2.5 text-[10px] font-bold text-muted-foreground">%</span>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
 
-                    {/* Line Total */}
-                    <div className="md:col-span-2">
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest">Total (₹)</FormLabel>
-                        <div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">
-                          {form.watch(`items.${index}.amount`).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {/* Line Total */}
+                      <div className="md:col-span-2">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Total (₹)</Label>
+                          <div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">
+                            {lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </div>
                         </div>
-                      </FormItem>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -522,7 +536,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                 disabled={isSubmitting || totalAmount <= 0} 
                 className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95"
               >
-                {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> AUTHORIZING...</> : <><Send className="mr-2 h-5 w-5" /> GENERATE PURCHASE ORDER</>}
+                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AUTHORIZING...</> : <><Send className="mr-2 h-5 w-5" /> GENERATE PURCHASE ORDER</>}
               </Button>
             </div>
           </div>
