@@ -171,11 +171,11 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
 
-      {/* Field Activities Group */}
+      {/* SITE VISITS Group */}
       {!isDriver && (
         <>
           <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Field Presence</SidebarGroupLabel>
+            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">SITE VISITS</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Start a Site Visit" isActive={pathname === '/site-visits/start'} className="rounded-sm" onClick={handleMobileClose}>
