@@ -363,7 +363,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                                 !field.value && "text-muted-foreground"
                               )}
                             >
-                              {field.value ? allSuppliers?.find(s => s.id === field.value)?.name : "Choose Vendor..."}
+                              {field.value ? allSuppliers?.find(s => s.id === field.value)?.name : "Choose Supplier..."}
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                           </FormControl>
@@ -372,7 +372,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                           <div className="flex items-center border-b px-3">
                             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                             <Input
-                              placeholder="Search vendors..."
+                              placeholder="Search suppliers..."
                               className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
                               value={supplierSearch}
                               onChange={(e) => setSupplierSearch(e.target.value)}

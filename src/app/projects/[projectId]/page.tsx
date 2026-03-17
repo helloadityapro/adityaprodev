@@ -948,7 +948,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <div className="flex items-center">PO Number <POSortIcon column="poNumber" /></div>
                         </TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('supplier')}>
-                          <div className="flex items-center">Vendor <POSortIcon column="supplier" /></div>
+                          <div className="flex items-center">Supplier <POSortIcon column="supplier" /></div>
                         </TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('date')}>
                           <div className="flex items-center">Date <POSortIcon column="date" /></div>
