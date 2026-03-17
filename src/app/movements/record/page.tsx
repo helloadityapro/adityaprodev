@@ -266,7 +266,7 @@ export default function RecordMovementPage() {
 
       setSubmittedData({ ...values, attachments });
       setIsSubmitted(true);
-      toast({ title: "Movement Recorded", description: "Log entries generated and component stock updated." });
+      toast({ title: "Movement Recorded", description: "Log entries generated and item stock updated." });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
@@ -289,7 +289,7 @@ export default function RecordMovementPage() {
             </div>
             <CardTitle className="text-2xl font-bold">Log Generated</CardTitle>
             <CardDescription className="text-base">
-              {submittedData.items.length} component(s) recorded at <strong>{submittedData.siteName}</strong>.
+              {submittedData.items.length} item(s) recorded at <strong>{submittedData.siteName}</strong>.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -442,7 +442,7 @@ export default function RecordMovementPage() {
 
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold flex items-center gap-2"><ListPlus className="h-5 w-5 text-primary" /> Component List</h3>
+                  <h3 className="text-lg font-semibold flex items-center gap-2"><ListPlus className="h-5 w-5 text-primary" /> Item List</h3>
                   <Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="rounded-sm border-primary text-primary">
                     <Plus className="mr-2 h-4 w-4" /> Add Item
                   </Button>
@@ -457,7 +457,7 @@ export default function RecordMovementPage() {
                       <CardContent className="pt-6 space-y-4">
                         <FormField control={form.control} name={`items.${index}.itemName`} render={({ field: itemField }) => (
                           <FormItem className="flex flex-col">
-                            <FormLabel>Select Component</FormLabel>
+                            <FormLabel>Select Item</FormLabel>
                             <Popover open={openItemPopoverIndex === index} onOpenChange={o => setOpenItemPopoverIndex(o ? index : null)}>
                               <PopoverTrigger asChild>
                                 <FormControl>
