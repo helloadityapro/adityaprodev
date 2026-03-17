@@ -214,6 +214,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const siteName = project?.name || "";
 
@@ -986,9 +987,16 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                   <Eye className="h-4 w-4" />
                                 </Button>
                                 {(isAdmin || isManager) && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}>
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  <>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
+                                      <Link href={`/projects/${projectId}/procurement/${po.id}/edit`}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Link>
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
                                 )}
                               </div>
                             </TableCell>
