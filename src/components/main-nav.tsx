@@ -226,6 +226,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   </SidebarMenuBadge>
                 )}
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="PtW Activities" isActive={pathname === '/ptw/activities'} className="rounded-sm" onClick={handleMobileClose}>
+                  <Link href="/ptw/activities">
+                    <History className="h-4 w-4" />
+                    <span className="font-medium">PtW Activities</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
 
