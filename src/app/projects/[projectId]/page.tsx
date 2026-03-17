@@ -600,7 +600,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead className="px-6">Description</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="text-center">Authorized Qty</TableHead>
+                        <TableHead className="text-center">Quantity Audit</TableHead>
                         <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -637,16 +637,19 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             </div>
                           </TableCell>
                           <TableCell className="text-center font-mono text-xs">
-                            <div className="flex flex-col gap-1 items-center">
+                            <div className="flex items-center justify-center gap-4">
                               <div className="flex flex-col items-center">
                                 <span className="text-[8px] text-muted-foreground uppercase font-black">Required</span>
                                 <span className="font-bold text-primary">{item.plannedQuantity} {item.unit}</span>
                               </div>
                               {item.status === 'Approved' && (
-                                <div className="flex flex-col items-center border-t border-primary/10 pt-1 w-full">
-                                  <span className="text-[8px] text-emerald-600 uppercase font-black">Approved</span>
-                                  <span className="font-bold text-emerald-700">{item.approvedQuantity || item.plannedQuantity} {item.unit}</span>
-                                </div>
+                                <>
+                                  <div className="h-8 w-px bg-border" />
+                                  <div className="flex flex-col items-center">
+                                    <span className="text-[8px] text-emerald-600 uppercase font-black">Approved</span>
+                                    <span className="font-bold text-emerald-700">{item.approvedQuantity || item.plannedQuantity} {item.unit}</span>
+                                  </div>
+                                </>
                               )}
                             </div>
                           </TableCell>
