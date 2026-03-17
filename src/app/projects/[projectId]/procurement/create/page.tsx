@@ -82,6 +82,13 @@ type BoMItem = {
   status: string;
 };
 
+type PurchaseOrder = {
+  id: string;
+  siteId: string;
+  status: string;
+  items: { bomItemId: string; quantity: number }[];
+};
+
 export default function CreatePOPage({ params }: { params: Promise<{ projectId: string }> }) {
   const resolvedParams = React.use(params);
   const projectId = resolvedParams.projectId;
@@ -114,6 +121,27 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
     [firestore, projectId]
   );
   const { data: approvedBomItems } = useCollection<BoMItem>(approvedBomQuery);
+
+  // Fetch existing POs to calculate consumed quantities
+  const posQuery = useMemoFirebase(() => 
+    query(collection(firestore, 'project_pos'), where('siteId', '==', projectId)), 
+    [firestore, projectId]
+  );
+  const { data: existingPOs } = useCollection<PurchaseOrder>(posQuery);
+
+  const consumedQuantities = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    if (!existingPOs) return counts;
+    
+    existingPOs.forEach(po => {
+      if (po.status !== 'Cancelled') {
+        po.items.forEach(item => {
+          counts[item.bomItemId] = (counts[item.bomItemId] || 0) + (Number(item.quantity) || 0);
+        });
+      }
+    });
+    return counts;
+  }, [existingPOs]);
 
   const form = useForm<z.infer<typeof poSchema>>({
     resolver: zodResolver(poSchema),
@@ -161,21 +189,42 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
     s.gstin.toLowerCase().includes(supplierSearch.toLowerCase())
   ) || [];
 
-  const filteredBomItems = approvedBomItems?.filter(i => 
-    i.itemName.toLowerCase().includes(bomSearch.toLowerCase())
-  ) || [];
+  const filteredBomItems = React.useMemo(() => {
+    if (!approvedBomItems) return [];
+    
+    return approvedBomItems.map(item => {
+      const consumed = consumedQuantities[item.id] || 0;
+      const authorized = item.approvedQuantity || item.plannedQuantity || 0;
+      return {
+        ...item,
+        remaining: Math.max(0, authorized - consumed),
+        authorized
+      };
+    }).filter(i => 
+      i.remaining > 0 && 
+      i.itemName.toLowerCase().includes(bomSearch.toLowerCase())
+    );
+  }, [approvedBomItems, consumedQuantities, bomSearch]);
 
   const onSubmit = async (values: z.infer<typeof poSchema>) => {
     if (!user || !userProfile || !site) return;
 
+    // Track local counts within this new PO to prevent duplicates in same order over-ordering
+    const newOrderCounts: Record<string, number> = {};
+
     for (const item of values.items) {
       const original = approvedBomItems?.find(i => i.id === item.bomItemId);
-      const maxAllowed = original?.approvedQuantity || original?.plannedQuantity || 0;
-      if (item.quantity > maxAllowed) {
+      const authorized = original?.approvedQuantity || original?.plannedQuantity || 0;
+      const consumed = consumedQuantities[item.bomItemId] || 0;
+      const remaining = authorized - consumed;
+      
+      newOrderCounts[item.bomItemId] = (newOrderCounts[item.bomItemId] || 0) + item.quantity;
+
+      if (newOrderCounts[item.bomItemId] > remaining) {
         toast({ 
           variant: 'destructive', 
-          title: 'Quantity Violation', 
-          description: `Item "${item.itemName}" exceeds authorized limit of ${maxAllowed}.` 
+          title: 'Authorization Exceeded', 
+          description: `Line item "${item.itemName}" exceeds remaining authorized limit of ${remaining.toFixed(2)} ${original?.unit}. Please adjust order or request more BoM quantity.` 
         });
         return;
       }
@@ -184,7 +233,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
     setIsSubmitting(true);
 
     try {
-      // Calculate total from values to be absolutely sure we have the latest data
       const calculatedTotal = values.items.reduce((sum, item) => {
         const qty = Number(item.quantity) || 0;
         const rate = Number(item.rate) || 0;
@@ -211,7 +259,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
 
       setFinalTotal(calculatedTotal);
       setIsSuccess(true);
-      toast({ title: 'PO Created', description: `Purchase Order ${values.poNumber} has been recorded.` });
+      toast({ title: 'PO Created', description: `Purchase Order ${values.poNumber} for ${values.supplierName} has been recorded.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
@@ -231,7 +279,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
             </div>
             <CardTitle className="text-2xl font-bold uppercase tracking-tight">PO Generated</CardTitle>
             <CardDescription className="text-base leading-relaxed">
-              Purchase Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated for <strong className="text-foreground">{form.getValues('supplierName')}</strong> for <strong className="text-primary">{site?.name}</strong>.
+              Purchase Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated for <strong className="text-foreground">{form.getValues('supplierName')}</strong> at <strong className="text-primary">{site?.name}</strong>.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -256,7 +304,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
         <h1 className="flex items-center gap-2">
           <ShoppingBag className="h-8 w-8 text-primary" /> Create Purchase Order
         </h1>
-        <p className="text-muted-foreground font-medium">Link procurement line items to approved site materials.</p>
+        <p className="text-muted-foreground font-medium">Link procurement line items to authorized site materials.</p>
       </div>
 
       <Form {...form}>
@@ -368,7 +416,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
             <div className="flex items-center justify-between border-b pb-2 px-1">
               <div className="flex items-center gap-2">
                 <Truck className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Line Items</h3>
+                <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Order Line Items</h3>
               </div>
               <Button 
                 type="button" 
@@ -388,8 +436,8 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                 const gst = Number(watchedItems[index]?.gstPercent) || 0;
                 const lineTotal = (qty * rate) * (1 + (gst / 100));
                 
-                const selectedBomItem = approvedBomItems?.find(i => i.id === watchedItems[index]?.bomItemId);
-                const maxAllowed = selectedBomItem?.approvedQuantity || selectedBomItem?.plannedQuantity || 0;
+                const selectedBomItem = filteredBomItems?.find(i => i.id === watchedItems[index]?.bomItemId);
+                const maxRemaining = selectedBomItem?.remaining || 0;
 
                 return (
                   <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2 duration-300">
@@ -412,7 +460,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                           name={`items.${index}.bomItemId`}
                           render={({ field: bomField }) => (
                             <FormItem className="flex flex-col">
-                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Approved Material</FormLabel>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Authorized Material</FormLabel>
                               <Popover 
                                 open={openBomIndex === index} 
                                 onOpenChange={(o) => setOpenBomIndex(o ? index : null)}
@@ -436,7 +484,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                                   <div className="flex items-center border-b px-3">
                                     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                     <Input
-                                      placeholder="Filter approved BoM..."
+                                      placeholder="Filter available authorized materials..."
                                       className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
                                       value={bomSearch}
                                       onChange={(e) => setBomSearch(e.target.value)}
@@ -460,11 +508,13 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                                           <Check className={cn("mr-2 h-4 w-4 text-primary", item.id === bomField.value ? "opacity-100" : "opacity-0")} />
                                           <div className="flex flex-col items-start overflow-hidden">
                                             <span className="font-bold truncate w-full">{item.itemName}</span>
-                                            <span className="text-[8px] font-black uppercase text-muted-foreground">Authorized: {item.approvedQuantity || item.plannedQuantity} {item.unit}</span>
+                                            <span className="text-[8px] font-black uppercase text-muted-foreground">Remaining: {item.remaining.toFixed(2)} / {item.authorized} {item.unit}</span>
                                           </div>
                                         </Button>
                                       )) : (
-                                        <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic">No authorized materials found for this site.</div>
+                                        <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">
+                                          No authorized items with remaining balance found for this site.
+                                        </div>
                                       )}
                                     </div>
                                   </ScrollArea>
@@ -478,12 +528,12 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
 
                       <div className="md:col-span-2">
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1.5">
-                            <ShieldCheck className="h-3 w-3 text-primary" /> Authorized Qty
+                          <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5">
+                            <ShieldCheck className="h-3 w-3 text-primary" /> Remaining Limit
                           </Label>
                           <div className="h-10 px-3 bg-muted/20 border border-border/50 rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground">
-                            <span>{maxAllowed || '—'}</span>
-                            <span className="opacity-50">{selectedBomItem?.unit}</span>
+                            <span>{maxRemaining.toFixed(2)}</span>
+                            <span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit}</span>
                           </div>
                         </div>
                       </div>
@@ -500,16 +550,16 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                                   <Input 
                                     type="number" 
                                     step="0.01" 
-                                    max={maxAllowed}
+                                    max={maxRemaining}
                                     {...field} 
                                     className={cn(
                                       "h-10 rounded-sm bg-background font-mono font-bold",
-                                      qty > maxAllowed && "border-destructive text-destructive"
+                                      qty > maxRemaining && "border-destructive text-destructive"
                                     )} 
                                   />
-                                  {qty > maxAllowed && (
+                                  {qty > maxRemaining && (
                                     <div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1">
-                                      <AlertCircle className="h-2.5 w-2.5" /> Limit exceeded
+                                      <AlertCircle className="h-2.5 w-2.5" /> Balance exceeded
                                     </div>
                                   )}
                                 </div>
@@ -526,7 +576,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                           name={`items.${index}.rate`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Unit Rate (₹)</FormLabel>
                               <FormControl>
                                 <Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" />
                               </FormControl>
@@ -542,10 +592,10 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                           name={`items.${index}.gstPercent`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">GST</FormLabel>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Tax %</FormLabel>
                               <FormControl>
                                 <div className="relative">
-                                  <Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold pr-6 px-2" />
+                                  <Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold pr-6 px-2 text-center" />
                                   <span className="absolute right-1.5 top-2.5 text-[10px] font-bold text-muted-foreground">%</span>
                                 </div>
                               </FormControl>
@@ -557,7 +607,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
 
                       <div className="md:col-span-2">
                         <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Total (₹)</Label>
+                          <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Line Total (₹)</Label>
                           <div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">
                             {lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </div>
@@ -595,7 +645,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                 disabled={isSubmitting} 
                 className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95"
               >
-                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AUTHORIZING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}
+                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}
               </Button>
             </div>
           </div>
