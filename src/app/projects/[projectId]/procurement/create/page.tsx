@@ -25,7 +25,9 @@ import {
   Truck,
   CheckCircle2,
   Calendar,
-  Send
+  Send,
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -158,6 +160,21 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
 
   const onSubmit = async (values: z.infer<typeof poSchema>) => {
     if (!user || !userProfile || !site) return;
+
+    // Check quantities one last time
+    for (const item of values.items) {
+      const original = approvedBomItems?.find(i => i.id === item.bomItemId);
+      const maxAllowed = original?.approvedQuantity || original?.plannedQuantity || 0;
+      if (item.quantity > maxAllowed) {
+        toast({ 
+          variant: 'destructive', 
+          title: 'Quantity Violation', 
+          description: `Item "${item.itemName}" exceeds authorized limit of ${maxAllowed}.` 
+        });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -215,7 +232,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
   }
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-20">
+    <div className="space-y-8 max-w-6xl mx-auto pb-20">
       <div className="flex flex-col gap-1">
         <Button variant="ghost" size="sm" onClick={() => router.back()} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
           <ArrowLeft className="mr-2 h-4 w-4" /> Cancel
@@ -354,6 +371,9 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                 const rate = Number(watchedItems[index]?.rate) || 0;
                 const gst = Number(watchedItems[index]?.gstPercent) || 0;
                 const lineTotal = (qty * rate) * (1 + (gst / 100));
+                
+                const selectedBomItem = approvedBomItems?.find(i => i.id === watchedItems[index]?.bomItemId);
+                const maxAllowed = selectedBomItem?.approvedQuantity || selectedBomItem?.plannedQuantity || 0;
 
                 return (
                   <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2 duration-300">
@@ -371,7 +391,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
 
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                       {/* Material Selection */}
-                      <div className="md:col-span-4">
+                      <div className="md:col-span-3">
                         <FormField
                           control={form.control}
                           name={`items.${index}.bomItemId`}
@@ -441,16 +461,45 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                         />
                       </div>
 
-                      {/* Qty */}
+                      {/* Authorized Qty Display */}
+                      <div className="md:col-span-2">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1.5">
+                            <ShieldCheck className="h-3 w-3 text-primary" /> Authorized Qty
+                          </Label>
+                          <div className="h-10 px-3 bg-muted/20 border border-border/50 rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+                            <span>{maxAllowed || '—'}</span>
+                            <span className="opacity-50">{selectedBomItem?.unit}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Qty Input */}
                       <div className="md:col-span-2">
                         <FormField
                           control={form.control}
                           name={`items.${index}.quantity`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Quantity</FormLabel>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Order Quantity</FormLabel>
                               <FormControl>
-                                <Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" />
+                                <div className="relative">
+                                  <Input 
+                                    type="number" 
+                                    step="0.01" 
+                                    max={maxAllowed}
+                                    {...field} 
+                                    className={cn(
+                                      "h-10 rounded-sm bg-background font-mono font-bold",
+                                      qty > maxAllowed && "border-destructive text-destructive"
+                                    )} 
+                                  />
+                                  {qty > maxAllowed && (
+                                    <div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1">
+                                      <AlertCircle className="h-2.5 w-2.5" /> Limit exceeded
+                                    </div>
+                                  )}
+                                </div>
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -476,17 +525,17 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                       </div>
 
                       {/* GST % */}
-                      <div className="md:col-span-2">
+                      <div className="md:col-span-1">
                         <FormField
                           control={form.control}
                           name={`items.${index}.gstPercent`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">GST %</FormLabel>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">GST</FormLabel>
                               <FormControl>
                                 <div className="relative">
-                                  <Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold pr-8" />
-                                  <span className="absolute right-3 top-2.5 text-[10px] font-bold text-muted-foreground">%</span>
+                                  <Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold pr-6 px-2" />
+                                  <span className="absolute right-1.5 top-2.5 text-[10px] font-bold text-muted-foreground">%</span>
                                 </div>
                               </FormControl>
                               <FormMessage />
