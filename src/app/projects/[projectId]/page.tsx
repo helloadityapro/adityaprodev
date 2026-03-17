@@ -75,6 +75,7 @@ type UserProfile = {
 type BoMItem = {
   id: string;
   itemName: string;
+  category: string;
   specification: string;
   plannedQuantity: number;
   unit: string;
@@ -224,7 +225,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     const formData = new FormData(e.currentTarget);
     const itemName = formData.get('itemName') as string;
     
-    if (!itemName) {
+    if (!itemName || !selectedMasterItem) {
       toast({ variant: 'destructive', title: 'Selection Missing', description: 'Please select a material from the inventory list.' });
       return;
     }
@@ -232,6 +233,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     const item = {
       siteId: projectId,
       itemName: itemName,
+      category: selectedMasterItem.category,
       specification: formData.get('spec') as string,
       plannedQuantity: parseFloat(formData.get('qty') as string),
       unit: formData.get('unit') as string,
@@ -539,6 +541,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <TableHeader className="bg-muted/30">
                       <TableRow>
                         <TableHead className="px-6">Description</TableHead>
+                        <TableHead>Category</TableHead>
                         <TableHead>Specification</TableHead>
                         <TableHead className="text-center">Target Qty</TableHead>
                         {isAdmin && <TableHead className="text-right px-6">Action</TableHead>}
@@ -548,6 +551,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       {bomItems && bomItems.length > 0 ? bomItems.map(item => (
                         <TableRow key={item.id} className="hover:bg-muted/5">
                           <TableCell className="px-6 py-4 font-bold text-sm text-foreground">{item.itemName}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="rounded-sm font-bold text-[9px] uppercase tracking-wider">
+                              {item.category || "Uncategorized"}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-xs text-muted-foreground">{item.specification}</TableCell>
                           <TableCell className="text-center font-mono font-bold text-primary">{item.plannedQuantity} {item.unit}</TableCell>
                           {isAdmin && (
@@ -559,7 +567,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           )}
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">Registry empty.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">Registry empty.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
