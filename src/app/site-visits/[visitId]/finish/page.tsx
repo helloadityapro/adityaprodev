@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
 import { doc, serverTimestamp } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
@@ -53,9 +53,8 @@ type TaskItem = {
   localPhoto?: string | null;
 };
 
-export default function FinishSiteVisitPage() {
-  const params = useParams();
-  const visitId = params.visitId as string;
+export default function FinishSiteVisitPage({ params }: { params: Promise<{ visitId: string }> }) {
+  const { visitId } = React.use(params);
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
   const { user } = useUser();

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, doc, query, where, orderBy, or } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -62,8 +62,8 @@ const formatCapacity = (val: any) => {
   return isNaN(num) ? "0.000" : num.toFixed(3);
 };
 
-export default function SiteActivitiesPage() {
-  const { siteId } = useParams() as { siteId: string };
+export default function SiteActivitiesPage({ params }: { params: Promise<{ siteId: string }> }) {
+  const { siteId } = React.use(params);
   const firestore = useFirestore();
   const router = useRouter();
 

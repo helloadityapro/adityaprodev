@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp } from '@/firebase';
 import { doc, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
@@ -15,9 +15,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-export default function FinishTripPage() {
-  const params = useParams();
-  const assignmentId = params.assignmentId as string;
+export default function FinishTripPage({ params }: { params: Promise<{ assignmentId: string }> }) {
+  const { assignmentId } = React.use(params);
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
   const { user } = useUser();

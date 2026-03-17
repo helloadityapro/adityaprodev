@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
 import { doc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -90,9 +90,8 @@ const calculateDuration = (start: any, end: any) => {
   return `${hours}h ${remMins}m`;
 };
 
-export default function SiteVisitDetailPage() {
-  const params = useParams();
-  const visitId = params.visitId as string;
+export default function SiteVisitDetailPage({ params }: { params: Promise<{ visitId: string }> }) {
+  const { visitId } = React.use(params);
   const firestore = useFirestore();
   const router = useRouter();
   

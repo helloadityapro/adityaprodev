@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, useFirebaseApp } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -68,9 +68,8 @@ const formatSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-export default function SiteDocumentsPage() {
-  const params = useParams();
-  const siteId = params.siteId as string;
+export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId: string }> }) {
+  const { siteId } = React.use(params);
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
   const { user } = useUser();

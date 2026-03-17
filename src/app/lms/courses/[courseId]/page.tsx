@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import { doc, collection, query, where, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -35,8 +35,8 @@ type ProgressData = {
   completedModuleIds: string[];
 };
 
-export default function CourseDetailsPage() {
-  const { courseId } = useParams() as { courseId: string };
+export default function CourseDetailsPage({ params }: { params: Promise<{ courseId: string }> }) {
+  const { courseId } = React.use(params);
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();

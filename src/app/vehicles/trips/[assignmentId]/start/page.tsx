@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp } from '@/firebase';
 import { doc, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
@@ -16,9 +16,8 @@ import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 
-export default function StartTripPage() {
-  const params = useParams();
-  const assignmentId = params.assignmentId as string;
+export default function StartTripPage({ params }: { params: Promise<{ assignmentId: string }> }) {
+  const { assignmentId } = React.use(params);
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
   const { user } = useUser();
@@ -167,7 +166,7 @@ export default function StartTripPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
                 <Button onClick={() => startCamera()} variant="outline" className="h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all text-primary group">
                   <Camera className="h-10 w-10 group-hover:scale-110 transition-transform" />
-                  <span className="font-black uppercase text-xs tracking-widest">Capture Live Photo</span>
+                  <span className="font-black uppercase text-xs tracking-widest text-primary">Capture Live Photo</span>
                 </Button>
 
                 <div className="relative">
@@ -180,7 +179,7 @@ export default function StartTripPage() {
                   />
                   <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-primary/5 transition-all text-primary group">
                     <ImagePlus className="h-10 w-10 group-hover:scale-110 transition-transform" />
-                    <span className="font-black uppercase text-xs tracking-widest">Upload from Gallery</span>
+                    <span className="font-black uppercase text-xs tracking-widest text-primary">Upload from Gallery</span>
                   </Button>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { doc, collection, query, where, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -52,8 +52,8 @@ function getYouTubeEmbedUrl(url?: string) {
   return videoId ? `https://www.youtube.com/embed/${videoId}?rel=0` : url;
 }
 
-export default function ModuleLearningPage() {
-  const { courseId, moduleId } = useParams() as { courseId: string, moduleId: string };
+export default function ModuleLearningPage({ params }: { params: Promise<{ courseId: string, moduleId: string }> }) {
+  const { courseId, moduleId } = React.use(params);
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
