@@ -220,37 +220,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const [displayedNotifIds, setDisplayedNotifIds] = React.useState<Set<string>>(new Set());
 
-  // Request native & web notification permissions
-  React.useEffect(() => {
-    const initNotifications = async () => {
-      // 1. Mobile Platform Setup
-      if (Capacitor.isNativePlatform()) {
-        const perm = await LocalNotifications.checkPermissions();
-        if (perm.display !== 'granted') {
-          await LocalNotifications.requestPermissions();
-        }
-        
-        if (Capacitor.getPlatform() === 'android') {
-          await LocalNotifications.createChannel({
-            id: 'aditya-pro-alerts',
-            name: 'Aditya Pro Alerts',
-            description: 'Critical alerts for permits, tasks, and site activities',
-            importance: 5,
-            visibility: 1,
-            vibration: true,
-          });
-        }
-      } 
-      // 2. Web Browser Setup
-      else if ('Notification' in window) {
-        if (Notification.permission === 'default') {
-          Notification.requestPermission();
-        }
-      }
-    };
-    initNotifications();
-  }, []);
-
   // Handle notification click routing
   React.useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -266,6 +235,44 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
+  // Request native & web notification permissions - triggered after user is confirmed
+  React.useEffect(() => {
+    if (!user) return;
+
+    const initNotifications = async () => {
+      // 1. Mobile Platform Setup
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const perm = await LocalNotifications.checkPermissions();
+          if (perm.display !== 'granted') {
+            await LocalNotifications.requestPermissions();
+          }
+          
+          if (Capacitor.getPlatform() === 'android') {
+            await LocalNotifications.createChannel({
+              id: 'aditya-pro-alerts',
+              name: 'Aditya Pro Alerts',
+              description: 'Critical alerts for permits, tasks, and site activities',
+              importance: 5, // High importance
+              visibility: 1, // Public
+              vibration: true,
+            });
+          }
+        } catch (err) {
+          console.warn("Failed to initialize native notifications:", err);
+        }
+      } 
+      // 2. Web Browser Setup
+      else if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'default') {
+          Notification.requestPermission();
+        }
+      }
+    };
+    initNotifications();
+  }, [user]);
+
+  // Hydrate displayed notification IDs from session storage
   React.useEffect(() => {
     try {
       const raw = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
@@ -280,8 +287,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Monitor notifications and dispatch system alerts
   React.useEffect(() => {
-      if (notifications) {
+      if (notifications && user) {
           const newDisplayedIds = new Set(displayedNotifIds);
           let wasUpdated = false;
           
@@ -303,15 +311,16 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                           body: notif.description,
                           id: parseInt(notif.id.replace(/\D/g, '').slice(-8)) || Math.floor(Math.random() * 1000000),
                           channelId: 'aditya-pro-alerts',
+                          smallIcon: 'ic_stat_icon_config_sample', // Standard resource name
                           extra: {
                             link: notif.link
                           }
                         }
                       ]
-                    });
+                    }).catch(err => console.error("Scheduling error:", err));
                   } 
                   // C. Trigger browser notification if on desktop
-                  else if ('Notification' in window && Notification.permission === 'granted') {
+                  else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
                     new Notification(notif.title, { body: notif.description });
                   }
 
@@ -325,7 +334,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               sessionStorage.setItem(DISPLAYED_NOTIFS_KEY, JSON.stringify(Array.from(newDisplayedIds)));
           }
       }
-  }, [notifications, toast, displayedNotifIds]);
+  }, [notifications, user, toast, displayedNotifIds]);
 
   if (isAuthPage) return <>{children}</>;
 
