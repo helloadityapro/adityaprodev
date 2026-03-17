@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
 import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, Hash, CheckCircle2, FileDown, FileUp, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,11 +33,11 @@ type Supplier = {
 };
 
 const supplierSchema = z.object({
-  name: z.string().min(1, 'Name is required.'),
-  gstin: z.string().min(15, 'GSTIN must be 15 characters.').max(15, 'GSTIN must be 15 characters.'),
-  address: z.string().min(1, 'Address is required.'),
-  mobile: z.string().min(10, 'Mobile number is required.'),
-  email: z.string().email('Invalid email address.').or(z.literal('')),
+  name: z.string().min(1, 'Company Name is required.'),
+  gstin: z.string().optional().or(z.literal('')).refine(val => !val || val.length === 15, "GSTIN must be exactly 15 characters if provided."),
+  address: z.string().optional().or(z.literal('')),
+  mobile: z.string().optional().or(z.literal('')),
+  email: z.string().email('Invalid email address.').optional().or(z.literal('')),
 });
 
 export default function SuppliersManagementPage() {
@@ -50,6 +50,7 @@ export default function SuppliersManagementPage() {
   const [supplierToEdit, setSupplierToEdit] = React.useState<Supplier | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isImporting, setIsImporting] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -71,7 +72,7 @@ export default function SuppliersManagementPage() {
     if (!suppliers) return [];
     return suppliers.filter(s => 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.gstin.toLowerCase().includes(searchTerm.toLowerCase())
+      (s.gstin || "").toLowerCase().includes(searchTerm.toLowerCase())
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [suppliers, searchTerm]);
 
@@ -85,9 +86,9 @@ export default function SuppliersManagementPage() {
     if (supplierToEdit) {
       form.reset({
         name: supplierToEdit.name,
-        gstin: supplierToEdit.gstin,
-        address: supplierToEdit.address,
-        mobile: supplierToEdit.mobile,
+        gstin: supplierToEdit.gstin || '',
+        address: supplierToEdit.address || '',
+        mobile: supplierToEdit.mobile || '',
         email: supplierToEdit.email || '',
       });
     } else if (!isAddDialogOpen) {
@@ -95,21 +96,65 @@ export default function SuppliersManagementPage() {
     }
   }, [supplierToEdit, isAddDialogOpen, form]);
 
-  const onAddSubmit = (values: z.infer<typeof supplierSchema>) => {
-    addDocumentNonBlocking(collection(firestore, 'suppliers'), {
-      ...values,
-      createdAt: serverTimestamp(),
-    });
-    toast({ title: 'Supplier Added', description: `${values.name} has been added to the registry.` });
-    form.reset();
-    setIsAddDialogOpen(false);
+  const checkGstinUnique = async (gstin: string, currentId?: string) => {
+    if (!gstin) return true;
+    const q = query(collection(firestore, 'suppliers'), where('gstin', '==', gstin.toUpperCase()));
+    const snap = await getDocs(q);
+    const others = snap.docs.filter(d => d.id !== currentId);
+    return others.length === 0;
   };
 
-  const onEditSubmit = (values: z.infer<typeof supplierSchema>) => {
+  const onAddSubmit = async (values: z.infer<typeof supplierSchema>) => {
+    setIsSubmitting(true);
+    try {
+      if (values.gstin) {
+        const isUnique = await checkGstinUnique(values.gstin);
+        if (!isUnique) {
+          form.setError('gstin', { type: 'manual', message: 'This GSTIN is already registered to another supplier.' });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      addDocumentNonBlocking(collection(firestore, 'suppliers'), {
+        ...values,
+        gstin: values.gstin?.toUpperCase() || "",
+        createdAt: serverTimestamp(),
+      });
+      toast({ title: 'Supplier Added', description: `${values.name} has been added to the registry.` });
+      form.reset();
+      setIsAddDialogOpen(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const onEditSubmit = async (values: z.infer<typeof supplierSchema>) => {
     if (!supplierToEdit) return;
-    updateDocumentNonBlocking(doc(firestore, 'suppliers', supplierToEdit.id), values);
-    toast({ title: 'Supplier Updated', description: 'Record has been successfully modified.' });
-    setSupplierToEdit(null);
+    setIsSubmitting(true);
+    try {
+      if (values.gstin) {
+        const isUnique = await checkGstinUnique(values.gstin, supplierToEdit.id);
+        if (!isUnique) {
+          form.setError('gstin', { type: 'manual', message: 'This GSTIN is already registered to another supplier.' });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      updateDocumentNonBlocking(doc(firestore, 'suppliers', supplierToEdit.id), {
+        ...values,
+        gstin: values.gstin?.toUpperCase() || ""
+      });
+      toast({ title: 'Supplier Updated', description: 'Record has been successfully modified.' });
+      setSupplierToEdit(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -155,21 +200,26 @@ export default function SuppliersManagementPage() {
         let count = 0;
         let errors = 0;
 
-        json.forEach((row) => {
+        for (const row of json) {
           const name = row['Name'] || row['name'];
           const gstin = row['GSTIN'] || row['gstin'];
           const mobile = row['Mobile'] || row['mobile'];
           const address = row['Address'] || row['address'];
           const email = row['Email'] || row['email'];
           
-          // Basic validation for required fields
-          if (name && gstin && String(gstin).trim().length === 15) {
+          if (name) {
+            const cleanGstin = String(gstin || '').trim().toUpperCase();
+            if (cleanGstin && cleanGstin.length !== 15) {
+              errors++;
+              continue;
+            }
+
             const newDocRef = doc(collection(firestore, 'suppliers'));
             batch.set(newDocRef, {
               name: String(name).trim(),
-              gstin: String(gstin).trim().toUpperCase(),
-              mobile: String(mobile || 'N/A').trim(),
-              address: String(address || 'N/A').trim(),
+              gstin: cleanGstin,
+              mobile: String(mobile || '').trim(),
+              address: String(address || '').trim(),
               email: String(email || '').trim(),
               createdAt: serverTimestamp(),
             });
@@ -177,14 +227,14 @@ export default function SuppliersManagementPage() {
           } else {
             errors++;
           }
-        });
+        }
 
         if (count > 0) {
           await batch.commit();
           toast({ 
             variant: 'success', 
             title: 'Import Successful', 
-            description: `Successfully imported ${count} suppliers. ${errors > 0 ? `${errors} rows were invalid.` : ''}` 
+            description: `Successfully imported ${count} suppliers. ${errors > 0 ? `${errors} rows were invalid or skipped.` : ''}` 
           });
         } else {
           toast({ variant: 'destructive', title: 'Import Failed', description: 'No valid data rows found in the file.' });
@@ -220,7 +270,7 @@ export default function SuppliersManagementPage() {
           <h1 className="flex items-center gap-2 text-primary">
             <Truck className="h-8 w-8" /> Supplier Registry
           </h1>
-          <p className="text-muted-foreground">Manage organizational material suppliers and their credentials.</p>
+          <p className="text-muted-foreground">Manage organizational material suppliers. Only Company Name is mandatory.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" onClick={handleDownloadTemplate} className="rounded-sm font-bold border-primary text-primary">
@@ -280,20 +330,24 @@ export default function SuppliersManagementPage() {
                         <span className="font-bold text-sm text-primary">{supplier.name}</span>
                         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-1">
                           <MapPin className="h-3 w-3 shrink-0" />
-                          <span className="truncate max-w-[200px]">{supplier.address}</span>
+                          <span className="truncate max-w-[200px]">{supplier.address || "No address recorded"}</span>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="rounded-sm font-mono text-[10px] uppercase font-bold tracking-wider">
-                        {supplier.gstin}
-                      </Badge>
+                      {supplier.gstin ? (
+                        <Badge variant="secondary" className="rounded-sm font-mono text-[10px] uppercase font-bold tracking-wider">
+                          {supplier.gstin}
+                        </Badge>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground italic">No GSTIN</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2 text-xs">
                           <Smartphone className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-medium">{supplier.mobile}</span>
+                          <span className="font-medium">{supplier.mobile || "—"}</span>
                         </div>
                         {supplier.email && (
                           <div className="flex items-center gap-2 text-xs">
@@ -341,21 +395,23 @@ export default function SuppliersManagementPage() {
               )} />
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="gstin" render={({ field }) => (
-                  <FormItem><FormLabel>GSTIN</FormLabel><FormControl><Input placeholder="15 Digit GST Number" {...field} className="rounded-sm font-mono uppercase" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>GSTIN (Optional)</FormLabel><FormControl><Input placeholder="15 Digit GST Number" {...field} className="rounded-sm font-mono uppercase" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="mobile" render={({ field }) => (
-                  <FormItem><FormLabel>Mobile Number</FormLabel><FormControl><Input placeholder="10 Digit Number" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Mobile Number (Optional)</FormLabel><FormControl><Input placeholder="10 Digit Number" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
               <FormField control={form.control} name="email" render={({ field }) => (
                 <FormItem><FormLabel>Email Address (Optional)</FormLabel><FormControl><Input placeholder="billing@supplier.com" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="address" render={({ field }) => (
-                <FormItem><FormLabel>Business Address</FormLabel><FormControl><Input placeholder="Street, City, State, ZIP" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Business Address (Optional)</FormLabel><FormControl><Input placeholder="Street, City, State, ZIP" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
               )} />
               <DialogFooter className="pt-4 border-t">
                 <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Cancel</Button></DialogClose>
-                <Button type="submit" className="rounded-sm font-bold px-8">Save Supplier</Button>
+                <Button type="submit" className="rounded-sm font-bold px-8" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Supplier"}
+                </Button>
               </DialogFooter>
             </form>
           </Form>
@@ -377,21 +433,23 @@ export default function SuppliersManagementPage() {
                 )} />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="gstin" render={({ field }) => (
-                    <FormItem><FormLabel>GSTIN</FormLabel><FormControl><Input {...field} className="rounded-sm font-mono uppercase" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>GSTIN (Optional)</FormLabel><FormControl><Input {...field} className="rounded-sm font-mono uppercase" /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="mobile" render={({ field }) => (
-                    <FormItem><FormLabel>Mobile Number</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Mobile Number (Optional)</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
                 <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Email Address (Optional)</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="address" render={({ field }) => (
-                  <FormItem><FormLabel>Business Address</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Business Address (Optional)</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <DialogFooter className="pt-4 border-t">
                   <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Cancel</Button></DialogClose>
-                  <Button type="submit" className="rounded-sm font-bold px-8">Save Changes</Button>
+                  <Button type="submit" className="rounded-sm font-bold px-8" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Changes"}
+                  </Button>
                 </DialogFooter>
               </form>
             </Form>
