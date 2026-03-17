@@ -220,11 +220,35 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const [displayedNotifIds, setDisplayedNotifIds] = React.useState<Set<string>>(new Set());
 
-  // Request native notification permissions
+  // Request native & web notification permissions
   React.useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      LocalNotifications.requestPermissions();
-    }
+    const initNotifications = async () => {
+      // 1. Mobile Platform Setup
+      if (Capacitor.isNativePlatform()) {
+        const perm = await LocalNotifications.checkPermissions();
+        if (perm.display !== 'granted') {
+          await LocalNotifications.requestPermissions();
+        }
+        
+        if (Capacitor.getPlatform() === 'android') {
+          await LocalNotifications.createChannel({
+            id: 'aditya-pro-alerts',
+            name: 'Aditya Pro Alerts',
+            description: 'Critical alerts for permits, tasks, and site activities',
+            importance: 5,
+            visibility: 1,
+            vibration: true,
+          });
+        }
+      } 
+      // 2. Web Browser Setup
+      else if ('Notification' in window) {
+        if (Notification.permission === 'default') {
+          Notification.requestPermission();
+        }
+      }
+    };
+    initNotifications();
   }, []);
 
   // Handle notification click routing
@@ -260,16 +284,17 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       if (notifications) {
           const newDisplayedIds = new Set(displayedNotifIds);
           let wasUpdated = false;
+          
           notifications.forEach(notif => {
               if (!notif.read && !displayedNotifIds.has(notif.id)) {
-                  // Show in-app toast
+                  // A. Show in-app UI toast
                   toast({ 
                     title: notif.title, 
                     description: notif.description, 
                     variant: notif.title.includes('Approved') ? 'success' : notif.title.includes('Rejected') ? 'destructive' : 'default' 
                   });
 
-                  // Trigger native system notification if on mobile
+                  // B. Trigger system panel notification if on mobile
                   if (Capacitor.isNativePlatform()) {
                     LocalNotifications.schedule({
                       notifications: [
@@ -277,18 +302,24 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                           title: notif.title,
                           body: notif.description,
                           id: parseInt(notif.id.replace(/\D/g, '').slice(-8)) || Math.floor(Math.random() * 1000000),
+                          channelId: 'aditya-pro-alerts',
                           extra: {
                             link: notif.link
                           }
                         }
                       ]
                     });
+                  } 
+                  // C. Trigger browser notification if on desktop
+                  else if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification(notif.title, { body: notif.description });
                   }
 
                   newDisplayedIds.add(notif.id);
                   wasUpdated = true;
               }
           });
+          
           if (wasUpdated) {
               setDisplayedNotifIds(newDisplayedIds);
               sessionStorage.setItem(DISPLAYED_NOTIFS_KEY, JSON.stringify(Array.from(newDisplayedIds)));
