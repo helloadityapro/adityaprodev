@@ -327,7 +327,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     return result;
   }, [purchaseOrders, poSearch, poSortConfig]);
 
-  // Team Table Sort
+  // Sorting UI Components
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
 
   const handleSort = (key: SortKey) => {
@@ -827,7 +827,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                 {isAdmin && item.status === 'Pending' && (
                                   <>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Approved' })}>
-                                      <CircleCheck className="h-4 w-4" />
+                                      <CheckCircle2 className="h-4 w-4" />
                                     </Button>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Rejected' })}>
                                       <XCircle className="h-4 w-4" />
