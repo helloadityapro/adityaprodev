@@ -43,7 +43,12 @@ import {
   XCircle,
   Loader2,
   PackageCheck,
-  Truck
+  Truck,
+  FilterX,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Pencil
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -65,6 +70,16 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import Link from 'next/link';
 
 type Project = {
@@ -107,6 +122,7 @@ type PurchaseOrder = {
   status: string;
   totalAmount: number;
   itemsCount?: number;
+  createdAt: any;
 };
 
 type InventoryItem = {
@@ -125,6 +141,8 @@ type MasterItem = {
   unit: string;
   description?: string;
 };
+
+type POSortKey = 'poNumber' | 'supplier' | 'status' | 'date' | 'total';
 
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
@@ -159,9 +177,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [isBomItemPopoverOpen, setIsBomItemPopoverOpen] = React.useState(false);
   const [bomItemSearchQuery, setBomItemSearchQuery] = React.useState("");
   
-  // State for BoM approval/rejection dialog
+  // BoM Logic
   const [bomActionState, setBomActionState] = React.useState<{ item: BoMItem, type: 'Approved' | 'Rejected' } | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
+
+  // PO Management State
+  const [poSearch, setPoSearch] = React.useState("");
+  const [poSortConfig, setPoSortConfig] = React.useState<{ key: POSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+  const [poToDelete, setPoToDelete] = React.useState<PurchaseOrder | null>(null);
 
   // 1. Core Site Info
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
@@ -252,6 +275,46 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     );
   }, [masterItems, bomItemSearchQuery]);
 
+  // PO Filtering and Sorting Logic
+  const filteredSortedPOs = React.useMemo(() => {
+    if (!purchaseOrders) return [];
+    
+    let result = purchaseOrders.filter(po => 
+      po.poNumber.toLowerCase().includes(poSearch.toLowerCase()) ||
+      po.supplierName.toLowerCase().includes(poSearch.toLowerCase())
+    );
+
+    result.sort((a, b) => {
+      const { key, direction } = poSortConfig;
+      let valA: any = '';
+      let valB: any = '';
+
+      if (key === 'poNumber') { valA = a.poNumber; valB = b.poNumber; }
+      else if (key === 'supplier') { valA = a.supplierName; valB = b.supplierName; }
+      else if (key === 'status') { valA = a.status; valB = b.status; }
+      else if (key === 'date') { valA = new Date(a.orderDate).getTime(); valB = new Date(b.orderDate).getTime(); }
+      else if (key === 'total') { valA = a.totalAmount; valB = b.totalAmount; }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [purchaseOrders, poSearch, poSortConfig]);
+
+  const handlePOSort = (key: POSortKey) => {
+    setPoSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const POSortIcon = ({ column }: { column: POSortKey }) => {
+    if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
+    return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+  };
+
   const handleAddBoM = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -308,6 +371,17 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       lastUpdated: serverTimestamp()
     });
     toast({ title: 'Stock Updated' });
+  };
+
+  const handleDeletePO = async () => {
+    if (!poToDelete) return;
+    try {
+      await deleteDocumentNonBlocking(doc(firestore, 'project_pos', poToDelete.id));
+      toast({ title: 'PO Removed', description: 'Purchase Order has been deleted from site records.' });
+      setPoToDelete(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
+    }
   };
 
   if (projectLoading) return (
@@ -745,8 +819,17 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
           {/* --- Tab Content: POs --- */}
           <TabsContent value="po" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
-            <div className="flex justify-end">
-              <Button asChild className="rounded-sm font-bold shadow-md">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search PO or Vendor..." 
+                  className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
+                  value={poSearch}
+                  onChange={e => setPoSearch(e.target.value)}
+                />
+              </div>
+              <Button asChild className="rounded-sm font-bold shadow-md h-9">
                 <Link href={`/projects/${projectId}/procurement/create`}>
                   <Plus className="h-4 w-4 mr-2" /> Create Purchase Order
                 </Link>
@@ -764,28 +847,52 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                   <Table>
                     <TableHeader className="bg-muted/30">
                       <TableRow>
-                        <TableHead className="px-6">PO Number</TableHead>
-                        <TableHead>Items</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right px-6">Total Value</TableHead>
+                        <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('poNumber')}>
+                          <div className="flex items-center">PO Number <POSortIcon column="poNumber" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('supplier')}>
+                          <div className="flex items-center">Vendor <POSortIcon column="supplier" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('date')}>
+                          <div className="flex items-center">Date <POSortIcon column="date" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('status')}>
+                          <div className="flex items-center">Status <POSortIcon column="status" /></div>
+                        </TableHead>
+                        <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}>
+                          <div className="flex items-center justify-end">Total Value <POSortIcon column="total" /></div>
+                        </TableHead>
+                        <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {purchaseOrders && purchaseOrders.length > 0 ? purchaseOrders.map(po => (
-                        <TableRow key={po.id} className="hover:bg-muted/5">
-                          <TableCell className="px-6 py-4 font-mono text-xs font-black text-primary uppercase">{po.poNumber}</TableCell>
-                          <TableCell className="font-bold text-sm">
-                            <Badge variant="secondary" className="rounded-sm font-bold text-[9px] uppercase">
-                              {po.itemsCount || 1} Item(s)
-                            </Badge>
+                      {filteredSortedPOs.length > 0 ? filteredSortedPOs.map(po => (
+                        <TableRow key={po.id} className="hover:bg-muted/5 transition-colors">
+                          <TableCell className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span>
+                              <span className="text-[9px] font-bold text-muted-foreground uppercase">{po.itemsCount || 1} Material(s)</span>
+                            </div>
                           </TableCell>
-                          <TableCell className="text-sm font-semibold text-muted-foreground">{po.supplierName}</TableCell>
+                          <TableCell className="text-sm font-semibold text-foreground">{po.supplierName}</TableCell>
+                          <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                           <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{po.status}</Badge></TableCell>
-                          <TableCell className="text-right px-6 font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</TableCell>
+                          <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</TableCell>
+                          <TableCell className="text-right px-6">
+                            <div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" title="Edit coming soon">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              {(isAdmin || isManager) && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">No POs found in project records.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No POs found in project records.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1043,6 +1150,24 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* PO Delete Confirmation */}
+      <AlertDialog open={!!poToDelete} onOpenChange={(o) => !o && setPoToDelete(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Purchase Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete PO <strong>{poToDelete?.poNumber}</strong>? This action will permanently remove it from organizational procurement records.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePO} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-bold">
+              Delete PO
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
