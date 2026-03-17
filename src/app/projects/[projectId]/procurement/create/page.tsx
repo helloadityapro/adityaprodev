@@ -5,7 +5,15 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from '@/firebase';
+import { 
+  useFirestore, 
+  useUser, 
+  useDoc, 
+  useMemoFirebase, 
+  useCollection, 
+  addDocumentNonBlocking, 
+  useFirebaseApp 
+} from '@/firebase';
 import { collection, doc, query, where, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -176,6 +184,15 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
     setIsSubmitting(true);
 
     try {
+      // Calculate total from values to be absolutely sure we have the latest data
+      const calculatedTotal = values.items.reduce((sum, item) => {
+        const qty = Number(item.quantity) || 0;
+        const rate = Number(item.rate) || 0;
+        const gst = Number(item.gstPercent) || 0;
+        const lineTotal = (qty * rate) * (1 + (gst / 100));
+        return sum + lineTotal;
+      }, 0);
+
       await addDocumentNonBlocking(collection(firestore, 'project_pos'), {
         siteId: projectId,
         siteName: site.name,
@@ -185,14 +202,14 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
         orderDate: values.orderDate,
         items: values.items,
         itemsCount: values.items.length,
-        totalAmount,
+        totalAmount: calculatedTotal,
         status: 'Open',
         createdAt: serverTimestamp(),
         createdBy: user.uid,
         createdByName: userProfile.username || user.email
       });
 
-      setFinalTotal(totalAmount);
+      setFinalTotal(calculatedTotal);
       setIsSuccess(true);
       toast({ title: 'PO Created', description: `Purchase Order ${values.poNumber} has been recorded.` });
     } catch (e: any) {
