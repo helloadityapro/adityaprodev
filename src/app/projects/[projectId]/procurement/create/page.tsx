@@ -85,6 +85,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
+  const [finalTotal, setFinalTotal] = React.useState(0);
 
   const [isSupplierPopoverOpen, setIsSupplierPopoverOpen] = React.useState(false);
   const [supplierSearch, setSupplierSearch] = React.useState("");
@@ -191,6 +192,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
         createdByName: userProfile.username || user.email
       });
 
+      setFinalTotal(totalAmount);
       setIsSuccess(true);
       toast({ title: 'PO Created', description: `Purchase Order ${values.poNumber} has been recorded.` });
     } catch (e: any) {
@@ -210,9 +212,9 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                 <CheckCircle2 className="h-12 w-12 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold">PO Generated</CardTitle>
+            <CardTitle className="text-2xl font-bold uppercase tracking-tight">PO Generated</CardTitle>
             <CardDescription className="text-base leading-relaxed">
-              Purchase Order for <strong className="text-primary font-black">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated for <strong className="text-foreground">{form.getValues('supplierName')}</strong> for <strong className="text-primary">{site?.name}</strong>.
+              Purchase Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated for <strong className="text-foreground">{form.getValues('supplierName')}</strong> for <strong className="text-primary">{site?.name}</strong>.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
