@@ -35,6 +35,45 @@
         "status": { "type": "string", "enum": ["Available", "Assigned", "Maintenance"] },
         "createdAt": { "type": "string", "format": "date-time" }
       }
+    },
+    "BoMItem": {
+      "title": "BoM Item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "specification": { "type": "string" },
+        "plannedQuantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "category": { "type": "string" }
+      }
+    },
+    "PurchaseOrder": {
+      "title": "Purchase Order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "poNumber": { "type": "string" },
+        "supplierId": { "type": "string" },
+        "supplierName": { "type": "string" },
+        "orderDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Open", "Partial", "Received", "Cancelled"] },
+        "totalAmount": { "type": "number" }
+      }
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "itemName": { "type": "string" },
+        "stockLevel": { "type": "number" },
+        "unit": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -48,6 +87,18 @@
     "/vehicles/{vehicleId}": {
       "schema": { "$ref": "#/backend/entities/Vehicle" },
       "description": "Fleet registry."
+    },
+    "/project_boms/{bomId}": {
+      "schema": { "$ref": "#/backend/entities/BoMItem" },
+      "description": "Bill of Materials per project site."
+    },
+    "/project_pos/{poId}": {
+      "schema": { "$ref": "#/backend/entities/PurchaseOrder" },
+      "description": "Purchase orders associated with project sites."
+    },
+    "/project_inventory/{invId}": {
+      "schema": { "$ref": "#/backend/entities/InventoryItem" },
+      "description": "Current inventory stock levels at project sites."
     }
   }
 }

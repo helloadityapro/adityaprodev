@@ -25,8 +25,6 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      // Allow users to update their own profile OR allow anyone to update 'totalPoints' (for inheritance rewards)
-      // Restricted fields like 'role' or 'department' remain protected via the affectedKeys check
       allow update: if isSignedIn() && (
         request.auth.uid == userId || 
         isAdmin() || 
@@ -38,6 +36,21 @@ service cloud.firestore {
     match /vehicles/{vehicleId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    match /project_boms/{bomId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && getUserData().role == 'Site Manager');
+    }
+
+    match /project_pos/{poId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /project_inventory/{invId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     match /vehicle_assignments/{assignmentId} {
