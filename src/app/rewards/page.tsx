@@ -45,7 +45,9 @@ type RewardSettings = {
   ptwNoCorrection?: number;
   ptwWithCorrection?: number;
   movementEngineer?: number;
+  movementManager?: number;
   dprEngineer?: number;
+  dprManager?: number;
   taskAssignment?: number;
   taskCompletion?: number;
 };
@@ -199,13 +201,13 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
                       </div>
                       <div className="flex flex-col min-w-0">
                         <span className="font-bold text-[11px] text-foreground truncate leading-none mb-1 uppercase tracking-tight">{entry.title}</span>
-                        <div className="flex items-center gap-2">
-                          <p className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1 truncate max-w-[100px] md:max-w-[150px]">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1 truncate max-w-[150px]">
                             <MapPin className="h-2 w-2 opacity-50" /> {entry.site}
                           </p>
-                          <p className="text-[9px] font-medium text-muted-foreground/40 hidden xs:flex items-center gap-1">
+                          <p className="text-[9px] font-medium text-muted-foreground/60 flex items-center gap-1">
                             <Clock className="h-2 w-2 opacity-50" />
-                            {entry.date ? format(entry.date.toDate(), 'dd MMM') : '—'}
+                            {entry.date ? format(entry.date.toDate(), 'dd MMM yyyy, HH:mm') : '—'}
                           </p>
                         </div>
                       </div>
