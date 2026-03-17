@@ -15,12 +15,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
-import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, Hash, CheckCircle2, FileDown, FileUp, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, Hash, CheckCircle2, FileDown, FileUp, AlertCircle, ArrowLeft, MoreHorizontal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { cn } from '@/lib/utils';
 
 type Supplier = {
   id: string;
@@ -261,22 +262,22 @@ export default function SuppliersManagementPage() {
   if (!isAdmin) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 md:space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <Button variant="ghost" size="sm" onClick={() => router.push('/settings')} className="w-fit mb-2 -ml-2">
+          <Button variant="ghost" size="sm" onClick={() => router.push('/settings')} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Settings
           </Button>
           <h1 className="flex items-center gap-2 text-primary">
-            <Truck className="h-8 w-8" /> Supplier Registry
+            <Truck className="h-6 w-6 md:h-8 md:w-8" /> Supplier Registry
           </h1>
-          <p className="text-muted-foreground">Manage organizational material suppliers. Only Company Name is mandatory.</p>
+          <p className="text-muted-foreground text-sm font-medium">Manage organizational material suppliers. Only Company Name is mandatory.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={handleDownloadTemplate} className="rounded-sm font-bold border-primary text-primary">
+          <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="flex-1 md:flex-initial h-10 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
             <FileDown className="mr-2 h-4 w-4" /> Template
           </Button>
-          <div className="relative">
+          <div className="relative flex-1 md:flex-initial">
             <input 
               type="file" 
               accept=".xlsx,.xls,.csv" 
@@ -284,175 +285,274 @@ export default function SuppliersManagementPage() {
               ref={fileInputRef} 
               onChange={handleBulkImport} 
             />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="rounded-sm font-bold border-primary text-primary">
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="w-full h-10 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
               {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
               Bulk Import
             </Button>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)} className="rounded-sm font-bold shadow-md">
-            <Plus className="mr-2 h-4 w-4" /> Add New
+          <Button onClick={() => setIsAddDialogOpen(true)} className="w-full md:w-auto h-10 rounded-sm font-bold shadow-md">
+            <Plus className="mr-2 h-4 w-4" /> Add New Supplier
           </Button>
         </div>
       </div>
 
       <Card className="rounded-sm shadow-sm overflow-hidden border-primary/10">
-        <CardHeader className="bg-muted/5 border-b flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-lg">Suppliers Database</CardTitle>
-            <CardDescription>Comprehensive list of all registered business partners.</CardDescription>
+        <CardHeader className="bg-muted/5 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6">
+          <div className="space-y-1">
+            <CardTitle className="text-base md:text-lg">Suppliers Database</CardTitle>
+            <CardDescription className="text-xs">Comprehensive list of all registered business partners.</CardDescription>
           </div>
           <div className="relative w-full md:w-72">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Search by name or GSTIN..." 
-              className="pl-8 rounded-sm h-10 border-primary/20" 
+              className="pl-8 h-10 rounded-sm border-primary/20 text-sm bg-background" 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 
             />
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="px-6">Supplier Details</TableHead>
-                <TableHead>GSTIN</TableHead>
-                <TableHead>Contact Info</TableHead>
-                <TableHead className="text-right px-6">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredSuppliers.length > 0 ? (
-                filteredSuppliers.map((supplier) => (
-                  <TableRow key={supplier.id} className="hover:bg-muted/5 group">
-                    <TableCell className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-sm text-primary">{supplier.name}</span>
-                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-1">
-                          <MapPin className="h-3 w-3 shrink-0" />
-                          <span className="truncate max-w-[200px]">{supplier.address || "No address recorded"}</span>
-                        </div>
+          {/* Mobile Card List */}
+          <div className="md:hidden divide-y divide-border/50">
+            {filteredSuppliers.length > 0 ? filteredSuppliers.map((supplier) => (
+              <div key={supplier.id} className="p-4 space-y-4 bg-card hover:bg-muted/5 transition-colors">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <h3 className="font-bold text-sm text-primary leading-tight truncate">{supplier.name}</h3>
+                    {supplier.gstin ? (
+                      <Badge variant="secondary" className="w-fit rounded-sm font-mono text-[10px] uppercase font-bold tracking-wider px-1.5 h-5">
+                        {supplier.gstin}
+                      </Badge>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground italic font-medium">No GSTIN recorded</span>
+                    )}
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setSupplierToEdit(supplier)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(supplier.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2.5 text-xs text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary/60" />
+                    <span className="leading-relaxed line-clamp-2">{supplier.address || "Address not provided"}</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-2 pt-1">
+                    <div className="flex items-center gap-2.5 text-xs font-semibold text-foreground">
+                      <Smartphone className="h-3.5 w-3.5 text-primary/60" />
+                      <span>{supplier.mobile || "Phone not available"}</span>
+                    </div>
+                    {supplier.email && (
+                      <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                        <Mail className="h-3.5 w-3.5 text-primary/60" />
+                        <span className="truncate">{supplier.email}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {supplier.gstin ? (
-                        <Badge variant="secondary" className="rounded-sm font-mono text-[10px] uppercase font-bold tracking-wider">
-                          {supplier.gstin}
-                        </Badge>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground italic">No GSTIN</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 text-xs">
-                          <Smartphone className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-medium">{supplier.mobile || "—"}</span>
-                        </div>
-                        {supplier.email && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <Mail className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-muted-foreground">{supplier.email}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )) : (
+              <div className="p-12 text-center text-muted-foreground italic text-sm">
+                No matching suppliers found.
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="px-6">Supplier Details</TableHead>
+                  <TableHead>GSTIN</TableHead>
+                  <TableHead>Contact Info</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredSuppliers.length > 0 ? (
+                  filteredSuppliers.map((supplier) => (
+                    <TableRow key={supplier.id} className="hover:bg-muted/5 group">
+                      <TableCell className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm text-primary">{supplier.name}</span>
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-1">
+                            <MapPin className="h-3 w-3 shrink-0" />
+                            <span className="truncate max-w-[200px]" title={supplier.address}>{supplier.address || "No address recorded"}</span>
                           </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {supplier.gstin ? (
+                          <Badge variant="secondary" className="rounded-sm font-mono text-[10px] uppercase font-bold tracking-wider">
+                            {supplier.gstin}
+                          </Badge>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground italic">No GSTIN</span>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right px-6">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setSupplierToEdit(supplier)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleDelete(supplier.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 text-xs">
+                            <Smartphone className="h-3 w-3 text-muted-foreground" />
+                            <span className="font-medium">{supplier.mobile || "—"}</span>
+                          </div>
+                          {supplier.email && (
+                            <div className="flex items-center gap-2 text-xs">
+                              <Mail className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-muted-foreground">{supplier.email}</span>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => setSupplierToEdit(supplier)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/10" onClick={() => handleDelete(supplier.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic">
+                      {searchTerm ? `No suppliers matching "${searchTerm}"` : "No registered suppliers found. Click 'Add New Supplier' to start."}
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic">
-                    {searchTerm ? `No suppliers matching "${searchTerm}"` : "No registered suppliers found. Click 'Add New Supplier' to start."}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
       {/* Add Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="rounded-sm max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Register New Supplier</DialogTitle>
-            <DialogDescription>Input business details for the new material supplier.</DialogDescription>
+        <DialogContent className="sm:max-w-lg rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b">
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Register New Supplier</DialogTitle>
+            <DialogDescription className="text-xs font-medium">Input business details for the new material supplier.</DialogDescription>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onAddSubmit)} className="space-y-4 py-4">
-              <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem><FormLabel>Company Name</FormLabel><FormControl><Input placeholder="Legal name of business" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-              )} />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="gstin" render={({ field }) => (
-                  <FormItem><FormLabel>GSTIN (Optional)</FormLabel><FormControl><Input placeholder="15 Digit GST Number" {...field} className="rounded-sm font-mono uppercase" /></FormControl><FormMessage /></FormItem>
+          <div className="p-6">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onAddSubmit)} className="space-y-5">
+                <FormField control={form.control} name="name" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Company Name</FormLabel>
+                    <FormControl><Input placeholder="Legal name of business" {...field} className="h-11 rounded-sm focus-visible:ring-primary/20" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
-                <FormField control={form.control} name="mobile" render={({ field }) => (
-                  <FormItem><FormLabel>Mobile Number (Optional)</FormLabel><FormControl><Input placeholder="10 Digit Number" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="gstin" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">GSTIN (Optional)</FormLabel>
+                      <FormControl><Input placeholder="15 Digit GST Number" {...field} className="h-11 rounded-sm font-mono uppercase focus-visible:ring-primary/20" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="mobile" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mobile Number (Optional)</FormLabel>
+                      <FormControl><Input placeholder="10 Digit Number" {...field} className="h-11 rounded-sm focus-visible:ring-primary/20" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Email Address (Optional)</FormLabel>
+                    <FormControl><Input placeholder="billing@supplier.com" {...field} className="h-11 rounded-sm focus-visible:ring-primary/20" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
-              </div>
-              <FormField control={form.control} name="email" render={({ field }) => (
-                <FormItem><FormLabel>Email Address (Optional)</FormLabel><FormControl><Input placeholder="billing@supplier.com" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="address" render={({ field }) => (
-                <FormItem><FormLabel>Business Address (Optional)</FormLabel><FormControl><Input placeholder="Street, City, State, ZIP" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-              )} />
-              <DialogFooter className="pt-4 border-t">
-                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Cancel</Button></DialogClose>
-                <Button type="submit" className="rounded-sm font-bold px-8" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Supplier"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+                <FormField control={form.control} name="address" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Business Address (Optional)</FormLabel>
+                    <FormControl><Textarea placeholder="Street, City, State, ZIP" {...field} className="rounded-sm focus-visible:ring-primary/20 min-h-[80px]" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <DialogFooter className="pt-4 border-t gap-2 flex flex-col sm:flex-row">
+                  <DialogClose asChild><Button variant="outline" className="flex-1 h-11 rounded-sm font-bold uppercase text-[10px] tracking-widest">Cancel</Button></DialogClose>
+                  <Button type="submit" className="flex-1 h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-lg" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Supplier"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={!!supplierToEdit} onOpenChange={(o) => !o && setSupplierToEdit(null)}>
-        <DialogContent className="rounded-sm max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Supplier Details</DialogTitle>
-            <DialogDescription>Update the registered information for {supplierToEdit?.name}.</DialogDescription>
+        <DialogContent className="sm:max-w-lg rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b">
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Edit Supplier Details</DialogTitle>
+            <DialogDescription className="text-xs font-medium">Update the registered information for {supplierToEdit?.name}.</DialogDescription>
           </DialogHeader>
           {supplierToEdit && (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-4 py-4">
-                <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Company Name</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                )} />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="gstin" render={({ field }) => (
-                    <FormItem><FormLabel>GSTIN (Optional)</FormLabel><FormControl><Input {...field} className="rounded-sm font-mono uppercase" /></FormControl><FormMessage /></FormItem>
+            <div className="p-6">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-5">
+                  <FormField control={form.control} name="name" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Company Name</FormLabel>
+                      <FormControl><Input {...field} className="h-11 rounded-sm focus-visible:ring-primary/20" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )} />
-                  <FormField control={form.control} name="mobile" render={({ field }) => (
-                    <FormItem><FormLabel>Mobile Number (Optional)</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="gstin" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">GSTIN (Optional)</FormLabel>
+                        <FormControl><Input {...field} className="h-11 rounded-sm font-mono uppercase focus-visible:ring-primary/20" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="mobile" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mobile Number (Optional)</FormLabel>
+                        <FormControl><Input {...field} className="h-11 rounded-sm focus-visible:ring-primary/20" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                  <FormField control={form.control} name="email" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Email Address (Optional)</FormLabel>
+                      <FormControl><Input {...field} className="h-11 rounded-sm focus-visible:ring-primary/20" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )} />
-                </div>
-                <FormField control={form.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Email Address (Optional)</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="address" render={({ field }) => (
-                  <FormItem><FormLabel>Business Address (Optional)</FormLabel><FormControl><Input {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                )} />
-                <DialogFooter className="pt-4 border-t">
-                  <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Cancel</Button></DialogClose>
-                  <Button type="submit" className="rounded-sm font-bold px-8" disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Changes"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
+                  <FormField control={form.control} name="address" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Business Address (Optional)</FormLabel>
+                      <FormControl><Textarea rows={3} {...field} className="rounded-sm focus-visible:ring-primary/20" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <DialogFooter className="pt-4 border-t gap-2 flex flex-col sm:flex-row">
+                    <DialogClose asChild><Button variant="outline" className="flex-1 h-11 rounded-sm font-bold uppercase text-[10px] tracking-widest">Cancel</Button></DialogClose>
+                    <Button type="submit" className="flex-1 h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-lg" disabled={isSubmitting}>
+                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Changes"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </div>
           )}
         </DialogContent>
       </Dialog>
