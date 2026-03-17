@@ -469,7 +469,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                     key={item.id}
                                     type="button"
                                     variant="ghost"
-                                    className="w-full justify-start font-normal h-11 text-xs mb-0.5"
+                                    className="w-full justify-start text-left font-normal h-11 text-xs mb-0.5"
                                     onClick={() => {
                                       setSelectedMasterItem(item);
                                       setIsBomItemPopoverOpen(false);
@@ -477,9 +477,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                     }}
                                   >
                                     <Check className={cn("mr-2 h-4 w-4 text-primary", selectedMasterItem?.id === item.id ? "opacity-100" : "opacity-0")} />
-                                    <div className="flex flex-col items-start min-w-0">
-                                      <span className="font-bold truncate w-full text-foreground">{item.name}</span>
-                                      <span className="text-[8px] uppercase text-muted-foreground">{item.make} • {item.category}</span>
+                                    <div className="flex flex-col items-start min-w-0 text-left">
+                                      <span className="font-bold truncate w-full text-foreground text-left">{item.name}</span>
+                                      <span className="text-[8px] uppercase text-muted-foreground text-left">{item.make} • {item.category}</span>
                                     </div>
                                   </Button>
                                 ))
