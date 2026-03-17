@@ -217,7 +217,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
             </div>
             <CardTitle className="text-2xl font-bold">PO Generated</CardTitle>
             <CardDescription className="text-base leading-relaxed">
-              Purchase Order for <strong className="text-primary font-black">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated for <strong className="text-foreground">{form.getValues('supplierName')}</strong>.
+              Purchase Order for <strong className="text-primary font-black">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated for <strong className="text-foreground">{form.getValues('supplierName')}</strong> for <strong className="text-primary">{site?.name}</strong>.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
