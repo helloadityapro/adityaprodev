@@ -89,6 +89,7 @@ type BoMItem = {
   category: string;
   specification: string;
   plannedQuantity: number;
+  approvedQuantity?: number;
   unit: string;
   status?: 'Pending' | 'Approved' | 'Rejected';
   processedByName?: string;
@@ -266,7 +267,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     (e.target as HTMLFormElement).reset();
   };
 
-  const handleProcessBoM = (remarks: string) => {
+  const handleProcessBoM = (remarks: string, approvedQty?: number) => {
     if (!bomActionState || !userProfile) return;
     setIsActionProcessing(true);
     
@@ -274,6 +275,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     updateDocumentNonBlocking(bomRef, {
       status: bomActionState.type,
       remarks: remarks,
+      approvedQuantity: approvedQty ?? null,
       processedByName: userProfile.username || user?.email || 'Admin',
       processedAt: serverTimestamp(),
       updatedAt: serverTimestamp()
@@ -598,7 +600,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead className="px-6">Description</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="text-center">Required Qty</TableHead>
+                        <TableHead className="text-center">Authorized Qty</TableHead>
                         <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -634,7 +636,20 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-center font-mono font-bold text-primary">{item.plannedQuantity} {item.unit}</TableCell>
+                          <TableCell className="text-center font-mono text-xs">
+                            <div className="flex flex-col gap-1 items-center">
+                              <div className="flex flex-col items-center">
+                                <span className="text-[8px] text-muted-foreground uppercase font-black">Required</span>
+                                <span className="font-bold text-primary">{item.plannedQuantity} {item.unit}</span>
+                              </div>
+                              {item.status === 'Approved' && (
+                                <div className="flex flex-col items-center border-t border-primary/10 pt-1 w-full">
+                                  <span className="text-[8px] text-emerald-600 uppercase font-black">Approved</span>
+                                  <span className="font-bold text-emerald-700">{item.approvedQuantity || item.plannedQuantity} {item.unit}</span>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell className="text-right px-6">
                             <div className="flex justify-end items-center gap-1">
                               {isAdmin && item.status === 'Pending' && (
@@ -962,6 +977,18 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <DialogDescription>Setting status for "{bomActionState?.item.itemName}"</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
+            {bomActionState?.type === 'Approved' && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Authorized Quantity ({bomActionState.item.unit})</Label>
+                <Input 
+                  type="number" 
+                  id="bom-approved-qty" 
+                  defaultValue={bomActionState.item.plannedQuantity}
+                  className="h-11 rounded-sm font-mono font-bold"
+                />
+                <p className="text-[9px] text-muted-foreground italic">You can adjust the quantity to be authorized for this site.</p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase text-muted-foreground tracking-widest">Audit Remarks</Label>
               <Textarea 
@@ -978,7 +1005,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               className={cn("rounded-sm font-black h-11 px-8 uppercase text-[10px] tracking-widest", bomActionState?.type === 'Approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
               onClick={() => {
                 const remarks = (document.getElementById('bom-remarks') as HTMLTextAreaElement)?.value || "";
-                handleProcessBoM(remarks);
+                const approvedQty = bomActionState?.type === 'Approved' 
+                  ? parseFloat((document.getElementById('bom-approved-qty') as HTMLInputElement)?.value || String(bomActionState.item.plannedQuantity))
+                  : undefined;
+                handleProcessBoM(remarks, approvedQty);
               }}
             >
               {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${bomActionState?.type}`}
