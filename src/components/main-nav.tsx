@@ -36,7 +36,8 @@ import {
   Users,
   SlidersHorizontal,
   FileCheck,
-  Briefcase
+  Briefcase,
+  Boxes
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -80,6 +81,17 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <Link href="/projects/list">
                   <Briefcase className="h-4 w-4 text-primary" />
                   <span className="font-bold">Manage Projects</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+
+          {!isDriver && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Master Inventory" isActive={pathname === '/inventory'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/inventory">
+                  <Boxes className="h-4 w-4" />
+                  <span className="font-medium">Master Inventory</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -153,269 +165,269 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <Trophy className="h-4 w-4 text-amber-500" />
                 <span className="font-medium">Points Bank</span>
               </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroup>
-
-      {/* Field Activities Group */}
-      {!isDriver && (
-        <>
-          <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Field Presence</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Start Site Visit" isActive={pathname === '/site-visits/start'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/site-visits/start">
-                    <Navigation className="h-4 w-4" />
-                    <span className="font-medium">Initiate Visit</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Active Visits" isActive={pathname === '/site-visits/active'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/site-visits/active">
-                    <Activity className="h-4 w-4" />
-                    <span className="font-medium">Ongoing Visits</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Visit History" isActive={pathname === '/site-visits/history'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/site-visits/history">
-                    <History className="h-4 w-4" />
-                    <span className="font-medium">Visit Archive</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-
-          <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">HSE Compliance</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Raise PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/ptw/raise">
-                    <FilePlus className="h-4 w-4" />
-                    <span className="font-medium">Request Permit</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="List of PtW" isActive={pathname === '/ptw/list'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/ptw/list">
-                    <List className="h-4 w-4" />
-                    <span className="font-medium">Compliance Audit</span>
-                  </Link>
-                </SidebarMenuButton>
-                {(isAdmin || isManager) && pendingPtwCount > 0 && (
-                  <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
-                    {pendingPtwCount}
-                  </SidebarMenuBadge>
-                )}
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-
-          <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Documentation</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Submit DPR" isActive={pathname === '/dpr/submit'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/dpr/submit">
-                    <FilePlus className="h-4 w-4" />
-                    <span className="font-medium">Submit Daily Report</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="DPR Data" isActive={pathname === '/dpr/list'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/dpr/list">
-                    <TableIcon className="h-4 w-4" />
-                    <span className="font-medium">Report Repository</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-        </>
-      )}
-
-      {/* Requirement & Movement - Synced with Screenshot */}
-      {!isDriver && (
-        <>
-          <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">SITE REQUIREMENTS</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Submit Requirement" isActive={pathname === '/requirements/submit'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/requirements/submit">
-                    <Package className="h-4 w-4" />
-                    <span className="font-medium">Submit Requirement</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Requirement Data" isActive={pathname === '/requirements/list'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/requirements/list">
-                    <ClipboardList className="h-4 w-4" />
-                    <span className="font-medium">Requirement Data</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-
-          <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">MATERIAL MOVEMENT</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Record Movement" isActive={pathname === '/movements/record'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/movements/record">
-                    <ArrowLeftRight className="h-4 w-4" />
-                    <span className="font-medium">Record Movement</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Movement Data" isActive={pathname === '/movements/list'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/movements/list">
-                    <TableIcon className="h-4 w-4" />
-                    <span className="font-medium">Movement Data</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-        </>
-      )}
-
-      {/* Logistics & Fleet */}
-      <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Logistics & Fleet</SidebarGroupLabel>
-        <SidebarMenu>
-          {!isDriver && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Request a Vehicle" isActive={pathname === '/vehicles/request'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/vehicles/request">
-                  <Fuel className="h-4 w-4" />
-                  <span className="font-medium">Vehicle Request</span>
-                </Link>
-              </SidebarMenuButton>
             </SidebarMenuItem>
-          )}
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Manage Trips" isActive={pathname === '/vehicles/trips/manage'} className="rounded-sm" onClick={handleMobileClose}>
-              <Link href="/vehicles/trips/manage">
-                <MapPinned className="h-4 w-4 text-indigo-600" />
-                <span className="font-bold">Trip Management</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroup>
-      
-      {/* Administration Section - Synced with Screenshot */}
-      {isAdminOrHR && (
-        <SidebarGroup className="mt-auto">
-          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">ADMINISTRATION</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Attendance Summary" isActive={pathname === '/admin/attendance-summary'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/admin/attendance-summary">
-                  <FileBarChart className="h-4 w-4 text-emerald-600" />
-                  <span className="font-bold text-emerald-700">Attendance Summary</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            {isAdmin && (
-              <>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Day Report" isActive={pathname === '/admin/day-report'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/admin/day-report">
-                      <CalendarDays className="h-4 w-4 text-amber-600" />
-                      <span className="font-bold text-amber-700">Day Report</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="LMS Admin" isActive={pathname.startsWith('/lms/admin')} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/lms/admin">
-                      <BookOpen className="h-4 w-4 text-primary" />
-                      <span className="font-bold">LMS Admin</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/admin/dashboard'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/admin/dashboard">
-                      <LayoutDashboard className="h-4 w-4" />
-                      <span className="font-medium">Dashboard</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Permit Management" isActive={pathname === '/settings/permits'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/permits">
-                      <FileCheck className="h-4 w-4 text-primary" />
-                      <span className="font-bold">Permit Management</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Manage Sites" isActive={pathname === '/settings/manage-sites'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/manage-sites">
-                      <MapPin className="h-4 w-4" />
-                      <span className="font-medium">Manage Sites</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Rewards Setup" isActive={pathname === '/settings/rewards'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/rewards">
-                      <Coins className="h-4 w-4 text-amber-600" />
-                      <span className="font-medium">Rewards Setup</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Suppliers" isActive={pathname.startsWith('/settings/suppliers')} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/suppliers">
-                      <Truck className="h-4 w-4" />
-                      <span className="font-medium">Suppliers</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Users" isActive={pathname.startsWith('/settings/users')} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/users">
-                      <Users className="h-4 w-4" />
-                      <span className="font-medium">Users</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Teams" isActive={pathname === '/settings/teams'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/teams">
-                      <Workflow className="h-4 w-4" />
-                      <span className="font-medium">Teams</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Settings" isActive={pathname.startsWith('/settings/dropdown-management')} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/dropdown-management">
-                      <SlidersHorizontal className="h-4 w-4" />
-                      <span className="font-medium">Settings</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </>
-            )}
           </SidebarMenu>
         </SidebarGroup>
-      )}
+
+        {/* Field Activities Group */}
+        {!isDriver && (
+          <>
+            <SidebarGroup>
+              <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Field Presence</SidebarGroupLabel>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Start Site Visit" isActive={pathname === '/site-visits/start'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/site-visits/start">
+                      <Navigation className="h-4 w-4" />
+                      <span className="font-medium">Initiate Visit</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Active Visits" isActive={pathname === '/site-visits/active'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/site-visits/active">
+                      <Activity className="h-4 w-4" />
+                      <span className="font-medium">Ongoing Visits</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Visit History" isActive={pathname === '/site-visits/history'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/site-visits/history">
+                      <History className="h-4 w-4" />
+                      <span className="font-medium">Visit Archive</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">HSE Compliance</SidebarGroupLabel>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Raise PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/ptw/raise">
+                      <FilePlus className="h-4 w-4" />
+                      <span className="font-medium">Request Permit</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="List of PtW" isActive={pathname === '/ptw/list'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/ptw/list">
+                      <List className="h-4 w-4" />
+                      <span className="font-medium">Compliance Audit</span>
+                    </Link>
+                  </SidebarMenuButton>
+                  {(isAdmin || isManager) && pendingPtwCount > 0 && (
+                    <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
+                      {pendingPtwCount}
+                    </SidebarMenuBadge>
+                  )}
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Documentation</SidebarGroupLabel>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Submit DPR" isActive={pathname === '/dpr/submit'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/dpr/submit">
+                      <FilePlus className="h-4 w-4" />
+                      <span className="font-medium">Submit Daily Report</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="DPR Data" isActive={pathname === '/dpr/list'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/dpr/list">
+                      <TableIcon className="h-4 w-4" />
+                      <span className="font-medium">Report Repository</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          </>
+        )}
+
+        {/* Requirement & Movement - Synced with Screenshot */}
+        {!isDriver && (
+          <>
+            <SidebarGroup>
+              <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">SITE REQUIREMENTS</SidebarGroupLabel>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Submit Requirement" isActive={pathname === '/requirements/submit'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/requirements/submit">
+                      <Package className="h-4 w-4" />
+                      <span className="font-medium">Submit Requirement</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Requirement Data" isActive={pathname === '/requirements/list'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/requirements/list">
+                      <ClipboardList className="h-4 w-4" />
+                      <span className="font-medium">Requirement Data</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+
+            <SidebarGroup>
+              <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">MATERIAL MOVEMENT</SidebarGroupLabel>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Record Movement" isActive={pathname === '/movements/record'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/movements/record">
+                      <ArrowLeftRight className="h-4 w-4" />
+                      <span className="font-medium">Record Movement</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Movement Data" isActive={pathname === '/movements/list'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/movements/list">
+                      <TableIcon className="h-4 w-4" />
+                      <span className="font-medium">Movement Data</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroup>
+          </>
+        )}
+
+        {/* Logistics & Fleet */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Logistics & Fleet</SidebarGroupLabel>
+          <SidebarMenu>
+            {!isDriver && (
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Request a Vehicle" isActive={pathname === '/vehicles/request'} className="rounded-sm" onClick={handleMobileClose}>
+                  <Link href="/vehicles/request">
+                    <Fuel className="h-4 w-4" />
+                    <span className="font-medium">Vehicle Request</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Manage Trips" isActive={pathname === '/vehicles/trips/manage'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/vehicles/trips/manage">
+                  <MapPinned className="h-4 w-4 text-indigo-600" />
+                  <span className="font-bold">Trip Management</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+        
+        {/* Administration Section - Synced with Screenshot */}
+        {isAdminOrHR && (
+          <SidebarGroup className="mt-auto">
+            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">ADMINISTRATION</SidebarGroupLabel>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Attendance Summary" isActive={pathname === '/admin/attendance-summary'} className="rounded-sm" onClick={handleMobileClose}>
+                  <Link href="/admin/attendance-summary">
+                    <FileBarChart className="h-4 w-4 text-emerald-600" />
+                    <span className="font-bold text-emerald-700">Attendance Summary</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {isAdmin && (
+                <>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Day Report" isActive={pathname === '/admin/day-report'} className="rounded-sm" onClick={handleMobileClose}>
+                      <Link href="/admin/day-report">
+                        <CalendarDays className="h-4 w-4 text-amber-600" />
+                        <span className="font-bold text-amber-700">Day Report</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="LMS Admin" isActive={pathname.startsWith('/lms/admin')} className="rounded-sm" onClick={handleMobileClose}>
+                      <Link href="/lms/admin">
+                        <BookOpen className="h-4 w-4 text-primary" />
+                        <span className="font-bold">LMS Admin</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/admin/dashboard'} className="rounded-sm" onClick={handleMobileClose}>
+                      <Link href="/admin/dashboard">
+                        <LayoutDashboard className="h-4 w-4" />
+                        <span className="font-medium">Dashboard</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Permit Management" isActive={pathname === '/settings/permits'} className="rounded-sm" onClick={handleMobileClose}>
+                      <Link href="/settings/permits">
+                        <FileCheck className="h-4 w-4 text-primary" />
+                        <span className="font-bold">Permit Management</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Manage Sites" isActive={pathname === '/settings/manage-sites'} className="rounded-sm" onClick={handleMobileClose}>
+                      <Link href="/settings/manage-sites">
+                        <MapPin className="h-4 w-4" />
+                        <span className="font-medium">Manage Sites</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Rewards Setup" isActive={pathname === '/settings/rewards'} className="rounded-sm" onClick={handleMobileClose}>
+                      <Link href="/settings/rewards">
+                        <Coins className="h-4 w-4 text-amber-600" />
+                        <span className="font-medium">Rewards Setup</span>
+                      </Link>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Suppliers" isActive={pathname.startsWith('/settings/suppliers')} className="rounded-sm" onClick={handleMobileClose}>
+                      <Link href="/settings/suppliers">
+                        <Truck className="h-4 w-4" />
+                        <span className="font-medium">Suppliers</span>
+                      </Link>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Users" isActive={pathname.startsWith('/settings/users')} className="rounded-sm" onClick={handleMobileClose}>
+                      <Link href="/settings/users">
+                        <Users className="h-4 w-4" />
+                        <span className="font-medium">Users</span>
+                      </Link>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Teams" isActive={pathname === '/settings/teams'} className="rounded-sm" onClick={handleMobileClose}>
+                      <Link href="/settings/teams">
+                        <Workflow className="h-4 w-4" />
+                        <span className="font-medium">Teams</span>
+                      </Link>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild tooltip="Settings" isActive={pathname.startsWith('/settings/dropdown-management')} className="rounded-sm" onClick={handleMobileClose}>
+                      <Link href="/settings/dropdown-management">
+                        <SlidersHorizontal className="h-4 w-4" />
+                        <span className="font-medium">Settings</span>
+                      </Link>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </>
+              )}
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
+      </div>
     </div>
   )
 }

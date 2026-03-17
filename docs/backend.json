@@ -74,6 +74,20 @@
         "unit": { "type": "string" },
         "lastUpdated": { "type": "string", "format": "date-time" }
       }
+    },
+    "MasterInventoryItem": {
+      "title": "Master Inventory Item",
+      "type": "object",
+      "description": "Global registry of items and assets.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "unit": { "type": "string" },
+        "make": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "unit", "make"]
     }
   },
   "auth": {
@@ -99,6 +113,10 @@
     "/project_inventory/{invId}": {
       "schema": { "$ref": "#/backend/entities/InventoryItem" },
       "description": "Current inventory stock levels at project sites."
+    },
+    "/master_inventory/{itemId}": {
+      "schema": { "$ref": "#/backend/entities/MasterInventoryItem" },
+      "description": "Global master list of all inventory item types."
     }
   }
 }

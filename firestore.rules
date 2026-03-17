@@ -53,6 +53,11 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
+    match /master_inventory/{itemId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && getUserData().role == 'Site Manager');
+    }
+
     match /vehicle_assignments/{assignmentId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
