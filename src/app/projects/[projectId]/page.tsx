@@ -170,7 +170,7 @@ type POSortKey = 'poNumber' | 'supplier' | 'status' | 'date' | 'total';
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
   const date = ts.toDate ? ts.toDate() : new Date(ts);
-  return format(date, 'dd MMM yyyy');
+  return format(date, 'dd MMM yyyy HH:mm');
 };
 
 const formatCapacity = (val: any) => {
@@ -437,7 +437,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   if (projectLoading) return (
     <div className="space-y-8 p-6 animate-pulse">
       <Skeleton className="h-12 w-1/3" />
-      <Skeleton className="h-64 w-full" />
+      <div className="grid grid-cols-4 gap-4">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+      <Skeleton className="h-[500px] w-full" />
     </div>
   );
 
@@ -634,7 +640,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <Label className="text-[10px] font-black uppercase text-muted-foreground">Select From Master Inventory</Label>
                         <Popover open={isBomItemPopoverOpen} onOpenChange={setIsBomItemPopoverOpen}>
                           <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/20">
+                            <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/20", !selectedMasterItem && "text-muted-foreground")}>
                               <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
