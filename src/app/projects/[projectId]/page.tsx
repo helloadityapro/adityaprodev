@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -148,6 +147,7 @@ type MasterItem = {
   subItems?: { name: string; quantityPerSet: number; unit: string }[];
 };
 
+type SortKey = 'engineer' | 'manager' | 'sites';
 type POSortKey = 'poNumber' | 'supplier' | 'status' | 'date' | 'total';
 
 const formatTimestamp = (ts: any) => {
@@ -309,6 +309,21 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
     return result;
   }, [purchaseOrders, poSearch, poSortConfig]);
+
+  // Team Table Sort
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+  };
 
   const handlePOSort = (key: POSortKey) => {
     setPoSortConfig(prev => ({
@@ -531,9 +546,15 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <Table>
                       <TableHeader className="bg-muted/30">
                         <TableRow>
-                          <TableHead className="px-6">Personnel</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Contact</TableHead>
+                          <TableHead className="px-6 cursor-pointer" onClick={() => handleSort('engineer')}>
+                            <div className="flex items-center">Personnel <SortIcon column="engineer" /></div>
+                          </TableHead>
+                          <TableHead className="cursor-pointer" onClick={() => handleSort('manager')}>
+                            <div className="flex items-center">Supervisor <SortIcon column="manager" /></div>
+                          </TableHead>
+                          <TableHead className="text-center cursor-pointer" onClick={() => handleSort('sites')}>
+                            <div className="flex items-center justify-center">Sites <SortIcon column="sites" /></div>
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -554,7 +575,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                 {member.role}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-xs font-medium font-mono text-muted-foreground">{member.mobile || '—'}</TableCell>
+                            <TableCell className="text-xs font-medium font-mono text-muted-foreground text-center">
+                              {member.assignedProjectIds?.length || 0}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -916,10 +939,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <div className="flex items-center">Vendor <POSortIcon column="supplier" /></div>
                         </TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('date')}>
-                          <div className="flex items-center">Date <SortIcon column="date" /></div>
+                          <div className="flex items-center">Date <POSortIcon column="date" /></div>
                         </TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('status')}>
-                          <div className="flex items-center">Status <SortIcon column="status" /></div>
+                          <div className="flex items-center">Status <POSortIcon column="status" /></div>
                         </TableHead>
                         <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}>
                           <div className="flex items-center justify-end">Total Value <POSortIcon column="total" /></div>
@@ -1200,7 +1223,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               disabled={isActionProcessing} 
               className={cn("rounded-sm font-black h-11 px-8 uppercase text-[10px] tracking-widest", bomActionState?.type === 'Approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
               onClick={() => {
-                const remarks = (document.getElementById('audit-remarks') as HTMLTextAreaElement)?.value || "";
+                const remarks = (document.getElementById('bom-remarks') as HTMLTextAreaElement)?.value || "";
                 const approvedQty = bomActionState?.type === 'Approved' 
                   ? parseFloat((document.getElementById('bom-approved-qty') as HTMLInputElement)?.value || String(bomActionState.item.plannedQuantity))
                   : undefined;
