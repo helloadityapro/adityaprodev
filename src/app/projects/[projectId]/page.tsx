@@ -51,7 +51,10 @@ import {
   Pencil,
   Layers,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Eye,
+  ExternalLink,
+  Printer
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -84,6 +87,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Link from 'next/link';
+import { Separator } from '@/components/ui/separator';
 
 type Project = {
   id: string;
@@ -118,6 +122,15 @@ type BoMItem = {
   subItems?: { name: string; quantityPerSet: number; unit: string }[];
 };
 
+type POItem = {
+  bomItemId: string;
+  itemName: string;
+  quantity: number;
+  rate: number;
+  gstPercent: number;
+  amount: number;
+};
+
 type PurchaseOrder = {
   id: string;
   poNumber: string;
@@ -125,8 +138,10 @@ type PurchaseOrder = {
   orderDate: string;
   status: string;
   totalAmount: number;
+  items: POItem[];
   itemsCount?: number;
   createdAt: any;
+  createdByName?: string;
 };
 
 type InventoryItem = {
@@ -192,6 +207,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [poSearch, setPoSearch] = React.useState("");
   const [poSortConfig, setPoSortConfig] = React.useState<{ key: POSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [poToDelete, setPoToDelete] = React.useState<PurchaseOrder | null>(null);
+  const [expandedPORows, setExpandedPORows] = React.useState<Set<string>>(new Set());
+  const [viewingPO, setViewingPO] = React.useState<PurchaseOrder | null>(null);
 
   // 1. Core Site Info
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
@@ -393,6 +410,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
     setExpandedBomRows(newSet);
+  };
+
+  const togglePORow = (id: string) => {
+    const newSet = new Set(expandedPORows);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedPORows(newSet);
   };
 
   const handleUpdateStock = async (itemId: string, newStock: number) => {
@@ -952,30 +976,60 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     </TableHeader>
                     <TableBody>
                       {filteredSortedPOs.length > 0 ? filteredSortedPOs.map(po => (
-                        <TableRow key={po.id} className="hover:bg-muted/5 transition-colors">
-                          <TableCell className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span>
-                              <span className="text-[9px] font-bold text-muted-foreground uppercase">{po.itemsCount || 1} Material(s)</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm font-semibold text-foreground">{po.supplierName}</TableCell>
-                          <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
-                          <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{po.status}</Badge></TableCell>
-                          <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</TableCell>
-                          <TableCell className="text-right px-6">
-                            <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" title="Edit coming soon">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              {(isAdmin || isManager) && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}>
-                                  <Trash2 className="h-4 w-4" />
+                        <React.Fragment key={po.id}>
+                          <TableRow className="hover:bg-muted/5 transition-colors">
+                            <TableCell className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => togglePORow(po.id)}>
+                                  {expandedPORows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                 </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                                <div className="flex flex-col">
+                                  <span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span>
+                                  <span className="text-[9px] font-bold text-muted-foreground uppercase">{po.itemsCount || 1} Material(s)</span>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold text-foreground">{po.supplierName}</TableCell>
+                            <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
+                            <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{po.status}</Badge></TableCell>
+                            <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</TableCell>
+                            <TableCell className="text-right px-6">
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                {(isAdmin || isManager) && (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {expandedPORows.has(po.id) && po.items && (
+                            <TableRow className="bg-muted/30">
+                              <TableCell colSpan={6} className="p-0">
+                                <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Layers className="h-3.5 w-3.5 text-primary" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">Purchase Breakdown for {po.poNumber}</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                    {po.items.map((item, iIdx) => (
+                                      <div key={iIdx} className="p-3 bg-background border border-primary/5 rounded-sm flex flex-col gap-1">
+                                        <span className="text-xs font-bold">{item.itemName}</span>
+                                        <div className="flex items-center justify-between text-[10px]">
+                                          <span className="text-muted-foreground uppercase font-medium">Qty: {item.quantity}</span>
+                                          <span className="text-primary font-black uppercase">₹{item.amount.toLocaleString('en-IN')}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
                       )) : (
                         <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No POs found in project records.</TableCell></TableRow>
                       )}
@@ -1187,6 +1241,96 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Viewing PO Dialog */}
+      <Dialog open={!!viewingPO} onOpenChange={(o) => !o && setViewingPO(null)}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><ShoppingBag className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Purchase Order Audit</DialogTitle>
+                <DialogDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{viewingPO?.poNumber}</DialogDescription>
+              </div>
+            </div>
+            <div className="no-print">
+              <Button variant="outline" size="sm" onClick={() => window.print()} className="rounded-sm h-9 border-primary/20 text-primary">
+                <Printer className="h-4 w-4 mr-2" /> Print PO
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 bg-background">
+            {viewingPO && (
+              <div className="p-8 space-y-10" id="printable-po-area">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Supplier / Vendor</Label>
+                        <p className="text-sm font-black text-foreground">{viewingPO.supplierName}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Order Date</Label>
+                        <p className="text-sm font-bold">{viewingPO.orderDate}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Authorized By</Label>
+                        <p className="text-sm font-bold">{viewingPO.createdByName || 'N/A'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Status</Label>
+                        <div className="mt-1"><Badge className="rounded-sm h-5 text-[9px] uppercase font-black">{viewingPO.status}</Badge></div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-primary/5 rounded-sm border-2 border-primary/10 p-6 flex flex-col justify-center items-center text-center shadow-inner">
+                    <span className="text-[10px] font-black uppercase text-primary tracking-widest mb-2">Total PO Value</span>
+                    <span className="text-4xl font-black tabular-nums text-primary">₹{viewingPO.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                    <History className="h-4 w-4 text-primary" /> Itemized Line Items
+                  </Label>
+                  <div className="border rounded-sm overflow-hidden bg-muted/10">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead className="text-[10px] font-black uppercase px-4">Material Description</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase text-center">Qty</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase text-right">Rate (₹)</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase text-center">GST %</TableHead>
+                          <TableHead className="text-right px-4 text-[10px] font-black uppercase">Line Total (₹)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {viewingPO.items.map((item, idx) => (
+                          <TableRow key={idx} className="bg-background">
+                            <TableCell className="px-4 text-xs font-bold">{item.itemName}</TableCell>
+                            <TableCell className="text-center font-mono font-bold text-xs">{item.quantity}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">₹{item.rate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                            <TableCell className="text-center text-xs font-medium">{item.gstPercent}%</TableCell>
+                            <TableCell className="text-right px-4 font-mono text-xs font-black text-primary">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 no-print">
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* BoM Action Dialog */}
       <Dialog open={!!bomActionState} onOpenChange={(o) => !o && setBomActionState(null)}>
