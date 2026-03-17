@@ -221,8 +221,8 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push(`/projects/${projectId}`)}>
-              Back to Command Center
+            <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push(`/projects/${projectId}?tab=po`)}>
+              Back to Procurement
             </Button>
             <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); }}>
               Create Another PO
@@ -587,7 +587,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                 disabled={isSubmitting} 
                 className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95"
               >
-                {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> AUTHORIZING...</> : <><Send className="mr-2 h-5 w-5" /> GENERATE PURCHASE ORDER</>}
+                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> AUTHORIZING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}
               </Button>
             </div>
           </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp, orderBy, or } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -144,8 +144,17 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [activeTab, setActiveTab] = React.useState("dashboard");
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = React.useState(tabParam || "dashboard");
+
+  React.useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
   const [selectedMasterItem, setSelectedMasterItem] = React.useState<MasterItem | null>(null);
   const [isBomItemPopoverOpen, setIsBomItemPopoverOpen] = React.useState(false);
   const [bomItemSearchQuery, setBomItemSearchQuery] = React.useState("");
