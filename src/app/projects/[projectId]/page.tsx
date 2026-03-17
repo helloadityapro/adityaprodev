@@ -234,9 +234,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       siteId: projectId,
       itemName: itemName,
       category: selectedMasterItem.category,
-      specification: formData.get('spec') as string,
+      specification: selectedMasterItem.description || "",
       plannedQuantity: parseFloat(formData.get('qty') as string),
-      unit: formData.get('unit') as string,
+      unit: selectedMasterItem.unit,
       createdAt: serverTimestamp()
     };
     
@@ -499,7 +499,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       </div>
                       
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Target Qty</Label>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">REQUIRED QUANTITY</Label>
                         <div className="flex gap-2">
                           <Input name="qty" type="number" required placeholder="0" className="h-11 rounded-sm bg-background border-primary/20" />
                           <Input 
