@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp, orderBy, or } from 'firebase/firestore';
+import { collection, doc, query, where, serverTimestamp, orderBy, or, getDoc, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -366,12 +366,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
     const item = {
       siteId: projectId,
+      siteName: siteName,
       itemName: itemName,
       category: selectedMasterItem.category,
       specification: selectedMasterItem.description || "",
       plannedQuantity: parseFloat(formData.get('qty') as string),
       unit: selectedMasterItem.unit,
-      subItems: selectedMasterItem.subItems || [], // Capture sub-item definitions
+      subItems: selectedMasterItem.subItems || [],
       status: 'Pending',
       createdAt: serverTimestamp()
     };
@@ -1016,11 +1017,20 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                   </div>
                                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                     {po.items.map((item, iIdx) => (
-                                      <div key={iIdx} className="p-3 bg-background border border-primary/5 rounded-sm flex flex-col gap-1">
-                                        <span className="text-xs font-bold">{item.itemName}</span>
-                                        <div className="flex items-center justify-between text-[10px]">
-                                          <span className="text-muted-foreground uppercase font-medium">Qty: {item.quantity}</span>
-                                          <span className="text-primary font-black uppercase">₹{item.amount.toLocaleString('en-IN')}</span>
+                                      <div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm">
+                                        <div className="flex justify-between items-start">
+                                          <span className="text-xs font-black text-foreground">{item.itemName}</span>
+                                          <Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 border-t pt-2">
+                                          <div className="flex flex-col">
+                                            <span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span>
+                                            <span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span>
+                                          </div>
+                                          <div className="flex flex-col text-right">
+                                            <span className="text-muted-foreground uppercase font-bold text-[8px]">Subtotal (Incl. GST)</span>
+                                            <span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                          </div>
                                         </div>
                                       </div>
                                     ))}
@@ -1095,7 +1105,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <TableHeader className="bg-muted/30">
                       <TableRow>
                         <TableHead className="px-6">Date</TableHead>
-                        <TableHead>Engineer</TableHead>
+                        <TableHead>User</TableHead>
                         <TableHead className="max-w-[400px]">Update Summary</TableHead>
                       </TableRow>
                     </TableHeader>
