@@ -1,9 +1,8 @@
-
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp, orderBy, or } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -107,7 +106,7 @@ type PurchaseOrder = {
   orderDate: string;
   status: string;
   totalAmount: number;
-  itemName?: string;
+  itemsCount?: number;
 };
 
 type InventoryItem = {
@@ -125,12 +124,6 @@ type MasterItem = {
   make: string;
   unit: string;
   description?: string;
-};
-
-type Supplier = {
-  id: string;
-  name: string;
-  gstin: string;
 };
 
 const formatTimestamp = (ts: any) => {
@@ -161,15 +154,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [bomActionState, setBomActionState] = React.useState<{ item: BoMItem, type: 'Approved' | 'Rejected' } | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
 
-  // State for PO creation
-  const [isAddPoDialogOpen, setIsAddPoDialogOpen] = React.useState(false);
-  const [selectedBomItemForPo, setSelectedBomItemForPo] = React.useState<BoMItem | null>(null);
-  const [selectedSupplierForPo, setSelectedSupplierForPo] = React.useState<Supplier | null>(null);
-  const [isPoBomPopoverOpen, setIsPoBomPopoverOpen] = React.useState(false);
-  const [poBomSearchQuery, setPoBomSearchQuery] = React.useState("");
-  const [isPoSupplierPopoverOpen, setIsPoSupplierPopoverOpen] = React.useState(false);
-  const [poSupplierSearchQuery, setPoSupplierSearchQuery] = React.useState("");
-
   // 1. Core Site Info
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
   const { data: project, isLoading: projectLoading } = useDoc<Project>(projectRef);
@@ -180,7 +164,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const siteName = project?.name || "";
 
-  // 2. Registries (BoM, PO, Inv, Master Inventory, Suppliers)
+  // 2. Registries (BoM, PO, Inv, Master Inventory)
   const bomQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_boms'), where('siteId', '==', projectId)), 
     [firestore, projectId]
@@ -201,9 +185,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const masterInventoryQuery = useMemoFirebase(() => collection(firestore, 'master_inventory'), [firestore]);
   const { data: masterItems } = useCollection<MasterItem>(masterInventoryQuery);
-
-  const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
-  const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
 
   // 3. Field Activities
   const ptwQuery = useMemoFirebase(() => 
@@ -262,15 +243,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     );
   }, [masterItems, bomItemSearchQuery]);
 
-  const approvedBomItems = React.useMemo(() => {
-    return bomItems?.filter(item => item.status === 'Approved') || [];
-  }, [bomItems]);
-
-  const filteredSuppliers = React.useMemo(() => {
-    if (!allSuppliers) return [];
-    return allSuppliers.filter(s => s.name.toLowerCase().includes(poSupplierSearchQuery.toLowerCase()));
-  }, [allSuppliers, poSupplierSearchQuery]);
-
   const handleAddBoM = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -319,37 +291,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     
     setIsActionProcessing(false);
     setBomActionState(null);
-  };
-
-  const handleAddPo = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    
-    if (!selectedSupplierForPo) {
-      toast({ variant: 'destructive', title: 'Supplier Required', description: 'Please select a vendor for this purchase order.' });
-      return;
-    }
-
-    const po = {
-      siteId: projectId,
-      poNumber: formData.get('poNumber') as string,
-      supplierId: selectedSupplierForPo.id,
-      supplierName: selectedSupplierForPo.name,
-      orderDate: formData.get('orderDate') as string,
-      totalAmount: parseFloat(formData.get('totalAmount') as string),
-      status: 'Open',
-      itemName: selectedBomItemForPo?.itemName || "Site Materials",
-      createdAt: serverTimestamp(),
-      createdBy: user?.uid,
-      createdByName: userProfile?.username || user?.email
-    };
-
-    addDocumentNonBlocking(collection(firestore, 'project_pos'), po);
-    toast({ title: 'PO Logged', description: `Purchase Order ${po.poNumber} added to registry.` });
-    setIsAddPoDialogOpen(false);
-    setSelectedBomItemForPo(null);
-    setSelectedSupplierForPo(null);
-    (e.target as HTMLFormElement).reset();
   };
 
   const handleUpdateStock = async (itemId: string, newStock: number) => {
@@ -796,8 +737,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           {/* --- Tab Content: POs --- */}
           <TabsContent value="po" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
             <div className="flex justify-end">
-              <Button onClick={() => setIsAddPoDialogOpen(true)} className="rounded-sm font-bold shadow-md">
-                <Plus className="h-4 w-4 mr-2" /> Add Purchase Order
+              <Button asChild className="rounded-sm font-bold shadow-md">
+                <Link href={`/projects/${projectId}/procurement/create`}>
+                  <Plus className="h-4 w-4 mr-2" /> Create Purchase Order
+                </Link>
               </Button>
             </div>
 
@@ -813,7 +756,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <TableHeader className="bg-muted/30">
                       <TableRow>
                         <TableHead className="px-6">PO Number</TableHead>
-                        <TableHead>Material / Item</TableHead>
+                        <TableHead>Items</TableHead>
                         <TableHead>Supplier</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right px-6">Total Value</TableHead>
@@ -823,7 +766,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       {purchaseOrders && purchaseOrders.length > 0 ? purchaseOrders.map(po => (
                         <TableRow key={po.id} className="hover:bg-muted/5">
                           <TableCell className="px-6 py-4 font-mono text-xs font-black text-primary uppercase">{po.poNumber}</TableCell>
-                          <TableCell className="font-bold text-sm">{po.itemName || "Site Materials"}</TableCell>
+                          <TableCell className="font-bold text-sm">
+                            <Badge variant="secondary" className="rounded-sm font-bold text-[9px] uppercase">
+                              {po.itemsCount || 1} Item(s)
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-sm font-semibold text-muted-foreground">{po.supplierName}</TableCell>
                           <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{po.status}</Badge></TableCell>
                           <TableCell className="text-right px-6 font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</TableCell>
@@ -1085,140 +1032,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${bomActionState?.type}`}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Procurement: Add PO Dialog */}
-      <Dialog open={isAddPoDialogOpen} onOpenChange={setIsAddPoDialogOpen}>
-        <DialogContent className="rounded-sm max-w-lg p-0 overflow-hidden">
-          <DialogHeader className="p-6 bg-primary/5 border-b">
-            <DialogTitle className="uppercase tracking-tight font-black flex items-center gap-2">
-              <ShoppingBag className="h-5 w-5 text-primary" /> Create Purchase Order
-            </DialogTitle>
-            <DialogDescription>Link procurement to approved project materials.</DialogDescription>
-          </DialogHeader>
-          
-          <form onSubmit={handleAddPo}>
-            <div className="p-6 space-y-6">
-              {/* Approved Material Selection */}
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Select Approved Material</Label>
-                <Popover open={isPoBomPopoverOpen} onOpenChange={setIsPoBomPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between h-11 rounded-sm font-bold">
-                      <span className="truncate">{selectedBomItemForPo ? selectedBomItemForPo.itemName : "Choose approved item..."}</span>
-                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <div className="flex items-center border-b px-3">
-                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                      <Input 
-                        placeholder="Search materials..." 
-                        className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" 
-                        value={poBomSearchQuery}
-                        onChange={(e) => setPoBomSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <ScrollArea className="h-[200px]">
-                      {approvedBomItems.length > 0 ? (
-                        <div className="p-1">
-                          {approvedBomItems.filter(i => i.itemName.toLowerCase().includes(poBomSearchQuery.toLowerCase())).map(item => (
-                            <Button
-                              key={item.id}
-                              type="button"
-                              variant="ghost"
-                              className="w-full justify-start text-left h-11 text-xs"
-                              onClick={() => { setSelectedBomItemForPo(item); setIsPoBomPopoverOpen(false); }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4 text-primary", selectedBomItemForPo?.id === item.id ? "opacity-100" : "opacity-0")} />
-                              <div className="flex flex-col">
-                                <span className="font-bold">{item.itemName}</span>
-                                <span className="text-[8px] uppercase">Approved: {item.approvedQuantity || item.plannedQuantity} {item.unit}</span>
-                              </div>
-                            </Button>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="p-8 text-center text-[10px] uppercase font-bold text-muted-foreground italic">No approved items found.</div>
-                      )}
-                    </ScrollArea>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {/* Supplier Selection */}
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Select Supplier</Label>
-                <Popover open={isPoSupplierPopoverOpen} onOpenChange={setIsPoSupplierPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between h-11 rounded-sm font-bold">
-                      <span className="truncate">{selectedSupplierForPo ? selectedSupplierForPo.name : "Choose vendor..."}</span>
-                      <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <div className="flex items-center border-b px-3">
-                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                      <Input 
-                        placeholder="Search vendors..." 
-                        className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" 
-                        value={poSupplierSearchQuery}
-                        onChange={(e) => setPoSupplierSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <ScrollArea className="h-[200px]">
-                      <div className="p-1">
-                        {filteredSuppliers.length > 0 ? (
-                          filteredSuppliers.map(s => (
-                            <Button
-                              key={s.id}
-                              type="button"
-                              variant="ghost"
-                              className="w-full justify-start text-left h-11 text-xs"
-                              onClick={() => { setSelectedSupplierForPo(s); setIsPoSupplierPopoverOpen(false); }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4 text-primary", selectedSupplierForPo?.id === s.id ? "opacity-100" : "opacity-0")} />
-                              <div className="flex flex-col">
-                                <span className="font-bold">{s.name}</span>
-                                <span className="text-[8px] uppercase font-mono">{s.gstin}</span>
-                              </div>
-                            </Button>
-                          ))
-                        ) : (
-                          <div className="p-8 text-center text-xs italic">No suppliers found in registry.</div>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">PO Number</Label>
-                  <Input name="poNumber" required placeholder="AGEPL/PO/2026/001" className="h-11 rounded-sm" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Order Date</Label>
-                  <Input name="orderDate" type="date" required defaultValue={format(new Date(), 'yyyy-MM-dd')} className="h-11 rounded-sm" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Total PO Value (Rupees)</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-3 text-sm font-bold text-muted-foreground">₹</span>
-                  <Input name="totalAmount" type="number" step="0.01" required placeholder="0.00" className="h-11 pl-7 rounded-sm font-mono font-bold" />
-                </div>
-              </div>
-            </div>
-            
-            <DialogFooter className="p-6 bg-muted/10 border-t gap-2">
-              <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold h-11">Cancel</Button></DialogClose>
-              <Button type="submit" className="rounded-sm font-black shadow-lg h-11 px-8">Confirm PO Authorization</Button>
-            </DialogFooter>
-          </form>
         </DialogContent>
       </Dialog>
     </div>
