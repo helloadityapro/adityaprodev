@@ -58,6 +58,11 @@ service cloud.firestore {
       allow write: if isAdmin() || (isSignedIn() && getUserData().role == 'Site Manager');
     }
 
+    match /inventory_categories/{categoryId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /vehicle_assignments/{assignmentId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();

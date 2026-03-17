@@ -20,10 +20,8 @@ import {
   FilterX, 
   Loader2, 
   Package, 
-  Building2, 
-  ShieldCheck,
-  ChevronRight,
-  Info
+  Tag,
+  Settings2
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -54,9 +52,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import Link from 'next/link';
 
 const itemSchema = z.object({
   name: z.string().min(1, 'Item Name is required.'),
+  category: z.string().min(1, 'Category is required.'),
   description: z.string().optional(),
   unit: z.string().min(1, 'Unit of Measurement is required.'),
   make: z.string().min(1, 'Make or OEM is required.'),
@@ -65,10 +65,16 @@ const itemSchema = z.object({
 type MasterItem = {
   id: string;
   name: string;
+  category: string;
   description?: string;
   unit: string;
   make: string;
   createdAt: any;
+};
+
+type Category = {
+  id: string;
+  name: string;
 };
 
 export default function MasterInventoryPage() {
@@ -92,9 +98,15 @@ export default function MasterInventoryPage() {
   );
   const { data: items, isLoading: isItemsLoading } = useCollection<MasterItem>(inventoryQuery);
 
+  const categoriesQuery = useMemoFirebase(() => 
+    query(collection(firestore, 'inventory_categories'), orderBy('name', 'asc')), 
+    [firestore]
+  );
+  const { data: categories } = useCollection<Category>(categoriesQuery);
+
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
-    defaultValues: { name: '', description: '', unit: '', make: '' },
+    defaultValues: { name: '', category: '', description: '', unit: '', make: '' },
   });
 
   const onSubmit = async (values: z.infer<typeof itemSchema>) => {
@@ -121,6 +133,7 @@ export default function MasterInventoryPage() {
     return items.filter(item => 
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [items, searchTerm]);
@@ -144,18 +157,25 @@ export default function MasterInventoryPage() {
           </div>
           <p className="text-muted-foreground text-sm font-medium">Centralized organizational registry of assets and materials.</p>
         </div>
-        {(isAdmin || isManager) && (
-          <Button onClick={() => setIsAddDialogOpen(true)} className="h-10 rounded-sm font-bold shadow-md px-6">
-            <Plus className="h-4 w-4 mr-2" /> Add New Item
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {(isAdmin || isManager) && (
+            <Button variant="outline" asChild className="h-10 rounded-sm font-bold border-primary/20 text-primary">
+              <Link href="/inventory/categories"><Tag className="h-4 w-4 mr-2" /> Manage Categories</Link>
+            </Button>
+          )}
+          {(isAdmin || isManager) && (
+            <Button onClick={() => setIsAddDialogOpen(true)} className="h-10 rounded-sm font-bold shadow-md px-6">
+              <Plus className="h-4 w-4 mr-2" /> Add New Item
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="bg-card p-4 border border-primary/10 rounded-sm shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search by name, OEM or description..." 
+            placeholder="Search by name, OEM, category..." 
             className="pl-10 h-10 text-sm rounded-sm border-primary/20 bg-background"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -178,6 +198,7 @@ export default function MasterInventoryPage() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="px-6 min-w-[200px]">Item Name</TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead>Make / OEM</TableHead>
                   <TableHead className="text-center">UoM</TableHead>
                   <TableHead className="min-w-[300px]">Specification / Description</TableHead>
@@ -195,6 +216,11 @@ export default function MasterInventoryPage() {
                       </div>
                     </TableCell>
                     <TableCell>
+                      <Badge variant="outline" className="rounded-sm font-bold text-[9px] uppercase tracking-wider text-muted-foreground border-muted-foreground/20">
+                        {item.category}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       <Badge variant="secondary" className="rounded-sm font-bold text-[10px] uppercase tracking-tight py-0.5 px-2">
                         {item.make}
                       </Badge>
@@ -208,7 +234,7 @@ export default function MasterInventoryPage() {
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic">
+                    <TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic">
                       <div className="flex flex-col items-center gap-2 opacity-40">
                         <Boxes className="h-10 w-10" />
                         <p className="text-sm font-bold uppercase tracking-widest">Registry empty</p>
@@ -241,6 +267,27 @@ export default function MasterInventoryPage() {
                   <FormItem>
                     <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Name of the Item</FormLabel>
                     <FormControl><Input placeholder="e.g. Solar Module 540Wp" {...field} className="h-11 rounded-sm focus-visible:ring-primary/20" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="category" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Item Category</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 rounded-sm focus-visible:ring-primary/20">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories?.length ? categories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.name} className="text-xs font-bold">{cat.name}</SelectItem>
+                        )) : (
+                          <div className="p-2 text-center text-[10px] uppercase font-bold text-muted-foreground">No categories defined</div>
+                        )}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )} />

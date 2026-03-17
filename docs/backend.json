@@ -83,11 +83,22 @@
         "id": { "type": "string" },
         "name": { "type": "string" },
         "description": { "type": "string" },
+        "category": { "type": "string" },
         "unit": { "type": "string" },
         "make": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "unit", "make"]
+      "required": ["name", "category", "unit", "make"]
+    },
+    "InventoryCategory": {
+      "title": "Inventory Category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
     }
   },
   "auth": {
@@ -117,6 +128,10 @@
     "/master_inventory/{itemId}": {
       "schema": { "$ref": "#/backend/entities/MasterInventoryItem" },
       "description": "Global master list of all inventory item types."
+    },
+    "/inventory_categories/{categoryId}": {
+      "schema": { "$ref": "#/backend/entities/InventoryCategory" },
+      "description": "Categories for inventory items."
     }
   }
 }
