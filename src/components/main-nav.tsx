@@ -206,18 +206,18 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">HSE Compliance</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Raise PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm" onClick={handleMobileClose}>
+                <SidebarMenuButton asChild tooltip="Raise a PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm" onClick={handleMobileClose}>
                   <Link href="/ptw/raise">
                     <FilePlus className="h-4 w-4" />
-                    <span className="font-medium">Request Permit</span>
+                    <span className="font-medium">Raise a PtW</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="List of PtW" isActive={pathname === '/ptw/list'} className="rounded-sm" onClick={handleMobileClose}>
+                <SidebarMenuButton asChild tooltip="My PtWs" isActive={pathname === '/ptw/list'} className="rounded-sm" onClick={handleMobileClose}>
                   <Link href="/ptw/list">
                     <List className="h-4 w-4" />
-                    <span className="font-medium">Compliance Audit</span>
+                    <span className="font-medium">My PtWs</span>
                   </Link>
                 </SidebarMenuButton>
                 {(isAdmin || isManager) && pendingPtwCount > 0 && (
