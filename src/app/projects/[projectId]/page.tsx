@@ -35,7 +35,8 @@ import {
   Clock,
   User,
   Zap,
-  ChevronRight
+  ChevronRight,
+  Table as TableIcon
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -103,7 +104,8 @@ const formatCapacity = (val: any) => {
 };
 
 export default function ProjectCommandCenterPage({ params }: { params: Promise<{ projectId: string }> }) {
-  const { projectId } = React.use(params);
+  const resolvedParams = React.use(params);
+  const projectId = resolvedParams.projectId;
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
@@ -308,8 +310,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <TabsTrigger value="ptw" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
               <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Permits
             </TabsTrigger>
-            <TabsTrigger value="field-logs" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
-              <FileText className="h-3.5 w-3.5 mr-1.5" /> Field Logs
+            <TabsTrigger value="dpr" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <TableIcon className="h-3.5 w-3.5 mr-1.5" /> DPR
+            </TabsTrigger>
+            <TabsTrigger value="logistics" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" /> Logistics
             </TabsTrigger>
             <TabsTrigger value="tasks" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
               <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Tasks
@@ -546,7 +551,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         <TabsContent value="ptw" className="mt-6 animate-in fade-in-50 duration-300">
           <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
             <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-primary" /> Compliance Audit: PtWs
               </CardTitle>
             </CardHeader>
@@ -583,79 +588,92 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           </Card>
         </TabsContent>
 
-        {/* --- Tab Content: Field Logs --- */}
-        <TabsContent value="field-logs" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
-              <CardHeader className="bg-muted/5 border-b py-4">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-primary" /> Progress Reports
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {dprs && dprs.length > 0 ? (
-                  <Table>
-                    <TableBody>
-                      {dprs.map((dpr: any) => (
-                        <TableRow key={dpr.id} className="hover:bg-muted/5">
-                          <TableCell className="px-6 py-4">
-                            <div className="flex flex-col gap-1">
-                              <span className="font-mono text-[10px] font-bold text-muted-foreground">{dpr.reportDate}</span>
-                              <span className="text-xs font-semibold">{dpr.userName}</span>
-                              <p className="text-sm text-muted-foreground italic line-clamp-2 mt-1">"{dpr.description}"</p>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="p-12 text-center text-xs text-muted-foreground">No reports found.</div>
-                )}
-              </CardContent>
-            </Card>
+        {/* --- Tab Content: DPR --- */}
+        <TabsContent value="dpr" className="mt-6 animate-in fade-in-50 duration-300">
+          <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+            <CardHeader className="bg-muted/5 border-b py-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                <FileText className="h-4 w-4 text-primary" /> Daily Progress Reports
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {dprs && dprs.length > 0 ? (
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="px-6">Date</TableHead>
+                      <TableHead>Engineer</TableHead>
+                      <TableHead className="max-w-[400px]">Update Summary</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {dprs.sort((a: any, b: any) => new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime()).map((dpr: any) => (
+                      <TableRow key={dpr.id} className="hover:bg-muted/5">
+                        <TableCell className="px-6 py-4 font-mono text-xs font-bold whitespace-nowrap">{dpr.reportDate}</TableCell>
+                        <TableCell className="text-xs font-semibold">{dpr.userName}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground italic line-clamp-2 py-4">"{dpr.description}"</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-20 text-center text-muted-foreground italic">No reports found.</div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
-              <CardHeader className="bg-muted/5 border-b py-4">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                  <ArrowLeftRight className="h-4 w-4 text-primary" /> Material Logs
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {movements && movements.length > 0 ? (
-                  <Table>
-                    <TableBody>
-                      {movements.map((mov: any) => (
-                        <TableRow key={mov.id} className="hover:bg-muted/5">
-                          <TableCell className="px-6 py-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex flex-col">
-                                <span className="text-sm font-bold">{mov.itemName}</span>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <Badge className={cn("text-[8px] font-black uppercase px-1 h-4", mov.movementType === 'Inward' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{mov.movementType}</Badge>
-                                  <span className="text-[9px] font-bold text-muted-foreground uppercase">{mov.movementDate}</span>
-                                </div>
-                              </div>
-                              <span className="text-xs font-black text-primary">{mov.quantity} {mov.unit}</span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="p-12 text-center text-xs text-muted-foreground">No movements found.</div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+        {/* --- Tab Content: Logistics --- */}
+        <TabsContent value="logistics" className="mt-6 animate-in fade-in-50 duration-300">
+          <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+            <CardHeader className="bg-muted/5 border-b py-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                <ArrowLeftRight className="h-4 w-4 text-primary" /> Material Movement Logs
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {movements && movements.length > 0 ? (
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="px-6">Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead className="text-right px-6">Source/Dest</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {movements.sort((a: any, b: any) => new Date(b.movementDate).getTime() - new Date(a.movementDate).getTime()).map((mov: any) => (
+                      <TableRow key={mov.id} className="hover:bg-muted/5">
+                        <TableCell className="px-6 py-4 font-mono text-xs font-bold whitespace-nowrap">{mov.movementDate}</TableCell>
+                        <TableCell>
+                          <Badge className={cn(
+                            "text-[9px] font-black uppercase rounded-sm",
+                            mov.movementType === 'Inward' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
+                          )}>
+                            {mov.movementType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm font-semibold">{mov.itemName}</TableCell>
+                        <TableCell className="text-xs font-bold text-primary">{mov.quantity} {mov.unit}</TableCell>
+                        <TableCell className="text-right px-6 text-[10px] font-bold text-muted-foreground uppercase">{mov.sourceOrDestination}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-20 text-center text-muted-foreground italic">No movements found.</div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* --- Tab Content: Tasks --- */}
         <TabsContent value="tasks" className="mt-6 animate-in fade-in-50 duration-300">
           <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
             <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                 <CheckSquare className="h-4 w-4 text-primary" /> Open Assignments
               </CardTitle>
             </CardHeader>
@@ -692,7 +710,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         <TabsContent value="visits" className="mt-6 animate-in fade-in-50 duration-300">
           <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
             <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                 <Navigation className="h-4 w-4 text-primary" /> Management Presence
               </CardTitle>
             </CardHeader>
