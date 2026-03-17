@@ -198,19 +198,16 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [isBomItemPopoverOpen, setIsBomItemPopoverOpen] = React.useState(false);
   const [bomItemSearchQuery, setBomItemSearchQuery] = React.useState("");
   
-  // BoM Logic
   const [bomActionState, setBomActionState] = React.useState<{ item: BoMItem, type: 'Approved' | 'Rejected' } | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
   const [expandedBomRows, setExpandedBomRows] = React.useState<Set<string>>(new Set());
 
-  // PO Management State
   const [poSearch, setPoSearch] = React.useState("");
   const [poSortConfig, setPoSortConfig] = React.useState<{ key: POSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [poToDelete, setPoToDelete] = React.useState<PurchaseOrder | null>(null);
   const [expandedPORows, setExpandedPORows] = React.useState<Set<string>>(new Set());
   const [viewingPO, setViewingPO] = React.useState<PurchaseOrder | null>(null);
 
-  // 1. Core Site Info
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
   const { data: project, isLoading: projectLoading } = useDoc<Project>(projectRef);
 
@@ -220,7 +217,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const siteName = project?.name || "";
 
-  // 2. Registries (BoM, PO, Inv, Master Inventory)
   const bomQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_boms'), where('siteId', '==', projectId)), 
     [firestore, projectId]
@@ -242,7 +238,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const masterInventoryQuery = useMemoFirebase(() => collection(firestore, 'master_inventory'), [firestore]);
   const { data: masterItems } = useCollection<MasterItem>(masterInventoryQuery);
 
-  // 3. Field Activities
   const ptwQuery = useMemoFirebase(() => 
     siteName ? query(collection(firestore, 'permits_to_work'), where('siteName', '==', siteName)) : null,
     [firestore, siteName]
@@ -273,7 +268,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   );
   const { data: visits } = useCollection(visitQuery);
 
-  // 4. Team Logic
   const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: teamLoading } = useCollection<UserProfile>(allUsersQuery);
 
@@ -299,7 +293,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     );
   }, [masterItems, bomItemSearchQuery]);
 
-  // PO Filtering and Sorting Logic
   const filteredSortedPOs = React.useMemo(() => {
     if (!purchaseOrders) return [];
     
@@ -317,7 +310,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       else if (key === 'supplier') { valA = a.supplierName; valB = b.supplierName; }
       else if (key === 'status') { valA = a.status; valB = b.status; }
       else if (key === 'date') { valA = new Date(a.orderDate).getTime(); valB = new Date(b.orderDate).getTime(); }
-      else if (key === 'total') { valA = a.totalAmount; valB = b.totalAmount; }
+      else if (key === 'total') { valA = a.totalAmount || 0; valB = b.totalAmount || 0; }
 
       if (valA < valB) return direction === 'asc' ? -1 : 1;
       if (valA > valB) return direction === 'asc' ? 1 : -1;
@@ -327,7 +320,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     return result;
   }, [purchaseOrders, poSearch, poSortConfig]);
 
-  // Sorting UI Components
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
 
   const handleSort = (key: SortKey) => {
@@ -450,7 +442,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   return (
     <div className="flex flex-col flex-1 h-full -mt-4 lg:-mt-6">
-      {/* Sticky Header Section */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shadow-sm -mx-4 lg:-mx-6 px-4 lg:px-6 py-4 animate-in fade-in slide-in-from-top-2 duration-300">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1 min-w-0">
@@ -480,7 +471,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       </div>
 
       <div className="flex-1 space-y-8 pt-6 px-0.5">
-        {/* Quick Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
           <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm">
             <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">AC Capacity</p>
@@ -555,7 +545,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
 
-          {/* --- Tab Content: Dashboard --- */}
           <TabsContent value="dashboard" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
@@ -629,7 +618,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </div>
           </TabsContent>
 
-          {/* --- Tab Content: BoM --- */}
           <TabsContent value="bom" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
             {(isAdmin || isManager) && (
               <Card className="rounded-sm border-primary/10 bg-primary/5 shadow-sm">
@@ -876,7 +864,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          {/* --- Tab Content: Inventory --- */}
           <TabsContent value="inventory" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
               <CardHeader className="bg-muted/5 border-b py-4">
@@ -927,7 +914,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          {/* --- Tab Content: POs --- */}
           <TabsContent value="po" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
               <div className="relative w-full md:w-80">
@@ -1054,7 +1040,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          {/* --- Tab Content: Permits --- */}
           <TabsContent value="ptw" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardHeader className="bg-muted/5 border-b py-4">
@@ -1095,7 +1080,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          {/* --- Tab Content: DPR --- */}
           <TabsContent value="dpr" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardHeader className="bg-muted/5 border-b py-4">
@@ -1130,7 +1114,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          {/* --- Tab Content: Logistics --- */}
           <TabsContent value="logistics" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardHeader className="bg-muted/5 border-b py-4">
@@ -1176,7 +1159,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          {/* --- Tab Content: Tasks --- */}
           <TabsContent value="tasks" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardHeader className="bg-muted/5 border-b py-4">
@@ -1213,7 +1195,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          {/* --- Tab Content: Visits --- */}
           <TabsContent value="visits" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardHeader className="bg-muted/5 border-b py-4">
@@ -1256,7 +1237,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </Tabs>
       </div>
 
-      {/* Viewing PO Dialog */}
       <Dialog open={!!viewingPO} onOpenChange={(o) => !o && setViewingPO(null)}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
@@ -1346,7 +1326,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </DialogContent>
       </Dialog>
 
-      {/* BoM Action Dialog */}
       <Dialog open={!!bomActionState} onOpenChange={(o) => !o && setBomActionState(null)}>
         <DialogContent className="rounded-sm max-w-md">
           <DialogHeader>
@@ -1394,7 +1373,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </DialogContent>
       </Dialog>
 
-      {/* PO Delete Confirmation */}
       <AlertDialog open={!!poToDelete} onOpenChange={(o) => !o && setPoToDelete(null)}>
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>

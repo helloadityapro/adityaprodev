@@ -86,7 +86,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
 
-  // Popover states for search
   const [isSupplierPopoverOpen, setIsSupplierPopoverOpen] = React.useState(false);
   const [supplierSearch, setSupplierSearch] = React.useState("");
   const [openBomIndex, setOpenBomIndex] = React.useState<number | null>(null);
@@ -125,7 +124,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
 
   const watchedItems = form.watch('items');
 
-  // Derive total amount immediately from watched input values
   const totalAmount = React.useMemo(() => {
     return watchedItems.reduce((sum, item) => {
       const qty = Number(item.quantity) || 0;
@@ -136,7 +134,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
     }, 0);
   }, [watchedItems]);
 
-  // Sync hidden 'amount' field in form state for submission and validation
   React.useEffect(() => {
     watchedItems.forEach((item, index) => {
       const qty = Number(item.quantity) || 0;
@@ -144,7 +141,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
       const gst = Number(item.gstPercent) || 0;
       const calculatedAmount = (qty * rate) * (1 + (gst / 100));
       
-      // Update the form value only if it has changed to prevent unnecessary re-renders
       if (Math.abs(item.amount - calculatedAmount) > 0.01) {
         form.setValue(`items.${index}.amount`, calculatedAmount);
       }
@@ -163,7 +159,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
   const onSubmit = async (values: z.infer<typeof poSchema>) => {
     if (!user || !userProfile || !site) return;
 
-    // Check quantities one last time
     for (const item of values.items) {
       const original = approvedBomItems?.find(i => i.id === item.bomItemId);
       const maxAllowed = original?.approvedQuantity || original?.plannedQuantity || 0;
@@ -392,7 +387,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                      {/* Material Selection */}
                       <div className="md:col-span-3">
                         <FormField
                           control={form.control}
@@ -463,7 +457,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                         />
                       </div>
 
-                      {/* Authorized Qty Display */}
                       <div className="md:col-span-2">
                         <div className="space-y-2">
                           <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1.5">
@@ -476,7 +469,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                         </div>
                       </div>
 
-                      {/* Qty Input */}
                       <div className="md:col-span-2">
                         <FormField
                           control={form.control}
@@ -509,7 +501,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                         />
                       </div>
 
-                      {/* Rate */}
                       <div className="md:col-span-2">
                         <FormField
                           control={form.control}
@@ -526,7 +517,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                         />
                       </div>
 
-                      {/* GST % */}
                       <div className="md:col-span-1">
                         <FormField
                           control={form.control}
@@ -546,7 +536,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                         />
                       </div>
 
-                      {/* Line Total */}
                       <div className="md:col-span-2">
                         <div className="space-y-2">
                           <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Total (₹)</Label>
