@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -36,7 +37,8 @@ import {
   SlidersHorizontal,
   FileCheck,
   Briefcase,
-  Boxes
+  Boxes,
+  UserCog
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -203,7 +205,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           </SidebarGroup>
 
           <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">HSE Compliance</SidebarGroupLabel>
+            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">PERMIT TO WORK</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Raise a PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm" onClick={handleMobileClose}>
