@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -46,7 +45,8 @@
         "specification": { "type": "string" },
         "plannedQuantity": { "type": "number" },
         "unit": { "type": "string" },
-        "category": { "type": "string" }
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] }
       }
     },
     "PurchaseOrder": {

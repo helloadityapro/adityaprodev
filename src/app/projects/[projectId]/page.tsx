@@ -39,7 +39,8 @@ import {
   Table as TableIcon,
   Search,
   ChevronsUpDown,
-  Check
+  Check,
+  XCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -79,6 +80,7 @@ type BoMItem = {
   specification: string;
   plannedQuantity: number;
   unit: string;
+  status?: 'Pending' | 'Approved' | 'Rejected';
 };
 
 type PurchaseOrder = {
@@ -237,13 +239,30 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       specification: selectedMasterItem.description || "",
       plannedQuantity: parseFloat(formData.get('qty') as string),
       unit: selectedMasterItem.unit,
+      status: 'Pending',
       createdAt: serverTimestamp()
     };
     
     addDocumentNonBlocking(collection(firestore, 'project_boms'), item);
-    toast({ title: 'Item Added' });
+    toast({ title: 'Item Logged', description: 'BoM entry submitted for administrative approval.' });
     setSelectedMasterItem(null);
     (e.target as HTMLFormElement).reset();
+  };
+
+  const handleApproveBoM = (itemId: string) => {
+    updateDocumentNonBlocking(doc(firestore, 'project_boms', itemId), {
+      status: 'Approved',
+      updatedAt: serverTimestamp()
+    });
+    toast({ title: 'Item Approved', description: 'BoM entry authorized.' });
+  };
+
+  const handleRejectBoM = (itemId: string) => {
+    updateDocumentNonBlocking(doc(firestore, 'project_boms', itemId), {
+      status: 'Rejected',
+      updatedAt: serverTimestamp()
+    });
+    toast({ variant: 'destructive', title: 'Item Rejected', description: 'BoM entry declined.' });
   };
 
   const handleUpdateStock = async (itemId: string, newStock: number) => {
@@ -438,7 +457,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
           {/* --- Tab Content: BoM --- */}
           <TabsContent value="bom" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
-            {isAdmin && (
+            {(isAdmin || isManager) && (
               <Card className="rounded-sm border-primary/10 bg-primary/5 shadow-sm">
                 <CardHeader className="py-4 border-b">
                   <CardTitle className="text-xs font-bold uppercase tracking-widest">Add BoM Entry</CardTitle>
@@ -555,29 +574,55 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableRow>
                         <TableHead className="px-6">Description</TableHead>
                         <TableHead>Category</TableHead>
-                        <TableHead>Specification</TableHead>
-                        <TableHead className="text-center">Target Qty</TableHead>
-                        {isAdmin && <TableHead className="text-right px-6">Action</TableHead>}
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-center">Required Qty</TableHead>
+                        <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {bomItems && bomItems.length > 0 ? bomItems.map(item => (
                         <TableRow key={item.id} className="hover:bg-muted/5">
-                          <TableCell className="px-6 py-4 font-bold text-sm text-foreground">{item.itemName}</TableCell>
+                          <TableCell className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-sm text-foreground">{item.itemName}</span>
+                              <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{item.specification}</span>
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="rounded-sm font-bold text-[9px] uppercase tracking-wider">
                               {item.category || "Uncategorized"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{item.specification}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn(
+                              "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
+                              item.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                              item.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                              "bg-yellow-50 text-yellow-700 border-yellow-200"
+                            )}>
+                              {item.status || 'Pending'}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-center font-mono font-bold text-primary">{item.plannedQuantity} {item.unit}</TableCell>
-                          {isAdmin && (
-                            <TableCell className="text-right px-6">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'project_boms', item.id))}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          )}
+                          <TableCell className="text-right px-6">
+                            <div className="flex justify-end items-center gap-1">
+                              {isAdmin && item.status === 'Pending' && (
+                                <>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleApproveBoM(item.id)}>
+                                    <CheckCircle2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => handleRejectBoM(item.id)}>
+                                    <XCircle className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                              {(isAdmin || (isManager && item.status === 'Pending')) && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'project_boms', item.id))}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
                         </TableRow>
                       )) : (
                         <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">Registry empty.</TableCell></TableRow>
