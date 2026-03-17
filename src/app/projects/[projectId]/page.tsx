@@ -1,10 +1,9 @@
-
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, where, serverTimestamp, orderBy, or } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -17,14 +16,26 @@ import {
   Trash2, 
   ArrowLeft,
   Building2,
-  AlertCircle,
+  ShieldCheck,
   FileText,
   CheckCircle2,
   History,
   TrendingUp,
   MapPin,
   PlusCircle,
-  MinusCircle
+  MinusCircle,
+  Users,
+  CheckSquare,
+  ArrowLeftRight,
+  Navigation,
+  Activity,
+  FolderOpen,
+  UserCog,
+  LayoutDashboard,
+  Clock,
+  User,
+  Zap,
+  ChevronRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -34,12 +45,25 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import Link from 'next/link';
 
 type Project = {
   id: string;
   name: string;
   projectCompany: string;
+  acCapacity: number;
+  dcCapacity: number;
+};
+
+type UserProfile = {
+  id: string;
+  username: string;
+  email: string;
+  role: 'Admin' | 'Site Manager' | 'Site Engineer' | 'Driver';
+  assignedProjectIds?: string[];
+  siteManagerId?: string;
+  mobile?: string;
 };
 
 type BoMItem = {
@@ -67,16 +91,27 @@ type InventoryItem = {
   lastUpdated: any;
 };
 
-export default function ProjectDetailsPage({ params }: { params: Promise<{ projectId: string }> }) {
+const formatTimestamp = (ts: any) => {
+  if (!ts) return '—';
+  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  return format(date, 'dd MMM yyyy');
+};
+
+const formatCapacity = (val: any) => {
+  const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
+  return isNaN(num) ? "0.000" : num.toFixed(3);
+};
+
+export default function ProjectCommandCenterPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = React.use(params);
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = React.useState("bom");
+  const [activeTab, setActiveTab] = React.useState("dashboard");
 
-  // 1. Fetch Project Details
+  // 1. Core Site Info
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
   const { data: project, isLoading: projectLoading } = useDoc<Project>(projectRef);
 
@@ -84,26 +119,75 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ proje
   const { data: userProfile } = useDoc<any>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
-  // 2. Fetch BoM Items
+  const siteName = project?.name || "";
+
+  // 2. Registries (BoM, PO, Inv)
   const bomQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_boms'), where('siteId', '==', projectId)), 
     [firestore, projectId]
   );
-  const { data: bomItems, isLoading: bomLoading } = useCollection<BoMItem>(bomQuery);
+  const { data: bomItems } = useCollection<BoMItem>(bomQuery);
 
-  // 3. Fetch Purchase Orders
   const posQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_pos'), where('siteId', '==', projectId)), 
     [firestore, projectId]
   );
-  const { data: purchaseOrders, isLoading: posLoading } = useCollection<PurchaseOrder>(posQuery);
+  const { data: purchaseOrders } = useCollection<PurchaseOrder>(posQuery);
 
-  // 4. Fetch Inventory
   const inventoryQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_inventory'), where('siteId', '==', projectId)), 
     [firestore, projectId]
   );
-  const { data: inventory, isLoading: invLoading } = useCollection<InventoryItem>(inventoryQuery);
+  const { data: inventory } = useCollection<InventoryItem>(inventoryQuery);
+
+  // 3. Field Activities
+  const ptwQuery = useMemoFirebase(() => 
+    siteName ? query(collection(firestore, 'permits_to_work'), where('siteName', '==', siteName)) : null,
+    [firestore, siteName]
+  );
+  const { data: permits } = useCollection(ptwQuery);
+
+  const dprQuery = useMemoFirebase(() => 
+    siteName ? query(collection(firestore, 'dprs'), where('siteName', '==', siteName)) : null,
+    [firestore, siteName]
+  );
+  const { data: dprs } = useCollection(dprQuery);
+
+  const taskQuery = useMemoFirebase(() => 
+    siteName ? query(collection(firestore, 'tasks'), where('siteName', '==', siteName)) : null,
+    [firestore, siteName]
+  );
+  const { data: tasks } = useCollection(taskQuery);
+
+  const movementQuery = useMemoFirebase(() => 
+    siteName ? query(collection(firestore, 'material_movements'), where('siteName', '==', siteName)) : null,
+    [firestore, siteName]
+  );
+  const { data: movements } = useCollection(movementQuery);
+
+  const visitQuery = useMemoFirebase(() => 
+    query(collection(firestore, 'site_visits'), where('siteId', '==', projectId)),
+    [firestore, projectId]
+  );
+  const { data: visits } = useCollection(visitQuery);
+
+  // 4. Team Logic
+  const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: allUsers, isLoading: teamLoading } = useCollection<UserProfile>(allUsersQuery);
+
+  const siteTeam = React.useMemo(() => {
+    if (!allUsers) return [];
+    const directTeam = allUsers.filter(u => u.assignedProjectIds?.includes(projectId));
+    const managerIds = new Set<string>();
+    directTeam.forEach(u => { if (u.siteManagerId) managerIds.add(u.siteManagerId); });
+    const linkedManagers = allUsers.filter(u => managerIds.has(u.id));
+    const combined = [...directTeam];
+    linkedManagers.forEach(m => { if (!combined.find(u => u.id === m.id)) combined.push(m); });
+    return combined.sort((a, b) => {
+      const h = { 'Admin': 0, 'Site Manager': 1, 'Site Engineer': 2 };
+      return (h[a.role] ?? 3) - (h[b.role] ?? 3);
+    });
+  }, [allUsers, projectId]);
 
   const handleAddBoM = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -116,9 +200,8 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ proje
       unit: formData.get('unit') as string,
       createdAt: serverTimestamp()
     };
-
     addDocumentNonBlocking(collection(firestore, 'project_boms'), item);
-    toast({ title: 'Item Added to BoM' });
+    toast({ title: 'Item Added' });
     (e.target as HTMLFormElement).reset();
   };
 
@@ -127,7 +210,7 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ proje
       stockLevel: newStock,
       lastUpdated: serverTimestamp()
     });
-    toast({ title: 'Inventory Updated' });
+    toast({ title: 'Stock Updated' });
   };
 
   if (projectLoading) return (
@@ -140,52 +223,189 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ proje
   if (!project) return <div className="p-20 text-center">Project site not found in registry.</div>;
 
   return (
-    <div className="space-y-8 pb-20 px-2 sm:px-4">
-      <div className="flex flex-col gap-1">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/projects/list')} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Registry
-        </Button>
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/10 p-2 rounded-sm"><Building2 className="h-8 w-8 text-primary" /></div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter">{project.name}</h1>
-            <p className="text-muted-foreground font-bold text-xs sm:text-sm">{project.projectCompany}</p>
+    <div className="space-y-8 pb-32">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="space-y-1">
+          <Button variant="ghost" size="sm" onClick={() => router.push('/projects/list')} className="mb-2 -ml-2 text-muted-foreground hover:text-primary">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Registry
+          </Button>
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 p-2 rounded-sm"><Building2 className="h-8 w-8 text-primary" /></div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tighter">{project.name}</h1>
+              <p className="text-muted-foreground font-bold text-xs sm:text-sm flex items-center gap-2">
+                {project.projectCompany}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild className="rounded-sm font-bold border-primary/20 text-primary h-10 px-4 bg-white">
+            <Link href={`/documents/${projectId}`}>
+              <FolderOpen className="mr-2 h-4 w-4" /> Documents Explorer
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* Quick Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm">
+          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">AC Capacity</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg font-black text-primary">{formatCapacity(project.acCapacity)}</span>
+            <span className="text-[8px] font-bold text-muted-foreground uppercase">MW</span>
+          </div>
+        </div>
+        <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-sm">
+          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">DC Capacity</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg font-black text-amber-700">{formatCapacity(project.dcCapacity)}</span>
+            <span className="text-[8px] font-bold text-muted-foreground uppercase">MWp</span>
+          </div>
+        </div>
+        <div className="p-4 bg-muted/30 border rounded-sm">
+          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Audit Score</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg font-black text-foreground">
+              {(permits?.length || 0) + (dprs?.length || 0)}
+            </span>
+            <Activity className="h-3 w-3 text-primary" />
+          </div>
+        </div>
+        <div className="p-4 bg-muted/30 border rounded-sm">
+          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Team Size</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg font-black text-foreground">{siteTeam.length}</span>
+            <Users className="h-3 w-3 text-primary" />
+          </div>
+        </div>
+        <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-sm hidden lg:block">
+          <p className="text-[10px] font-black uppercase text-emerald-700 tracking-widest mb-1">Completion</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-lg font-black text-emerald-700">74%</span>
+            <TrendingUp className="h-3 w-3 text-emerald-600" />
           </div>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8 rounded-sm bg-muted/50 border border-primary/10 p-1">
-          <TabsTrigger value="bom" className="rounded-sm font-bold text-[10px] uppercase tracking-widest py-2">
-            <ClipboardList className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" /> BoM
-          </TabsTrigger>
-          <TabsTrigger value="po" className="rounded-sm font-bold text-[10px] uppercase tracking-widest py-2">
-            <ShoppingBag className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" /> POs
-          </TabsTrigger>
-          <TabsTrigger value="inventory" className="rounded-sm font-bold text-[10px] uppercase tracking-widest py-2">
-            <Warehouse className="h-3.5 w-3.5 mr-1.5 hidden sm:inline" /> Inventory
-          </TabsTrigger>
-        </TabsList>
+        <ScrollArea className="w-full">
+          <TabsList className="flex w-max min-w-full rounded-sm bg-muted/50 border border-primary/10 p-1 h-11">
+            <TabsTrigger value="dashboard" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" /> Board
+            </TabsTrigger>
+            <TabsTrigger value="bom" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <ClipboardList className="h-3.5 w-3.5 mr-1.5" /> BoM
+            </TabsTrigger>
+            <TabsTrigger value="inventory" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <Warehouse className="h-3.5 w-3.5 mr-1.5" /> Stock
+            </TabsTrigger>
+            <TabsTrigger value="po" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <ShoppingBag className="h-3.5 w-3.5 mr-1.5" /> Procurement
+            </TabsTrigger>
+            <TabsTrigger value="ptw" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Permits
+            </TabsTrigger>
+            <TabsTrigger value="field-logs" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <FileText className="h-3.5 w-3.5 mr-1.5" /> Field Logs
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Tasks
+            </TabsTrigger>
+            <TabsTrigger value="visits" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <Navigation className="h-3.5 w-3.5 mr-1.5" /> Visits
+            </TabsTrigger>
+          </TabsList>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
 
-        {/* --- BoM Content --- */}
-        <TabsContent value="bom" className="space-y-8 animate-in fade-in-50 duration-300">
+        {/* --- Tab Content: Dashboard --- */}
+        <TabsContent value="dashboard" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
+              <CardHeader className="bg-muted/5 border-b py-4">
+                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  <Users className="h-4 w-4 text-primary" /> Site Personnel Hierarchy
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {teamLoading ? (
+                  <div className="p-8 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
+                ) : siteTeam.length > 0 ? (
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6">Personnel</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Contact</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {siteTeam.map(member => (
+                        <TableRow key={member.id} className="hover:bg-muted/5 group">
+                          <TableCell className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-sm text-foreground">{member.username}</span>
+                              <span className="text-[10px] text-muted-foreground uppercase">{member.email}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn(
+                              "rounded-sm text-[9px] font-black uppercase border-primary/20",
+                              member.role === 'Site Manager' ? "bg-primary text-white border-none" : "text-primary bg-primary/5"
+                            )}>
+                              {member.role === 'Site Manager' && <UserCog className="h-2.5 w-2.5 mr-1" />}
+                              {member.role}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs font-medium font-mono text-muted-foreground">{member.mobile || '—'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="p-20 text-center text-muted-foreground italic text-sm">No personnel currently mapped to this site.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="space-y-6">
+              <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-full">
+                <CardHeader className="py-4 border-b bg-muted/5">
+                  <CardTitle className="text-xs font-bold uppercase tracking-widest">Compliance Health</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <StatRow label="Approved Permits" value={permits?.filter((p: any) => p.status === 'Approved').length || 0} color="green" />
+                  <StatRow label="Pending Audits" value={permits?.filter((p: any) => p.status === 'Pending').length || 0} color="amber" />
+                  <StatRow label="Ongoing Work" value={tasks?.filter((t: any) => t.status !== 'Completed').length || 0} color="blue" />
+                  <StatRow label="Total Evidence" value={dprs?.length || 0} color="primary" />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* --- Tab Content: BoM --- */}
+        <TabsContent value="bom" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
           {isAdmin && (
             <Card className="rounded-sm border-primary/10 bg-primary/5 shadow-sm">
               <CardHeader className="py-4 border-b">
-                <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-widest">Register BoM Item</CardTitle>
+                <CardTitle className="text-xs font-bold uppercase tracking-widest">Add BoM Entry</CardTitle>
               </CardHeader>
               <CardContent className="pt-6">
                 <form onSubmit={handleAddBoM} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                   <div className="space-y-2 col-span-1 md:col-span-2">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground">Material Name</Label>
-                    <Input name="itemName" required placeholder="e.g. Solar Module 540Wp" className="h-10 rounded-sm bg-background" />
+                    <Input name="itemName" required placeholder="Solar Module 540Wp" className="h-10 rounded-sm bg-background" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground">Specification</Label>
-                    <Input name="spec" placeholder="e.g. Mono PERC" className="h-10 rounded-sm bg-background" />
+                    <Input name="spec" placeholder="Mono PERC" className="h-10 rounded-sm bg-background" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground">Planned Quantity</Label>
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground">Target Qty</Label>
                     <div className="flex gap-2">
                       <Input name="qty" type="number" required className="h-10 rounded-sm bg-background" />
                       <Input name="unit" placeholder="Unit" className="w-24 h-10 rounded-sm bg-background" />
@@ -200,46 +420,33 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ proje
           )}
 
           <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-            <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-primary" /> Bill of Materials Registry
-              </CardTitle>
-            </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-muted/30">
                     <TableRow>
-                      <TableHead className="px-6 min-w-[200px]">Description</TableHead>
+                      <TableHead className="px-6">Description</TableHead>
                       <TableHead>Specification</TableHead>
                       <TableHead className="text-center">Target Qty</TableHead>
-                      <TableHead className="text-right px-6">Action</TableHead>
+                      {isAdmin && <TableHead className="text-right px-6">Action</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {bomItems && bomItems.length > 0 ? bomItems.map(item => (
-                      <TableRow key={item.id} className="hover:bg-muted/5 transition-colors">
-                        <TableCell className="px-6 py-4">
-                          <span className="font-bold text-sm">{item.itemName}</span>
-                        </TableCell>
+                      <TableRow key={item.id} className="hover:bg-muted/5">
+                        <TableCell className="px-6 py-4 font-bold text-sm text-foreground">{item.itemName}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{item.specification}</TableCell>
-                        <TableCell className="text-center font-mono font-bold text-primary whitespace-nowrap">
-                          {item.plannedQuantity} {item.unit}
-                        </TableCell>
-                        <TableCell className="text-right px-6">
-                          {isAdmin && (
+                        <TableCell className="text-center font-mono font-bold text-primary">{item.plannedQuantity} {item.unit}</TableCell>
+                        {isAdmin && (
+                          <TableCell className="text-right px-6">
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'project_boms', item.id))}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                          )}
-                        </TableCell>
+                          </TableCell>
+                        )}
                       </TableRow>
                     )) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">
-                          No Bill of Materials items defined for this project.
-                        </TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">Registry empty.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -248,71 +455,11 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ proje
           </Card>
         </TabsContent>
 
-        {/* --- Purchase Orders Content --- */}
-        <TabsContent value="po" className="space-y-8 animate-in fade-in-50 duration-300">
+        {/* --- Tab Content: Inventory --- */}
+        <TabsContent value="inventory" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
           <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
             <CardHeader className="bg-muted/5 border-b py-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                  <ShoppingBag className="h-4 w-4 text-primary" /> Active Purchase Orders
-                </CardTitle>
-                {isAdmin && (
-                  <Button size="sm" className="h-8 rounded-sm font-bold text-[10px] uppercase" asChild>
-                    <Link href="/settings/suppliers">Manage Suppliers</Link>
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
-                      <TableHead className="px-6">PO Number</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right px-6">Total Value</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {purchaseOrders && purchaseOrders.length > 0 ? purchaseOrders.map(po => (
-                      <TableRow key={po.id} className="hover:bg-muted/5 transition-colors">
-                        <TableCell className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span>
-                            <span className="text-[9px] text-muted-foreground font-bold">{po.orderDate}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm font-bold text-foreground">{po.supplierName}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={cn(
-                            "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
-                            po.status === 'Open' ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-green-50 text-green-700 border-green-200"
-                          )}>{po.status}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right px-6 font-black text-sm font-mono">
-                          ₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </TableCell>
-                      </TableRow>
-                    )) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">
-                          No purchase orders linked to this project site.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* --- Inventory Content --- */}
-        <TabsContent value="inventory" className="space-y-8 animate-in fade-in-50 duration-300">
-          <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-            <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
                 <Warehouse className="h-4 w-4 text-primary" /> Live On-Site Stock
               </CardTitle>
             </CardHeader>
@@ -329,45 +476,27 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ proje
                   </TableHeader>
                   <TableBody>
                     {inventory && inventory.length > 0 ? inventory.map(item => (
-                      <TableRow key={item.id} className="hover:bg-muted/5 transition-colors">
-                        <TableCell className="px-6 py-4">
-                          <span className="font-bold text-sm">{item.itemName}</span>
-                        </TableCell>
+                      <TableRow key={item.id} className="hover:bg-muted/5">
+                        <TableCell className="px-6 py-4 font-bold text-sm">{item.itemName}</TableCell>
                         <TableCell className="text-center">
-                          <Badge className="bg-emerald-600 text-white font-mono font-bold rounded-sm border-none px-2 h-6">
+                          <Badge className="bg-emerald-600 text-white font-mono font-bold rounded-sm px-2 h-6 border-none">
                             {item.stockLevel} {item.unit}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-[10px] text-muted-foreground uppercase font-black tracking-tighter">
-                          {item.lastUpdated ? format(item.lastUpdated.toDate(), 'dd MMM HH:mm') : '—'}
-                        </TableCell>
+                        <TableCell className="text-[10px] text-muted-foreground uppercase font-black">{formatTimestamp(item.lastUpdated)}</TableCell>
                         <TableCell className="text-right px-6">
                           <div className="flex justify-end items-center gap-1.5">
-                            <Button 
-                              variant="outline" 
-                              size="icon" 
-                              className="h-8 w-8 rounded-sm border-primary/20 text-primary hover:bg-primary hover:text-white transition-all" 
-                              onClick={() => handleUpdateStock(item.id, Math.max(0, item.stockLevel - 1))}
-                            >
+                            <Button variant="outline" size="icon" className="h-8 w-8 rounded-sm border-primary/20 text-primary" onClick={() => handleUpdateStock(item.id, Math.max(0, item.stockLevel - 1))}>
                               <MinusCircle className="h-4 w-4" />
                             </Button>
-                            <Button 
-                              variant="outline" 
-                              size="icon" 
-                              className="h-8 w-8 rounded-sm border-primary/20 text-primary hover:bg-primary hover:text-white transition-all" 
-                              onClick={() => handleUpdateStock(item.id, item.stockLevel + 1)}
-                            >
+                            <Button variant="outline" size="icon" className="h-8 w-8 rounded-sm border-primary/20 text-primary" onClick={() => handleUpdateStock(item.id, item.stockLevel + 1)}>
                               <PlusCircle className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
                       </TableRow>
                     )) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">
-                          Inventory records for this site have not been initialized.
-                        </TableCell>
-                      </TableRow>
+                      <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">No stock data available.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -375,7 +504,246 @@ export default function ProjectDetailsPage({ params }: { params: Promise<{ proje
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* --- Tab Content: POs --- */}
+        <TabsContent value="po" className="mt-6 animate-in fade-in-50 duration-300">
+          <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+            <CardHeader className="bg-muted/5 border-b py-4">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                <ShoppingBag className="h-4 w-4 text-primary" /> Active Purchase Orders
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="px-6">PO Number</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right px-6">Total Value</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {purchaseOrders && purchaseOrders.length > 0 ? purchaseOrders.map(po => (
+                      <TableRow key={po.id} className="hover:bg-muted/5">
+                        <TableCell className="px-6 py-4 font-mono text-xs font-black text-primary uppercase">{po.poNumber}</TableCell>
+                        <TableCell className="text-sm font-bold">{po.supplierName}</TableCell>
+                        <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{po.status}</Badge></TableCell>
+                        <TableCell className="text-right px-6 font-black text-sm font-mono">₹{po.totalAmount.toLocaleString('en-IN')}</TableCell>
+                      </TableRow>
+                    )) : (
+                      <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">No POs found.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* --- Tab Content: Permits --- */}
+        <TabsContent value="ptw" className="mt-6 animate-in fade-in-50 duration-300">
+          <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+            <CardHeader className="bg-muted/5 border-b py-4">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-primary" /> Compliance Audit: PtWs
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {permits && permits.length > 0 ? (
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="px-6">Serial No</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right px-6">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {permits.map((permit: any) => (
+                      <TableRow key={permit.id} className="hover:bg-muted/5">
+                        <TableCell className="px-6 py-4 font-mono text-xs font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
+                        <TableCell className="text-sm font-semibold">{permit.ptwType}</TableCell>
+                        <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm h-5">{permit.status}</Badge></TableCell>
+                        <TableCell className="text-right px-6">
+                          <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary">
+                            <Link href={`/ptw/list?view=${permit.id}`}><ChevronRight className="h-4 w-4" /></Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-20 text-center text-muted-foreground italic">No permits found.</div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* --- Tab Content: Field Logs --- */}
+        <TabsContent value="field-logs" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+              <CardHeader className="bg-muted/5 border-b py-4">
+                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" /> Progress Reports
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {dprs && dprs.length > 0 ? (
+                  <Table>
+                    <TableBody>
+                      {dprs.map((dpr: any) => (
+                        <TableRow key={dpr.id} className="hover:bg-muted/5">
+                          <TableCell className="px-6 py-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="font-mono text-[10px] font-bold text-muted-foreground">{dpr.reportDate}</span>
+                              <span className="text-xs font-semibold">{dpr.userName}</span>
+                              <p className="text-sm text-muted-foreground italic line-clamp-2 mt-1">"{dpr.description}"</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="p-12 text-center text-xs text-muted-foreground">No reports found.</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+              <CardHeader className="bg-muted/5 border-b py-4">
+                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  <ArrowLeftRight className="h-4 w-4 text-primary" /> Material Logs
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {movements && movements.length > 0 ? (
+                  <Table>
+                    <TableBody>
+                      {movements.map((mov: any) => (
+                        <TableRow key={mov.id} className="hover:bg-muted/5">
+                          <TableCell className="px-6 py-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold">{mov.itemName}</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge className={cn("text-[8px] font-black uppercase px-1 h-4", mov.movementType === 'Inward' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{mov.movementType}</Badge>
+                                  <span className="text-[9px] font-bold text-muted-foreground uppercase">{mov.movementDate}</span>
+                                </div>
+                              </div>
+                              <span className="text-xs font-black text-primary">{mov.quantity} {mov.unit}</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="p-12 text-center text-xs text-muted-foreground">No movements found.</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* --- Tab Content: Tasks --- */}
+        <TabsContent value="tasks" className="mt-6 animate-in fade-in-50 duration-300">
+          <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+            <CardHeader className="bg-muted/5 border-b py-4">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                <CheckSquare className="h-4 w-4 text-primary" /> Open Assignments
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {tasks && tasks.length > 0 ? (
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="px-6">Title</TableHead>
+                      <TableHead>Assignee</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right px-6">Due</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tasks.map((task: any) => (
+                      <TableRow key={task.id} className="hover:bg-muted/5">
+                        <TableCell className="px-6 py-4 font-bold text-sm">{task.title}</TableCell>
+                        <TableCell className="text-xs font-medium">{task.assignedToName}</TableCell>
+                        <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm">{task.status}</Badge></TableCell>
+                        <TableCell className="text-right px-6 text-[10px] font-mono font-black text-muted-foreground">{task.dueDate}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-20 text-center text-muted-foreground italic">No active tasks.</div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* --- Tab Content: Visits --- */}
+        <TabsContent value="visits" className="mt-6 animate-in fade-in-50 duration-300">
+          <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+            <CardHeader className="bg-muted/5 border-b py-4">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                <Navigation className="h-4 w-4 text-primary" /> Management Presence
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {visits && visits.length > 0 ? (
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="px-6">Audit Date</TableHead>
+                      <TableHead>Manager</TableHead>
+                      <TableHead>Purpose</TableHead>
+                      <TableHead className="text-right px-6">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visits.map((visit: any) => (
+                      <TableRow key={visit.id} className="hover:bg-muted/5">
+                        <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
+                        <TableCell className="text-sm font-bold text-foreground">{visit.managerName}</TableCell>
+                        <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm">{visit.purpose || '—'}</Badge></TableCell>
+                        <TableCell className="text-right px-6">
+                          <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm">
+                            <Link href={`/site-visits/${visit.id}`}><ChevronRight className="h-4 w-4" /></Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-20 text-center text-muted-foreground italic">No audits recorded.</div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function StatRow({ label, value, color }: { label: string, value: number, color: string }) {
+  const colors = {
+    green: "text-green-600 bg-green-50 border-green-100",
+    amber: "text-amber-600 bg-amber-50 border-amber-100",
+    blue: "text-blue-600 bg-blue-50 border-blue-100",
+    primary: "text-primary bg-primary/5 border-primary/10",
+  };
+  return (
+    <div className={cn("flex items-center justify-between p-3 rounded-sm border", (colors as any)[color])}>
+      <span className="text-[10px] font-black uppercase tracking-wider">{label}</span>
+      <span className="text-base font-black">{value}</span>
     </div>
   );
 }
