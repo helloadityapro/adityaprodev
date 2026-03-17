@@ -70,7 +70,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
 
   return (
     <div className="flex flex-col gap-4 py-2 flex-1">
-      {/* Main Section */}
+      {/* Main Operations Section */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Operations</SidebarGroupLabel>
         <SidebarMenu>
@@ -158,44 +158,9 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
 
-      {/* Vehicles Management */}
-      <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Logistics & Fleet</SidebarGroupLabel>
-        <SidebarMenu>
-          {!isDriver && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Request a Vehicle" isActive={pathname === '/vehicles/request'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/vehicles/request">
-                  <Fuel className="h-4 w-4" />
-                  <span className="font-medium">Vehicle Request</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Manage Trips" isActive={pathname === '/vehicles/trips/manage'} className="rounded-sm" onClick={handleMobileClose}>
-              <Link href="/vehicles/trips/manage">
-                <MapPinned className="h-4 w-4 text-indigo-600" />
-                <span className="font-bold">Trip Management</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          {isAdmin && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Manage Vehicles" isActive={pathname === '/vehicles/manage'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/vehicles/manage">
-                  <Car className="h-4 w-4 text-primary" />
-                  <span className="font-bold">Vehicle Registry</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-        </SidebarMenu>
-      </SidebarGroup>
-
+      {/* Field Activities Group */}
       {!isDriver && (
         <>
-          {/* Site Visits */}
           <SidebarGroup>
             <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Field Presence</SidebarGroupLabel>
             <SidebarMenu>
@@ -226,30 +191,6 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </SidebarMenu>
           </SidebarGroup>
 
-          {/* Task Management */}
-          <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Action Management</SidebarGroupLabel>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Assign Task" isActive={pathname === '/tasks/create'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/tasks/create">
-                    <CheckSquare className="h-4 w-4" />
-                    <span className="font-medium">Create Task</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Tasks List" isActive={pathname === '/tasks/list'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/tasks/list">
-                    <ListTodo className="h-4 w-4" />
-                    <span className="font-medium">Work Center</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroup>
-
-          {/* Permit to Work */}
           <SidebarGroup>
             <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">HSE Compliance</SidebarGroupLabel>
             <SidebarMenu>
@@ -274,18 +215,9 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   </SidebarMenuBadge>
                 )}
               </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild tooltip="Activities" isActive={pathname === '/ptw/activities'} className="rounded-sm" onClick={handleMobileClose}>
-                  <Link href="/ptw/activities">
-                    <History className="h-4 w-4" />
-                    <span className="font-medium">Action Log</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
 
-          {/* DPR Reporting */}
           <SidebarGroup>
             <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Documentation</SidebarGroupLabel>
             <SidebarMenu>
@@ -307,16 +239,20 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
+        </>
+      )}
 
-          {/* Site Requirements */}
+      {/* Requirement & Movement - Synced with Screenshot */}
+      {!isDriver && (
+        <>
           <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Resources</SidebarGroupLabel>
+            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">SITE REQUIREMENTS</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Submit Requirement" isActive={pathname === '/requirements/submit'} className="rounded-sm" onClick={handleMobileClose}>
                   <Link href="/requirements/submit">
                     <Package className="h-4 w-4" />
-                    <span className="font-medium">Submit Request</span>
+                    <span className="font-medium">Submit Requirement</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -324,22 +260,21 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <SidebarMenuButton asChild tooltip="Requirement Data" isActive={pathname === '/requirements/list'} className="rounded-sm" onClick={handleMobileClose}>
                   <Link href="/requirements/list">
                     <ClipboardList className="h-4 w-4" />
-                    <span className="font-medium">Resource Audit</span>
+                    <span className="font-medium">Requirement Data</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
 
-          {/* Material Movement */}
           <SidebarGroup>
-            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Material flow</SidebarGroupLabel>
+            <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">MATERIAL MOVEMENT</SidebarGroupLabel>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="Record Movement" isActive={pathname === '/movements/record'} className="rounded-sm" onClick={handleMobileClose}>
                   <Link href="/movements/record">
                     <ArrowLeftRight className="h-4 w-4" />
-                    <span className="font-medium">Log Movement</span>
+                    <span className="font-medium">Record Movement</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -347,7 +282,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <SidebarMenuButton asChild tooltip="Movement Data" isActive={pathname === '/movements/list'} className="rounded-sm" onClick={handleMobileClose}>
                   <Link href="/movements/list">
                     <TableIcon className="h-4 w-4" />
-                    <span className="font-medium">Log Archive</span>
+                    <span className="font-medium">Movement Data</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -355,17 +290,42 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           </SidebarGroup>
         </>
       )}
+
+      {/* Logistics & Fleet */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Logistics & Fleet</SidebarGroupLabel>
+        <SidebarMenu>
+          {!isDriver && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Request a Vehicle" isActive={pathname === '/vehicles/request'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/vehicles/request">
+                  <Fuel className="h-4 w-4" />
+                  <span className="font-medium">Vehicle Request</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Manage Trips" isActive={pathname === '/vehicles/trips/manage'} className="rounded-sm" onClick={handleMobileClose}>
+              <Link href="/vehicles/trips/manage">
+                <MapPinned className="h-4 w-4 text-indigo-600" />
+                <span className="font-bold">Trip Management</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
       
-      {/* Administration Section */}
+      {/* Administration Section - Synced with Screenshot */}
       {isAdminOrHR && (
         <SidebarGroup className="mt-auto">
-          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">System Admin</SidebarGroupLabel>
+          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">ADMINISTRATION</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Attendance Summary" isActive={pathname === '/admin/attendance-summary'} className="rounded-sm" onClick={handleMobileClose}>
                 <Link href="/admin/attendance-summary">
                   <FileBarChart className="h-4 w-4 text-emerald-600" />
-                  <span className="font-bold text-emerald-700">Presence Summary</span>
+                  <span className="font-bold text-emerald-700">Attendance Summary</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -375,7 +335,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <SidebarMenuButton asChild tooltip="Day Report" isActive={pathname === '/admin/day-report'} className="rounded-sm" onClick={handleMobileClose}>
                     <Link href="/admin/day-report">
                       <CalendarDays className="h-4 w-4 text-amber-600" />
-                      <span className="font-bold text-amber-700">Audit Day Report</span>
+                      <span className="font-bold text-amber-700">Day Report</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -383,7 +343,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <SidebarMenuButton asChild tooltip="LMS Admin" isActive={pathname.startsWith('/lms/admin')} className="rounded-sm" onClick={handleMobileClose}>
                     <Link href="/lms/admin">
                       <BookOpen className="h-4 w-4 text-primary" />
-                      <span className="font-bold">Academy Admin</span>
+                      <span className="font-bold">LMS Admin</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -391,7 +351,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/admin/dashboard'} className="rounded-sm" onClick={handleMobileClose}>
                     <Link href="/admin/dashboard">
                       <LayoutDashboard className="h-4 w-4" />
-                      <span className="font-medium">Core Dashboard</span>
+                      <span className="font-medium">Dashboard</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -399,7 +359,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <SidebarMenuButton asChild tooltip="Permit Management" isActive={pathname === '/settings/permits'} className="rounded-sm" onClick={handleMobileClose}>
                     <Link href="/settings/permits">
                       <FileCheck className="h-4 w-4 text-primary" />
-                      <span className="font-bold">Permit Oversight</span>
+                      <span className="font-bold">Permit Management</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -407,7 +367,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <SidebarMenuButton asChild tooltip="Manage Sites" isActive={pathname === '/settings/manage-sites'} className="rounded-sm" onClick={handleMobileClose}>
                     <Link href="/settings/manage-sites">
                       <MapPin className="h-4 w-4" />
-                      <span className="font-medium">Registry: Sites</span>
+                      <span className="font-medium">Manage Sites</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -415,7 +375,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <SidebarMenuButton asChild tooltip="Rewards Setup" isActive={pathname === '/settings/rewards'} className="rounded-sm" onClick={handleMobileClose}>
                     <Link href="/settings/rewards">
                       <Coins className="h-4 w-4 text-amber-600" />
-                      <span className="font-medium">Rewards Economy</span>
+                      <span className="font-medium">Rewards Setup</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -423,7 +383,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <SidebarMenuButton asChild tooltip="Suppliers" isActive={pathname.startsWith('/settings/suppliers')} className="rounded-sm" onClick={handleMobileClose}>
                     <Link href="/settings/suppliers">
                       <Truck className="h-4 w-4" />
-                      <span className="font-medium">Registry: Partners</span>
+                      <span className="font-medium">Suppliers</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -431,7 +391,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <SidebarMenuButton asChild tooltip="Users" isActive={pathname.startsWith('/settings/users')} className="rounded-sm" onClick={handleMobileClose}>
                     <Link href="/settings/users">
                       <Users className="h-4 w-4" />
-                      <span className="font-medium">Registry: Personnel</span>
+                      <span className="font-medium">Users</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -439,7 +399,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <SidebarMenuButton asChild tooltip="Teams" isActive={pathname === '/settings/teams'} className="rounded-sm" onClick={handleMobileClose}>
                     <Link href="/settings/teams">
                       <Workflow className="h-4 w-4" />
-                      <span className="font-medium">Team Structures</span>
+                      <span className="font-medium">Teams</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -447,7 +407,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <SidebarMenuButton asChild tooltip="Settings" isActive={pathname.startsWith('/settings/dropdown-management')} className="rounded-sm" onClick={handleMobileClose}>
                     <Link href="/settings/dropdown-management">
                       <SlidersHorizontal className="h-4 w-4" />
-                      <span className="font-medium">System Constants</span>
+                      <span className="font-medium">Settings</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
