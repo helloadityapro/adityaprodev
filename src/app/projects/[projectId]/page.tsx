@@ -46,6 +46,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -441,84 +442,91 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                   <CardTitle className="text-xs font-bold uppercase tracking-widest">Add BoM Entry</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
-                  <form onSubmit={handleAddBoM} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                    <div className="space-y-2 col-span-1 md:col-span-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Select From Master Inventory</Label>
-                      <Popover open={isBomItemPopoverOpen} onOpenChange={setIsBomItemPopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/20">
-                            {selectedMasterItem ? selectedMasterItem.name : "Choose material..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                          <div className="flex items-center border-b px-3">
-                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                            <Input 
-                              placeholder="Filter items..." 
-                              className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
-                              value={bomItemSearchQuery}
-                              onChange={(e) => setBomItemSearchQuery(e.target.value)}
-                              onKeyDown={(e) => e.stopPropagation()}
-                            />
-                          </div>
-                          <ScrollArea className="h-[200px]">
-                            <div className="p-1">
-                              {filteredMasterItems.length > 0 ? (
-                                filteredMasterItems.map((item) => (
-                                  <Button
-                                    key={item.id}
-                                    type="button"
-                                    variant="ghost"
-                                    className="w-full justify-start text-left font-normal h-11 text-xs mb-0.5"
-                                    onClick={() => {
-                                      setSelectedMasterItem(item);
-                                      setIsBomItemPopoverOpen(false);
-                                      setBomItemSearchQuery("");
-                                    }}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4 text-primary", selectedMasterItem?.id === item.id ? "opacity-100" : "opacity-0")} />
-                                    <div className="flex flex-col items-start min-w-0 text-left">
-                                      <span className="font-bold truncate w-full text-foreground text-left">{item.name}</span>
-                                      <span className="text-[8px] uppercase text-muted-foreground text-left">{item.make} • {item.category}</span>
-                                    </div>
-                                  </Button>
-                                ))
-                              ) : (
-                                <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground">No matches</p>
-                              )}
+                  <form onSubmit={handleAddBoM} className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                    <div className="md:col-span-4 space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Select From Master Inventory</Label>
+                        <Popover open={isBomItemPopoverOpen} onOpenChange={setIsBomItemPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/20">
+                              {selectedMasterItem ? selectedMasterItem.name : "Choose material..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                            <div className="flex items-center border-b px-3">
+                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                              <Input 
+                                placeholder="Filter items..." 
+                                className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
+                                value={bomItemSearchQuery}
+                                onChange={(e) => setBomItemSearchQuery(e.target.value)}
+                                onKeyDown={(e) => e.stopPropagation()}
+                              />
                             </div>
-                          </ScrollArea>
-                        </PopoverContent>
-                      </Popover>
-                      <input type="hidden" name="itemName" value={selectedMasterItem?.name || ""} />
+                            <ScrollArea className="h-[200px]">
+                              <div className="p-1">
+                                {filteredMasterItems.length > 0 ? (
+                                  filteredMasterItems.map((item) => (
+                                    <Button
+                                      key={item.id}
+                                      type="button"
+                                      variant="ghost"
+                                      className="w-full justify-start text-left font-normal h-11 text-xs mb-0.5"
+                                      onClick={() => {
+                                        setSelectedMasterItem(item);
+                                        setIsBomItemPopoverOpen(false);
+                                        setBomItemSearchQuery("");
+                                      }}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4 text-primary", selectedMasterItem?.id === item.id ? "opacity-100" : "opacity-0")} />
+                                      <div className="flex flex-col items-start min-w-0 text-left">
+                                        <span className="font-bold truncate w-full text-foreground text-left">{item.name}</span>
+                                        <span className="text-[8px] uppercase text-muted-foreground text-left">{item.make} • {item.category}</span>
+                                      </div>
+                                    </Button>
+                                  ))
+                                ) : (
+                                  <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground">No matches</p>
+                                )}
+                              </div>
+                            </ScrollArea>
+                          </PopoverContent>
+                        </Popover>
+                        <input type="hidden" name="itemName" value={selectedMasterItem?.name || ""} />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Target Qty</Label>
+                        <div className="flex gap-2">
+                          <Input name="qty" type="number" required placeholder="0" className="h-11 rounded-sm bg-background border-primary/20" />
+                          <Input 
+                            key={`unit-${selectedMasterItem?.id || 'none'}`}
+                            name="unit" 
+                            placeholder="Unit" 
+                            readOnly
+                            defaultValue={selectedMasterItem?.unit || ""} 
+                            className="w-24 h-11 rounded-sm bg-muted/20 border-primary/10 font-black text-primary cursor-not-allowed" 
+                          />
+                        </div>
+                      </div>
+                      <Button type="submit" className="rounded-sm h-11 font-black uppercase text-[10px] tracking-widest w-full shadow-xl" disabled={!selectedMasterItem}>
+                        <Plus className="h-4 w-4 mr-2" /> Add to BoM
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Specification</Label>
-                      <Input 
+                    
+                    <div className="md:col-span-8 space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Technical Specifications (Automated)</Label>
+                      <Textarea 
+                        readOnly
                         key={`spec-${selectedMasterItem?.id || 'none'}`}
                         name="spec" 
-                        placeholder="e.g. 540Wp Mono" 
+                        placeholder="Select an item to view its master specification..." 
                         defaultValue={selectedMasterItem?.description || ""}
-                        className="h-10 rounded-sm bg-background border-primary/20" 
+                        className="min-h-[160px] rounded-sm bg-muted/10 border-primary/10 cursor-not-allowed resize-none text-sm leading-relaxed italic" 
                       />
+                      <p className="text-[9px] text-muted-foreground font-medium italic px-1">Values are pulled directly from the Master Inventory registry to ensure audit compliance.</p>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground">Target Qty</Label>
-                      <div className="flex gap-2">
-                        <Input name="qty" type="number" required placeholder="0" className="h-10 rounded-sm bg-background border-primary/20" />
-                        <Input 
-                          key={`unit-${selectedMasterItem?.id || 'none'}`}
-                          name="unit" 
-                          placeholder="Unit" 
-                          defaultValue={selectedMasterItem?.unit || ""} 
-                          className="w-24 h-10 rounded-sm bg-background border-primary/20 font-bold text-primary" 
-                        />
-                      </div>
-                    </div>
-                    <Button type="submit" className="rounded-sm h-10 font-bold w-full shadow-lg" disabled={!selectedMasterItem}>
-                      <Plus className="h-4 w-4 mr-2" /> Add to BoM
-                    </Button>
                   </form>
                 </CardContent>
               </Card>
@@ -827,7 +835,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     </TableHeader>
                     <TableBody>
                       {visits.map((visit: any) => (
-                        <TableRow key={visit.id} className="hover:bg-muted/5">
+                        <TableRow key={visit.id} className="hover:bg-muted/5 group">
                           <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
                           <TableCell className="text-sm font-bold text-foreground">{visit.managerName}</TableCell>
                           <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm">{visit.purpose || '—'}</Badge></TableCell>
