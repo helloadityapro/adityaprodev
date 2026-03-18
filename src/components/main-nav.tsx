@@ -154,7 +154,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             <SidebarMenuButton asChild tooltip="Learning Hub" isActive={pathname.startsWith('/lms')} className="rounded-sm" onClick={handleMobileClose}>
               <Link href="/lms">
                 <GraduationCap className="h-4 w-4" />
-                <span className="font-medium">Training Center</span>
+                <span className="font-medium">Learning Hub</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
