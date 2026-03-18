@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -355,8 +354,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   };
 
   const POSortIcon = ({ column }: { column: POSortKey }) => {
-    if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
-    return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+    if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
 
   const handleAddBoM = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -501,7 +500,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </div>
               <div className="min-w-0">
                 <h1 className="text-xl md:text-2xl font-black uppercase tracking-tighter truncate leading-none">{project.name}</h1>
-                <p className="text-muted-foreground font-bold text-[10px] md:text-xs flex items-center gap-1.5 mt-1 truncate">
+                <p className="text-muted-foreground font-bold text-[10px] md:text-xs flex items-center gap-2 mt-1 truncate">
                   {project.projectCompany}
                 </p>
               </div>
@@ -571,7 +570,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 <Warehouse className="h-3.5 w-3.5 mr-1.5" /> Stock
               </TabsTrigger>
               <TabsTrigger value="po" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
-                <ShoppingBag className="h-3.5 w-3.5 mr-1.5" /> Procurement
+                <ShoppingBag className="h-3.5 w-3.5 mr-1.5" /> PURCHASE ORDERS
               </TabsTrigger>
               <TabsTrigger value="ptw" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
                 <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Permits
