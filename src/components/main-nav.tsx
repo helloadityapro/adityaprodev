@@ -377,7 +377,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                       <LayoutDashboard className="h-4 w-4" />
                       <span className="font-medium">Dashboard</span>
                     </Link>
-                  </SidebarMenuItem>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild tooltip="Permit Management" isActive={pathname === '/settings/permits'} className="rounded-sm" onClick={handleMobileClose}>
