@@ -216,7 +216,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
+            <SidebarMenuItem className="relative">
               <SidebarMenuButton asChild tooltip="My PtWs" isActive={pathname === '/ptw/list'} className="rounded-sm" onClick={handleMobileClose}>
                 <Link href="/ptw/list">
                   <List className="h-4 w-4" />
@@ -392,6 +392,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <Link href="/settings/manage-sites">
                       <MapPin className="h-4 w-4" />
                       <span className="font-medium">Manage Sites</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Manage Vehicles" isActive={pathname === '/vehicles/manage'} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/vehicles/manage">
+                      <Car className="h-4 w-4 text-primary" />
+                      <span className="font-medium">Manage Vehicles</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
