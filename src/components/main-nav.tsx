@@ -228,7 +228,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     {pendingPtwCount}
                   </SidebarMenuBadge>
                 )}
-              </SidebarMenuItem>
+              </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="PtW Activities" isActive={pathname === '/ptw/activities'} className="rounded-sm" onClick={handleMobileClose}>
@@ -287,7 +287,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <ClipboardList className="h-4 w-4" />
                     <span className="font-medium">Requirement Data</span>
                   </Link>
-                </SidebarMenuItem>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
@@ -309,7 +309,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <TableIcon className="h-4 w-4" />
                     <span className="font-medium">Movement Data</span>
                   </Link>
-                </SidebarMenuItem>
+                </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroup>
@@ -341,7 +341,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
       
-      {/* Administration Section */}
+      {/* ADMINISTRATION Section */}
       {isAdminOrHR && (
         <SidebarGroup className="mt-auto">
           <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">ADMINISTRATION</SidebarGroupLabel>
