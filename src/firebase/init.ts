@@ -5,41 +5,51 @@ import { Firestore, getFirestore, initializeFirestore } from 'firebase/firestore
 import { Auth, getAuth } from 'firebase/auth';
 import { firebaseConfig } from './config';
 
+// Module-level singletons to ensure only one instance of each service exists.
+let cachedApp: FirebaseApp | undefined;
+let cachedFirestore: Firestore | undefined;
+let cachedAuth: Auth | undefined;
+
 /**
  * Core initialization logic for Firebase SDKs.
  * Uses forced long polling to resolve connectivity issues in workstation and proxy environments.
  */
 export function getFirebaseServices() {
-  let app: FirebaseApp;
-
-  if (!getApps().length) {
-    try {
-      // Attempt to initialize via Firebase App Hosting environment variables
-      app = initializeApp();
-    } catch (e) {
-      // Fallback to config object
-      app = initializeApp(firebaseConfig);
+  if (!cachedApp) {
+    if (!getApps().length) {
+      try {
+        // Attempt to initialize via Firebase App Hosting environment variables
+        cachedApp = initializeApp();
+      } catch (e) {
+        // Fallback to config object
+        cachedApp = initializeApp(firebaseConfig);
+      }
+    } else {
+      cachedApp = getApp();
     }
-  } else {
-    app = getApp();
   }
 
-  // Use forced long polling to ensure reliability in proxied environments (e.g. Cloud Workstations)
-  // This prevents the "Could not reach Cloud Firestore backend" 10s timeout error.
-  let firestore: Firestore;
-  try {
-    firestore = initializeFirestore(app, {
-      experimentalForceLongPolling: true,
-      useFetchStreams: false
-    });
-  } catch (e) {
-    // Fallback if firestore was already initialized
-    firestore = getFirestore(app);
+  if (!cachedAuth) {
+    cachedAuth = getAuth(cachedApp);
+  }
+
+  if (!cachedFirestore) {
+    // Use forced long polling to ensure reliability in proxied environments (e.g. Cloud Workstations)
+    // This prevents the "Could not reach Cloud Firestore backend" 10s timeout error.
+    try {
+      cachedFirestore = initializeFirestore(cachedApp, {
+        experimentalForceLongPolling: true,
+        useFetchStreams: false
+      });
+    } catch (e) {
+      // Fallback if firestore was already initialized
+      cachedFirestore = getFirestore(cachedApp);
+    }
   }
 
   return {
-    firebaseApp: app,
-    auth: getAuth(app),
-    firestore: firestore
+    firebaseApp: cachedApp,
+    auth: cachedAuth,
+    firestore: cachedFirestore
   };
 }
