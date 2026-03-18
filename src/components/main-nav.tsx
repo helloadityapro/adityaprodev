@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -223,12 +222,12 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   <List className="h-4 w-4" />
                   <span className="font-medium">My PtWs</span>
                 </Link>
-                {(isAdmin || isManager) && pendingPtwCount > 0 && (
-                  <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
-                    {pendingPtwCount}
-                  </SidebarMenuBadge>
-                )}
               </SidebarMenuButton>
+              {(isAdmin || isManager) && pendingPtwCount > 0 && (
+                <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
+                  {pendingPtwCount}
+                </SidebarMenuBadge>
+              )}
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="PtW Activities" isActive={pathname === '/ptw/activities'} className="rounded-sm" onClick={handleMobileClose}>
@@ -378,7 +377,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                       <LayoutDashboard className="h-4 w-4" />
                       <span className="font-medium">Dashboard</span>
                     </Link>
-                  </SidebarMenuButton>
+                  </SidebarMenuItem>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild tooltip="Permit Management" isActive={pathname === '/settings/permits'} className="rounded-sm" onClick={handleMobileClose}>
