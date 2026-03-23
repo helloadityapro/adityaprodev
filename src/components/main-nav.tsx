@@ -37,7 +37,9 @@ import {
   FileCheck,
   Briefcase,
   Boxes,
-  UserCog
+  UserCog,
+  Gavel,
+  Hammer
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -196,6 +198,31 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <Link href="/site-visits/history">
                   <History className="h-4 w-4" />
                   <span className="font-medium">Visit Archive</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+      )}
+
+      {/* TASKS Group */}
+      {!isDriver && (
+        <SidebarGroup>
+          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">TASKS</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Assign New Task" isActive={pathname === '/tasks/create'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/tasks/create">
+                  <CheckSquare className="h-4 w-4" />
+                  <span className="font-medium">Assign Task</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Tasks Audit" isActive={pathname === '/tasks/list'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/tasks/list">
+                  <ListTodo className="h-4 w-4" />
+                  <span className="font-medium">Tasks Audit</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -416,6 +443,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <Link href="/settings/suppliers">
                       <Truck className="h-4 w-4" />
                       <span className="font-medium">Suppliers</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Contractors" isActive={pathname.startsWith('/settings/contractors')} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/settings/contractors">
+                      <Hammer className="h-4 w-4" />
+                      <span className="font-medium">Contractors</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

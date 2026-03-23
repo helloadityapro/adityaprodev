@@ -54,7 +54,8 @@ import {
   ChevronUp,
   Eye,
   ExternalLink,
-  Printer
+  Printer,
+  Gavel
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -417,6 +418,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     setExpandedBomRows(newSet);
   };
 
+  const toggleSelectAll = () => {
+    // Logic if needed
+  };
+
   const togglePORow = (id: string) => {
     const newSet = new Set(expandedPORows);
     if (newSet.has(id)) newSet.delete(id);
@@ -570,7 +575,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 <Warehouse className="h-3.5 w-3.5 mr-1.5" /> Stock
               </TabsTrigger>
               <TabsTrigger value="po" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
-                <ShoppingBag className="h-3.5 w-3.5 mr-1.5" /> PURCHASE ORDERS
+                <ShoppingBag className="h-3.5 w-3.5 mr-1.5" /> Purchase Orders
+              </TabsTrigger>
+              <TabsTrigger value="wo" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+                <Gavel className="h-3.5 w-3.5 mr-1.5" /> Work Orders
               </TabsTrigger>
               <TabsTrigger value="ptw" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
                 <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Permits
@@ -814,7 +822,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                   </Button>
                                 )}
                                 <div className="flex flex-col min-w-0">
-                                  <span className="font-bold text-sm text-foreground truncate">{item.itemName}</span>
+                                  <span className="font-bold text-sm text-foreground">{item.itemName}</span>
                                   <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{item.specification}</span>
                                 </div>
                               </div>
@@ -1130,6 +1138,16 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
+          <TabsContent value="wo" className="mt-6 animate-in fade-in-50 duration-300">
+            <div className="flex flex-col items-center justify-center py-32 text-center bg-muted/10 rounded-sm border border-dashed border-primary/20">
+              <Gavel className="h-16 w-16 text-muted-foreground/20 mb-4" />
+              <h3 className="text-xl font-bold">Work Orders Module</h3>
+              <p className="text-muted-foreground max-w-sm mx-auto mt-2">
+                This section is reserved for managing service contracts and technical task orders for this site.
+              </p>
+            </div>
+          </TabsContent>
+
           <TabsContent value="ptw" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardHeader className="bg-muted/5 border-b py-4">
@@ -1417,7 +1435,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       </Dialog>
 
       <Dialog open={!!bomActionState} onOpenChange={(o) => !o && setBomActionState(null)}>
-        <DialogContent className="rounded-sm max-w-md">
+        <DialogContent className="max-w-md rounded-sm">
           <DialogHeader>
             <DialogTitle className="uppercase tracking-tight font-black">{bomActionState?.type} BoM Item</DialogTitle>
             <DialogDescription>Setting status for "{bomActionState?.item.itemName}"</DialogDescription>
