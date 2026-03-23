@@ -98,7 +98,10 @@ export default function TaskListPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [activeTab, setActiveTab] = React.useState("all");
+  
   const [actionTask, setActionTask] = React.useState<Task | null>(null);
+  const [pendingStatus, setPendingStatus] = React.useState<Task['status'] | "">("");
+  
   const [isUpdating, setIsUpdating] = React.useState(false);
   const [deletingTask, setDeletingTask] = React.useState<Task | null>(null);
 
@@ -153,11 +156,13 @@ export default function TaskListPage() {
     };
   }, [tasks, user]);
 
-  const handleUpdateStatus = async (remarks: string, nextStatus: Task['status']) => {
-    if (!actionTask) return;
+  const handleUpdateStatus = async (remarks: string) => {
+    if (!actionTask || !pendingStatus) return;
     setIsUpdating(true);
     
-    // Guard against double points
+    const nextStatus = pendingStatus;
+
+    // Guard against double completion logic
     if (actionTask.status === 'Completed' && nextStatus === 'Completed') {
         setActionTask(null);
         setIsUpdating(false);
@@ -209,6 +214,7 @@ export default function TaskListPage() {
     toast({ title: "Task Updated", description: `Status changed to ${nextStatus}. Points updated if applicable.` });
     setIsUpdating(false);
     setActionTask(null);
+    setPendingStatus("");
   };
 
   const handleDelete = async () => {
@@ -299,10 +305,9 @@ export default function TaskListPage() {
           </div>
         </div>
 
-        {/* Mobile-Responsive Card List */}
         <div className="md:hidden space-y-4">
           {filteredTasks.length > 0 ? filteredTasks.map((task) => (
-            <Card key={task.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setActionTask(task)}>
+            <Card key={task.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => { setActionTask(task); setPendingStatus(task.status); }}>
               <CardContent className="p-4 space-y-4">
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex flex-col gap-1 min-w-0">
@@ -357,7 +362,6 @@ export default function TaskListPage() {
           )}
         </div>
 
-        {/* Desktop Table View */}
         <div className="hidden md:block">
           <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden">
             <CardContent className="p-0">
@@ -374,7 +378,7 @@ export default function TaskListPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredTasks.map((task) => (
-                    <TableRow key={task.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setActionTask(task)}>
+                    <TableRow key={task.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => { setActionTask(task); setPendingStatus(task.status); }}>
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="text-xs font-bold text-muted-foreground uppercase tracking-tight">Due By</span>
@@ -406,7 +410,7 @@ export default function TaskListPage() {
                             variant="ghost" 
                             size="icon" 
                             className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm" 
-                            onClick={() => setActionTask(task)}
+                            onClick={() => { setActionTask(task); setPendingStatus(task.status); }}
                             title="Update Status"
                           >
                             <MoreHorizontal className="h-4 w-4" />
@@ -427,8 +431,7 @@ export default function TaskListPage() {
         </div>
       </div>
 
-      {/* Task Update Dialog */}
-      <Dialog open={!!actionTask} onOpenChange={() => setActionTask(null)}>
+      <Dialog open={!!actionTask} onOpenChange={() => { setActionTask(null); setPendingStatus(""); }}>
         <DialogContent className="rounded-sm max-w-lg">
           <DialogHeader>
             <DialogTitle>Update Task Status</DialogTitle>
@@ -449,7 +452,7 @@ export default function TaskListPage() {
               </div>
               <div className="space-y-2">
                 <Label>Set New Status</Label>
-                <Select value={actionTask?.status} onValueChange={(val: any) => setActionTask(prev => prev ? {...prev, status: val} : null)}>
+                <Select value={pendingStatus} onValueChange={(val: any) => setPendingStatus(val)}>
                   <SelectTrigger className="rounded-sm h-9">
                     <SelectValue />
                   </SelectTrigger>
@@ -476,7 +479,7 @@ export default function TaskListPage() {
             <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
             <Button className="rounded-sm" onClick={() => {
               const remarks = (document.getElementById('task-remarks') as HTMLTextAreaElement)?.value || "";
-              handleUpdateStatus(remarks, actionTask?.status as any);
+              handleUpdateStatus(remarks);
             }}>
               {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Remarks
@@ -485,7 +488,6 @@ export default function TaskListPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deletingTask} onOpenChange={(o) => !o && setDeletingTask(null)}>
         <AlertDialogContent className="rounded-sm">
             <AlertDialogHeader>

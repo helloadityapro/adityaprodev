@@ -1142,7 +1142,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <div className="flex flex-col items-center justify-center py-32 text-center bg-muted/10 rounded-sm border border-dashed border-primary/20">
               <Gavel className="h-16 w-16 text-muted-foreground/20 mb-4" />
               <h3 className="text-xl font-bold">Work Orders Module</h3>
-              <p className="text-muted-foreground max-w-sm mx-auto mt-2">
+              <p className="text-muted-foreground max-sm mx-auto mt-2">
                 This section is reserved for managing service contracts and technical task orders for this site.
               </p>
             </div>
