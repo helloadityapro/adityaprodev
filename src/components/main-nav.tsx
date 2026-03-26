@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -39,7 +38,6 @@ import {
   Briefcase,
   Boxes,
   UserCog,
-  Hammer,
   HardHat
 } from "lucide-react"
 import {
@@ -55,7 +53,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Button } from "@/components/ui/button"
 
 export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendingPtwCount: number }) {
   const pathname = usePathname()

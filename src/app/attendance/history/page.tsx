@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, where, limit, doc, or } from "firebase/firestore";
+import { collection, query, where, limit, doc, or, orderBy } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes } from "date-fns";
@@ -80,15 +80,17 @@ export default function AttendanceHistoryPage() {
     
     // Admin sees all records globally
     if (isAdmin) {
-      return query(colRef, limit(200));
+      return query(colRef, orderBy('checkInTime', 'desc'), limit(1000));
     }
     
     // Manager sees self + team
     if (isManager) {
+      // Note: 'or' queries with 'orderBy' can be problematic without complex indices
+      // We increase limit and sort in-memory for the combined manager view
       return query(
         colRef,
         or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid)),
-        limit(150)
+        limit(1000)
       );
     }
     
@@ -96,7 +98,8 @@ export default function AttendanceHistoryPage() {
     return query(
       colRef,
       where('userId', '==', user.uid),
-      limit(100)
+      orderBy('checkInTime', 'desc'),
+      limit(500)
     );
   }, [firestore, user, userProfile, isAdmin, isManager, isProfileLoading]);
 
@@ -218,7 +221,6 @@ export default function AttendanceHistoryPage() {
         </div>
       </div>
 
-      {/* Mobile Card List */}
       <div className="md:hidden space-y-4">
         {filteredEntries.length > 0 ? filteredEntries.map((entry) => (
           <Card key={entry.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden">
@@ -281,7 +283,6 @@ export default function AttendanceHistoryPage() {
         )}
       </div>
 
-      {/* Desktop View */}
       <div className="hidden md:block">
         <Card className="rounded-sm shadow-xl border-primary/10 overflow-hidden">
           <CardContent className="p-0">
