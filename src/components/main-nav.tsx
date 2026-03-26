@@ -38,7 +38,8 @@ import {
   Briefcase,
   Boxes,
   UserCog,
-  HardHat
+  HardHat,
+  Gavel
 } from "lucide-react"
 import {
   SidebarMenu,

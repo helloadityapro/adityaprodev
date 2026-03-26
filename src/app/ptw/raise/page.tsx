@@ -175,9 +175,19 @@ export default function RaisePtwPage() {
         resolve(null);
         return;
       }
+      
+      const timeoutId = setTimeout(() => {
+        toast({ variant: 'destructive', title: 'GPS Timeout', description: 'Could not obtain precise location in time.' });
+        resolve(null);
+      }, 10000);
+
       navigator.geolocation.getCurrentPosition(
-        (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+        (position) => {
+          clearTimeout(timeoutId);
+          resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        },
         () => {
+          clearTimeout(timeoutId);
           toast({ variant: 'destructive', title: 'Location Error', description: 'Could not get location.' });
           resolve(null);
         },
@@ -255,7 +265,7 @@ export default function RaisePtwPage() {
         : 0;
       const currentSubmissionIndex = maxExistingIndex + 1;
 
-      const uploadFile = (file: File, storagePath: string): Promise<any> => {
+      const uploadFile = (file: Blob, fileName: string, storagePath: string): Promise<any> => {
         return new Promise((resolve, reject) => {
           const storage = getStorage(firebaseApp);
           const storageRef = ref(storage, storagePath);
@@ -269,7 +279,7 @@ export default function RaisePtwPage() {
             () => getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve({ 
               url, 
               contentType: file.type, 
-              name: file.name,
+              name: fileName,
               submissionIndex: currentSubmissionIndex,
               timestamp: new Date().toISOString()
             }))
@@ -278,18 +288,20 @@ export default function RaisePtwPage() {
       };
 
       const timestamp = Date.now();
-      let allFilesToUpload: File[] = [...files, ...referenceDocs];
+      const newAttachments = [];
+      const allFilesToUpload: File[] = [...files, ...referenceDocs];
 
-      const processedFiles = await Promise.all(allFilesToUpload.map(async (file) => {
-        if (file.type.startsWith('image/')) return imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true });
-        return file;
-      }));
-
-      const newAttachments = await Promise.all(processedFiles.map(file => {
+      // Sequential uploads for reliability
+      for (const file of allFilesToUpload) {
+        let fileToUpload: Blob = file;
+        if (file.type.startsWith('image/')) {
+          fileToUpload = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: false });
+        }
         const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const filePath = `uploads/${user.uid}/${timestamp}-${safeName}`;
-        return uploadFile(file, filePath);
-      }));
+        const attachment = await uploadFile(fileToUpload, file.name, filePath);
+        newAttachments.push(attachment);
+      }
       
       const isEngineerRole = userProfile.role === 'Site Engineer';
       const targetStatus = isEngineerRole ? "Pending" : "ManagerApproved";
@@ -338,22 +350,6 @@ export default function RaisePtwPage() {
           }
         }
       }
-
-      const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
-      getDocs(adminsQuery).then(snapshot => {
-        snapshot.forEach(adminDoc => {
-          if (adminDoc.id === user.uid) return;
-          
-          addDocumentNonBlocking(collection(firestore, 'notifications'), {
-            userId: adminDoc.id,
-            title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
-            description: `Permit ${serialNumber} ("${values.siteName}") has been ${isCorrectionMode ? 'resubmitted' : 'raised'} and is now ${targetStatus}.`,
-            link: `/ptw/list?view=${permitId}`,
-            read: false,
-            createdAt: serverTimestamp(),
-          });
-        });
-      });
 
       if (isCorrectionMode) {
         permitData.attachments = arrayUnion(...newAttachments);
@@ -404,7 +400,7 @@ export default function RaisePtwPage() {
                 <CheckCircle2 className="h-12 w-12 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold">Submission Successful</CardTitle>
+            <CardTitle className="text-2xl font-bold uppercase tracking-tight">ACCOUNT CREATED</CardTitle>
             <CardDescription className="text-base">
               Permit <span className="font-mono font-bold text-primary">{submittedPermit.serialNumber}</span> has been raised and is pending review.
             </CardDescription>

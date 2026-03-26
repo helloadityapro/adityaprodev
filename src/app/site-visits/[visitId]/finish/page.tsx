@@ -203,26 +203,30 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
     setTasks(newTasks);
   };
 
-  const processTaskPhotos = async () => {
+  const processTaskPhotosSequential = async () => {
     const storage = getStorage(firebaseApp);
     const metadata = { contentType: 'image/jpeg' };
+    const uploadedTasks = [];
     
-    return await Promise.all(tasks.map(async (task, idx) => {
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
       if (task.localPhoto) {
-        const taskPhotoRef = ref(storage, `site_visits/${user!.uid}/task_${idx}_${Date.now()}.jpg`);
+        const taskPhotoRef = ref(storage, `site_visits/${user!.uid}/task_${i}_${Date.now()}.jpg`);
         await uploadString(taskPhotoRef, task.localPhoto, 'data_url', metadata);
         const url = await getDownloadURL(taskPhotoRef);
-        return { text: task.text, photoUrl: url };
+        uploadedTasks.push({ text: task.text, photoUrl: url });
+      } else {
+        uploadedTasks.push({ text: task.text, photoUrl: task.photoUrl });
       }
-      return { text: task.text, photoUrl: task.photoUrl };
-    }));
+    }
+    return uploadedTasks;
   };
 
   const handleSaveProgress = async () => {
     if (!user || !visit) return;
     setIsSubmitting(true);
     try {
-      const finalTasks = await processTaskPhotos();
+      const finalTasks = await processTaskPhotosSequential();
       await updateDocumentNonBlocking(visitRef, {
         tasks: finalTasks.filter(t => t.text.trim() !== "" || t.photoUrl),
         updatedAt: serverTimestamp()
@@ -264,7 +268,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
       await uploadString(selfieRef, selfie, 'data_url', metadata);
       const selfieUrl = await getDownloadURL(selfieRef);
 
-      const finalTasks = await processTaskPhotos();
+      const finalTasks = await processTaskPhotosSequential();
 
       await updateDocumentNonBlocking(visitRef, {
         endTime: serverTimestamp(),

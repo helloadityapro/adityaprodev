@@ -454,7 +454,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
               </div>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
                 <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
-                  {currentFileIndex + 1} / {viewUrls.length}
+                  {currentUrlIndex + 1} / {viewUrls.length}
                 </Badge>
               </div>
             </>

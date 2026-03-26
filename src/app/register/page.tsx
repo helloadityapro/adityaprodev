@@ -128,7 +128,7 @@ export default function RegisterPage() {
             <div className="flex justify-center mb-4">
               <CheckCircle2 className="h-16 w-16 text-green-500" />
             </div>
-            <CardTitle className="text-2xl font-black uppercase tracking-tight">Authorization Pending</CardTitle>
+            <CardTitle className="text-2xl font-black uppercase tracking-tight">ACCOUNT CREATED</CardTitle>
             <CardDescription className="text-base font-medium">
               Profile initialized successfully.
             </CardDescription>
@@ -137,9 +137,14 @@ export default function RegisterPage() {
             <p className="text-sm text-muted-foreground leading-relaxed">
               Your request for access to Aditya Pro has been received. Project administration will review and verify your credentials shortly. You will be notified once access is granted.
             </p>
-            <Button variant="outline" onClick={() => auth.signOut()} className="w-full rounded-sm font-bold border-primary/20">
-              Sign Out & Close
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button asChild className="w-full rounded-sm font-bold shadow-md h-12">
+                <Link href="/login">Return to Sign In</Link>
+              </Button>
+              <Button variant="outline" onClick={() => auth.signOut()} className="w-full rounded-sm font-bold border-primary/20">
+                Sign Out
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
