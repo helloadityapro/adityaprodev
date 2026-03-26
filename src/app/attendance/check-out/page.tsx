@@ -13,6 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 export default function CheckOutPage() {
   const firestore = useFirestore();
@@ -144,7 +145,12 @@ export default function CheckOutPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 text-center">
         <CheckCircle2 className="h-16 w-16 text-green-500 opacity-20" />
-        <h2 className="text-2xl font-black uppercase">No Active Session</h2>
+        <div className="flex flex-col items-center gap-2">
+          <h2 className="text-2xl font-black uppercase">No Active Session</h2>
+          <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase rounded-sm border-none bg-amber-500 text-white shadow-sm">
+            Status: Checked-out
+          </Badge>
+        </div>
         <Button onClick={() => router.push('/attendance/check-in')}>Check-in Now</Button>
       </div>
     );
@@ -156,7 +162,12 @@ export default function CheckOutPage() {
         <h1 className="flex items-center gap-2">
           <CalendarCheck className="h-8 w-8 text-primary" /> Workday In Progress
         </h1>
-        <p className="text-muted-foreground">Session started {formatDistanceToNow(currentEntry.checkInTime?.toDate() || new Date(), { addSuffix: true })}.</p>
+        <div className="flex items-center gap-2">
+          <p className="text-muted-foreground text-sm">Session started {formatDistanceToNow(currentEntry.checkInTime?.toDate() || new Date(), { addSuffix: true })}.</p>
+          <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase rounded-sm border-none bg-emerald-500 text-white shadow-sm">
+            Status: Checked-in
+          </Badge>
+        </div>
       </div>
 
       <Card className="shadow-lg border-emerald-500/20 overflow-hidden rounded-sm">

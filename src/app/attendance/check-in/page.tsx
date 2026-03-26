@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
-import { collection, doc, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, useFirebaseApp, useCollection } from "@/firebase";
+import { collection, doc, serverTimestamp, query, where, limit } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 export default function CheckInPage() {
   const firestore = useFirestore();
@@ -30,6 +31,19 @@ export default function CheckInPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
+
+  const activeAttendanceQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(
+      collection(firestore, 'attendance'),
+      where('userId', '==', user.uid),
+      where('status', '==', 'ongoing'),
+      limit(1)
+    );
+  }, [firestore, user]);
+
+  const { data: activeAttendance } = useCollection(activeAttendanceQuery);
+  const isCheckedIn = activeAttendance && activeAttendance.length > 0;
 
   const startCamera = async (mode: "user" | "environment" = facingMode) => {
     try {
@@ -133,7 +147,15 @@ export default function CheckInPage() {
           <h1 className="flex items-center gap-2">
             <CalendarCheck className="h-6 w-6 text-primary" /> Check-in
           </h1>
-          <p className="text-muted-foreground text-xs font-medium">Verify your site presence.</p>
+          <div className="flex items-center gap-2">
+            <p className="text-muted-foreground text-xs font-medium">Verify your site presence.</p>
+            <Badge variant="outline" className={cn(
+              "h-5 px-1.5 text-[8px] font-black uppercase rounded-sm border-none shadow-sm",
+              isCheckedIn ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
+            )}>
+              Status: {isCheckedIn ? 'Checked-in' : 'Checked-out'}
+            </Badge>
+          </div>
         </div>
         <Button variant="ghost" size="sm" asChild className="rounded-sm font-bold text-primary h-8 px-3 border border-primary/10">
           <Link href="/attendance/history"><History className="mr-1.5 h-3.5 w-3.5" /> Log</Link>
