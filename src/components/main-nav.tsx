@@ -38,7 +38,6 @@ import {
   Briefcase,
   Boxes,
   UserCog,
-  Gavel,
   Hammer
 } from "lucide-react"
 import {
@@ -445,14 +444,6 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <Link href="/settings/suppliers">
                       <Truck className="h-4 w-4" />
                       <span className="font-medium">Suppliers</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Contractors" isActive={pathname.startsWith('/settings/contractors')} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/contractors">
-                      <Hammer className="h-4 w-4" />
-                      <span className="font-medium">Contractors</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
