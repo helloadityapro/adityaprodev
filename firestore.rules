@@ -142,6 +142,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /contractors/{contractorId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /system_settings/{settingId} {
       allow read: if isSignedIn();
       allow write: if isAdmin() || (settingId == 'counters' && isSignedIn());

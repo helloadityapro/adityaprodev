@@ -36,6 +36,32 @@
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
+    "Supplier": {
+      "title": "Supplier",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "gstin": { "type": "string" },
+        "address": { "type": "string" },
+        "mobile": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "Contractor": {
+      "title": "Contractor",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "gstin": { "type": "string" },
+        "address": { "type": "string" },
+        "mobile": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["name"]
+    },
     "BoMItem": {
       "title": "BoM Item",
       "type": "object",
@@ -136,6 +162,14 @@
     "/vehicles/{vehicleId}": {
       "schema": { "$ref": "#/backend/entities/Vehicle" },
       "description": "Fleet registry."
+    },
+    "/suppliers/{supplierId}": {
+      "schema": { "$ref": "#/backend/entities/Supplier" },
+      "description": "Material supplier registry."
+    },
+    "/contractors/{contractorId}": {
+      "schema": { "$ref": "#/backend/entities/Contractor" },
+      "description": "Service contractor registry."
     },
     "/project_boms/{bomId}": {
       "schema": { "$ref": "#/backend/entities/BoMItem" },

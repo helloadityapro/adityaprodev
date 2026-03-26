@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -38,7 +39,8 @@ import {
   Briefcase,
   Boxes,
   UserCog,
-  Hammer
+  Hammer,
+  HardHat
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -444,6 +446,14 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <Link href="/settings/suppliers">
                       <Truck className="h-4 w-4" />
                       <span className="font-medium">Suppliers</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Contractors" isActive={pathname.startsWith('/settings/contractors')} className="rounded-sm" onClick={handleMobileClose}>
+                    <Link href="/settings/contractors">
+                      <HardHat className="h-4 w-4" />
+                      <span className="font-medium">Contractors</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

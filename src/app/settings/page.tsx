@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -17,7 +18,9 @@ import {
   Workflow, 
   FileCheck,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Truck,
+  HardHat
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -59,6 +62,8 @@ export default function SettingsPage() {
     { label: 'Rewards Setup', href: '/settings/rewards', icon: Coins, color: 'text-amber-600' },
     { label: 'User Directory', href: '/settings/users', icon: Users, color: 'text-purple-600' },
     { label: 'Team Mapping', href: '/settings/teams', icon: Workflow, color: 'text-emerald-600' },
+    { label: 'Supplier Registry', href: '/settings/suppliers', icon: Truck, color: 'text-indigo-600' },
+    { label: 'Contractor Registry', href: '/settings/contractors', icon: HardHat, color: 'text-orange-600' },
     { label: 'Permit Management', href: '/settings/permits', icon: FileCheck, color: 'text-primary' },
     { label: 'Dropdown Config', href: '/settings/dropdown-management', icon: Settings2, color: 'text-slate-600' },
   ];
