@@ -43,7 +43,9 @@ import {
   HardHat,
   TrendingUp,
   Fuel,
-  FilterX
+  FilterX,
+  Check,
+  ChevronsUpDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
@@ -60,6 +62,7 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type Attachment = { 
   url: string; 
@@ -180,6 +183,12 @@ export default function PtwListPage() {
   const [statusFilter, setStatusFilter] = React.useState('all');
   const [userFilter, setUserFilter] = React.useState('all');
   const [siteFilter, setSiteFilter] = React.useState('all');
+  
+  const [isUserPopoverOpen, setIsUserPopoverOpen] = React.useState(false);
+  const [userSearchQuery, setUserSearchQuery] = React.useState("");
+  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
+  const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
+
   const [actionState, setActionState] = React.useState<{ permit: Permit, status: 'Approved' | 'Rejected' | 'ManagerApproved' } | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
@@ -216,6 +225,20 @@ export default function PtwListPage() {
 
   const sitesQuery = useMemoFirebase(() => isAdmin ? collection(firestore, 'sites') : null, [firestore, isAdmin]);
   const { data: sites } = useCollection<{ name: string, id: string }>(sitesQuery);
+
+  const filteredEngineersList = React.useMemo(() => {
+    if (!engineers) return [];
+    return engineers.filter(eng => 
+      eng.username.toLowerCase().includes(userSearchQuery.toLowerCase())
+    );
+  }, [engineers, userSearchQuery]);
+
+  const filteredSitesListForFilter = React.useMemo(() => {
+    if (!sites) return [];
+    return sites.filter(site => 
+      site.name.toLowerCase().includes(siteSearchQuery.toLowerCase())
+    );
+  }, [sites, siteSearchQuery]);
 
   // Zoom logic for media preview
   React.useEffect(() => {
@@ -456,29 +479,91 @@ export default function PtwListPage() {
           </div>
           {isAdmin && (
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              <Select value={userFilter} onValueChange={setUserFilter}>
-                <SelectTrigger className="w-full md:w-[180px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20">
-                  <SelectValue placeholder="Filter Personnel" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-[10px] font-bold uppercase">All Engineers</SelectItem>
-                  {engineers?.map(eng => (
-                    <SelectItem key={eng.id} value={eng.id} className="text-[10px] font-bold uppercase">{eng.username}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full md:w-[180px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
+                    {userFilter === 'all' ? "All Engineers" : engineers?.find(e => e.id === userFilter)?.username || "Filter Personnel"}
+                    <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[240px] p-0" align="start">
+                  <div className="flex items-center border-b px-3">
+                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                    <Input 
+                      placeholder="Search engineers..." 
+                      className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" 
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <ScrollArea className="h-[200px]">
+                    <div className="p-1">
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start font-bold text-xs rounded-sm h-9"
+                        onClick={() => { setUserFilter('all'); setIsUserPopoverOpen(false); setUserSearchQuery(""); }}
+                      >
+                        <Check className={cn("mr-2 h-3 w-3", userFilter === 'all' ? "opacity-100" : "opacity-0")} />
+                        All Engineers
+                      </Button>
+                      {filteredEngineersList.map(eng => (
+                        <Button
+                          key={eng.id}
+                          variant="ghost"
+                          className="w-full justify-start font-medium text-xs rounded-sm h-9"
+                          onClick={() => { setUserFilter(eng.id); setIsUserPopoverOpen(false); setUserSearchQuery(""); }}
+                        >
+                          <Check className={cn("mr-2 h-3 w-3", userFilter === eng.id ? "opacity-100" : "opacity-0")} />
+                          {eng.username}
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
 
-              <Select value={siteFilter} onValueChange={setSiteFilter}>
-                <SelectTrigger className="w-full md:w-[180px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20">
-                  <SelectValue placeholder="Filter Site" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-[10px] font-bold uppercase">All Sites</SelectItem>
-                  {sites?.map(site => (
-                    <SelectItem key={site.id} value={site.name} className="text-[10px] font-bold uppercase">{site.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full md:w-[180px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
+                    {siteFilter === 'all' ? "All Sites" : siteFilter}
+                    <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[240px] p-0" align="start">
+                  <div className="flex items-center border-b px-3">
+                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                    <Input 
+                      placeholder="Search sites..." 
+                      className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" 
+                      value={siteSearchQuery}
+                      onChange={(e) => setSiteSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <ScrollArea className="h-[200px]">
+                    <div className="p-1">
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start font-bold text-xs rounded-sm h-9"
+                        onClick={() => { setSiteFilter('all'); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}
+                      >
+                        <Check className={cn("mr-2 h-3 w-3", siteFilter === 'all' ? "opacity-100" : "opacity-0")} />
+                        All Sites
+                      </Button>
+                      {filteredSitesListForFilter.map(site => (
+                        <Button
+                          key={site.id}
+                          variant="ghost"
+                          className="w-full justify-start font-medium text-xs rounded-sm h-9"
+                          onClick={() => { setSiteFilter(site.name); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}
+                        >
+                          <Check className={cn("mr-2 h-3 w-3", siteFilter === site.name ? "opacity-100" : "opacity-0")} />
+                          {site.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
 
               <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setStatusFilter('all'); setUserFilter('all'); setSiteFilter('all'); }} className="h-10 w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
                 <FilterX className="h-4 w-4" />
