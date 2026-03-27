@@ -418,14 +418,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     setExpandedBomRows(newSet);
   };
 
-  const toggleSelectAll = () => {
-    // Logic if needed
-  };
-
-  const toggleSelectOne = (id: string) => {
-    // Logic if needed
-  };
-
   const togglePORow = (id: string) => {
     const newSet = new Set(expandedPORows);
     if (newSet.has(id)) newSet.delete(id);
@@ -667,7 +659,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                   </CardHeader>
                   <CardContent className="pt-6 space-y-4">
                     <StatRow label="Approved Permits" value={permits?.filter((p: any) => p.status === 'Approved').length || 0} color="green" />
-                    <StatRow label="Pending Audits" value={permits?.filter((p: any) => p.status === 'Pending').length || 0} color="amber" />
+                    <StatRow label="Pending Audits" value={permits?.filter((p: any) => p.status === 'Pending' || p.status === 'ManagerApproved').length || 0} color="amber" />
                     <StatRow label="Ongoing Work" value={tasks?.filter((t: any) => t.status !== 'Completed').length || 0} color="blue" />
                     <StatRow label="Total Evidence" value={dprs?.length || 0} color="primary" />
                   </CardContent>
@@ -1166,19 +1158,32 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableRow>
                         <TableHead className="px-6">Serial No</TableHead>
                         <TableHead>Type</TableHead>
+                        <TableHead>Engineer</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
                         <TableHead className="text-right px-6">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {permits.map((permit: any) => (
-                        <TableRow key={permit.id} className="hover:bg-muted/5">
+                      {permits.sort((a: any, b: any) => (b.requestDate?.toDate?.() || 0) - (a.requestDate?.toDate?.() || 0)).map((permit: any) => (
+                        <TableRow key={permit.id} className="hover:bg-muted/5 group">
                           <TableCell className="px-6 py-4 font-mono text-xs font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
                           <TableCell className="text-sm font-semibold">{permit.ptwType}</TableCell>
-                          <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm h-5">{permit.status}</Badge></TableCell>
+                          <TableCell className="text-xs font-medium">{permit.siteEngineerName || '—'}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn(
+                              "text-[9px] font-black uppercase rounded-sm h-5 px-1.5 whitespace-nowrap",
+                              permit.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                              permit.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                              "bg-yellow-50 text-yellow-700 border-yellow-200"
+                            )}>
+                              {permit.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{formatTimestamp(permit.requestDate).split(' ')[0]}</TableCell>
                           <TableCell className="text-right px-6">
-                            <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary">
-                              <Link href={`/ptw/list?view=${permit.id}`}><ChevronRight className="h-4 w-4" /></Link>
+                            <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm">
+                              <Link href={`/ptw/list?view=${permit.id}`} title="View Permit Audit Log"><Eye className="h-4 w-4" /></Link>
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -1186,7 +1191,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="p-20 text-center text-muted-foreground italic">No permits found.</div>
+                  <div className="p-20 text-center text-muted-foreground italic">No permits found for this project.</div>
                 )}
               </CardContent>
             </Card>
