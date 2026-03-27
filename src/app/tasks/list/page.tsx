@@ -371,7 +371,8 @@ export default function TaskListPage() {
                     <TableHead className="w-32">Due Date</TableHead>
                     <TableHead>Task & Site</TableHead>
                     <TableHead>Priority</TableHead>
-                    <TableHead>Assignee</TableHead>
+                    <TableHead>Assigned To</TableHead>
+                    <TableHead>Assigned By</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right px-6">Actions</TableHead>
                   </TableRow>
@@ -396,11 +397,14 @@ export default function TaskListPage() {
                       <TableCell><PriorityBadge priority={task.priority} /></TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
+                          <User className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-xs font-bold">{task.assignedToName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
                           <User className="h-3.5 w-3.5 text-muted-foreground" />
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold leading-none">{task.assignedToName}</span>
-                            <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter mt-0.5">By: {task.assignedByName}</span>
-                          </div>
+                          <span className="text-xs font-medium">{task.assignedByName}</span>
                         </div>
                       </TableCell>
                       <TableCell><StatusBadge status={task.status} /></TableCell>

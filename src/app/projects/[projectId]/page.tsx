@@ -1384,14 +1384,21 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <TableHeader className="bg-muted/30">
                       <TableRow>
                         <TableHead className="px-6">Title</TableHead>
-                        <TableHead>Assignee</TableHead>
+                        <TableHead>Assigned To</TableHead>
+                        <TableHead>Assigned By</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right px-6">Due</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {tasks.map((task: any) => (
-                        <TableRow key={task.id} className="hover:bg-muted/5"><TableCell className="px-6 py-4 font-bold text-sm">{task.title}</TableCell><TableCell className="text-xs font-medium">{task.assignedToName}</TableCell><TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm">{task.status}</Badge></TableCell><TableCell className="text-right px-6 text-[10px] font-mono font-black text-muted-foreground">{task.dueDate}</TableCell></TableRow>
+                        <TableRow key={task.id} className="hover:bg-muted/5">
+                          <TableCell className="px-6 py-4 font-bold text-sm">{task.title}</TableCell>
+                          <TableCell className="text-xs font-medium">{task.assignedToName}</TableCell>
+                          <TableCell className="text-xs font-medium">{task.assignedByName}</TableCell>
+                          <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm">{task.status}</Badge></TableCell>
+                          <TableCell className="text-right px-6 text-[10px] font-mono font-black text-muted-foreground">{task.dueDate}</TableCell>
+                        </TableRow>
                       ))}
                     </TableBody>
                   </Table>
