@@ -103,7 +103,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <SidebarMenuButton asChild tooltip="Reports" isActive={pathname === '/reports'} className="rounded-sm" onClick={handleMobileClose}>
                 <Link href="/reports">
                   <FileBarChart className="h-4 w-4" />
-                  <span className="font-medium">Reports Dashboard</span>
+                  <span className="font-medium">Dashboard</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
