@@ -852,7 +852,7 @@ export default function PtwListPage() {
           <DialogFooter className="p-3 sm:p-4 bg-muted/5 border-t gap-2 sm:gap-3 shrink-0 no-print">
             {detailsPermit && detailsPermit.status !== 'Approved' && detailsPermit.status !== 'Rejected' && (
               <>
-                {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || (isAdmin && (detailsPermit.status === 'ManagerApproved' || detailsPermit.status === 'Pending'))) && (
+                {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || (isAdmin && detailsPermit.status === 'ManagerApproved')) && (
                   <div className="flex-1 flex gap-2">
                     <Button className="flex-1 h-10 sm:h-12 rounded-sm font-bold text-[10px] sm:text-xs bg-green-600 hover:bg-green-700 text-white shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
                       Approve
