@@ -547,6 +547,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     setExpandedBomRows(newSet);
   };
 
+  const toggleSelectMasterItem = (item: MasterItem) => {
+    setSelectedMasterItem(item);
+    setIsBomItemPopoverOpen(false);
+    setBomItemSearchQuery("");
+  };
+
   const togglePORow = (id: string) => {
     const newSet = new Set(expandedPORows);
     if (newSet.has(id)) newSet.delete(id);
@@ -768,8 +774,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                 {member.role}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-xs font-medium font-mono text-muted-foreground text-center">
-                              {member.assignedProjectIds?.length || 0}
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">
+                                {member.assignedProjectIds?.length || 0}
+                              </Badge>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -800,17 +808,17 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           <TabsContent value="bom" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
             {(isAdmin || isManager) && (
               <Card className="rounded-sm border-primary/10 bg-primary/5 shadow-sm">
-                <CardHeader className="py-4 border-b">
-                  <CardTitle className="text-xs font-bold uppercase tracking-widest">Add BoM Entry</CardTitle>
+                <CardHeader className="py-2 border-b bg-muted/10">
+                  <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Add BoM Entry</CardTitle>
                 </CardHeader>
-                <CardContent className="pt-6">
-                  <form onSubmit={handleAddBoM} className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-                    <div className="md:col-span-4 space-y-4">
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Select From Master Inventory</Label>
+                <CardContent className="p-4 pt-4">
+                  <form onSubmit={handleAddBoM} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                      <div className="md:col-span-2 space-y-1.5">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-tight">Material Item</Label>
                         <Popover open={isBomItemPopoverOpen} onOpenChange={setIsBomItemPopoverOpen}>
                           <PopoverTrigger asChild>
-                            <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/20", !selectedMasterItem && "text-muted-foreground")}>
+                            <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-9 rounded-sm bg-background border-primary/20", !selectedMasterItem && "text-muted-foreground")}>
                               <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
                               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
@@ -835,11 +843,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                       type="button"
                                       variant="ghost"
                                       className="w-full justify-start text-left font-normal h-11 text-xs mb-0.5"
-                                      onClick={() => {
-                                        setSelectedMasterItem(item);
-                                        setIsBomItemPopoverOpen(false);
-                                        setBomItemSearchQuery("");
-                                      }}
+                                      onClick={() => toggleSelectMasterItem(item)}
                                     >
                                       <Check className={cn("mr-2 h-4 w-4 text-primary", selectedMasterItem?.id === item.id ? "opacity-100" : "opacity-0")} />
                                       <div className="flex flex-col items-start min-w-0 text-left">
@@ -858,63 +862,63 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <input type="hidden" name="itemName" value={selectedMasterItem?.name || ""} />
                       </div>
                       
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">REQUIRED QUANTITY</Label>
-                        <div className="flex gap-2">
-                          <Input name="qty" type="number" required placeholder="0" className="h-11 rounded-sm bg-background border-primary/20" />
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-tight">Required Qty & Unit</Label>
+                        <div className="flex gap-1.5">
+                          <Input name="qty" type="number" required placeholder="0" className="h-9 rounded-sm bg-background border-primary/20" />
                           <Input 
                             key={`unit-${selectedMasterItem?.id || 'none'}`}
                             name="unit" 
                             placeholder="Unit" 
                             readOnly
                             defaultValue={selectedMasterItem?.unit || ""} 
-                            className="w-24 h-11 rounded-sm bg-muted/20 border-primary/10 font-black text-primary cursor-not-allowed" 
+                            className="w-20 h-9 rounded-sm bg-muted/20 border-primary/10 font-black text-primary cursor-not-allowed text-[10px]" 
                           />
                         </div>
                       </div>
-                      <Button type="submit" className="rounded-sm h-11 font-black uppercase text-[10px] tracking-widest w-full shadow-xl" disabled={!selectedMasterItem}>
-                        <Plus className="h-4 w-4 mr-2" /> Add to BoM
-                      </Button>
-                    </div>
-                    
-                    <div className="md:col-span-8 space-y-4">
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Item Category (Automated)</Label>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-tight">Category (Auto)</Label>
                         <Input 
                           readOnly
                           key={`cat-field-${selectedMasterItem?.id || 'none'}`}
-                          placeholder="Category will appear here..."
+                          placeholder="Category..."
                           defaultValue={selectedMasterItem?.category || ""}
-                          className="h-10 rounded-sm bg-muted/10 border-primary/10 cursor-not-allowed font-bold text-primary"
+                          className="h-9 rounded-sm bg-muted/10 border-primary/10 cursor-not-allowed font-bold text-primary text-[10px]"
                         />
                       </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Master Specification / Breakdown</Label>
-                        <div className="min-h-[100px] p-4 rounded-sm bg-muted/10 border border-primary/10 overflow-auto">
+                    </div>
+                    
+                    <div className="flex flex-col md:flex-row gap-4 items-start">
+                      <div className="flex-1 min-w-0 space-y-1.5 w-full">
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-tight">Specifications / Breakdown Preview</Label>
+                        <div className="h-20 p-3 rounded-sm bg-muted/10 border border-primary/5 overflow-auto shadow-inner">
                           {selectedMasterItem ? (
                             <div className="space-y-2">
                               {selectedMasterItem.unit === 'Sets' && selectedMasterItem.subItems && selectedMasterItem.subItems.length > 0 ? (
                                 <>
-                                  <p className="text-[10px] font-black text-primary uppercase mb-2">Composition Breakdown:</p>
-                                  <div className="grid gap-1.5">
+                                  <p className="text-[9px] font-black text-primary uppercase mb-1">Set Composition:</p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                                     {selectedMasterItem.subItems.map((sub, idx) => (
-                                      <div key={idx} className="flex items-center justify-between text-[11px] font-medium border-b border-border/50 pb-1">
-                                        <span>{sub.name}</span>
-                                        <span className="font-bold text-primary">{sub.quantityPerSet} {sub.unit} / Set</span>
+                                      <div key={idx} className="flex items-center justify-between text-[10px] font-medium border-b border-border/20 pb-0.5">
+                                        <span className="truncate mr-2">{sub.name}</span>
+                                        <span className="font-bold text-primary shrink-0">{sub.quantityPerSet} {sub.unit}</span>
                                       </div>
                                     ))}
                                   </div>
                                 </>
                               ) : (
-                                <p className="text-sm italic text-muted-foreground leading-relaxed">"{selectedMasterItem.description || 'No additional specifications provided.'}"</p>
+                                <p className="text-[11px] italic text-muted-foreground leading-relaxed">"{selectedMasterItem.description || 'No additional specifications provided.'}"</p>
                               )}
                             </div>
                           ) : (
-                            <p className="text-xs text-muted-foreground/40 italic">Select an item to view its details...</p>
+                            <p className="text-[10px] text-muted-foreground/40 italic flex items-center justify-center h-full">Selection preview will appear here...</p>
                           )}
                         </div>
                       </div>
+                      <Button type="submit" className="h-20 md:w-32 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md mt-auto w-full" disabled={!selectedMasterItem}>
+                        <Plus className="h-4 w-4 mr-1.5" /> Log to BoM
+                      </Button>
                     </div>
                   </form>
                 </CardContent>
