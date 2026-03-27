@@ -3,8 +3,7 @@
  * These users bypass standard role checks and have full system access.
  */
 export const SUPER_ADMIN_EMAILS = [
-  'khalil@adityagreenenergy.com',
-  'prafulrana143@gmail.com'
+  'khalil@adityagreenenergy.com'
 ];
 
 /**

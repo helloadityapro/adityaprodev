@@ -11,7 +11,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      let superAdminEmails = ['khalil@adityagreenenergy.com', 'prafulrana143@gmail.com'];
+      let superAdminEmails = ['khalil@adityagreenenergy.com'];
       let userEmail = request.auth.token.get('email', '').lower();
       let isSuperAdmin = userEmail in superAdminEmails;
       

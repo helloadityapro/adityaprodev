@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from "react";
@@ -141,8 +140,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       const needsBootstrap = !userProfile || 
                              userProfile.role !== 'Admin' || 
                              userProfile.registrationRequest === true || 
-                             (user.email === 'khalil@adityagreenenergy.com' && userProfile.username !== 'Khalil Choudhary') ||
-                             (user.email === 'prafulrana143@gmail.com' && userProfile.username !== 'Praful Upadhaye');
+                             (user.email === 'khalil@adityagreenenergy.com' && userProfile.username !== 'Khalil Choudhary');
       
       if (needsBootstrap) {
         const updateData: any = {
@@ -157,8 +155,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
         if (user.email === 'khalil@adityagreenenergy.com') {
           updateData.username = 'Khalil Choudhary';
-        } else if (user.email === 'prafulrana143@gmail.com') {
-          updateData.username = 'Praful Upadhaye';
         }
 
         if (!userProfile) {
