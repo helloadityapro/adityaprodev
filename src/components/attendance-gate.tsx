@@ -70,23 +70,27 @@ export function AttendanceGate() {
     const hasCompletedToday = todayFinished && todayFinished.length > 0;
 
     // 1. CYCLE RESET (12 AM Logic)
-    // If we find an "ongoing" session where the date is NOT today, it means it's a leftover from yesterday.
+    // If we find an "ongoing" session where the date is NOT today, it means it's a leftover from yesterday or older.
     if (activeSession && activeSession.date !== todayStr) {
       const ref = doc(firestore, 'attendance', activeSession.id);
       
-      // The user failed to check out yesterday. 
-      // We set the checkout time to exactly 12:00 AM of the next day (midnight transition).
-      const sessionDate = parseISO(activeSession.date);
-      const nextDayMidnight = startOfDay(addDays(sessionDate, 1));
+      // The user failed to check out previously.
+      // We force close the session at the end of its respective workday.
+      try {
+        const sessionDate = parseISO(activeSession.date);
+        const nextDayMidnight = startOfDay(addDays(sessionDate, 1));
 
-      updateDocumentNonBlocking(ref, {
-        status: 'completed',
-        checkOutTime: Timestamp.fromDate(nextDayMidnight),
-        checkOutLat: activeSession.checkInLat, // Best effort fallback
-        checkOutLng: activeSession.checkInLng,
-        checkOutType: 'System CheckOut',
-        remarks: 'System CheckOut: Session automatically closed at 12:00 AM reset.'
-      });
+        updateDocumentNonBlocking(ref, {
+          status: 'completed',
+          checkOutTime: Timestamp.fromDate(nextDayMidnight),
+          checkOutLat: activeSession.checkInLat || 0, 
+          checkOutLng: activeSession.checkInLng || 0,
+          checkOutType: 'System CheckOut',
+          remarks: 'System CheckOut: Session automatically closed at 12:00 AM reset.'
+        });
+      } catch (e) {
+        console.error("Auto-checkout failed", e);
+      }
       return;
     }
 

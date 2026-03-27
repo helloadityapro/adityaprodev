@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -101,14 +100,10 @@ export default function AttendanceHistoryPage() {
 
     // 2. History filters ("7days", "custom"):
     // We avoid combining 'where' and 'orderBy' on different fields to prevent missing index errors.
-    // Instead, we fetch the broader set and sort/filter in memory for stability.
     if (isAdmin) {
-      // Admins fetch recent global records
       return query(colRef, orderBy('checkInTime', 'desc'), limit(1000));
     }
     
-    // Individual users fetch their own history limit
-    // Removing 'orderBy' here avoids the composite index requirement (userId + checkInTime)
     return query(
       colRef,
       where('userId', '==', user.uid),
@@ -171,17 +166,12 @@ export default function AttendanceHistoryPage() {
     const { start, end } = queryDateRange;
 
     const filtered = entries.filter(e => {
-      // Date Range Filter (Robust string comparison for yyyy-MM-dd)
       const matchesDate = e.date >= start && e.date <= end;
-      
-      // Search Term Filter
       const matchesSearch = e.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            e.date.includes(searchTerm);
-      
       return matchesDate && matchesSearch;
     });
 
-    // In-memory sort ensures data is always chronological regardless of Firestore index availability
     return [...filtered].sort((a, b) => {
         const dateA = a.checkInTime?.toDate?.()?.getTime() || 0;
         const dateB = b.checkInTime?.toDate?.()?.getTime() || 0;
@@ -315,18 +305,23 @@ export default function AttendanceHistoryPage() {
                 <div className="space-y-2">
                   <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Exit</p>
                   {entry.checkOutTime ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-700">{formatTime(entry.checkOutTime)}</span>
-                      <div className="flex gap-1">
-                        {entry.checkOutSelfieUrl && (
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkOutSelfieUrl!, entry)}>
-                            {isVideoUrl(entry.checkOutSelfieUrl!) ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-700">{formatTime(entry.checkOutTime)}</span>
+                        <div className="flex gap-1">
+                          {entry.checkOutSelfieUrl && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-primary" onClick={() => openViewer(entry.checkOutSelfieUrl!, entry)}>
+                              {isVideoUrl(entry.checkOutSelfieUrl!) ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
+                            <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
                           </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" asChild>
-                          <a href={`https://www.google.com/maps/search/?api=1&query=${entry.checkOutLat},${entry.checkOutLng}`} target="_blank" rel="noopener noreferrer"><MapPin className="h-3 w-3" /></a>
-                        </Button>
+                        </div>
                       </div>
+                      {entry.checkOutType === 'System CheckOut' && (
+                        <Badge variant="outline" className="bg-red-50 text-red-600 border-red-100 text-[7px] h-3.5 px-1 font-black uppercase w-fit">System</Badge>
+                      )}
                     </div>
                   ) : (
                     <Badge variant="secondary" className="text-[8px] font-black uppercase rounded-sm h-5">In Session</Badge>
