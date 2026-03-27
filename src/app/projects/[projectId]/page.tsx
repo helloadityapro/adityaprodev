@@ -55,7 +55,8 @@ import {
   Eye,
   ExternalLink,
   Printer,
-  Gavel
+  Gavel,
+  Save
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -87,8 +88,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
+
+const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"];
 
 type Project = {
   id: string;
@@ -213,6 +223,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [bomActionState, setBomActionState] = React.useState<{ item: BoMItem, type: 'Approved' | 'Rejected' } | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
   const [expandedBomRows, setExpandedBomRows] = React.useState<Set<string>>(new Set());
+  
+  const [editingBomItem, setEditingBomItem] = React.useState<BoMItem | null>(null);
+  const [isUpdatingBom, setIsUpdatingBom] = React.useState(false);
 
   const [poSearch, setPoSearch] = React.useState("");
   const [poSortConfig, setPoSortConfig] = React.useState<{ key: POSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
@@ -409,6 +422,31 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     
     setIsActionProcessing(false);
     setBomActionState(null);
+  };
+
+  const handleUpdateBoM = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingBomItem) return;
+    setIsUpdatingBom(true);
+    
+    const formData = new FormData(e.currentTarget);
+    const updateData = {
+      itemName: formData.get('itemName') as string,
+      specification: formData.get('specification') as string,
+      plannedQuantity: parseFloat(formData.get('plannedQty') as string),
+      unit: formData.get('unit') as string,
+      updatedAt: serverTimestamp()
+    };
+
+    try {
+      updateDocumentNonBlocking(doc(firestore, 'project_boms', editingBomItem.id), updateData);
+      toast({ title: 'Item Updated', description: 'BoM entry modified successfully.' });
+      setEditingBomItem(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setIsUpdatingBom(false);
+    }
   };
 
   const toggleBomRow = (id: string) => {
@@ -862,18 +900,23 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             </TableCell>
                             <TableCell className="text-right px-6">
                               <div className="flex justify-end items-center gap-1">
+                                {isAdmin && (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingBomItem(item)} title="Edit Item">
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 {isAdmin && item.status === 'Pending' && (
                                   <>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Approved' })}>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Approved' })} title="Approve">
                                       <CheckCircle2 className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Rejected' })}>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Rejected' })} title="Reject">
                                       <XCircle className="h-4 w-4" />
                                     </Button>
                                   </>
                                 )}
                                 {(isAdmin || (isManager && item.status === 'Pending')) && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'project_boms', item.id))}>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'project_boms', item.id))} title="Delete">
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 )}
@@ -1521,6 +1564,54 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit BoM Dialog */}
+      <Dialog open={!!editingBomItem} onOpenChange={(o) => !o && setEditingBomItem(null)}>
+        <DialogContent className="sm:max-w-md rounded-sm">
+          <DialogHeader>
+            <DialogTitle>Edit BoM Item</DialogTitle>
+            <DialogDescription>Modify authorized material details for this site.</DialogDescription>
+          </DialogHeader>
+          {editingBomItem && (
+            <form onSubmit={handleUpdateBoM} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-itemName">Item Name</Label>
+                <Input id="edit-itemName" name="itemName" defaultValue={editingBomItem.itemName} required className="rounded-sm" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-specification">Specification</Label>
+                <Textarea id="edit-specification" name="specification" defaultValue={editingBomItem.specification} className="rounded-sm" rows={3} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-plannedQty">Planned Quantity</Label>
+                  <Input id="edit-plannedQty" name="plannedQty" type="number" step="0.01" defaultValue={editingBomItem.plannedQuantity} required className="rounded-sm" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-unit">Unit</Label>
+                  <Select name="unit" defaultValue={editingBomItem.unit}>
+                    <SelectTrigger className="rounded-sm">
+                      <SelectValue placeholder="Select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {UNITS.map(u => (
+                        <SelectItem key={u} value={u}>{u}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter className="pt-4 gap-2">
+                <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
+                <Button type="submit" className="rounded-sm font-bold">
+                  {isUpdatingBom ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
