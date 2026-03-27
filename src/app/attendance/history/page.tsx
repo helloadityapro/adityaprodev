@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -5,8 +6,8 @@ import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@
 import { collection, query, where, limit, doc, or, orderBy } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, differenceInMinutes } from "date-fns";
-import { MapPin, History, Search, User, Timer, LogIn, LogOut, ImageIcon, X, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, PlayCircle, Film } from "lucide-react";
+import { format, differenceInMinutes, subDays } from "date-fns";
+import { MapPin, History, Search, User, Timer, LogIn, LogOut, ImageIcon, X, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, PlayCircle, Film, FilterX, Calendar } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 type AttendanceEntry = {
   id: string;
@@ -60,6 +63,10 @@ export default function AttendanceHistoryPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [dateFilter, setDateFilter] = React.useState<string>("today");
+  const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  
   const [viewUrl, setViewUrl] = React.useState<string | null>(null);
   const [viewUrls, setViewUrls] = React.useState<string[]>([]);
   const [currentUrlIndex, setCurrentUrlIndex] = React.useState(0);
@@ -74,34 +81,37 @@ export default function AttendanceHistoryPage() {
   const isManager = userProfile?.role === 'Site Manager';
   const showPersonnelColumn = isAdmin || isManager;
 
+  const queryDateRange = React.useMemo(() => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    if (dateFilter === 'today') return { start: today, end: today };
+    if (dateFilter === '7days') return { start: format(subDays(new Date(), 7), 'yyyy-MM-dd'), end: today };
+    return { start: customStart, end: customEnd };
+  }, [dateFilter, customStart, customEnd]);
+
   const attendanceQuery = useMemoFirebase(() => {
     if (!user || !userProfile || isProfileLoading) return null;
     const colRef = collection(firestore, 'attendance');
+    const { start, end } = queryDateRange;
     
-    // Admin sees all records globally
+    // For "Today" filter, we can do a very efficient equality query
+    if (dateFilter === 'today') {
+      if (isAdmin) return query(colRef, where('date', '==', start), limit(1000));
+      // For user history, always filter by userId
+      return query(colRef, where('userId', '==', user.uid), where('date', '==', start), limit(500));
+    }
+
+    // For range/history, fetch broader set and refine in memory to ensure no index build-up issues
     if (isAdmin) {
       return query(colRef, orderBy('checkInTime', 'desc'), limit(1000));
     }
     
-    // Manager sees self + team
-    if (isManager) {
-      // Note: 'or' queries with 'orderBy' can be problematic without complex indices
-      // We increase limit and sort in-memory for the combined manager view
-      return query(
-        colRef,
-        or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid)),
-        limit(1000)
-      );
-    }
-    
-    // Regular personnel sees only their own history
     return query(
       colRef,
       where('userId', '==', user.uid),
       orderBy('checkInTime', 'desc'),
-      limit(500)
+      limit(1000)
     );
-  }, [firestore, user, userProfile, isAdmin, isManager, isProfileLoading]);
+  }, [firestore, user, userProfile, isAdmin, isProfileLoading, dateFilter, queryDateRange]);
 
   const { data: entries, isLoading } = useCollection<AttendanceEntry>(attendanceQuery);
 
@@ -155,17 +165,25 @@ export default function AttendanceHistoryPage() {
   const filteredEntries = React.useMemo(() => {
     if (!entries) return [];
     
-    const sorted = [...entries].sort((a, b) => {
+    const { start, end } = queryDateRange;
+
+    const filtered = entries.filter(e => {
+      // Date Range Filter (Secondary guard)
+      const matchesDate = e.date >= start && e.date <= end;
+      
+      // Search Term Filter
+      const matchesSearch = e.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           e.date.includes(searchTerm);
+      
+      return matchesDate && matchesSearch;
+    });
+
+    return [...filtered].sort((a, b) => {
         const dateA = a.checkInTime?.toDate?.()?.getTime() || 0;
         const dateB = b.checkInTime?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
     });
-
-    return sorted.filter(e => 
-      e.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.date.includes(searchTerm)
-    );
-  }, [entries, searchTerm]);
+  }, [entries, searchTerm, queryDateRange]);
 
   const openViewer = (url: string, entry: AttendanceEntry) => {
     const urls = [entry.checkInSelfieUrl, entry.checkOutSelfieUrl].filter(Boolean) as string[];
@@ -199,25 +217,62 @@ export default function AttendanceHistoryPage() {
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4 max-w-5xl mx-auto"><Skeleton className="h-[500px] w-full" /></div>;
 
-  const headerTitle = isAdmin ? "Global Attendance Audit" : (isManager ? "Team Attendance Log" : "My Workday History");
+  const headerTitle = isAdmin ? "Global Attendance Audit" : "My Workday History";
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto py-8 px-4">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2">
-            <History className="h-8 w-8 text-primary" /> {headerTitle}
-          </h1>
-          <p className="text-muted-foreground font-medium text-sm">Review workday sessions with GPS and profile verification.</p>
+      <div className="flex flex-col gap-1">
+        <h1 className="flex items-center gap-2">
+          <History className="h-8 w-8 text-primary" /> {headerTitle}
+        </h1>
+        <p className="text-muted-foreground font-medium text-sm">Review workday sessions with GPS and profile verification.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-card p-4 border rounded-sm shadow-sm">
+        <div className="md:col-span-2 space-y-1.5">
+          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Records</Label>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Name or date (yyyy-mm-dd)..." 
+              className="pl-8 rounded-sm border-primary/20 h-10 bg-background text-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search name or date..." 
-            className="pl-8 rounded-sm border-primary/20 h-10 bg-background"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+
+        <div className="space-y-1.5">
+          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Time Range</Label>
+          <Select value={dateFilter} onValueChange={setDateFilter}>
+            <SelectTrigger className="h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+              <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
+              <SelectValue placeholder="Select Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+              <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+              <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-end gap-2">
+          {dateFilter === 'custom' ? (
+            <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95">
+              <div className="flex-1 space-y-1">
+                <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-10 rounded-sm border-primary/20 text-xs" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-10 rounded-sm border-primary/20 text-xs" />
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setDateFilter("today"); }} className="h-10 w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
+            <FilterX className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -278,7 +333,7 @@ export default function AttendanceHistoryPage() {
           </Card>
         )) : (
           <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-            No attendance records discovered.
+            No attendance records discovered for the selected range.
           </div>
         )}
       </div>
