@@ -484,7 +484,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
               </Button>
               <Button 
                 type="submit" 
-                disabled={isSubmitting || totalAmount <= 0} 
+                disabled={isSubmitting} 
                 className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95"
               >
                 {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> SUBMITTING...</> : <><Send className="mr-2 h-4 w-4" /> SUBMIT FOR APPROVAL</>}
