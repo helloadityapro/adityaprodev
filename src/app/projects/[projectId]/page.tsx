@@ -307,7 +307,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       const matchesSearch = item.itemName.toLowerCase().includes(bomTableSearch.toLowerCase()) || 
                            (item.specification || "").toLowerCase().includes(bomTableSearch.toLowerCase()) ||
                            (item.category || "").toLowerCase().includes(bomTableSearch.toLowerCase());
-      const matchesStatus = bomStatusFilter === 'all' || item.status === bomStatusFilter;
+      const matchesStatus = bomStatusFilter === 'all' || item.status === statusFilter;
       const matchesCategory = bomCategoryFilter === 'all' || item.category === bomCategoryFilter;
       
       return matchesSearch && matchesStatus && matchesCategory;
@@ -803,37 +803,43 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 value="dashboard" 
                 className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
               >
-                <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" /> Board
+                <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" /> BOARD
               </TabsTrigger>
               <TabsTrigger 
                 value="bom" 
                 className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
               >
-                <ClipboardList className="h-3.5 w-3.5 mr-1.5" /> BoM
-              </TabsTrigger>
-              <TabsTrigger 
-                value="inventory" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
-                <Warehouse className="h-3.5 w-3.5 mr-1.5" /> Stock
+                <ClipboardList className="h-3.5 w-3.5 mr-1.5" /> BOM
               </TabsTrigger>
               <TabsTrigger 
                 value="po" 
                 className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
               >
-                <ShoppingBag className="h-3.5 w-3.5 mr-1.5" /> Purchase Orders
+                <ShoppingBag className="h-3.5 w-3.5 mr-1.5" /> PURCHASE ORDERS
               </TabsTrigger>
               <TabsTrigger 
                 value="wo" 
                 className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
               >
-                <Gavel className="h-3.5 w-3.5 mr-1.5" /> Work Orders
+                <Gavel className="h-3.5 w-3.5 mr-1.5" /> WORK ORDERS
+              </TabsTrigger>
+              <TabsTrigger 
+                value="inventory" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
+                <Warehouse className="h-3.5 w-3.5 mr-1.5" /> INVENTORY
+              </TabsTrigger>
+              <TabsTrigger 
+                value="logistics" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" /> MOVEMENTS
               </TabsTrigger>
               <TabsTrigger 
                 value="ptw" 
                 className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
               >
-                <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Permits
+                <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> PERMITS
               </TabsTrigger>
               <TabsTrigger 
                 value="dpr" 
@@ -842,22 +848,16 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 <TableIcon className="h-3.5 w-3.5 mr-1.5" /> DPR
               </TabsTrigger>
               <TabsTrigger 
-                value="logistics" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
-                <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" /> Logistics
-              </TabsTrigger>
-              <TabsTrigger 
                 value="tasks" 
                 className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
               >
-                <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Tasks
+                <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> TASKS
               </TabsTrigger>
               <TabsTrigger 
                 value="visits" 
                 className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
               >
-                <Navigation className="h-3.5 w-3.5 mr-1.5" /> Visits
+                <Navigation className="h-3.5 w-3.5 mr-1.5" /> VISITS
               </TabsTrigger>
             </TabsList>
             <ScrollBar orientation="horizontal" />
@@ -1200,41 +1200,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          <TabsContent value="inventory" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
-            <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-              <CardHeader className="bg-muted/5 border-b py-4">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" /> Live On-Site Component Stock</CardTitle>
-                <CardDescription>Individual tracking for materials and sub-components.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-muted/30">
-                      <TableRow>
-                        <TableHead className="px-6 min-w-[200px]">Material / Component</TableHead>
-                        <TableHead className="text-center">Availability</TableHead>
-                        <TableHead>Last Audit</TableHead>
-                        <TableHead className="text-right px-6">Manual Adjust</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {inventory && inventory.length > 0 ? inventory.sort((a, b) => a.itemName.localeCompare(b.itemName)).map(item => (
-                        <TableRow key={item.id} className="hover:bg-muted/5">
-                          <TableCell className="px-6 py-4 font-bold text-sm">{item.itemName}</TableCell>
-                          <TableCell className="text-center"><Badge className="bg-emerald-600 text-white font-mono font-bold rounded-sm px-2 h-6 border-none">{item.stockLevel} {item.unit}</Badge></TableCell>
-                          <TableCell className="text-[10px] text-muted-foreground uppercase font-black">{formatTimestamp(item.lastUpdated)}</TableCell>
-                          <TableCell className="text-right px-6"><div className="flex justify-end items-center gap-1.5"><Button variant="outline" size="icon" className="h-8 w-8 rounded-sm border-primary/20 text-primary" onClick={() => handleUpdateStock(item.id, Math.max(0, item.stockLevel - 1))}><MinusCircle className="h-4 w-4" /></Button><Button variant="outline" size="icon" className="h-8 w-8 rounded-sm border-primary/20 text-primary" onClick={() => handleUpdateStock(item.id, item.stockLevel + 1)}><PlusCircle className="h-4 w-4" /></Button></div></TableCell>
-                        </TableRow>
-                      )) : (
-                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">No stock data available. Component-level stock appears as material movements are recorded.</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="po" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
               <div className="relative w-full md:w-80"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search PO or Supplier" className="pl-8 h-9 rounded-sm border-primary/20 text-xs" value={poSearch} onChange={e => setPoSearch(e.target.value)} /></div>
@@ -1323,6 +1288,69 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
+          <TabsContent value="inventory" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
+            <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+              <CardHeader className="bg-muted/5 border-b py-4">
+                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" /> Live On-Site Component Stock</CardTitle>
+                <CardDescription>Individual tracking for materials and sub-components.</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6 min-w-[200px]">Material / Component</TableHead>
+                        <TableHead className="text-center">Availability</TableHead>
+                        <TableHead>Last Audit</TableHead>
+                        <TableHead className="text-right px-6">Manual Adjust</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {inventory && inventory.length > 0 ? inventory.sort((a, b) => a.itemName.localeCompare(b.itemName)).map(item => (
+                        <TableRow key={item.id} className="hover:bg-muted/5">
+                          <TableCell className="px-6 py-4 font-bold text-sm">{item.itemName}</TableCell>
+                          <TableCell className="text-center"><Badge className="bg-emerald-600 text-white font-mono font-bold rounded-sm px-2 h-6 border-none">{item.stockLevel} {item.unit}</Badge></TableCell>
+                          <TableCell className="text-[10px] text-muted-foreground uppercase font-black">{formatTimestamp(item.lastUpdated)}</TableCell>
+                          <TableCell className="text-right px-6"><div className="flex justify-end items-center gap-1.5"><Button variant="outline" size="icon" className="h-8 w-8 rounded-sm border-primary/20 text-primary" onClick={() => handleUpdateStock(item.id, Math.max(0, item.stockLevel - 1))}><MinusCircle className="h-4 w-4" /></Button><Button variant="outline" size="icon" className="h-8 w-8 rounded-sm border-primary/20 text-primary" onClick={() => handleUpdateStock(item.id, item.stockLevel + 1)}><PlusCircle className="h-4 w-4" /></Button></div></TableCell>
+                        </TableRow>
+                      )) : (
+                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">No stock data available. Component-level stock appears as material movements are recorded.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="logistics" className="mt-6 animate-in fade-in-50 duration-300">
+            <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+              <CardHeader className="bg-muted/5 border-b py-4"><CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><ArrowLeftRight className="h-4 w-4 text-primary" /> Material Movement Logs</CardTitle></CardHeader>
+              <CardContent className="p-0">
+                {movements && movements.length > 0 ? (
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6">Date</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Item</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead className="text-right px-6">Source/Dest</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {movements.sort((a: any, b: any) => new Date(b.movementDate).getTime() - new Date(a.movementDate).getTime()).map((mov: any) => (
+                        <TableRow key={mov.id} className="hover:bg-muted/5"><TableCell className="px-6 py-4 font-mono text-xs font-bold whitespace-nowrap">{mov.movementDate}</TableCell><TableCell><Badge className={cn("text-[9px] font-black uppercase rounded-sm", mov.movementType === 'Inward' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{mov.movementType}</Badge></TableCell><TableCell className="text-sm font-semibold">{mov.itemName}</TableCell><TableCell className="text-xs font-bold text-primary">{mov.quantity} {mov.unit}</TableCell><TableCell className="text-right px-6 text-[10px] font-bold text-muted-foreground uppercase">{mov.sourceOrDestination}</TableCell></TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="p-20 text-center text-muted-foreground italic">No movements found.</div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="ptw" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardHeader className="bg-muted/5 border-b py-4"><CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Compliance Audit: PtWs</CardTitle></CardHeader>
@@ -1373,34 +1401,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                   </Table>
                 ) : (
                   <div className="p-20 text-center text-muted-foreground italic">No reports found for this project.</div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="logistics" className="mt-6 animate-in fade-in-50 duration-300">
-            <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
-              <CardHeader className="bg-muted/5 border-b py-4"><CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><ArrowLeftRight className="h-4 w-4 text-primary" /> Material Movement Logs</CardTitle></CardHeader>
-              <CardContent className="p-0">
-                {movements && movements.length > 0 ? (
-                  <Table>
-                    <TableHeader className="bg-muted/30">
-                      <TableRow>
-                        <TableHead className="px-6">Date</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Item</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead className="text-right px-6">Source/Dest</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {movements.sort((a: any, b: any) => new Date(b.movementDate).getTime() - new Date(a.movementDate).getTime()).map((mov: any) => (
-                        <TableRow key={mov.id} className="hover:bg-muted/5"><TableCell className="px-6 py-4 font-mono text-xs font-bold whitespace-nowrap">{mov.movementDate}</TableCell><TableCell><Badge className={cn("text-[9px] font-black uppercase rounded-sm", mov.movementType === 'Inward' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{mov.movementType}</Badge></TableCell><TableCell className="text-sm font-semibold">{mov.itemName}</TableCell><TableCell className="text-xs font-bold text-primary">{mov.quantity} {mov.unit}</TableCell><TableCell className="text-right px-6 text-[10px] font-bold text-muted-foreground uppercase">{mov.sourceOrDestination}</TableCell></TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="p-20 text-center text-muted-foreground italic">No movements found.</div>
                 )}
               </CardContent>
             </Card>
