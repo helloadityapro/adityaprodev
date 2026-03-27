@@ -6,7 +6,7 @@ import { collection, doc, query, where, limit, serverTimestamp } from "firebase/
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, CalendarCheck, CheckCircle2, LogOut, Camera, Trash2, SwitchCamera, AlertCircle } from "lucide-react";
+import { Loader2, CalendarCheck, CheckCircle2, LogOut, Camera, Trash2, SwitchCamera, AlertCircle, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
@@ -58,6 +58,19 @@ export default function CheckOutPage() {
       toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable hardware permissions to complete check-out.' });
     }
   };
+
+  // Automatically start camera on mount if session active and no selfie taken
+  React.useEffect(() => {
+    if (currentEntry && !selfie && !isCameraActive) {
+      startCamera();
+    }
+    return () => {
+      if (videoRef.current?.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [currentEntry, selfie]);
 
   const toggleCamera = async () => {
     if (isCameraActive) {
@@ -177,42 +190,44 @@ export default function CheckOutPage() {
         </CardHeader>
         <CardContent className="pt-8 pb-8 space-y-6">
           <div className="flex flex-col items-center gap-4">
-            <div className={cn("relative w-full aspect-video bg-black rounded-sm overflow-hidden shadow-2xl", !isCameraActive && "hidden")}>
+            {/* Doubled height and full preview logic */}
+            <div className={cn("relative w-full h-80 bg-black rounded-sm overflow-hidden shadow-2xl border-4 border-emerald-500/20", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
               
+              <div className="absolute top-4 left-4">
+                <Badge className="bg-emerald-600 animate-pulse border-none rounded-full h-6 px-3 flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest">
+                  <Zap className="h-3 w-3 fill-white" /> Exit Audit Live
+                </Badge>
+              </div>
+
               {facingMode === "user" && (
                 <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-40">
-                  <div className="w-24 h-24 rounded-full border-2 border-white mt-4" />
-                  <div className="w-40 h-24 rounded-t-full border-2 border-t-2 border-x-2 border-white -mt-2" />
-                  <p className="text-white text-[8px] font-black uppercase mt-2 bg-black/20 px-2 rounded-full tracking-widest text-center">Position face and shoulders here</p>
+                  <div className="w-32 h-32 rounded-full border-2 border-white mt-4 shadow-[0_0_50px_rgba(255,255,255,0.2)]" />
+                  <div className="w-48 h-32 rounded-t-full border-2 border-t-2 border-x-2 border-white -mt-2" />
+                  <p className="text-white text-[8px] font-black uppercase mt-4 bg-black/20 px-2 rounded-full tracking-widest text-center">Position face and shoulders</p>
                 </div>
               )}
 
-              <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
-                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-10 w-10 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
-                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-lg border-4 border-white/20 bg-white text-black hover:bg-white/90 transition-transform active:scale-90"><Camera className="h-7 w-7" /></Button>
-                <div className="w-10" />
+              <div className="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-6">
+                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-12 w-12 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg backdrop-blur-md"><SwitchCamera className="h-6 w-6" /></Button>
+                <Button onClick={capturePhoto} className="rounded-full h-16 w-16 p-0 shadow-lg border-4 border-emerald-500/20 bg-white text-black hover:bg-white/90 transition-all active:scale-90 scale-110"><Camera className="h-8 w-8" /></Button>
+                <div className="w-12" />
               </div>
             </div>
 
             {selfie && !isCameraActive && (
-              <div className="relative w-full aspect-video group">
+              <div className="relative w-full h-80 group">
                 <img src={selfie} className="w-full h-full object-cover rounded-sm border-2 border-emerald-200 shadow-md" alt="Checkout Selfie" />
-                <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-1 rounded-sm uppercase tracking-tighter">Exit Profile Snapshot</div>
-                <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setSelfie(null)}><Trash2 className="h-4 w-4" /></Button>
+                <div className="absolute top-4 left-4 bg-black/60 text-white text-[10px] font-bold px-3 py-1 rounded-sm uppercase tracking-widest backdrop-blur-md">Exit Profile Snapshot</div>
+                <Button variant="destructive" size="icon" className="absolute top-4 right-4 rounded-full h-10 w-10 shadow-lg" onClick={() => setSelfie(null)}><Trash2 className="h-5 w-5" /></Button>
               </div>
             )}
 
-            {!selfie && !isCameraActive && (
-              <Button onClick={() => startCamera()} variant="outline" className="w-full h-40 border-dashed border-2 rounded-sm flex flex-col gap-3 hover:bg-emerald-50/50 transition-all border-emerald-200 text-emerald-700 group">
-                <div className="p-3 bg-emerald-100 rounded-full text-emerald-600 group-hover:scale-110 transition-transform">
-                  <Camera className="h-8 w-8" />
-                </div>
-                <div className="flex flex-col gap-1 text-center px-4">
-                  <span className="font-black uppercase text-xs tracking-widest">Open Camera</span>
-                  <span className="text-[10px] text-muted-foreground font-bold uppercase">Live Exit Audit Required</span>
-                </div>
-              </Button>
+            {!selfie && !isCameraActive && hasCameraPermission === null && (
+              <div className="w-full h-80 bg-muted/20 border-dashed border-2 rounded-sm flex flex-col items-center justify-center gap-4">
+                <Loader2 className="h-10 w-10 animate-spin text-emerald-600 opacity-20" />
+                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Initializing Exit Audit Feed...</p>
+              </div>
             )}
           </div>
 
