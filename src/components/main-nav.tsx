@@ -114,7 +114,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton tooltip="Attendance" isActive={pathname.startsWith('/attendance')} className="rounded-sm">
                   <CalendarCheck className="h-4 w-4 text-emerald-600" />
-                  <span className="font-medium">Attendance Logs</span>
+                  <span className="font-medium">Attendance</span>
                   <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                 </SidebarMenuButton>
               </CollapsibleTrigger>
