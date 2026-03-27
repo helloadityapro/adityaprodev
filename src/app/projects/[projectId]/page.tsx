@@ -252,14 +252,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const { data: masterItems } = useCollection<MasterItem>(masterInventoryQuery);
 
   const ptwQuery = useMemoFirebase(() => 
-    siteName ? query(collection(firestore, 'permits_to_work'), where('siteName', '==', siteName)) : null,
-    [firestore, siteName]
+    query(collection(firestore, 'permits_to_work'), where('siteId', '==', projectId)),
+    [firestore, projectId]
   );
   const { data: permits } = useCollection(ptwQuery);
 
   const dprQuery = useMemoFirebase(() => 
-    siteName ? query(collection(firestore, 'dprs'), where('siteName', '==', siteName)) : null,
-    [firestore, siteName]
+    query(collection(firestore, 'dprs'), where('siteId', '==', projectId)),
+    [firestore, projectId]
   );
   const { data: dprs } = useCollection(dprQuery);
 
@@ -270,8 +270,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const { data: tasks } = useCollection(taskQuery);
 
   const movementQuery = useMemoFirebase(() => 
-    siteName ? query(collection(firestore, 'material_movements'), where('siteName', '==', siteName)) : null,
-    [firestore, siteName]
+    query(collection(firestore, 'material_movements'), where('siteId', '==', projectId)),
+    [firestore, projectId]
   );
   const { data: movements } = useCollection(movementQuery);
 
@@ -419,6 +419,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   };
 
   const toggleSelectAll = () => {
+    // Logic if needed
+  };
+
+  const toggleSelectOne = (id: string) => {
     // Logic if needed
   };
 
@@ -1216,7 +1220,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="p-20 text-center text-muted-foreground italic">No reports found.</div>
+                  <div className="p-20 text-center text-muted-foreground italic">No reports found for this project.</div>
                 )}
               </CardContent>
             </Card>
