@@ -81,7 +81,6 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
   const resolvedParams = React.use(params);
   const projectId = resolvedParams.projectId;
   const woId = resolvedParams.woId;
-  
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
@@ -105,20 +104,10 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
 
   const form = useForm<z.infer<typeof woSchema>>({
     resolver: zodResolver(woSchema),
-    defaultValues: {
-      woNumber: "",
-      orderDate: "",
-      contractorId: "",
-      contractorName: "",
-      items: [{ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }],
-      description: ""
-    },
+    defaultValues: { woNumber: "", orderDate: "", contractorId: "", contractorName: "", items: [{ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }], description: "" },
   });
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "items"
-  });
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
   React.useEffect(() => {
     if (woData) {
@@ -151,7 +140,6 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
       const rate = Number(item.rate) || 0;
       const gst = Number(item.gstPercent) || 0;
       const calculatedAmount = (qty * rate) * (1 + (gst / 100));
-      
       if (Math.abs(item.amount - calculatedAmount) > 0.01) {
         form.setValue(`items.${index}.amount`, calculatedAmount);
       }
@@ -160,37 +148,16 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
 
   const onSubmit = async (values: z.infer<typeof woSchema>) => {
     if (!user || !userProfile || !woData) return;
-
     setIsSubmitting(true);
     try {
       const changes: string[] = [];
       if (values.woNumber !== woData.woNumber) changes.push(`WO Number changed from ${woData.woNumber}`);
       if (values.contractorId !== woData.contractorId) changes.push(`Contractor changed to ${values.contractorName}`);
       if (Math.abs(totalAmount - woData.totalAmount) > 0.01) changes.push(`Contract value adjusted to ₹${totalAmount.toLocaleString('en-IN')}`);
-
-      const historyEntry = {
-        action: 'Modified',
-        userName: userProfile.username || user.email,
-        userId: user.uid,
-        timestamp: new Date(),
-        details: `${changes.length > 0 ? changes.join(', ') : 'Order details modified'} (Returned to Pending for re-approval)`
-      };
-
+      const historyEntry = { action: 'Modified', userName: userProfile.username || user.email, userId: user.uid, timestamp: new Date(), details: `${changes.length > 0 ? changes.join(', ') : 'Order details modified'} (Returned to Pending for re-approval)` };
       await updateDocumentNonBlocking(doc(firestore, 'project_wos', woId), {
-        woNumber: values.woNumber,
-        contractorId: values.contractorId,
-        contractorName: values.contractorName,
-        orderDate: values.orderDate,
-        items: values.items,
-        totalAmount,
-        description: values.description,
-        status: 'Pending',
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid,
-        updatedByName: userProfile.username || user.email,
-        history: arrayUnion(historyEntry)
+        woNumber: values.woNumber, contractorId: values.contractorId, contractorName: values.contractorName, orderDate: values.orderDate, items: values.items, totalAmount, description: values.description, status: 'Pending', updatedAt: serverTimestamp(), updatedBy: user.uid, updatedByName: userProfile.username || user.email, history: arrayUnion(historyEntry)
       });
-
       setFinalTotal(totalAmount);
       setIsSuccess(true);
       toast({ title: 'WO Updated', description: `Work Order ${values.woNumber} modified and returned to Pending.` });
@@ -208,21 +175,11 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300 rounded-sm">
           <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="bg-primary/10 p-4 rounded-full">
-                <CheckCircle2 className="h-12 w-12 text-primary" />
-              </div>
-            </div>
+            <div className="flex justify-center mb-4"><div className="bg-primary/10 p-4 rounded-full"><CheckCircle2 className="h-12 w-12 text-primary" /></div></div>
             <CardTitle className="text-2xl font-bold uppercase tracking-tight">WO Updated</CardTitle>
-            <CardDescription className="text-base leading-relaxed">
-              Work Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> issued to <strong className="text-foreground">{form.getValues('contractorName')}</strong> has been modified. Awaiting re-approval.
-            </CardDescription>
+            <CardDescription className="text-base leading-relaxed">Work Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> issued to <strong className="text-foreground">{form.getValues('contractorName')}</strong> has been modified. Awaiting re-approval.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push(`/projects/${projectId}?tab=wo`)}>
-              Back to Work Orders
-            </Button>
-          </CardContent>
+          <CardContent className="space-y-4"><Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push(`/projects/${projectId}?tab=wo`)}>Back to Work Orders</Button></CardContent>
         </Card>
       </div>
     );
@@ -231,280 +188,38 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
-        <Button variant="ghost" size="sm" onClick={() => router.back()} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Cancel Edit
-        </Button>
-        <h1 className="flex items-center gap-2">
-          <Pencil className="h-8 w-8 text-primary" /> Edit Work Order
-        </h1>
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary"><ArrowLeft className="mr-2 h-4 w-4" /> Cancel Edit</Button>
+        <h1 className="flex items-center gap-2"><Pencil className="h-8 w-8 text-primary" /> Edit Work Order</h1>
         <p className="text-muted-foreground font-medium">Update contract value or line items. Resubmission requires Admin re-approval.</p>
       </div>
-
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
-          <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-            <CardHeader className="bg-primary/5 border-b">
-              <CardTitle className="text-sm font-black uppercase tracking-widest">Order Context</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <FormField
-                  control={form.control}
-                  name="woNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">WO Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. AGEPL/WO/2026/042" {...field} className="h-11 rounded-sm uppercase font-mono font-bold" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="orderDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Order Date</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Input type="date" {...field} className="h-11 rounded-sm pr-10" />
-                          <Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="contractorId"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Select Contractor</FormLabel>
-                      <Popover open={isContractorPopoverOpen} onOpenChange={setIsContractorPopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              className={cn(
-                                "w-full justify-between font-normal rounded-sm h-11",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? allContractors?.find(c => c.id === field.value)?.name : "Choose Contractor..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                          <div className="flex items-center border-b px-3">
-                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                            <Input
-                              placeholder="Search contractors..."
-                              className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
-                              value={contractorSearch}
-                              onChange={(e) => setContractorSearch(e.target.value)}
-                            />
-                          </div>
-                          <ScrollArea className="h-[200px]">
-                            <div className="p-1">
-                              {allContractors?.filter(c => c.name.toLowerCase().includes(contractorSearch.toLowerCase())).map((c) => (
-                                <Button
-                                  key={c.id}
-                                  type="button"
-                                  variant="ghost"
-                                  className="w-full justify-start font-normal h-11 text-xs"
-                                  onClick={() => {
-                                    field.onChange(c.id);
-                                    form.setValue('contractorName', c.name);
-                                    setIsContractorPopoverOpen(false);
-                                    setContractorSearch("");
-                                  }}
-                                >
-                                  <Check className={cn("mr-2 h-4 w-4 text-primary", c.id === field.value ? "opacity-100" : "opacity-0")} />
-                                  <div className="flex flex-col items-start">
-                                    <span className="font-bold">{c.name}</span>
-                                    <span className="text-[8px] font-mono text-muted-foreground">{c.gstin}</span>
-                                  </div>
-                                </Button>
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
+          <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden"><CardHeader className="bg-primary/5 border-b"><CardTitle className="text-sm font-black uppercase tracking-widest">Order Context</CardTitle></CardHeader><CardContent className="pt-6"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><FormField control={form.control} name="woNumber" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">WO Number</FormLabel><FormControl><Input placeholder="e.g. AGEPL/WO/2026/042" {...field} className="h-11 rounded-sm uppercase font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="orderDate" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Order Date</FormLabel><FormControl><div className="relative"><Input type="date" {...field} className="h-11 rounded-sm pr-10" /><Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" /></div></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="contractorId" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Select Contractor</FormLabel><Popover open={isContractorPopoverOpen} onOpenChange={setIsContractorPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>{field.value ? allContractors?.find(c => c.id === field.value)?.name : "Choose Contractor..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search contractors..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={contractorSearch} onChange={(e) => setContractorSearch(e.target.value)} /></div><ScrollArea className="h-[200px]"><div className="p-1">{allContractors?.filter(c => c.name.toLowerCase().includes(contractorSearch.toLowerCase())).map((c) => (<Button key={c.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { field.onChange(c.id); form.setValue('contractorName', c.name); setIsContractorPopoverOpen(false); setContractorSearch(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", c.id === field.value ? "opacity-100" : "opacity-0")} /><div className="flex flex-col items-start"><span className="font-bold">{c.name}</span><span className="text-[8px] font-mono text-muted-foreground">{c.gstin}</span></div></Button>))}</div></ScrollArea></PopoverContent></Popover><FormMessage /></FormItem>)} /></div></CardContent></Card>
           <div className="space-y-6">
-            <div className="flex items-center justify-between border-b pb-2 px-1">
-              <div className="flex items-center gap-2">
-                <ListPlus className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Service Line Items</h3>
-              </div>
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                onClick={() => append({ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 })}
-                className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Service
-              </Button>
-            </div>
-
+            <div className="flex items-center justify-between border-b pb-2 px-1"><div className="flex items-center gap-2"><ListPlus className="h-4 w-4 text-primary" /><h3 className="text-sm font-black uppercase tracking-widest text-foreground">Service Line Items</h3></div><Button type="button" variant="outline" size="sm" onClick={() => append({ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"><Plus className="h-3.5 w-3.5 mr-1.5" /> Add Service</Button></div>
             <div className="space-y-4">
               {fields.map((field, index) => {
                 const qty = Number(watchedItems[index]?.quantity) || 0;
                 const rate = Number(watchedItems[index]?.rate) || 0;
                 const gst = Number(watchedItems[index]?.gstPercent) || 0;
                 const lineTotal = (qty * rate) * (1 + (gst / 100));
-
                 return (
                   <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2 duration-300">
-                    {fields.length > 1 && (
-                      <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="icon" 
-                        className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm"
-                        onClick={() => remove(index)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-
+                    {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>)}
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                      <div className="md:col-span-5">
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.description`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Service Description</FormLabel>
-                              <FormControl>
-                                <Input placeholder="e.g. Earthwork excavation" {...field} className="h-10 rounded-sm bg-background" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.quantity`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Qty</FormLabel>
-                              <FormControl>
-                                <Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.rate`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel>
-                              <FormControl>
-                                <Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="md:col-span-1">
-                        <FormField
-                          control={form.control}
-                          name={`items.${index}.gstPercent`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">GST %</FormLabel>
-                              <FormControl>
-                                <Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold text-center px-1" />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase text-primary tracking-widest text-right block">Line Total (₹)</Label>
-                          <div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">
-                            {lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </div>
-                        </div>
-                      </div>
+                      <div className="md:col-span-5"><FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Service Description</FormLabel><FormControl><Input placeholder="e.g. Earthwork excavation" {...field} className="h-10 rounded-sm bg-background" /></FormControl><FormMessage /></FormItem>)} /></div>
+                      <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Qty</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} /></div>
+                      <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} /></div>
+                      <div className="md:col-span-1"><FormField control={form.control} name={`items.${index}.gstPercent`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">GST %</FormLabel><FormControl><Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold text-center px-1" /></FormControl><FormMessage /></FormItem>)} /></div>
+                      <div className="md:col-span-2"><div className="space-y-2"><Label className="text-[10px] font-black uppercase text-primary tracking-widest text-right block">Line Total (₹)</Label><div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div></div></div>
                     </div>
                   </div>
                 );
               })}
             </div>
           </div>
-
-          <div className="mt-8 space-y-4">
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <FileText className="h-3.5 w-3.5 text-primary" /> Scope of Work & Description
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Detail the services or deliverables..." rows={8} {...field} className="rounded-sm bg-muted/5 italic" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
-            <div className="flex items-center gap-4">
-              <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5">
-                <Save className="h-8 w-8" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Total Contract Value</span>
-                <span className="text-4xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-              </div>
-            </div>
-            
-            <div className="flex gap-3 w-full sm:w-auto">
-              <Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isSubmitting} 
-                className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl"
-              >
-                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> SAVING...</> : <><Save className="mr-2 h-4 w-4" /> SAVE CHANGES</>}
-              </Button>
-            </div>
-          </div>
+          <div className="mt-8 space-y-4"><FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-primary" /> Scope of Work & Description</FormLabel><FormControl><Textarea placeholder="Detail the services or deliverables..." rows={8} {...field} className="rounded-sm bg-muted/5 italic" /></FormControl><FormMessage /></FormItem>)} /></div>
+          <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl"><div className="flex items-center gap-4"><div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5"><Save className="h-8 w-8" /></div><div className="flex flex-col"><span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Total Contract Value</span><span className="text-4xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div><div className="flex gap-3 w-full sm:w-auto"><Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">Cancel</Button><Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl">{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> SAVING...</> : <><Save className="mr-2 h-4 w-4" /> SAVE CHANGES</>}</Button></div></div>
         </form>
       </Form>
     </div>
