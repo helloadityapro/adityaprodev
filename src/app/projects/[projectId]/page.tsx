@@ -68,7 +68,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -651,14 +650,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
     setExpandedWORows(newSet);
-  };
-
-  const handleUpdateStock = async (itemId: string, newStock: number) => {
-    updateDocumentNonBlocking(doc(firestore, 'project_inventory', itemId), {
-      stockLevel: newStock,
-      lastUpdated: serverTimestamp()
-    });
-    toast({ title: 'Stock Updated' });
   };
 
   const handleDeletePO = async () => {
@@ -1303,8 +1294,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableRow>
                         <TableHead className="px-6 min-w-[200px]">Material / Component</TableHead>
                         <TableHead className="text-center">Available Quantity</TableHead>
-                        <TableHead>Last Transaction</TableHead>
-                        <TableHead className="text-right px-6">Direct Adjustment</TableHead>
+                        <TableHead className="text-right px-6">Last Transaction</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1312,11 +1302,17 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableRow key={item.id} className="hover:bg-muted/5">
                           <TableCell className="px-6 py-4 font-bold text-sm">{item.itemName}</TableCell>
                           <TableCell className="text-center"><Badge className={cn("font-mono font-bold rounded-sm px-3 h-7 border-none shadow-sm", item.stockLevel > 0 ? "bg-emerald-600 text-white" : "bg-red-500 text-white")}>{item.stockLevel} {item.unit}</Badge></TableCell>
-                          <TableCell className="text-[10px] text-muted-foreground uppercase font-black">{formatTimestamp(item.lastUpdated)}</TableCell>
-                          <TableCell className="text-right px-6"><div className="flex justify-end items-center gap-1.5"><Button variant="outline" size="icon" className="h-8 w-8 rounded-sm border-primary/20 text-primary" onClick={() => handleUpdateStock(item.id, Math.max(0, item.stockLevel - 1))}><MinusCircle className="h-4 w-4" /></Button><Button variant="outline" size="icon" className="h-8 w-8 rounded-sm border-primary/20 text-primary" onClick={() => handleUpdateStock(item.id, item.stockLevel + 1)}><PlusCircle className="h-4 w-4" /></Button></div></TableCell>
+                          <TableCell className="text-right px-6">
+                            <div className="flex flex-col items-end gap-1">
+                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase font-black">
+                                <Clock className="h-3 w-3" />
+                                {formatTimestamp(item.lastUpdated)}
+                              </div>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-xs">No stock discovered. Records appear as Material Movements are logged.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={3} className="h-32 text-center text-muted-foreground italic text-xs">No stock discovered. Records appear as Material Movements are logged.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
