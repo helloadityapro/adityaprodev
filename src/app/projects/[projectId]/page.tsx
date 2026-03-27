@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp, orderBy, or, getDoc, increment } from 'firebase/firestore';
+import { collection, doc, query, where, serverTimestamp, orderBy, or, getDoc, increment, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -118,6 +118,13 @@ type UserProfile = {
   mobile?: string;
 };
 
+type AuditEntry = {
+  action: string;
+  userName: string;
+  timestamp: any;
+  details: string;
+};
+
 type BoMItem = {
   id: string;
   itemName: string;
@@ -131,6 +138,7 @@ type BoMItem = {
   processedAt?: any;
   remarks?: string;
   subItems?: { name: string; quantityPerSet: number; unit: string }[];
+  auditLog?: AuditEntry[];
 };
 
 type POItem = {
@@ -226,6 +234,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   
   const [editingBomItem, setEditingBomItem] = React.useState<BoMItem | null>(null);
   const [isUpdatingBom, setIsUpdatingBom] = React.useState(false);
+  const [viewingBomLog, setViewingBomLog] = React.useState<BoMItem | null>(null);
 
   const [poSearch, setPoSearch] = React.useState("");
   const [poSortConfig, setPoSortConfig] = React.useState<{ key: POSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
@@ -382,6 +391,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       return;
     }
 
+    const logEntry = {
+      action: 'Created',
+      userName: userProfile?.username || user?.email || 'Unknown',
+      timestamp: new Date(),
+      details: 'Initial BoM entry submission.'
+    };
+
     const item = {
       siteId: projectId,
       siteName: siteName,
@@ -392,7 +408,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       unit: selectedMasterItem.unit,
       subItems: selectedMasterItem.subItems || [],
       status: 'Pending',
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      auditLog: [logEntry]
     };
     
     addDocumentNonBlocking(collection(firestore, 'project_boms'), item);
@@ -405,6 +422,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     if (!bomActionState || !userProfile) return;
     setIsActionProcessing(true);
     
+    const logEntry = {
+      action: bomActionState.type === 'Approved' ? 'Authorized' : 'Rejected',
+      userName: userProfile.username || user?.email || 'Admin',
+      timestamp: new Date(),
+      details: remarks ? `Remarks: ${remarks}${approvedQty ? ` (Qty Set: ${approvedQty})` : ''}` : 'Processed without specific remarks.'
+    };
+
     const bomRef = doc(firestore, 'project_boms', bomActionState.item.id);
     updateDocumentNonBlocking(bomRef, {
       status: bomActionState.type,
@@ -412,7 +436,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       approvedQuantity: approvedQty ?? null,
       processedByName: userProfile.username || user?.email || 'Admin',
       processedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
+      auditLog: arrayUnion(logEntry)
     });
 
     toast({ 
@@ -430,17 +455,29 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     setIsUpdatingBom(true);
     
     const formData = new FormData(e.currentTarget);
+    const newName = formData.get('itemName') as string;
+    const newQty = parseFloat(formData.get('plannedQty') as string);
+
+    const logEntry = {
+      action: 'Modified',
+      userName: userProfile?.username || user?.email || 'Unknown',
+      timestamp: new Date(),
+      details: `Entry modified (${newName}, ${newQty} ${formData.get('unit')}). Returned to Pending for re-approval.`
+    };
+
     const updateData = {
-      itemName: formData.get('itemName') as string,
+      itemName: newName,
       specification: formData.get('specification') as string,
-      plannedQuantity: parseFloat(formData.get('plannedQty') as string),
+      plannedQuantity: newQty,
       unit: formData.get('unit') as string,
-      updatedAt: serverTimestamp()
+      status: 'Pending',
+      updatedAt: serverTimestamp(),
+      auditLog: arrayUnion(logEntry)
     };
 
     try {
       updateDocumentNonBlocking(doc(firestore, 'project_boms', editingBomItem.id), updateData);
-      toast({ title: 'Item Updated', description: 'BoM entry modified successfully.' });
+      toast({ title: 'Item Updated', description: 'BoM entry modified and returned to Pending for approval.' });
       setEditingBomItem(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
@@ -900,6 +937,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             </TableCell>
                             <TableCell className="text-right px-6">
                               <div className="flex justify-end items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm" onClick={() => setViewingBomLog(item)} title="View Log">
+                                  <History className="h-4 w-4" />
+                                </Button>
                                 {isAdmin && (
                                   <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingBomItem(item)} title="Edit Item">
                                     <Pencil className="h-4 w-4" />
@@ -1511,11 +1551,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             {bomActionState?.type === 'Approved' && (
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Authorized Quantity ({bomActionState.item.unit})</Label>
-                <Input 
+                <input 
                   type="number" 
                   id="bom-approved-qty" 
                   defaultValue={bomActionState.item.plannedQuantity}
-                  className="h-11 rounded-sm font-mono font-bold"
+                  className="flex h-11 w-full rounded-sm border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm font-mono font-bold"
                 />
                 <p className="text-[9px] text-muted-foreground italic">You can adjust the quantity to be authorized for this site.</p>
               </div>
@@ -1570,7 +1610,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         <DialogContent className="sm:max-w-md rounded-sm">
           <DialogHeader>
             <DialogTitle>Edit BoM Item</DialogTitle>
-            <DialogDescription>Modify authorized material details for this site.</DialogDescription>
+            <DialogDescription>Modify material details. Item will return to <strong>Pending</strong> status for re-approval.</DialogDescription>
           </DialogHeader>
           {editingBomItem && (
             <form onSubmit={handleUpdateBoM} className="space-y-4 py-4">
@@ -1605,11 +1645,58 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
                 <Button type="submit" className="rounded-sm font-bold">
                   {isUpdatingBom ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Save Changes
+                  Save & Request Approval
                 </Button>
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* BoM Item History Dialog */}
+      <Dialog open={!!viewingBomLog} onOpenChange={(o) => !o && setViewingBomLog(null)}>
+        <DialogContent className="max-w-lg rounded-sm">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" />
+              <DialogTitle className="uppercase tracking-tight font-black">Activity Log: {viewingBomLog?.itemName}</DialogTitle>
+            </div>
+            <DialogDescription className="text-xs font-medium">Full lifecycle audit for this BoM line item.</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[400px] mt-4">
+            <div className="space-y-6 relative border-l-2 border-muted ml-3 pl-6 py-2">
+              {viewingBomLog?.auditLog?.sort((a, b) => {
+                const da = a.timestamp?.toDate?.()?.getTime() || new Date(a.timestamp).getTime();
+                const db = b.timestamp?.toDate?.()?.getTime() || new Date(b.timestamp).getTime();
+                return db - da; // Descending
+              }).map((entry, idx) => (
+                <div key={idx} className="relative">
+                  <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                  <div className="flex flex-col gap-1 text-left">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-[10px] font-black text-primary uppercase tracking-wider">{entry.action}</span>
+                      <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{formatTimestamp(entry.timestamp)}</span>
+                    </div>
+                    <p className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      <User className="h-3 w-3 opacity-40" /> {entry.userName}
+                    </p>
+                    <p className="text-[11px] italic text-muted-foreground leading-relaxed bg-muted/20 p-2 rounded-sm border border-primary/5 mt-1">
+                      "{entry.details}"
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {(!viewingBomLog?.auditLog || viewingBomLog.auditLog.length === 0) && (
+                <div className="flex flex-col items-center justify-center py-10 opacity-30">
+                  <Clock className="h-8 w-8 mb-2" />
+                  <p className="text-[10px] font-black uppercase tracking-widest">No activity records found</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+          <DialogFooter className="bg-muted/5 border-t p-4">
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close Audit</Button></DialogClose>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
