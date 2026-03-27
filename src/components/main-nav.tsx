@@ -146,7 +146,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <SidebarMenuButton asChild tooltip="Documents" isActive={pathname.startsWith('/documents')} className="rounded-sm" onClick={handleMobileClose}>
                 <Link href="/documents">
                   <FolderOpen className="h-4 w-4" />
-                  <span className="font-medium">Site Documents</span>
+                  <span className="font-medium">Documents</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
