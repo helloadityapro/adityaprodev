@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -225,7 +224,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
         toast({ 
           variant: 'destructive', 
           title: 'Authorization Exceeded', 
-          description: `Line item "${item.itemName}" exceeds remaining authorized limit of ${remaining.toFixed(2)} ${original?.unit}. Please adjust order or request more BoM quantity.` 
+          description: `Line item "${item.itemName}" exceeds remaining approved quantity (${remaining.toFixed(2)} ${original?.unit}). Please obtain additional quantity approval from the site BoM before proceeding.` 
         });
         return;
       }

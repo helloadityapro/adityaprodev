@@ -865,14 +865,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <div className="space-y-1.5">
                         <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-tight">Required Qty & Unit</Label>
                         <div className="flex gap-1.5">
-                          <Input name="qty" type="number" required placeholder="0" className="h-9 rounded-sm bg-background border-primary/20" />
+                          <Input name="qty" type="number" required placeholder="0" className="h-9 rounded-sm bg-background border-primary/20 text-[10px] font-bold" />
                           <Input 
                             key={`unit-${selectedMasterItem?.id || 'none'}`}
                             name="unit" 
                             placeholder="Unit" 
                             readOnly
                             defaultValue={selectedMasterItem?.unit || ""} 
-                            className="w-20 h-9 rounded-sm bg-muted/20 border-primary/10 font-black text-primary cursor-not-allowed text-[10px]" 
+                            className="w-20 h-9 rounded-sm bg-muted/10 border-primary/10 font-bold text-primary cursor-not-allowed text-[10px]" 
                           />
                         </div>
                       </div>
