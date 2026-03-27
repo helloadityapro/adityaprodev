@@ -1213,15 +1213,28 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableRow>
                         <TableHead className="px-6">Date</TableHead>
                         <TableHead>User</TableHead>
-                        <TableHead className="max-w-[400px]">Update Summary</TableHead>
+                        <TableHead className="min-w-[400px]">Activity & Update</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {dprs.sort((a: any, b: any) => new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime()).map((dpr: any) => (
                         <TableRow key={dpr.id} className="hover:bg-muted/5">
-                          <TableCell className="px-6 py-4 font-mono text-xs font-bold whitespace-nowrap">{dpr.reportDate}</TableCell>
-                          <TableCell className="text-xs font-semibold">{dpr.userName}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground italic line-clamp-2 py-4">"{dpr.description}"</TableCell>
+                          <TableCell className="px-6 py-4 font-mono text-xs font-bold whitespace-nowrap align-top">{dpr.reportDate}</TableCell>
+                          <TableCell className="text-xs font-semibold align-top">{dpr.userName}</TableCell>
+                          <TableCell className="py-4">
+                            <div className="space-y-3">
+                                {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx, arr) => (
+                                    <React.Fragment key={pIdx}>
+                                        <p className="text-sm italic text-muted-foreground leading-relaxed">
+                                            "{para.trim()}"
+                                        </p>
+                                        {pIdx < arr.length - 1 && (
+                                            <div className="h-px bg-primary/10 my-2" />
+                                        )}
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
