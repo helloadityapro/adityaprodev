@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   ClipboardList, 
-  ShoppingBag, 
   Warehouse, 
   Plus, 
   Trash2, 
@@ -22,8 +21,6 @@ import {
   History,
   TrendingUp,
   MapPin,
-  PlusCircle,
-  MinusCircle,
   Users,
   CheckSquare,
   ArrowLeftRight,
@@ -34,17 +31,12 @@ import {
   LayoutDashboard,
   Clock,
   User,
-  Zap,
-  ChevronRight,
   Table as TableIcon,
   Search,
   ChevronsUpDown,
   Check,
   XCircle,
   Loader2,
-  PackageCheck,
-  Truck,
-  FilterX,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -53,15 +45,15 @@ import {
   ChevronDown,
   ChevronUp,
   Eye,
-  ExternalLink,
-  Printer,
   Gavel,
   Save,
   HardHat,
   CircleCheck,
   CircleX,
+  ShoppingBag,
   ArrowDownCircle,
-  ArrowUpCircle
+  ArrowUpCircle,
+  Package
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -102,8 +94,6 @@ import {
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 
-const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"];
-
 type Project = {
   id: string;
   name: string;
@@ -137,6 +127,7 @@ type BoMItem = {
   plannedQuantity: number;
   approvedQuantity?: number;
   unit: string;
+  make?: string;
   status?: 'Pending' | 'Approved' | 'Rejected';
   processedByName?: string;
   processedAt?: any;
@@ -254,7 +245,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     }
   }, [tabParam]);
 
-  // BoM Filtering/Searching States
   const [bomTableSearch, setBomTableSearch] = React.useState("");
   const [bomStatusFilter, setBomStatusFilter] = React.useState("all");
   const [bomCategoryFilter, setBomCategoryFilter] = React.useState("all");
@@ -268,6 +258,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [woActionState, setWoActionState] = React.useState<{ wo: WorkOrder, type: 'Approved' | 'Rejected' } | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
   const [expandedBomRows, setExpandedBomRows] = React.useState<Set<string>>(new Set());
+  const [expandedInvRows, setExpandedInvRows] = React.useState<Set<string>>(new Set());
   
   const [editingBomItem, setEditingBomItem] = React.useState<BoMItem | null>(null);
   const [isUpdatingBom, setIsUpdatingBom] = React.useState(false);
@@ -524,6 +515,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       siteId: projectId,
       siteName: siteName,
       itemName: itemName,
+      make: selectedMasterItem.make || "Standard",
       category: selectedMasterItem.category,
       specification: selectedMasterItem.description || "",
       plannedQuantity: parseFloat(formData.get('qty') as string),
@@ -630,6 +622,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
     setExpandedBomRows(newSet);
+  };
+
+  const toggleInvRow = (id: string) => {
+    const newSet = new Set(expandedInvRows);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedInvRows(newSet);
   };
 
   const toggleSelectMasterItem = (item: MasterItem) => {
@@ -748,7 +747,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       </div>
 
       <div className="flex-1 space-y-8 pt-6 px-0.5">
-        {/* Performance Metrics Header - Persistent across all tabs */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
           <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm">
             <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">AC Capacity</p>
@@ -792,64 +790,34 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <ScrollArea className="w-full">
             <TabsList className="flex w-max min-w-full rounded-sm bg-muted/50 border border-primary/10 p-1 h-11">
-              <TabsTrigger 
-                value="dashboard" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
+              <TabsTrigger value="dashboard" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" /> BOARD
               </TabsTrigger>
-              <TabsTrigger 
-                value="bom" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
+              <TabsTrigger value="bom" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <ClipboardList className="h-3.5 w-3.5 mr-1.5" /> BOM
               </TabsTrigger>
-              <TabsTrigger 
-                value="po" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
+              <TabsTrigger value="po" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <ShoppingBag className="h-3.5 w-3.5 mr-1.5" /> PURCHASE ORDERS
               </TabsTrigger>
-              <TabsTrigger 
-                value="wo" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
+              <TabsTrigger value="wo" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <Gavel className="h-3.5 w-3.5 mr-1.5" /> WORK ORDERS
               </TabsTrigger>
-              <TabsTrigger 
-                value="inventory" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
+              <TabsTrigger value="inventory" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <Warehouse className="h-3.5 w-3.5 mr-1.5" /> INVENTORY
               </TabsTrigger>
-              <TabsTrigger 
-                value="movements" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
+              <TabsTrigger value="movements" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" /> MOVEMENTS
               </TabsTrigger>
-              <TabsTrigger 
-                value="ptw" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
+              <TabsTrigger value="ptw" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> PERMITS
               </TabsTrigger>
-              <TabsTrigger 
-                value="dpr" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
+              <TabsTrigger value="dpr" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <TableIcon className="h-3.5 w-3.5 mr-1.5" /> DPR
               </TabsTrigger>
-              <TabsTrigger 
-                value="tasks" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
+              <TabsTrigger value="tasks" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> TASKS
               </TabsTrigger>
-              <TabsTrigger 
-                value="visits" 
-                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-              >
+              <TabsTrigger value="visits" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <Navigation className="h-3.5 w-3.5 mr-1.5" /> VISITS
               </TabsTrigger>
             </TabsList>
@@ -1051,40 +1019,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             )}
 
-            <div className="flex flex-col md:flex-row items-center gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm mb-6">
-              <div className="relative w-full flex-1">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Search BoM items..." className="pl-9 h-10 rounded-sm bg-muted/20 border-none" value={bomTableSearch} onChange={e => setBomTableSearch(e.target.value)} />
-              </div>
-              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                <Select value={bomStatusFilter} onValueChange={setBomStatusFilter}>
-                  <SelectTrigger className="w-[140px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
-                    <SelectItem value="Pending" className="text-xs font-bold uppercase">Pending</SelectItem>
-                    <SelectItem value="Approved" className="text-xs font-bold uppercase text-green-600">Approved</SelectItem>
-                    <SelectItem value="Rejected" className="text-xs font-bold uppercase text-red-600">Rejected</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={bomCategoryFilter} onValueChange={setBomCategoryFilter}>
-                  <SelectTrigger className="w-[140px] h-10 text-[10px] font-bold uppercase rounded-sm border-primary/20">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-xs font-bold uppercase">All Categories</SelectItem>
-                    {bomCategories.map(cat => (
-                      <SelectItem key={cat} value={cat} className="text-xs font-bold uppercase">{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button variant="ghost" size="icon" onClick={() => { setBomTableSearch(""); setBomStatusFilter("all"); setBomCategoryFilter("all"); }} className="h-10 w-10 text-muted-foreground rounded-sm">
-                  <FilterX className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -1284,35 +1218,108 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           <TabsContent value="inventory" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
               <CardHeader className="bg-muted/5 border-b py-4">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" /> On-Site Component Stock (Real-time)</CardTitle>
-                <CardDescription>Live tracking of component availability based on material movements.</CardDescription>
+                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" /> On-Site Inventory Registry</CardTitle>
+                <CardDescription>Comprehensive tracking of authorized materials and their current stock levels.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-muted/30">
                       <TableRow>
-                        <TableHead className="px-6 min-w-[200px]">Material / Component</TableHead>
-                        <TableHead className="text-center">Available Quantity</TableHead>
-                        <TableHead className="text-right px-6">Last Transaction</TableHead>
+                        <TableHead className="px-6 min-w-[250px]">Item & Description</TableHead>
+                        <TableHead>Make</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead className="text-center">Approved Qty</TableHead>
+                        <TableHead className="text-center">Available Qty</TableHead>
+                        <TableHead className="text-right px-6">Logs</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {inventory && inventory.length > 0 ? inventory.sort((a, b) => a.itemName.localeCompare(b.itemName)).map(item => (
-                        <TableRow key={item.id} className="hover:bg-muted/5">
-                          <TableCell className="px-6 py-4 font-bold text-sm">{item.itemName}</TableCell>
-                          <TableCell className="text-center"><Badge className={cn("font-mono font-bold rounded-sm px-3 h-7 border-none shadow-sm", item.stockLevel > 0 ? "bg-emerald-600 text-white" : "bg-red-500 text-white")}>{item.stockLevel} {item.unit}</Badge></TableCell>
-                          <TableCell className="text-right px-6">
-                            <div className="flex flex-col items-end gap-1">
-                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground uppercase font-black">
-                                <Clock className="h-3 w-3" />
-                                {formatTimestamp(item.lastUpdated)}
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )) : (
-                        <TableRow><TableCell colSpan={3} className="h-32 text-center text-muted-foreground italic text-xs">No stock discovered. Records appear as Material Movements are logged.</TableCell></TableRow>
+                      {bomItems?.filter(i => i.status === 'Approved').map(bomItem => {
+                        const invRecord = inventory?.find(inv => inv.itemName === bomItem.itemName);
+                        const pos = purchaseOrders?.filter(po => po.items.some(pi => pi.bomItemId === bomItem.id)) || [];
+                        const suppliers = Array.from(new Set(pos.map(p => p.supplierName))).join(', ') || '—';
+                        const itemMovements = movements?.filter(m => m.itemName === bomItem.itemName) || [];
+
+                        return (
+                          <React.Fragment key={bomItem.id}>
+                            <TableRow className="hover:bg-muted/5 group">
+                              <TableCell className="px-6 py-4">
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="font-bold text-sm text-foreground">{bomItem.itemName}</span>
+                                  <span className="text-[10px] text-muted-foreground line-clamp-1">{bomItem.specification}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="rounded-sm text-[9px] font-black uppercase bg-primary/5 text-primary border-primary/10">
+                                  {bomItem.make || masterItems?.find(m => m.name === bomItem.itemName)?.make || 'Standard'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs font-medium text-muted-foreground truncate max-w-[150px]" title={suppliers}>{suppliers}</TableCell>
+                              <TableCell className="text-center">
+                                <div className="font-mono font-bold text-sm text-foreground">{bomItem.approvedQuantity || bomItem.plannedQuantity}</div>
+                                <div className="text-[10px] text-muted-foreground uppercase font-medium">{bomItem.unit}</div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge className={cn(
+                                  "font-mono font-bold rounded-sm px-3 h-7 border-none shadow-sm",
+                                  (invRecord?.stockLevel || 0) > 0 ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
+                                )}>
+                                  {invRecord?.stockLevel || 0} {bomItem.unit}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right px-6">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => toggleInvRow(bomItem.id)}>
+                                  {expandedInvRows.has(bomItem.id) ? <ChevronUp className="h-4 w-4" /> : <History className="h-4 w-4" />}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                            {expandedInvRows.has(bomItem.id) && (
+                              <TableRow className="bg-primary/[0.01]">
+                                <TableCell colSpan={6} className="p-0 border-b">
+                                  <div className="p-6 px-12 animate-in slide-in-from-top-1 duration-200">
+                                    <div className="flex items-center gap-2 mb-4">
+                                      <History className="h-3.5 w-3.5 text-primary" />
+                                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Movement History: {bomItem.itemName}</span>
+                                    </div>
+                                    {itemMovements.length > 0 ? (
+                                      <div className="grid gap-2">
+                                        {itemMovements.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map((m: any) => (
+                                          <div key={m.id} className="flex items-center justify-between p-3 bg-background border rounded-sm text-[11px] shadow-sm">
+                                            <div className="flex items-center gap-4">
+                                              <Badge variant="outline" className={cn("text-[8px] font-black h-5 px-1.5 uppercase", m.movementType === 'Inward' ? "bg-green-50 text-green-700 border-green-200" : "bg-blue-50 text-blue-700 border-blue-200")}>
+                                                {m.movementType === 'Inward' ? <ArrowDownCircle className="h-2.5 w-2.5 mr-1" /> : <ArrowUpCircle className="h-2.5 w-2.5 mr-1" />}
+                                                {m.movementType}
+                                              </Badge>
+                                              <div className="flex flex-col">
+                                                <span className="font-bold text-foreground">Qty: {m.quantity} {m.unit}</span>
+                                                <span className="text-[9px] text-muted-foreground uppercase">{m.movementType === 'Inward' ? 'From' : 'To'}: {m.sourceOrDestination}</span>
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-right">
+                                              <div className="flex flex-col items-end">
+                                                <span className="font-bold text-muted-foreground uppercase text-[9px]">{m.userName}</span>
+                                                <span className="text-[9px] text-muted-foreground/60">{m.movementDate}</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/10 rounded-sm border border-dashed">No material movements logged for this item.</div>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                      {(!bomItems || bomItems.filter(i => i.status === 'Approved').length === 0) && (
+                        <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic flex flex-col items-center justify-center gap-3">
+                          <Package className="h-10 w-10 opacity-20" />
+                          <p className="text-sm font-bold uppercase tracking-widest">No Approved BoM Items Discovered</p>
+                        </TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1482,6 +1489,154 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Decision Dialog for BoM items */}
+      <Dialog open={!!bomActionState} onOpenChange={(o) => !o && setBomActionState(null)}>
+        <DialogContent className="rounded-sm max-w-md">
+          <DialogHeader>
+            <DialogTitle>Authorize BoM Item</DialogTitle>
+            <DialogDescription>Set status for {bomActionState?.item.itemName}. Authorized items enable material movement logging.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold">Planned Qty: {bomActionState?.item.plannedQuantity} {bomActionState?.item.unit}</Label>
+              {bomActionState?.type === 'Approved' && (
+                <div className="space-y-2 pt-2">
+                  <Label>Final Approved Quantity</Label>
+                  <Input 
+                    type="number" 
+                    defaultValue={bomActionState.item.plannedQuantity} 
+                    id="approved-qty"
+                    className="rounded-sm" 
+                  />
+                </div>
+              )}
+              <Label className="text-xs font-bold pt-2 block">Remarks</Label>
+              <Textarea id="action-remarks" placeholder="Provide justification or comments..." className="min-h-[100px] rounded-sm" />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button 
+              className={cn("min-w-[120px]", bomActionState?.type === 'Approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+              disabled={isActionProcessing}
+              onClick={() => {
+                const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "";
+                const approvedQty = bomActionState?.type === 'Approved' ? parseFloat((document.getElementById('approved-qty') as HTMLInputElement)?.value || "0") : undefined;
+                handleProcessBoM(remarks, approvedQty);
+              }}
+            >
+              {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${bomActionState?.type}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit BoM Dialog */}
+      <Dialog open={!!editingBomItem} onOpenChange={(o) => !o && setEditingBomItem(null)}>
+        <DialogContent className="rounded-sm max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit BoM Entry</DialogTitle>
+            <DialogDescription>Modify planned materials for {siteName}.</DialogDescription>
+          </DialogHeader>
+          {editingBomItem && (
+            <form onSubmit={handleUpdateBoM} className="space-y-4 py-4">
+              <div className="grid gap-2">
+                <Label>Item Name</Label>
+                <Input name="itemName" defaultValue={editingBomItem.itemName} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Planned Qty</Label>
+                  <Input name="plannedQty" type="number" defaultValue={editingBomItem.plannedQuantity} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Unit</Label>
+                  <Select name="unit" defaultValue={editingBomItem.unit}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label>Specification</Label>
+                <Textarea name="specification" defaultValue={editingBomItem.specification} />
+              </div>
+              <DialogFooter className="pt-4">
+                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                <Button type="submit" disabled={isUpdatingBom}>{isUpdatingBom ? <Loader2 className="animate-spin" /> : 'Update & Re-Submit'}</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* BoM Audit Log Dialog */}
+      <Dialog open={!!viewingBomLog} onOpenChange={(o) => !o && setViewingBomLog(null)}>
+        <DialogContent className="rounded-sm max-w-lg">
+          <DialogHeader>
+            <DialogTitle>BoM Life-cycle Log</DialogTitle>
+            <DialogDescription>Historical changes for {viewingBomLog?.itemName}</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[400px] pr-4">
+            <div className="space-y-6 relative border-l-2 border-muted ml-3 pl-6 py-2">
+              {viewingBomLog?.auditLog?.map((entry, idx) => (
+                <div key={idx} className="relative">
+                  <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="text-xs font-bold text-primary uppercase tracking-tight">{entry.action} — {entry.userName}</span>
+                    <p className="text-[10px] text-muted-foreground font-mono font-bold uppercase">{formatTimestamp(entry.timestamp)}</p>
+                    <p className="text-xs italic leading-relaxed text-foreground/80 mt-1">"{entry.details}"</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Decision Dialog for Work Orders */}
+      <Dialog open={!!woActionState} onOpenChange={(o) => !o && setWoActionState(null)}>
+        <DialogContent className="rounded-sm max-w-md">
+          <DialogHeader>
+            <DialogTitle>Authorize Work Order</DialogTitle>
+            <DialogDescription>Process approval for WO {woActionState?.wo.woNumber}.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase text-muted-foreground">Decision Remarks</Label>
+              <Textarea id="wo-action-remarks" placeholder="Enter comments for the contractor/engineer..." className="min-h-[100px] rounded-sm" />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button 
+              className={cn("min-w-[120px]", woActionState?.type === 'Approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+              disabled={isActionProcessing}
+              onClick={() => {
+                const remarks = (document.getElementById('wo-action-remarks') as HTMLTextAreaElement)?.value || "";
+                handleProcessWO(remarks);
+              }}
+            >
+              {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${woActionState?.type}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!poToDelete} onOpenChange={(o) => !o && setPoToDelete(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader><AlertDialogTitle>Delete PO?</AlertDialogTitle><AlertDialogDescription>This will remove purchase order <strong>{poToDelete?.poNumber}</strong> from site records.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeletePO} className="bg-destructive text-destructive-foreground">Confirm Delete</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!woToDelete} onOpenChange={(o) => !o && setWoToDelete(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader><AlertDialogTitle>Delete WO?</AlertDialogTitle><AlertDialogDescription>This will remove work order <strong>{woToDelete?.woNumber}</strong> from site records.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteWO} className="bg-destructive text-destructive-foreground">Confirm Delete</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -1497,3 +1652,5 @@ function StatRow({ label, value, color }: { label: string, value: number, color:
     <div className={cn("flex items-center justify-between p-3 rounded-sm border", (colors as any)[color])}><span className="text-[10px] font-black uppercase tracking-wider">{label}</span><span className="text-lg font-black">{value}</span></div>
   );
 }
+
+const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"];
