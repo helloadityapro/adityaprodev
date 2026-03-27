@@ -39,7 +39,9 @@ import {
   Boxes,
   UserCog,
   HardHat,
-  Gavel
+  Gavel,
+  PackageCheck,
+  Layers
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -88,14 +90,45 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           )}
 
           {!isDriver && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Master Inventory" isActive={pathname === '/inventory'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/inventory">
-                  <Boxes className="h-4 w-4" />
-                  <span className="font-medium">Master Inventory</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <Collapsible asChild defaultOpen={pathname.startsWith('/inventory')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Inventory" isActive={pathname.startsWith('/inventory')} className="rounded-sm">
+                    <Boxes className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Inventory</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/inventory/global'} onClick={handleMobileClose}>
+                        <Link href="/inventory/global">
+                          <PackageCheck className="h-4 w-4" />
+                          <span>Global Inventory</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/inventory/record'} onClick={handleMobileClose}>
+                        <Link href="/inventory/record">
+                          <ArrowLeftRight className="h-4 w-4" />
+                          <span>Record Movement</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/inventory/data'} onClick={handleMobileClose}>
+                        <Link href="/inventory/data">
+                          <TableIcon className="h-4 w-4" />
+                          <span>Movement Data</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
           )}
 
           {!isDriver && (
@@ -311,31 +344,6 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                 <Link href="/requirements/list">
                   <ClipboardList className="h-4 w-4" />
                   <span className="font-medium">Requirement Data</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      )}
-
-      {/* MATERIAL MOVEMENT Group */}
-      {!isDriver && (
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">MATERIAL MOVEMENT</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Record Movement" isActive={pathname === '/movements/record'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/movements/record">
-                  <ArrowLeftRight className="h-4 w-4" />
-                  <span className="font-medium">Record Movement</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Movement Data" isActive={pathname === '/movements/list'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/movements/list">
-                  <TableIcon className="h-4 w-4" />
-                  <span className="font-medium">Movement Data</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
