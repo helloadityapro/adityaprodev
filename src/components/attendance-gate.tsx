@@ -2,12 +2,12 @@
 
 import * as React from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, doc, serverTimestamp, limit, Timestamp } from 'firebase/firestore';
-import { format, isAfter, setHours, setMinutes, parseISO, addDays, startOfDay } from 'date-fns';
+import { collection, query, where, doc, limit, Timestamp } from 'firebase/firestore';
+import { format, isAfter, setHours, setMinutes, parseISO, addDays, startOfDay, endOfDay } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useRouter, usePathname } from 'next/navigation';
-import { Clock, LogIn, AlertCircle } from 'lucide-react';
+import { Clock, LogIn } from 'lucide-react';
 
 /**
  * Global component to manage attendance compliance.
@@ -24,9 +24,21 @@ export function AttendanceGate() {
   
   const [showCheckIn, setShowCheckIn] = React.useState(false);
   const [showCheckOut, setShowCheckOut] = React.useState(false);
+  const [currentDate, setCurrentDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
+
+  // Periodic check for date rollover (every 1 minute)
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      const nowStr = format(new Date(), 'yyyy-MM-dd');
+      if (nowStr !== currentDate) {
+        setCurrentDate(nowStr);
+      }
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [currentDate]);
 
   // Today's date reference
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayStr = currentDate;
 
   // Query for ANY ongoing session for this user
   const activeQuery = useMemoFirebase(() => {
@@ -69,24 +81,22 @@ export function AttendanceGate() {
     const activeSession = activeSessions?.[0];
     const hasCompletedToday = todayFinished && todayFinished.length > 0;
 
-    // 1. CYCLE RESET (12 AM Logic)
-    // If we find an "ongoing" session where the date is NOT today, it means it's a leftover from yesterday or older.
+    // 1. CYCLE RESET (Stale Session Cleanup)
+    // If we find an "ongoing" session where the date is NOT today, it means it's a leftover.
     if (activeSession && activeSession.date !== todayStr) {
       const ref = doc(firestore, 'attendance', activeSession.id);
       
-      // The user failed to check out previously.
-      // We force close the session at the end of its respective workday.
       try {
         const sessionDate = parseISO(activeSession.date);
-        const nextDayMidnight = startOfDay(addDays(sessionDate, 1));
+        const dayEnd = endOfDay(sessionDate);
 
         updateDocumentNonBlocking(ref, {
           status: 'completed',
-          checkOutTime: Timestamp.fromDate(nextDayMidnight),
+          checkOutTime: Timestamp.fromDate(dayEnd),
           checkOutLat: activeSession.checkInLat || 0, 
           checkOutLng: activeSession.checkInLng || 0,
           checkOutType: 'System CheckOut',
-          remarks: 'System CheckOut: Session automatically closed at 12:00 AM reset.'
+          remarks: 'System CheckOut: Session automatically closed at end of workday.'
         });
       } catch (e) {
         console.error("Auto-checkout failed", e);

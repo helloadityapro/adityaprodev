@@ -2,21 +2,22 @@
 
 import * as React from 'react';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, where, getDocs, doc } from 'firebase/firestore';
+import { collection, query, where, doc, writeBatch, Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, parseISO, differenceInMinutes } from 'date-fns';
-import { CalendarDays, Search, FileDown, User, Clock, MapPin, CheckCircle2, XCircle, Timer, Loader2, ArrowUpDown, ArrowUp, ArrowDown, FilterX, Users, Building2 } from 'lucide-react';
+import { format, parseISO, differenceInMinutes, endOfDay } from 'date-fns';
+import { CalendarDays, Search, FileDown, User, Clock, MapPin, CheckCircle2, XCircle, Timer, Loader2, ArrowUpDown, ArrowUp, ArrowDown, FilterX, RefreshCw, ShieldCheck } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 type UserProfile = {
   id: string;
@@ -46,6 +47,7 @@ type SortKey = 'personnel' | 'status' | 'checkIn' | 'checkOut';
 export default function AttendanceSummaryPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
+  const { toast } = useToast();
   const router = useRouter();
 
   const [selectedDate, setSelectedDate] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -53,7 +55,7 @@ export default function AttendanceSummaryPage() {
   const [statusFilter, setStatusFilter] = React.useState<string>("all");
   const [roleFilter, setRoleFilter] = React.useState<string>("all");
   const [deptFilter, setDeptFilter] = React.useState<string>("all");
-  const [isExporting, setIsExporting] = React.useState(false);
+  const [isSyncing, setIsSyncing] = React.useState(false);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'personnel', direction: 'asc' });
 
   const currentUserProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -80,6 +82,46 @@ export default function AttendanceSummaryPage() {
     return query(collection(firestore, 'attendance'), where('date', '==', selectedDate));
   }, [firestore, selectedDate]);
   const { data: attendanceRecords, isLoading: isAttendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery);
+
+  /**
+   * Automatically close open sessions for dates in the past.
+   * This handles the "even if user doesn't open app" requirement by performing cleanup
+   * when an admin views the summary.
+   */
+  React.useEffect(() => {
+    if (!attendanceRecords || isAttendanceLoading || !isAdmin) return;
+
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const openStaleSessions = attendanceRecords.filter(r => r.status === 'ongoing' && r.date < today);
+
+    if (openStaleSessions.length > 0) {
+      const performCleanup = async () => {
+        setIsSyncing(true);
+        try {
+          const batch = writeBatch(firestore);
+          openStaleSessions.forEach(session => {
+            const ref = doc(firestore, 'attendance', session.id);
+            const dayEnd = endOfDay(parseISO(session.date));
+            batch.update(ref, {
+              status: 'completed',
+              checkOutTime: Timestamp.fromDate(dayEnd),
+              checkOutLat: session.checkInLat || 0,
+              checkOutLng: session.checkInLng || 0,
+              checkOutType: 'System CheckOut',
+              remarks: 'System CheckOut: Automatically finalized during administrative audit.'
+            });
+          });
+          await batch.commit();
+          toast({ title: 'Workday Finalized', description: `Automatically closed ${openStaleSessions.length} open sessions from ${selectedDate}.` });
+        } catch (e) {
+          console.error("Cleanup failed", e);
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+      performCleanup();
+    }
+  }, [attendanceRecords, isAttendanceLoading, selectedDate, firestore, isAdmin, toast]);
 
   const summaryData = React.useMemo(() => {
     if (!allUsers || !attendanceRecords) return [];
@@ -158,7 +200,6 @@ export default function AttendanceSummaryPage() {
 
   const handleExport = () => {
     if (summaryData.length === 0) return;
-    setIsExporting(true);
     
     const exportData = summaryData.map(item => ({
       'Name': item.user.username,
@@ -177,7 +218,6 @@ export default function AttendanceSummaryPage() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance Summary");
     XLSX.writeFile(wb, `Attendance_Summary_${selectedDate}.xlsx`);
-    setIsExporting(false);
   };
 
   if (isProfileLoading || isUsersLoading || isAttendanceLoading || isUserLoading) {
@@ -209,6 +249,11 @@ export default function AttendanceSummaryPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
+          {isSyncing && (
+            <Badge variant="outline" className="h-10 px-4 bg-primary/5 border-primary/20 text-primary animate-pulse font-black text-[10px] uppercase rounded-sm">
+              <RefreshCw className="mr-2 h-3 w-3 animate-spin" /> Finalizing Logs...
+            </Badge>
+          )}
           <div className="space-y-1.5">
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Select Date</Label>
             <Input 
@@ -267,9 +312,16 @@ export default function AttendanceSummaryPage() {
       <Card className="rounded-sm border-primary/10 shadow-lg overflow-hidden">
         <CardHeader className="bg-muted/5 border-b py-4">
           <div className="flex flex-col gap-4">
-            <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-              Presence Log for {format(parseISO(selectedDate), 'dd MMMM yyyy')}
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                Presence Log for {format(parseISO(selectedDate), 'dd MMMM yyyy')}
+              </CardTitle>
+              {selectedDate < format(new Date(), 'yyyy-MM-dd') && stats.ongoing > 0 && (
+                <Badge className="bg-amber-100 text-amber-800 border-amber-200 uppercase font-black text-[9px] flex items-center gap-1.5 px-3 rounded-sm shadow-sm animate-pulse">
+                  <ShieldCheck className="h-3 w-3" /> Auto-Cleanup Active
+                </Badge>
+              )}
+            </div>
             
             <div className="flex flex-col md:flex-row md:items-end gap-4">
               <div className="relative flex-1">
@@ -280,7 +332,7 @@ export default function AttendanceSummaryPage() {
                     placeholder="Name or email..." 
                     className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
                     value={searchTerm} 
-                    onChange={(e) => setSearchTerm(e.target.value)} 
+                    onChange={(e) => setSearchTerm(item.target.value)} 
                   />
                 </div>
               </div>
