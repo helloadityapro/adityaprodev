@@ -56,7 +56,8 @@ import {
   ExternalLink,
   Printer,
   Gavel,
-  Save
+  Save,
+  HardHat
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -174,6 +175,21 @@ type PurchaseOrder = {
   history?: POHistoryEntry[];
 };
 
+type WorkOrder = {
+  id: string;
+  woNumber: string;
+  contractorName: string;
+  orderDate: string;
+  status: string;
+  totalAmount: number;
+  description: string;
+  createdAt: any;
+  createdByName?: string;
+  updatedAt?: any;
+  updatedByName?: string;
+  history?: POHistoryEntry[];
+};
+
 type InventoryItem = {
   id: string;
   itemName: string;
@@ -194,6 +210,7 @@ type MasterItem = {
 
 type SortKey = 'engineer' | 'manager' | 'sites';
 type POSortKey = 'poNumber' | 'supplier' | 'status' | 'date' | 'total';
+type WOSortKey = 'woNumber' | 'contractor' | 'status' | 'date' | 'total';
 type BoMSortKey = 'itemName' | 'category' | 'status' | 'plannedQuantity' | 'approvedQuantity';
 
 const formatTimestamp = (ts: any) => {
@@ -248,6 +265,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [poToDelete, setPoToDelete] = React.useState<PurchaseOrder | null>(null);
   const [expandedPORows, setExpandedPORows] = React.useState<Set<string>>(new Set());
   const [viewingPO, setViewingPO] = React.useState<PurchaseOrder | null>(null);
+
+  const [woSearch, setWoSearch] = React.useState("");
+  const [woSortConfig, setWoSortConfig] = React.useState<{ key: WOSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+  const [woToDelete, setWoToDelete] = React.useState<WorkOrder | null>(null);
+  const [viewingWO, setViewingWO] = React.useState<WorkOrder | null>(null);
 
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
   const { data: project, isLoading: projectLoading } = useDoc<Project>(projectRef);
@@ -306,6 +328,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   );
   const { data: purchaseOrders } = useCollection<PurchaseOrder>(posQuery);
 
+  const wosQuery = useMemoFirebase(() => 
+    query(collection(firestore, 'project_wos'), where('siteId', '==', projectId)), 
+    [firestore, projectId]
+  );
+  const { data: workOrders } = useCollection<WorkOrder>(wosQuery);
+
   const inventoryQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_inventory'), where('siteId', '==', projectId)), 
     [firestore, projectId]
@@ -340,8 +368,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const { data: movements } = useCollection(movementQuery);
 
   const visitQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'site_visits'), where('siteId', '==', projectId)),
-    [firestore, projectId]
+    query(collection(firestore, 'site_visits'), where('siteId', '==', siteId)),
+    [firestore, siteId]
   );
   const { data: visits } = useCollection(visitQuery);
 
@@ -397,6 +425,33 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     return result;
   }, [purchaseOrders, poSearch, poSortConfig]);
 
+  const filteredSortedWOs = React.useMemo(() => {
+    if (!workOrders) return [];
+    
+    let result = workOrders.filter(wo => 
+      wo.woNumber.toLowerCase().includes(woSearch.toLowerCase()) ||
+      wo.contractorName.toLowerCase().includes(woSearch.toLowerCase())
+    );
+
+    result.sort((a, b) => {
+      const { key, direction } = woSortConfig;
+      let valA: any = '';
+      let valB: any = '';
+
+      if (key === 'woNumber') { valA = a.woNumber; valB = b.woNumber; }
+      else if (key === 'contractor') { valA = a.contractorName; valB = b.contractorName; }
+      else if (key === 'status') { valA = a.status; valB = b.status; }
+      else if (key === 'date') { valA = new Date(a.orderDate).getTime(); valB = new Date(b.orderDate).getTime(); }
+      else if (key === 'total') { valA = a.totalAmount || 0; valB = b.totalAmount || 0; }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [workOrders, woSearch, woSortConfig]);
+
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
 
   const handleSort = (key: SortKey) => {
@@ -421,6 +476,18 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const POSortIcon = ({ column }: { column: POSortKey }) => {
     if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
     return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
+
+  const handleWOSort = (key: WOSortKey) => {
+    setWoSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const WOSortIcon = ({ column }: { column: WOSortKey }) => {
+    if (woSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    return woSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
 
   const handleBoMSort = (key: BoMSortKey) => {
@@ -579,24 +646,35 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     }
   };
 
-  const getPOHistory = (po: PurchaseOrder) => {
-    if (po.history && po.history.length > 0) return po.history;
+  const handleDeleteWO = async () => {
+    if (!woToDelete) return;
+    try {
+      await deleteDocumentNonBlocking(doc(firestore, 'project_wos', woToDelete.id));
+      toast({ title: 'WO Removed', description: 'Work Order has been deleted from site records.' });
+      setWoToDelete(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
+    }
+  };
+
+  const getLogHistory = (item: any) => {
+    if (item.history && item.history.length > 0) return item.history;
     const fallback: POHistoryEntry[] = [];
-    if (po.createdAt) {
+    if (item.createdAt) {
       fallback.push({
         action: 'Created',
-        userName: po.createdByName || 'Unknown',
+        userName: item.createdByName || 'Unknown',
         userId: '',
-        timestamp: po.createdAt,
+        timestamp: item.createdAt,
         details: 'Initial order creation'
       });
     }
-    if (po.updatedAt) {
+    if (item.updatedAt) {
       fallback.push({
         action: 'Modified',
-        userName: po.updatedByName || 'Unknown',
+        userName: item.updatedByName || 'Unknown',
         userId: '',
-        timestamp: po.updatedAt,
+        timestamp: item.updatedAt,
         details: 'Order details updated'
       });
     }
@@ -1237,7 +1315,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                   </div>
                                   <ScrollArea className="h-[250px]">
                                     <div className="p-4 space-y-4">
-                                      {getPOHistory(po).map((entry, idx) => (
+                                      {getLogHistory(po).map((entry, idx) => (
                                         <div key={idx} className="relative pl-4 border-l border-primary/20 pb-4 last:pb-0">
                                           <div className="absolute -left-[4.5px] top-1 h-2 w-2 rounded-full bg-primary" />
                                           <div className="flex flex-col gap-0.5">
@@ -1327,14 +1405,91 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          <TabsContent value="wo" className="mt-6 animate-in fade-in-50 duration-300">
-            <div className="flex flex-col items-center justify-center py-32 text-center bg-muted/10 rounded-sm border border-dashed border-primary/20">
-              <Gavel className="h-16 w-16 text-muted-foreground/20 mb-4" />
-              <h3 className="text-xl font-bold">Work Orders Module</h3>
-              <p className="text-muted-foreground max-sm mx-auto mt-2">
-                This section is reserved for managing service contracts and technical task orders for this site.
-              </p>
+          <TabsContent value="wo" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search WO or Contractor" 
+                  className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
+                  value={woSearch}
+                  onChange={e => setWoSearch(e.target.value)}
+                />
+              </div>
+              <Button asChild className="rounded-sm font-bold shadow-md h-9">
+                <Link href={`/projects/${projectId}/work-orders/create`}>
+                  <Plus className="h-4 w-4 mr-2" /> Create Work Order
+                </Link>
+              </Button>
             </div>
+
+            <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+              <CardHeader className="bg-muted/5 border-b py-4">
+                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  <Gavel className="h-4 w-4 text-primary" /> Service Work Orders
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('woNumber')}>
+                          <div className="flex items-center">WO Number <WOSortIcon column="woNumber" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('contractor')}>
+                          <div className="flex items-center">Contractor <WOSortIcon column="contractor" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('date')}>
+                          <div className="flex items-center">Date <WOSortIcon column="date" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('status')}>
+                          <div className="flex items-center">Status <WOSortIcon column="status" /></div>
+                        </TableHead>
+                        <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('total')}>
+                          <div className="flex items-center justify-end">Contract Value <WOSortIcon column="total" /></div>
+                        </TableHead>
+                        <TableHead className="text-right px-6">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSortedWOs.length > 0 ? filteredSortedWOs.map(wo => (
+                        <TableRow key={wo.id} className="hover:bg-muted/5 transition-colors">
+                          <TableCell className="px-6 py-4">
+                            <span className="font-mono text-xs font-black text-primary uppercase">{wo.woNumber}</span>
+                          </TableCell>
+                          <TableCell className="text-sm font-semibold text-foreground">{wo.contractorName}</TableCell>
+                          <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
+                          <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{wo.status}</Badge></TableCell>
+                          <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="text-right px-6">
+                            <div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {(isAdmin || isManager) && (
+                                <>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
+                                    <Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}>
+                                      <Pencil className="h-4 w-4" />
+                                    </Link>
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )) : (
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No work orders found.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="ptw" className="mt-6 animate-in fade-in-50 duration-300">
@@ -1651,6 +1806,103 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </DialogContent>
       </Dialog>
 
+      {/* WO Details Modal */}
+      <Dialog open={!!viewingWO} onOpenChange={(o) => !o && setViewingWO(null)}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><Gavel className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Work Order Audit</DialogTitle>
+                <DialogDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{viewingWO?.woNumber}</DialogDescription>
+              </div>
+            </div>
+            <div className="no-print">
+              <Button variant="outline" size="sm" onClick={() => window.print()} className="rounded-sm h-9 border-primary/20 text-primary">
+                <Printer className="h-4 w-4 mr-2" /> Print WO
+              </Button>
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 bg-background">
+            {viewingWO && (
+              <div className="p-8 space-y-10" id="printable-wo-area">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Contractor Partner</Label>
+                        <p className="text-sm font-black text-foreground">{viewingWO.contractorName}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Release Date</Label>
+                        <p className="text-sm font-bold">{viewingWO.orderDate}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Authorized By</Label>
+                        <p className="text-sm font-bold">{viewingWO.createdByName || 'N/A'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Status</Label>
+                        <div className="mt-1"><Badge className="rounded-sm h-5 text-[9px] uppercase font-black">{viewingWO.status}</Badge></div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-primary/5 rounded-sm border-2 border-primary/10 p-6 flex flex-col justify-center items-center text-center shadow-inner">
+                    <span className="text-[10px] font-black uppercase text-primary tracking-widest mb-2">Contract Value</span>
+                    <span className="text-4xl font-black tabular-nums text-primary">₹{viewingWO.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" /> Scope of Work / Description
+                  </Label>
+                  <div className="p-6 bg-muted/10 rounded-sm border italic leading-relaxed text-sm">
+                    {viewingWO.description}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                    <History className="h-4 w-4 text-primary" /> Activity Log
+                  </Label>
+                  <div className="border rounded-sm overflow-hidden bg-muted/10">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead className="text-[10px] font-black uppercase px-4">Action</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase">Personnel</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase">Timestamp</TableHead>
+                          <TableHead className="text-right px-4 text-[10px] font-black uppercase">Notes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {getLogHistory(viewingWO).map((entry, idx) => (
+                          <TableRow key={idx} className="bg-background">
+                            <TableCell className="px-4 text-xs font-bold text-primary uppercase">{entry.action}</TableCell>
+                            <TableCell className="text-xs font-semibold">{entry.userName}</TableCell>
+                            <TableCell className="text-[10px] font-mono">{formatTimestamp(entry.timestamp)}</TableCell>
+                            <TableCell className="text-right px-4 text-[10px] italic">{entry.details}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 no-print">
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!bomActionState} onOpenChange={(o) => !o && setBomActionState(null)}>
         <DialogContent className="max-w-md rounded-sm">
           <DialogHeader>
@@ -1710,6 +1962,23 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeletePO} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-bold">
               Delete PO
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!woToDelete} onOpenChange={(o) => !o && setWoToDelete(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Work Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete WO <strong>{woToDelete?.woNumber}</strong>? This action will permanently remove it from project service records.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteWO} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-bold">
+              Delete WO
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

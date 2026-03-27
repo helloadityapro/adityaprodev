@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -102,6 +101,23 @@
         "totalAmount": { "type": "number" }
       }
     },
+    "WorkOrder": {
+      "title": "Work Order",
+      "type": "object",
+      "description": "Service contracts for contractors.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "woNumber": { "type": "string" },
+        "contractorId": { "type": "string" },
+        "contractorName": { "type": "string" },
+        "orderDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Open", "Approved", "Rejected", "Cancelled"] },
+        "totalAmount": { "type": "number" },
+        "description": { "type": "string" }
+      },
+      "required": ["woNumber", "contractorId", "totalAmount"]
+    },
     "InventoryItem": {
       "title": "Inventory Item",
       "type": "object",
@@ -178,6 +194,10 @@
     "/project_pos/{poId}": {
       "schema": { "$ref": "#/backend/entities/PurchaseOrder" },
       "description": "Purchase orders associated with project sites."
+    },
+    "/project_wos/{woId}": {
+      "schema": { "$ref": "#/backend/entities/WorkOrder" },
+      "description": "Work orders for contractors per project site."
     },
     "/project_inventory/{invId}": {
       "schema": { "$ref": "#/backend/entities/InventoryItem" },

@@ -61,6 +61,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /project_wos/{woId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && getUserData().role == 'Site Manager');
+    }
+
     match /project_inventory/{invId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
