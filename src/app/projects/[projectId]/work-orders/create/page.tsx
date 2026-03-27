@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
@@ -32,7 +32,9 @@ import {
   CheckCircle2,
   Calendar,
   Send,
-  FileText
+  FileText,
+  Trash2,
+  ListPlus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -40,14 +42,23 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+
+const woItemSchema = z.object({
+  description: z.string().min(1, 'Description is required.'),
+  quantity: z.coerce.number().min(0.01, 'Quantity is required.'),
+  rate: z.coerce.number().min(0.01, 'Rate is required.'),
+  gstPercent: z.coerce.number().min(0, 'GST is required.'),
+  amount: z.number(),
+});
 
 const woSchema = z.object({
   woNumber: z.string().min(3, 'WO Number is required.'),
   orderDate: z.string().min(1, 'Date is required.'),
   contractorId: z.string().min(1, 'Please select a contractor.'),
   contractorName: z.string(),
-  totalAmount: z.coerce.number().min(0.01, 'Contract value is required.'),
-  description: z.string().min(10, 'Please provide a detailed scope of work (min 10 chars).'),
+  items: z.array(woItemSchema).min(1, 'At least one line item is required.'),
+  description: z.string().min(10, 'Please provide a detailed overall scope of work.'),
 });
 
 type Site = {
@@ -93,10 +104,40 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
       orderDate: format(new Date(), 'yyyy-MM-dd'),
       contractorId: "",
       contractorName: "",
-      totalAmount: 0,
+      items: [{ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }],
       description: ""
     },
   });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "items"
+  });
+
+  const watchedItems = form.watch('items');
+
+  const totalAmount = React.useMemo(() => {
+    return watchedItems.reduce((sum, item) => {
+      const qty = Number(item.quantity) || 0;
+      const rate = Number(item.rate) || 0;
+      const gst = Number(item.gstPercent) || 0;
+      const lineTotal = (qty * rate) * (1 + (gst / 100));
+      return sum + lineTotal;
+    }, 0);
+  }, [watchedItems]);
+
+  React.useEffect(() => {
+    watchedItems.forEach((item, index) => {
+      const qty = Number(item.quantity) || 0;
+      const rate = Number(item.rate) || 0;
+      const gst = Number(item.gstPercent) || 0;
+      const calculatedAmount = (qty * rate) * (1 + (gst / 100));
+      
+      if (Math.abs(item.amount - calculatedAmount) > 0.01) {
+        form.setValue(`items.${index}.amount`, calculatedAmount);
+      }
+    });
+  }, [watchedItems, form]);
 
   const onSubmit = async (values: z.infer<typeof woSchema>) => {
     if (!user || !userProfile || !site) return;
@@ -109,7 +150,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
         userName: userProfile.username || user.email,
         userId: user.uid,
         timestamp: new Date(),
-        details: `Work Order released for ₹${values.totalAmount.toLocaleString('en-IN')}`
+        details: `Work Order released for ₹${totalAmount.toLocaleString('en-IN')}`
       };
 
       await addDocumentNonBlocking(collection(firestore, 'project_wos'), {
@@ -119,7 +160,8 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
         contractorId: values.contractorId,
         contractorName: values.contractorName,
         orderDate: values.orderDate,
-        totalAmount: values.totalAmount,
+        items: values.items,
+        totalAmount,
         description: values.description,
         status: 'Open',
         createdAt: serverTimestamp(),
@@ -127,7 +169,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
         history: [historyEntry]
       });
 
-      setFinalTotal(values.totalAmount);
+      setFinalTotal(totalAmount);
       setIsSuccess(true);
       toast({ title: 'WO Created', description: `Work Order ${values.woNumber} for ${values.contractorName} has been recorded.` });
     } catch (e: any) {
@@ -166,7 +208,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto pb-20 px-4">
+    <div className="space-y-8 max-w-6xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
         <Button variant="ghost" size="sm" onClick={() => router.back()} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
           <ArrowLeft className="mr-2 h-4 w-4" /> Cancel
@@ -184,7 +226,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
               <CardTitle className="text-sm font-black uppercase tracking-widest">Order Context</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField
                   control={form.control}
                   name="woNumber"
@@ -278,42 +320,145 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
                     </FormItem>
                   )}
                 />
+              </div>
+            </CardContent>
+          </Card>
 
-                <FormField
-                  control={form.control}
-                  name="totalAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Contract Value (₹)</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-bold">₹</span>
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="h-11 rounded-sm pl-7 font-mono font-bold" />
+          <div className="space-y-6">
+            <div className="flex items-center justify-between border-b pb-2 px-1">
+              <div className="flex items-center gap-2">
+                <ListPlus className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Service Line Items</h3>
+              </div>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={() => append({ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 })}
+                className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Service
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {fields.map((field, index) => {
+                const qty = Number(watchedItems[index]?.quantity) || 0;
+                const rate = Number(watchedItems[index]?.rate) || 0;
+                const gst = Number(watchedItems[index]?.gstPercent) || 0;
+                const lineTotal = (qty * rate) * (1 + (gst / 100));
+
+                return (
+                  <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2 duration-300">
+                    {fields.length > 1 && (
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm"
+                        onClick={() => remove(index)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                      <div className="md:col-span-5">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.description`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Service / Work Description</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g. Labor for module mounting" {...field} className="h-10 rounded-sm bg-background" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.quantity`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Qty / Units</FormLabel>
+                              <FormControl>
+                                <Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.rate`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Unit Rate (₹)</FormLabel>
+                              <FormControl>
+                                <Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="md:col-span-1">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.gstPercent`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">GST %</FormLabel>
+                              <FormControl>
+                                <Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold text-center px-1" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-black uppercase text-primary tracking-widest text-right block">Line Total (₹)</Label>
+                          <div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">
+                            {lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </div>
                         </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
-              <div className="mt-8 space-y-4">
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                        <FileText className="h-3.5 w-3.5 text-primary" /> Scope of Work & Deliverables
-                      </FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Detail the specific services, milestones, or technical requirements..." rows={8} {...field} className="rounded-sm bg-muted/5 italic" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+          <Card className="rounded-sm border-primary/10">
+            <CardHeader className="bg-muted/5 py-3 border-b">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider">Additional Scope & Narrative</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Textarea placeholder="Detail specific project milestones, technical requirements, or legal conditions..." rows={6} {...field} className="rounded-sm bg-muted/5 italic" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
           </Card>
 
@@ -323,8 +468,8 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
                 <Gavel className="h-8 w-8" />
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Contract Total</span>
-                <span className="text-4xl font-black text-primary tabular-nums">₹{form.watch('totalAmount').toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Total Contract Value</span>
+                <span className="text-4xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
             
@@ -339,8 +484,8 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
               </Button>
               <Button 
                 type="submit" 
-                disabled={isSubmitting} 
-                className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl"
+                disabled={isSubmitting || totalAmount <= 0} 
+                className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95"
               >
                 {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> PROVISIONING...</> : <><Send className="mr-2 h-4 w-4" /> RELEASE WORK ORDER</>}
               </Button>

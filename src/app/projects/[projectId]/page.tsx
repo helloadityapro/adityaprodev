@@ -175,6 +175,14 @@ type PurchaseOrder = {
   history?: POHistoryEntry[];
 };
 
+type WOItem = {
+  description: string;
+  quantity: number;
+  rate: number;
+  gstPercent: number;
+  amount: number;
+};
+
 type WorkOrder = {
   id: string;
   woNumber: string;
@@ -182,6 +190,7 @@ type WorkOrder = {
   orderDate: string;
   status: string;
   totalAmount: number;
+  items?: WOItem[];
   description: string;
   createdAt: any;
   createdByName?: string;
@@ -269,6 +278,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [woSearch, setWoSearch] = React.useState("");
   const [woSortConfig, setWoSortConfig] = React.useState<{ key: WOSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [woToDelete, setWoToDelete] = React.useState<WorkOrder | null>(null);
+  const [expandedWORows, setExpandedWORows] = React.useState<Set<string>>(new Set());
   const [viewingWO, setViewingWO] = React.useState<WorkOrder | null>(null);
 
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
@@ -625,6 +635,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
     setExpandedPORows(newSet);
+  };
+
+  const toggleWORow = (id: string) => {
+    const newSet = new Set(expandedWORows);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedWORows(newSet);
   };
 
   const handleUpdateStock = async (itemId: string, newStock: number) => {
@@ -1454,34 +1471,77 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     </TableHeader>
                     <TableBody>
                       {filteredSortedWOs.length > 0 ? filteredSortedWOs.map(wo => (
-                        <TableRow key={wo.id} className="hover:bg-muted/5 transition-colors">
-                          <TableCell className="px-6 py-4">
-                            <span className="font-mono text-xs font-black text-primary uppercase">{wo.woNumber}</span>
-                          </TableCell>
-                          <TableCell className="text-sm font-semibold text-foreground">{wo.contractorName}</TableCell>
-                          <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
-                          <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{wo.status}</Badge></TableCell>
-                          <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell className="text-right px-6">
-                            <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}>
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              {(isAdmin || isManager) && (
-                                <>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
-                                    <Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}>
-                                      <Pencil className="h-4 w-4" />
-                                    </Link>
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}>
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                        <React.Fragment key={wo.id}>
+                          <TableRow className="hover:bg-muted/5 transition-colors">
+                            <TableCell className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => toggleWORow(wo.id)}>
+                                  {expandedWORows.has(wo.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                </Button>
+                                <span className="font-mono text-xs font-black text-primary uppercase">{wo.woNumber}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold text-foreground">{wo.contractorName}</TableCell>
+                            <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
+                            <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{wo.status}</Badge></TableCell>
+                            <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                            <TableCell className="text-right px-6">
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                {(isAdmin || isManager) && (
+                                  <>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
+                                      <Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Link>
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {expandedWORows.has(wo.id) && wo.items && wo.items.length > 0 && (
+                            <TableRow className="bg-muted/30">
+                              <TableCell colSpan={6} className="p-0">
+                                <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Layers className="h-3.5 w-3.5 text-primary" />
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown for {wo.woNumber}</span>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                    {wo.items.map((item, iIdx) => (
+                                      <div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm">
+                                        <div className="flex justify-between items-start">
+                                          <span className="text-xs font-black text-foreground">{item.description}</span>
+                                          <Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 border-t pt-2">
+                                          <div className="flex flex-col">
+                                            <span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span>
+                                            <span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span>
+                                          </div>
+                                          <div className="flex flex-col text-right">
+                                            <span className="text-muted-foreground uppercase font-bold text-[8px]">Amount (Incl. GST)</span>
+                                            <span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="flex justify-between items-center pt-2 border-t border-primary/10 mt-2">
+                                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Aggregate Value</span>
+                                    <span className="text-sm font-black text-primary">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
                       )) : (
                         <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No work orders found.</TableCell></TableRow>
                       )}
@@ -1859,11 +1919,38 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
                 <div className="space-y-4">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" /> Scope of Work / Description
+                    <FileText className="h-4 w-4 text-primary" /> Service & Work Item Breakdown
                   </Label>
-                  <div className="p-6 bg-muted/10 rounded-sm border italic leading-relaxed text-sm">
-                    {viewingWO.description}
-                  </div>
+                  {viewingWO.items && viewingWO.items.length > 0 ? (
+                    <div className="border rounded-sm overflow-hidden bg-muted/10">
+                      <Table>
+                        <TableHeader className="bg-muted/30">
+                          <TableRow>
+                            <TableHead className="text-[10px] font-black uppercase px-4">Description</TableHead>
+                            <TableHead className="text-[10px] font-black uppercase text-center">Qty</TableHead>
+                            <TableHead className="text-[10px] font-black uppercase text-right">Rate (₹)</TableHead>
+                            <TableHead className="text-[10px] font-black uppercase text-center">GST %</TableHead>
+                            <TableHead className="text-right px-4 text-[10px] font-black uppercase">Line Total (₹)</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {viewingWO.items.map((item, idx) => (
+                            <TableRow key={idx} className="bg-background">
+                              <TableCell className="px-4 text-xs font-bold">{item.description}</TableCell>
+                              <TableCell className="text-center font-mono font-bold text-xs">{item.quantity}</TableCell>
+                              <TableCell className="text-right font-mono text-xs">₹{item.rate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                              <TableCell className="text-center text-xs font-medium">{item.gstPercent}%</TableCell>
+                              <TableCell className="text-right px-4 font-mono text-xs font-black text-primary">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="p-6 bg-muted/10 rounded-sm border italic leading-relaxed text-sm">
+                      {viewingWO.description}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
