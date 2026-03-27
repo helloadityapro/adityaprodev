@@ -730,7 +730,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1 min-w-0">
             <Button variant="ghost" size="sm" onClick={() => router.push('/projects/list')} className="h-7 mb-1 -ml-2 text-muted-foreground hover:text-primary transition-colors">
-              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back to Registry
+              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back to Projects Management
             </Button>
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm shrink-0">
