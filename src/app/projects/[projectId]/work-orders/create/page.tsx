@@ -150,7 +150,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
         userName: userProfile.username || user.email,
         userId: user.uid,
         timestamp: new Date(),
-        details: `Work Order released for ₹${totalAmount.toLocaleString('en-IN')}`
+        details: `Work Order released for ₹${totalAmount.toLocaleString('en-IN')} (Pending Admin Approval)`
       };
 
       await addDocumentNonBlocking(collection(firestore, 'project_wos'), {
@@ -163,7 +163,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
         items: values.items,
         totalAmount,
         description: values.description,
-        status: 'Open',
+        status: 'Pending',
         createdAt: serverTimestamp(),
         createdByName: userProfile.username || user.email,
         history: [historyEntry]
@@ -171,7 +171,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
 
       setFinalTotal(totalAmount);
       setIsSuccess(true);
-      toast({ title: 'WO Created', description: `Work Order ${values.woNumber} for ${values.contractorName} has been recorded.` });
+      toast({ title: 'WO Submitted', description: `Work Order ${values.woNumber} has been sent for Admin approval.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
@@ -189,9 +189,9 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
                 <CheckCircle2 className="h-12 w-12 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold uppercase tracking-tight">WO Generated</CardTitle>
+            <CardTitle className="text-2xl font-bold uppercase tracking-tight">WO Submitted</CardTitle>
             <CardDescription className="text-base leading-relaxed">
-              Work Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been released to <strong className="text-foreground">{form.getValues('contractorName')}</strong>.
+              Work Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> is awaiting Admin approval.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -216,7 +216,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
         <h1 className="flex items-center gap-2">
           <Gavel className="h-8 w-8 text-primary" /> Release Work Order
         </h1>
-        <p className="text-muted-foreground font-medium">Provision service contracts for site contractors.</p>
+        <p className="text-muted-foreground font-medium">Provision service contracts for site contractors. Subject to Admin approval.</p>
       </div>
 
       <Form {...form}>
@@ -487,7 +487,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
                 disabled={isSubmitting || totalAmount <= 0} 
                 className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95"
               >
-                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> PROVISIONING...</> : <><Send className="mr-2 h-4 w-4" /> RELEASE WORK ORDER</>}
+                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> SUBMITTING...</> : <><Send className="mr-2 h-4 w-4" /> SUBMIT FOR APPROVAL</>}
               </Button>
             </div>
           </div>

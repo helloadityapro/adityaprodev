@@ -173,7 +173,7 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
         userName: userProfile.username || user.email,
         userId: user.uid,
         timestamp: new Date(),
-        details: changes.length > 0 ? changes.join(', ') : 'Order details modified'
+        details: `${changes.length > 0 ? changes.join(', ') : 'Order details modified'} (Returned to Pending for re-approval)`
       };
 
       await updateDocumentNonBlocking(doc(firestore, 'project_wos', woId), {
@@ -184,6 +184,7 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
         items: values.items,
         totalAmount,
         description: values.description,
+        status: 'Pending',
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
         updatedByName: userProfile.username || user.email,
@@ -192,7 +193,7 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
 
       setFinalTotal(totalAmount);
       setIsSuccess(true);
-      toast({ title: 'WO Updated', description: `Work Order ${values.woNumber} has been modified.` });
+      toast({ title: 'WO Updated', description: `Work Order ${values.woNumber} modified and returned to Pending.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
@@ -214,7 +215,7 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
             </div>
             <CardTitle className="text-2xl font-bold uppercase tracking-tight">WO Updated</CardTitle>
             <CardDescription className="text-base leading-relaxed">
-              Work Order total value: <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>.
+              Work Order total value: <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>. Awaiting re-approval.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -236,7 +237,7 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
         <h1 className="flex items-center gap-2">
           <Pencil className="h-8 w-8 text-primary" /> Edit Work Order
         </h1>
-        <p className="text-muted-foreground font-medium">Update contract value or line items for service orders.</p>
+        <p className="text-muted-foreground font-medium">Update contract value or line items. Resubmission requires Admin re-approval.</p>
       </div>
 
       <Form {...form}>

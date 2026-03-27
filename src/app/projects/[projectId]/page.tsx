@@ -57,7 +57,9 @@ import {
   Printer,
   Gavel,
   Save,
-  HardHat
+  HardHat,
+  CircleCheck,
+  CircleX
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -262,6 +264,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [bomItemSearchQuery, setBomItemSearchQuery] = React.useState("");
   
   const [bomActionState, setBomActionState] = React.useState<{ item: BoMItem, type: 'Approved' | 'Rejected' } | null>(null);
+  const [woActionState, setWoActionState] = React.useState<{ wo: WorkOrder, type: 'Approved' | 'Rejected' } | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
   const [expandedBomRows, setExpandedBomRows] = React.useState<Set<string>>(new Set());
   
@@ -578,6 +581,36 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     
     setIsActionProcessing(false);
     setBomActionState(null);
+  };
+
+  const handleProcessWO = (remarks: string) => {
+    if (!woActionState || !userProfile) return;
+    setIsActionProcessing(true);
+    
+    const logEntry = {
+      action: woActionState.type === 'Approved' ? 'Authorized' : 'Rejected',
+      userName: userProfile.username || user?.email || 'Admin',
+      userId: user?.uid || '',
+      timestamp: new Date(),
+      details: remarks ? `Remarks: ${remarks}` : 'Processed without specific remarks.'
+    };
+
+    const woRef = doc(firestore, 'project_wos', woActionState.wo.id);
+    updateDocumentNonBlocking(woRef, {
+      status: woActionState.type,
+      updatedAt: serverTimestamp(),
+      updatedBy: user?.uid || '',
+      updatedByName: userProfile.username || user?.email || 'Admin',
+      history: arrayUnion(logEntry)
+    });
+
+    toast({ 
+      title: woActionState.type === 'Approved' ? 'WO Authorized' : 'WO Rejected', 
+      description: `Work Order ${woActionState.wo.woNumber} has been updated.` 
+    });
+    
+    setIsActionProcessing(false);
+    setWoActionState(null);
   };
 
   const handleUpdateBoM = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -1483,13 +1516,44 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             </TableCell>
                             <TableCell className="text-sm font-semibold text-foreground">{wo.contractorName}</TableCell>
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
-                            <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{wo.status}</Badge></TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={cn(
+                                "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
+                                wo.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                                wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                                "bg-yellow-50 text-yellow-700 border-yellow-200"
+                              )}>
+                                {wo.status || 'Pending'}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                             <TableCell className="text-right px-6">
-                              <div className="flex justify-end gap-1">
+                              <div className="flex justify-end items-center gap-1">
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}>
                                   <Eye className="h-4 w-4" />
                                 </Button>
+                                {isAdmin && wo.status === 'Pending' && (
+                                  <>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 text-green-600 rounded-sm" 
+                                      onClick={() => setWoActionState({ wo, type: 'Approved' })}
+                                      title="Approve WO"
+                                    >
+                                      <CircleCheck className="h-4 w-4" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 text-red-600 rounded-sm" 
+                                      onClick={() => setWoActionState({ wo, type: 'Rejected' })}
+                                      title="Reject WO"
+                                    >
+                                      <CircleX className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
                                 {(isAdmin || isManager) && (
                                   <>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
@@ -1990,6 +2054,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </DialogContent>
       </Dialog>
 
+      {/* BoM Action Dialog */}
       <Dialog open={!!bomActionState} onOpenChange={(o) => !o && setBomActionState(null)}>
         <DialogContent className="max-w-md rounded-sm">
           <DialogHeader>
@@ -2032,6 +2097,39 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               }}
             >
               {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${bomActionState?.type}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* WO Action Dialog */}
+      <Dialog open={!!woActionState} onOpenChange={(o) => !o && setWoActionState(null)}>
+        <DialogContent className="max-w-md rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="uppercase tracking-tight font-black">{woActionState?.type} Work Order</DialogTitle>
+            <DialogDescription>Setting status for "{woActionState?.wo.woNumber}"</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase text-muted-foreground tracking-widest">Decision Remarks</Label>
+              <Textarea 
+                id="wo-remarks" 
+                placeholder="Provide feedback for the contractor engagement..." 
+                className="min-h-[100px] rounded-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold h-11 px-6 uppercase text-[10px]">Cancel</Button></DialogClose>
+            <Button 
+              disabled={isActionProcessing} 
+              className={cn("rounded-sm font-black h-11 px-8 uppercase text-[10px] tracking-widest", woActionState?.type === 'Approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+              onClick={() => {
+                const remarks = (document.getElementById('wo-remarks') as HTMLTextAreaElement)?.value || "";
+                handleProcessWO(remarks);
+              }}
+            >
+              {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${woActionState?.type}`}
             </Button>
           </DialogFooter>
         </DialogContent>
