@@ -100,7 +100,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
 
           {!isDriver && (
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Reports" isActive={pathname === '/reports'} className="rounded-sm" onClick={handleMobileClose}>
+              <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/reports'} className="rounded-sm" onClick={handleMobileClose}>
                 <Link href="/reports">
                   <FileBarChart className="h-4 w-4" />
                   <span className="font-medium">Dashboard</span>
