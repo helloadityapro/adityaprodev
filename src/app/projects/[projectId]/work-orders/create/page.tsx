@@ -191,14 +191,17 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
             </div>
             <CardTitle className="text-2xl font-bold uppercase tracking-tight">WO Submitted</CardTitle>
             <CardDescription className="text-base leading-relaxed">
-              Work Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> is awaiting Admin approval.
+              Work Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been issued to <strong className="text-foreground">{form.getValues('contractorName')}</strong> and is awaiting Admin approval.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push(`/projects/${projectId}?tab=wo`)}>
               Back to Work Orders
             </Button>
-            <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); }}>
+            <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => {
+              setIsSuccess(false);
+              form.reset();
+            }}>
               Create Another WO
             </Button>
           </CardContent>

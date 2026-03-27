@@ -215,7 +215,7 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
             </div>
             <CardTitle className="text-2xl font-bold uppercase tracking-tight">WO Updated</CardTitle>
             <CardDescription className="text-base leading-relaxed">
-              Work Order total value: <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>. Awaiting re-approval.
+              Work Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> issued to <strong className="text-foreground">{form.getValues('contractorName')}</strong> has been modified. Awaiting re-approval.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
