@@ -236,10 +236,10 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">PERMIT TO WORK</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Raise a PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm" onClick={handleMobileClose}>
+              <SidebarMenuButton asChild tooltip="Request a PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm" onClick={handleMobileClose}>
                 <Link href="/ptw/raise">
                   <FilePlus className="h-4 w-4" />
-                  <span className="font-medium">Raise a PtW</span>
+                  <span className="font-medium">Request a PtW</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

@@ -35,10 +35,10 @@ export function QuickActions() {
       description: 'Check-in to a project site',
     },
     {
-      label: 'Raise PtW',
+      label: 'Request PtW',
       icon: <FilePlus className="mr-2 h-4 w-4 text-blue-500" />,
       href: '/ptw/raise',
-      description: 'Create a new Permit to Work',
+      description: 'Request a new Permit to Work',
     },
     {
       label: 'Submit DPR',
