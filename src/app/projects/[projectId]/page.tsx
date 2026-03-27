@@ -371,7 +371,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const { data: dprs } = useCollection(dprQuery);
 
   const taskQuery = useMemoFirebase(() => 
-    siteName ? query(collection(firestore, 'tasks'), where('siteName', '==', siteName)) : null,
+    query(collection(firestore, 'tasks'), where('siteName', '==', siteName)),
     [firestore, siteName]
   );
   const { data: tasks } = useCollection(taskQuery);
@@ -757,7 +757,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       </div>
 
       <div className="flex-1 space-y-8 pt-6 px-0.5">
-        {/* Performance Metrics Header - Consistent for all tabs */}
+        {/* Performance Metrics Header - Persistent across all tabs */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
           <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm">
             <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">AC Capacity</p>
@@ -1486,8 +1486,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* Decision Dialogs and Modals omitted for brevity - preserved from previous version */}
     </div>
   );
 }

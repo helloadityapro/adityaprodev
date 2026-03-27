@@ -7,7 +7,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { Table as TableIcon, Search, FilterX, Clock, MapPin, User, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { 
+  Table as TableIcon, 
+  Search, 
+  FilterX, 
+  Clock, 
+  MapPin, 
+  User, 
+  ArrowDownCircle, 
+  ArrowUpCircle,
+  Calendar
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
