@@ -368,8 +368,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const { data: movements } = useCollection(movementQuery);
 
   const visitQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'site_visits'), where('siteId', '==', siteId)),
-    [firestore, siteId]
+    query(collection(firestore, 'site_visits'), where('siteId', '==', projectId)),
+    [firestore, projectId]
   );
   const { data: visits } = useCollection(visitQuery);
 
