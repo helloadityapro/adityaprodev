@@ -42,7 +42,8 @@ import {
   Navigation,
   HardHat,
   TrendingUp,
-  Fuel
+  Fuel,
+  FilterX
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
@@ -177,6 +178,8 @@ export default function PtwListPage() {
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState('all');
+  const [userFilter, setUserFilter] = React.useState('all');
+  const [siteFilter, setSiteFilter] = React.useState('all');
   const [actionState, setActionState] = React.useState<{ permit: Permit, status: 'Approved' | 'Rejected' | 'ManagerApproved' } | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
@@ -206,6 +209,13 @@ export default function PtwListPage() {
 
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
   const { data: rewardSettings } = useDoc<RewardSettings>(useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]));
+
+  // Fetch users and sites for filters (Admins only)
+  const usersQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), where('role', '==', 'Site Engineer')) : null, [firestore, isAdmin]);
+  const { data: engineers } = useCollection<{ username: string, id: string }>(usersQuery);
+
+  const sitesQuery = useMemoFirebase(() => isAdmin ? collection(firestore, 'sites') : null, [firestore, isAdmin]);
+  const { data: sites } = useCollection<{ name: string, id: string }>(sitesQuery);
 
   // Zoom logic for media preview
   React.useEffect(() => {
@@ -361,10 +371,12 @@ export default function PtwListPage() {
     return permits.filter(p => !hiddenIds.includes(p.id))
       .filter(p => {
         const matchesStatus = statusFilter === 'all' ? true : p.status === statusFilter;
+        const matchesUser = userFilter === 'all' ? true : p.siteEngineerId === userFilter;
+        const matchesSite = siteFilter === 'all' ? true : p.siteName === siteFilter;
         const matchesSearch = p.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                              p.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              p.siteEngineerName?.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesStatus && matchesSearch;
+        return matchesStatus && matchesSearch && matchesUser && matchesSite;
       })
       .sort((a, b) => {
         const { key, direction } = sortConfig;
@@ -376,7 +388,7 @@ export default function PtwListPage() {
         }
         return direction === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
       });
-  }, [permits, statusFilter, searchTerm, sortConfig, userProfile]);
+  }, [permits, statusFilter, userFilter, siteFilter, searchTerm, sortConfig, userProfile]);
 
   const stats = React.useMemo(() => {
     if (!permits) return { total: 0, pending: 0, approved: 0 };
@@ -437,9 +449,42 @@ export default function PtwListPage() {
       </div>
 
       <div className="flex flex-col gap-4 bg-card p-4 border rounded-sm shadow-sm">
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by serial or site..." className="pl-9 h-10 rounded-sm bg-muted/20 border-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        <div className="flex flex-col md:flex-row items-center gap-4 w-full">
+          <div className="relative w-full flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search by serial or site..." className="pl-9 h-10 rounded-sm bg-muted/20 border-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          </div>
+          {isAdmin && (
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+              <Select value={userFilter} onValueChange={setUserFilter}>
+                <SelectTrigger className="w-full md:w-[180px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20">
+                  <SelectValue placeholder="Filter Personnel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[10px] font-bold uppercase">All Engineers</SelectItem>
+                  {engineers?.map(eng => (
+                    <SelectItem key={eng.id} value={eng.id} className="text-[10px] font-bold uppercase">{eng.username}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={siteFilter} onValueChange={setSiteFilter}>
+                <SelectTrigger className="w-full md:w-[180px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20">
+                  <SelectValue placeholder="Filter Site" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[10px] font-bold uppercase">All Sites</SelectItem>
+                  {sites?.map(site => (
+                    <SelectItem key={site.id} value={site.name} className="text-[10px] font-bold uppercase">{site.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setStatusFilter('all'); setUserFilter('all'); setSiteFilter('all'); }} className="h-10 w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
+                <FilterX className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 no-print">
           {[
