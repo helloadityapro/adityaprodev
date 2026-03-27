@@ -307,7 +307,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       const matchesSearch = item.itemName.toLowerCase().includes(bomTableSearch.toLowerCase()) || 
                            (item.specification || "").toLowerCase().includes(bomTableSearch.toLowerCase()) ||
                            (item.category || "").toLowerCase().includes(bomTableSearch.toLowerCase());
-      const matchesStatus = bomStatusFilter === 'all' || item.status === statusFilter;
+      const matchesStatus = bomStatusFilter === 'all' || item.status === bomStatusFilter;
       const matchesCategory = bomCategoryFilter === 'all' || item.category === bomCategoryFilter;
       
       return matchesSearch && matchesStatus && matchesCategory;

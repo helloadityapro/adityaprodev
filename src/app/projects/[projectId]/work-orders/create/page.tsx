@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
@@ -111,7 +111,10 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
-  const watchedItems = form.watch('items');
+  const watchedItems = useWatch({
+    control: form.control,
+    name: "items",
+  }) || [];
 
   const totalAmount = React.useMemo(() => {
     return watchedItems.reduce((sum, item) => {
@@ -129,7 +132,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
       const rate = Number(item.rate) || 0;
       const gst = Number(item.gstPercent) || 0;
       const calculatedAmount = (qty * rate) * (1 + (gst / 100));
-      if (Math.abs(item.amount - calculatedAmount) > 0.01) {
+      if (Math.abs((item.amount || 0) - calculatedAmount) > 0.01) {
         form.setValue(`items.${index}.amount`, calculatedAmount);
       }
     });
