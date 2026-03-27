@@ -91,6 +91,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 
@@ -1243,7 +1244,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
                         return (
                           <React.Fragment key={bomItem.id}>
-                            <TableRow className="hover:bg-muted/5 group">
+                            <TableRow className="hover:bg-muted/5 transition-colors group">
                               <TableCell className="px-6 py-4">
                                 <div className="flex flex-col gap-0.5">
                                   <span className="font-bold text-sm text-foreground">{bomItem.itemName}</span>
@@ -1534,7 +1535,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
       {/* Edit BoM Dialog */}
       <Dialog open={!!editingBomItem} onOpenChange={(o) => !o && setEditingBomItem(null)}>
-        <DialogContent className="rounded-sm max-w-lg">
+        <DialogContent className="rounded-sm max-lg w-full">
           <DialogHeader>
             <DialogTitle>Edit BoM Entry</DialogTitle>
             <DialogDescription>Modify planned materials for {siteName}.</DialogDescription>
@@ -1563,8 +1564,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 <Textarea name="specification" defaultValue={editingBomItem.specification} />
               </div>
               <DialogFooter className="pt-4">
-                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                <Button type="submit" disabled={isUpdatingBom}>{isUpdatingBom ? <Loader2 className="animate-spin" /> : 'Update & Re-Submit'}</Button>
+                <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
+                <Button type="submit" className="rounded-sm font-bold" disabled={isUpdatingBom}>{isUpdatingBom ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : 'Update & Re-Submit'}</Button>
               </DialogFooter>
             </form>
           )}
