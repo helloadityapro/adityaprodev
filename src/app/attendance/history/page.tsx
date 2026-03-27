@@ -91,24 +91,27 @@ export default function AttendanceHistoryPage() {
   const attendanceQuery = useMemoFirebase(() => {
     if (!user || !userProfile || isProfileLoading) return null;
     const colRef = collection(firestore, 'attendance');
-    const { start, end } = queryDateRange;
+    const { start } = queryDateRange;
     
-    // For "Today" filter, we can do a very efficient equality query
+    // 1. "Today" filter: Equality on date works without complex indices
     if (dateFilter === 'today') {
       if (isAdmin) return query(colRef, where('date', '==', start), limit(1000));
-      // For user history, always filter by userId
       return query(colRef, where('userId', '==', user.uid), where('date', '==', start), limit(500));
     }
 
-    // For range/history, fetch broader set and refine in memory to ensure no index build-up issues
+    // 2. History filters ("7days", "custom"):
+    // We avoid combining 'where' and 'orderBy' on different fields to prevent missing index errors.
+    // Instead, we fetch the broader set and sort/filter in memory for stability.
     if (isAdmin) {
+      // Admins fetch recent global records
       return query(colRef, orderBy('checkInTime', 'desc'), limit(1000));
     }
     
+    // Individual users fetch their own history limit
+    // Removing 'orderBy' here avoids the composite index requirement (userId + checkInTime)
     return query(
       colRef,
       where('userId', '==', user.uid),
-      orderBy('checkInTime', 'desc'),
       limit(1000)
     );
   }, [firestore, user, userProfile, isAdmin, isProfileLoading, dateFilter, queryDateRange]);
@@ -168,7 +171,7 @@ export default function AttendanceHistoryPage() {
     const { start, end } = queryDateRange;
 
     const filtered = entries.filter(e => {
-      // Date Range Filter (Secondary guard)
+      // Date Range Filter (Robust string comparison for yyyy-MM-dd)
       const matchesDate = e.date >= start && e.date <= end;
       
       // Search Term Filter
@@ -178,6 +181,7 @@ export default function AttendanceHistoryPage() {
       return matchesDate && matchesSearch;
     });
 
+    // In-memory sort ensures data is always chronological regardless of Firestore index availability
     return [...filtered].sort((a, b) => {
         const dateA = a.checkInTime?.toDate?.()?.getTime() || 0;
         const dateB = b.checkInTime?.toDate?.()?.getTime() || 0;
