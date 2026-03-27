@@ -755,6 +755,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       </div>
 
       <div className="flex-1 space-y-8 pt-6 px-0.5">
+        {/* Performance Metrics Header - Consistent for all tabs */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
           <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm">
             <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">AC Capacity</p>
@@ -798,34 +799,64 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <ScrollArea className="w-full">
             <TabsList className="flex w-max min-w-full rounded-sm bg-muted/50 border border-primary/10 p-1 h-11">
-              <TabsTrigger value="dashboard" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <TabsTrigger 
+                value="dashboard" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
                 <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" /> Board
               </TabsTrigger>
-              <TabsTrigger value="bom" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <TabsTrigger 
+                value="bom" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
                 <ClipboardList className="h-3.5 w-3.5 mr-1.5" /> BoM
               </TabsTrigger>
-              <TabsTrigger value="inventory" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <TabsTrigger 
+                value="inventory" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
                 <Warehouse className="h-3.5 w-3.5 mr-1.5" /> Stock
               </TabsTrigger>
-              <TabsTrigger value="po" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <TabsTrigger 
+                value="po" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
                 <ShoppingBag className="h-3.5 w-3.5 mr-1.5" /> Purchase Orders
               </TabsTrigger>
-              <TabsTrigger value="wo" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <TabsTrigger 
+                value="wo" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
                 <Gavel className="h-3.5 w-3.5 mr-1.5" /> Work Orders
               </TabsTrigger>
-              <TabsTrigger value="ptw" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <TabsTrigger 
+                value="ptw" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
                 <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Permits
               </TabsTrigger>
-              <TabsTrigger value="dpr" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <TabsTrigger 
+                value="dpr" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
                 <TableIcon className="h-3.5 w-3.5 mr-1.5" /> DPR
               </TabsTrigger>
-              <TabsTrigger value="logistics" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <TabsTrigger 
+                value="logistics" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
                 <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" /> Logistics
               </TabsTrigger>
-              <TabsTrigger value="tasks" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <TabsTrigger 
+                value="tasks" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
                 <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> Tasks
               </TabsTrigger>
-              <TabsTrigger value="visits" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9">
+              <TabsTrigger 
+                value="visits" 
+                className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+              >
                 <Navigation className="h-3.5 w-3.5 mr-1.5" /> Visits
               </TabsTrigger>
             </TabsList>
@@ -1438,6 +1469,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </Tabs>
       </div>
 
+      {/* PO Details Modal */}
       <Dialog open={!!viewingPO} onOpenChange={(o) => !o && setViewingPO(null)}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]"><DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0"><div className="flex items-center gap-3"><div className="bg-primary/10 p-2 rounded-sm"><ShoppingBag className="h-5 w-5 text-primary" /></div><div><DialogTitle className="text-xl font-black uppercase tracking-tight">Purchase Order Audit</DialogTitle><DialogDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{viewingPO?.poNumber}</DialogDescription></div></div><div className="no-print"><Button variant="outline" size="sm" onClick={() => window.print()} className="rounded-sm h-9 border-primary/20 text-primary"><Printer className="h-4 w-4 mr-2" /> Print PO</Button></div></DialogHeader><ScrollArea className="flex-1 bg-background">{viewingPO && (<div className="p-8 space-y-10" id="printable-po-area"><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div className="space-y-6"><div className="grid grid-cols-2 gap-4"><div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Supplier / Vendor</Label><p className="text-sm font-black text-foreground">{viewingPO.supplierName}</p></div><div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Order Date</Label><p className="text-sm font-bold">{viewingPO.orderDate}</p></div></div><div className="grid grid-cols-2 gap-4"><div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Authorized By</Label><p className="text-sm font-bold">{viewingPO.createdByName || 'N/A'}</p></div><div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Status</Label><div className="mt-1"><Badge className="rounded-sm h-5 text-[9px] uppercase font-black">{viewingPO.status}</Badge></div></div></div></div><div className="bg-primary/5 rounded-sm border-2 border-primary/10 p-6 flex flex-col justify-center items-center text-center shadow-inner"><span className="text-[10px] font-black uppercase text-primary tracking-widest mb-2">Total PO Value</span><span className="text-4xl font-black tabular-nums text-primary">₹{viewingPO.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div><div className="space-y-4"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><History className="h-4 w-4 text-primary" /> Itemized Line Items</Label><div className="border rounded-sm overflow-hidden bg-muted/10"><Table><TableHeader className="bg-muted/30"><TableRow><TableHead className="text-[10px] font-black uppercase px-4">Material Description</TableHead><TableHead className="text-[10px] font-black uppercase text-center">Qty</TableHead><TableHead className="text-[10px] font-black uppercase text-right">Rate (₹)</TableHead><TableHead className="text-[10px] font-black uppercase text-center">GST %</TableHead><TableHead className="text-right px-4 text-[10px] font-black uppercase">Line Total (₹)</TableHead></TableRow></TableHeader><TableBody>{viewingPO.items.map((item, idx) => (<TableRow key={idx} className="bg-background"><TableCell className="px-4 text-xs font-bold">{item.itemName}</TableCell><TableCell className="text-center font-mono font-bold text-xs">{item.quantity}</TableCell><TableCell className="text-right font-mono text-xs">₹{item.rate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell><TableCell className="text-center text-xs font-medium">{item.gstPercent}%</TableCell><TableCell className="text-right px-4 font-mono text-xs font-black text-primary">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell></TableRow>))}</TableBody></Table></div></div></div>)}</ScrollArea><DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 no-print"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose></DialogFooter></DialogContent>
       </Dialog>
