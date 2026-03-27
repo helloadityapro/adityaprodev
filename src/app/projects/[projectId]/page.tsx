@@ -180,7 +180,7 @@ type POSortKey = 'poNumber' | 'supplier' | 'status' | 'date' | 'total';
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
   const date = ts.toDate ? ts.toDate() : new Date(ts);
-  return format(date, 'dd MMM yyyy HH:mm');
+  return format(date, 'dd/MM/yyyy HH:mm');
 };
 
 const formatCapacity = (val: any) => {
@@ -1160,7 +1160,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead>Type</TableHead>
                         <TableHead>Engineer</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Date</TableHead>
+                        <TableHead>Date & Time</TableHead>
                         <TableHead className="text-right px-6">Action</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1180,7 +1180,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               {permit.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{formatTimestamp(permit.requestDate).split(' ')[0]}</TableCell>
+                          <TableCell className="text-[10px] font-bold text-muted-foreground uppercase whitespace-nowrap">
+                            {formatTimestamp(permit.requestDate)}
+                          </TableCell>
                           <TableCell className="text-right px-6">
                             <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm">
                               <Link href={`/ptw/list?view=${permit.id}`} title="View Permit Audit Log"><Eye className="h-4 w-4" /></Link>
