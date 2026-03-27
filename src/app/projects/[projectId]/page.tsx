@@ -194,6 +194,7 @@ type MasterItem = {
 
 type SortKey = 'engineer' | 'manager' | 'sites';
 type POSortKey = 'poNumber' | 'supplier' | 'status' | 'date' | 'total';
+type BoMSortKey = 'itemName' | 'category' | 'status' | 'plannedQuantity' | 'approvedQuantity';
 
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
@@ -223,6 +224,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       setActiveTab(tabParam);
     }
   }, [tabParam]);
+
+  // BoM Filtering/Searching States
+  const [bomTableSearch, setBomTableSearch] = React.useState("");
+  const [bomStatusFilter, setBomStatusFilter] = React.useState("all");
+  const [bomCategoryFilter, setBomCategoryFilter] = React.useState("all");
+  const [bomSortConfig, setBomSortConfig] = React.useState<{ key: BoMSortKey; direction: 'asc' | 'desc' }>({ key: 'itemName', direction: 'asc' });
 
   const [selectedMasterItem, setSelectedMasterItem] = React.useState<MasterItem | null>(null);
   const [isBomItemPopoverOpen, setIsBomItemPopoverOpen] = React.useState(false);
@@ -257,6 +264,41 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     [firestore, projectId]
   );
   const { data: bomItems } = useCollection<BoMItem>(bomQuery);
+
+  const filteredSortedBomItems = React.useMemo(() => {
+    if (!bomItems) return [];
+    
+    let result = bomItems.filter(item => {
+      const matchesSearch = item.itemName.toLowerCase().includes(bomTableSearch.toLowerCase()) || 
+                           (item.specification || "").toLowerCase().includes(bomTableSearch.toLowerCase()) ||
+                           (item.category || "").toLowerCase().includes(bomTableSearch.toLowerCase());
+      const matchesStatus = bomStatusFilter === 'all' || item.status === bomStatusFilter;
+      const matchesCategory = bomCategoryFilter === 'all' || item.category === bomCategoryFilter;
+      
+      return matchesSearch && matchesStatus && matchesCategory;
+    });
+
+    result.sort((a, b) => {
+      const { key, direction } = bomSortConfig;
+      let valA: any = a[key] ?? '';
+      let valB: any = b[key] ?? '';
+      
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [bomItems, bomTableSearch, bomStatusFilter, bomCategoryFilter, bomSortConfig]);
+
+  const bomCategories = React.useMemo(() => {
+    if (!bomItems) return [];
+    const cats = new Set(bomItems.map(item => item.category).filter(Boolean));
+    return Array.from(cats).sort();
+  }, [bomItems]);
 
   const posQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_pos'), where('siteId', '==', projectId)), 
@@ -379,6 +421,18 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const POSortIcon = ({ column }: { column: POSortKey }) => {
     if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
     return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
+
+  const handleBoMSort = (key: BoMSortKey) => {
+    setBomSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const BoMSortIcon = ({ column }: { column: BoMSortKey }) => {
+    if (bomSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    return bomSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
 
   const handleAddBoM = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -867,22 +921,74 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             )}
 
+            {/* BoM Search and Filter Bar */}
+            <div className="flex flex-col md:flex-row items-center gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm mb-6">
+              <div className="relative w-full flex-1">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search BoM items..." 
+                  className="pl-9 h-10 rounded-sm bg-muted/20 border-none" 
+                  value={bomTableSearch} 
+                  onChange={e => setBomTableSearch(e.target.value)} 
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <Select value={bomStatusFilter} onValueChange={setBomStatusFilter}>
+                  <SelectTrigger className="w-[140px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
+                    <SelectItem value="Pending" className="text-xs font-bold uppercase">Pending</SelectItem>
+                    <SelectItem value="Approved" className="text-xs font-bold uppercase text-green-600">Approved</SelectItem>
+                    <SelectItem value="Rejected" className="text-xs font-bold uppercase text-red-600">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={bomCategoryFilter} onValueChange={setBomCategoryFilter}>
+                  <SelectTrigger className="w-[140px] h-10 text-[10px] font-bold uppercase rounded-sm border-primary/20">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-xs font-bold uppercase">All Categories</SelectItem>
+                    {bomCategories.map(cat => (
+                      <SelectItem key={cat} value={cat} className="text-xs font-bold uppercase">{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button variant="ghost" size="icon" onClick={() => { setBomTableSearch(""); setBomStatusFilter("all"); setBomCategoryFilter("all"); }} className="h-10 w-10 text-muted-foreground rounded-sm">
+                  <FilterX className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-muted/30">
                       <TableRow>
-                        <TableHead className="px-6">Description</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-center">Required Qty</TableHead>
-                        <TableHead className="text-center">Approved Qty</TableHead>
+                        <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleBoMSort('itemName')}>
+                          <div className="flex items-center">Description <BoMSortIcon column="itemName" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleBoMSort('category')}>
+                          <div className="flex items-center">Category <BoMSortIcon column="category" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleBoMSort('status')}>
+                          <div className="flex items-center">Status <BoMSortIcon column="status" /></div>
+                        </TableHead>
+                        <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleBoMSort('plannedQuantity')}>
+                          <div className="flex items-center justify-center">Required Qty <BoMSortIcon column="plannedQuantity" /></div>
+                        </TableHead>
+                        <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleBoMSort('approvedQuantity')}>
+                          <div className="flex items-center justify-center">Approved Qty <BoMSortIcon column="approvedQuantity" /></div>
+                        </TableHead>
                         <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {bomItems && bomItems.length > 0 ? bomItems.map(item => (
+                      {filteredSortedBomItems.length > 0 ? filteredSortedBomItems.map(item => (
                         <React.Fragment key={item.id}>
                           <TableRow className="hover:bg-muted/5 transition-colors group">
                             <TableCell className="px-6 py-4">
@@ -988,7 +1094,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           )}
                         </React.Fragment>
                       )) : (
-                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">Registry empty.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No records found matching filters.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
