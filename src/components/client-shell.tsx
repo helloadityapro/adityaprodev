@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -183,15 +184,17 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     const colRef = collection(firestore, 'permits_to_work');
     
     if (userRole === 'Admin') {
-      return query(colRef, where('status', '==', 'Pending'));
+      // Admins act on permits already approved by Managers
+      return query(colRef, where('status', '==', 'ManagerApproved'));
     }
     
     if (userRole === 'Site Manager') {
+      // Managers act on permits pending initial review
       return query(
         colRef, 
         and(
           where('status', '==', 'Pending'),
-          or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid))
+          where('siteManagerId', '==', user.uid)
         )
       );
     }

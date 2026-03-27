@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react"
@@ -303,8 +304,8 @@ export default function RaisePtwPage() {
         newAttachments.push(attachment);
       }
       
-      const isEngineerRole = userProfile.role === 'Site Engineer';
-      const targetStatus = isEngineerRole ? "Pending" : "ManagerApproved";
+      // Strict flow: Site Engineer (Pending) -> Site Manager (ManagerApproved) -> Admin (Approved)
+      const targetStatus = (userProfile.role === 'Site Engineer' || isCorrectionMode) ? "Pending" : "ManagerApproved";
 
       const timelineEntry = {
         status: targetStatus,

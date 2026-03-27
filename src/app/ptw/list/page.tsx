@@ -118,10 +118,10 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
       className: 'bg-yellow-50 text-yellow-700 border-yellow-200' 
     },
     ManagerApproved: { 
-      label: 'Pending Admin', 
+      label: 'Forwarded to Admin', 
       className: 'bg-blue-50 text-blue-700 border-blue-200' 
     },
-    Approved: { label: 'Approved', className: 'bg-green-50 text-green-700 border-green-200' },
+    Approved: { label: 'Final Approved', className: 'bg-green-50 text-green-700 border-green-200' },
     Rejected: { label: 'Rejected', className: 'bg-red-50 text-red-700 border-red-200' },
   };
   const config = (statusConfig as any)[permit.status] || statusConfig.Pending;
@@ -852,7 +852,7 @@ export default function PtwListPage() {
           <DialogFooter className="p-3 sm:p-4 bg-muted/5 border-t gap-2 sm:gap-3 shrink-0 no-print">
             {detailsPermit && detailsPermit.status !== 'Approved' && detailsPermit.status !== 'Rejected' && (
               <>
-                {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || isAdmin) && (
+                {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || (isAdmin && (detailsPermit.status === 'ManagerApproved' || detailsPermit.status === 'Pending'))) && (
                   <div className="flex-1 flex gap-2">
                     <Button className="flex-1 h-10 sm:h-12 rounded-sm font-bold text-[10px] sm:text-xs bg-green-600 hover:bg-green-700 text-white shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>
                       Approve
