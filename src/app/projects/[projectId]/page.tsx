@@ -1220,7 +1220,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
               <CardHeader className="bg-muted/5 border-b py-4">
                 <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" /> On-Site Inventory Registry</CardTitle>
-                <CardDescription>Comprehensive tracking of authorized materials and their current stock levels.</CardDescription>
+                <CardDescription>Strictly showing items tracked through formal Material Movement Logs.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -1236,52 +1236,52 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {bomItems?.filter(i => i.status === 'Approved').map(bomItem => {
-                        const invRecord = inventory?.find(inv => inv.itemName === bomItem.itemName);
-                        const pos = purchaseOrders?.filter(po => po.items.some(pi => pi.bomItemId === bomItem.id)) || [];
+                      {inventory && inventory.length > 0 ? inventory.map(invRecord => {
+                        const bomItem = bomItems?.find(i => i.itemName === invRecord.itemName && i.status === 'Approved');
+                        const pos = purchaseOrders?.filter(po => po.items.some(pi => pi.itemName === invRecord.itemName)) || [];
                         const suppliers = Array.from(new Set(pos.map(p => p.supplierName))).join(', ') || '—';
-                        const itemMovements = movements?.filter(m => m.itemName === bomItem.itemName) || [];
+                        const itemMovements = movements?.filter(m => m.itemName === invRecord.itemName) || [];
 
                         return (
-                          <React.Fragment key={bomItem.id}>
+                          <React.Fragment key={invRecord.id}>
                             <TableRow className="hover:bg-muted/5 transition-colors group">
                               <TableCell className="px-6 py-4">
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="font-bold text-sm text-foreground">{bomItem.itemName}</span>
-                                  <span className="text-[10px] text-muted-foreground line-clamp-1">{bomItem.specification}</span>
+                                  <span className="font-bold text-sm text-foreground">{invRecord.itemName}</span>
+                                  <span className="text-[10px] text-muted-foreground line-clamp-1">{bomItem?.specification || 'Site Allocated Asset'}</span>
                                 </div>
                               </TableCell>
                               <TableCell>
                                 <Badge variant="secondary" className="rounded-sm text-[9px] font-black uppercase bg-primary/5 text-primary border-primary/10">
-                                  {bomItem.make || masterItems?.find(m => m.name === bomItem.itemName)?.make || 'Standard'}
+                                  {bomItem?.make || 'Standard'}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-xs font-medium text-muted-foreground truncate max-w-[150px]" title={suppliers}>{suppliers}</TableCell>
                               <TableCell className="text-center">
-                                <div className="font-mono font-bold text-sm text-foreground">{bomItem.approvedQuantity || bomItem.plannedQuantity}</div>
-                                <div className="text-[10px] text-muted-foreground uppercase font-medium">{bomItem.unit}</div>
+                                <div className="font-mono font-bold text-sm text-foreground">{bomItem ? (bomItem.approvedQuantity || bomItem.plannedQuantity) : '—'}</div>
+                                <div className="text-[10px] text-muted-foreground uppercase font-medium">{invRecord.unit}</div>
                               </TableCell>
                               <TableCell className="text-center">
                                 <Badge className={cn(
                                   "font-mono font-bold rounded-sm px-3 h-7 border-none shadow-sm",
-                                  (invRecord?.stockLevel || 0) > 0 ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
+                                  invRecord.stockLevel > 0 ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
                                 )}>
-                                  {invRecord?.stockLevel || 0} {bomItem.unit}
+                                  {invRecord.stockLevel} {invRecord.unit}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right px-6">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => toggleInvRow(bomItem.id)}>
-                                  {expandedInvRows.has(bomItem.id) ? <ChevronUp className="h-4 w-4" /> : <History className="h-4 w-4" />}
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => toggleInvRow(invRecord.id)}>
+                                  {expandedInvRows.has(invRecord.id) ? <ChevronUp className="h-4 w-4" /> : <History className="h-4 w-4" />}
                                 </Button>
                               </TableCell>
                             </TableRow>
-                            {expandedInvRows.has(bomItem.id) && (
+                            {expandedInvRows.has(invRecord.id) && (
                               <TableRow className="bg-primary/[0.01]">
                                 <TableCell colSpan={6} className="p-0 border-b">
                                   <div className="p-6 px-12 animate-in slide-in-from-top-1 duration-200">
                                     <div className="flex items-center gap-2 mb-4">
                                       <History className="h-3.5 w-3.5 text-primary" />
-                                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Movement History: {bomItem.itemName}</span>
+                                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Movement History: {invRecord.itemName}</span>
                                     </div>
                                     {itemMovements.length > 0 ? (
                                       <div className="grid gap-2">
@@ -1315,11 +1315,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             )}
                           </React.Fragment>
                         );
-                      })}
-                      {(!bomItems || bomItems.filter(i => i.status === 'Approved').length === 0) && (
+                      }) : (
                         <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic flex flex-col items-center justify-center gap-3">
                           <Package className="h-10 w-10 opacity-20" />
-                          <p className="text-sm font-bold uppercase tracking-widest">No Approved BoM Items Discovered</p>
+                          <p className="text-sm font-bold uppercase tracking-widest">No site movements recorded yet</p>
                         </TableCell></TableRow>
                       )}
                     </TableBody>
