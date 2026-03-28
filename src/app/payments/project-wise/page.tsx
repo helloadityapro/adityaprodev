@@ -25,7 +25,8 @@ import {
   History,
   Eye,
   User,
-  Clock
+  Clock,
+  IndianRupee
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -225,7 +226,7 @@ export default function ProjectWisePaymentsPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-2 text-primary font-black"><Building2 className="h-8 w-8" /> Project-wise Payments</h1>
+        <h1 className="flex items-center gap-2 text-primary font-black"><IndianRupee className="h-8 w-8" /> Project-wise Payments</h1>
         <p className="text-muted-foreground font-medium">Audit historical disbursements filtered by project location.</p>
       </div>
 
@@ -490,7 +491,7 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
 
   return (
     <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
         <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
         <Icon className="h-4 w-4" />
       </CardHeader>

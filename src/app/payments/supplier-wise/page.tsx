@@ -25,7 +25,8 @@ import {
   Loader2,
   History,
   User,
-  Clock
+  Clock,
+  IndianRupee
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -219,7 +220,7 @@ export default function SupplierWisePaymentsPage() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-2 font-black text-primary"><Truck className="h-8 w-8" /> Supplier-wise Payments</h1>
+        <h1 className="flex items-center gap-2 font-black text-primary"><IndianRupee className="h-8 w-8" /> Supplier-wise Payments</h1>
         <p className="text-muted-foreground font-medium">Review disbursement logs associated with material vendors.</p>
       </div>
 
@@ -399,7 +400,7 @@ export default function SupplierWisePaymentsPage() {
               </div>
               <DialogFooter className="pt-4 gap-2">
                 <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-11 flex-1">Cancel</Button></DialogClose>
-                <Button type="submit" disabled={isProcessing} className="rounded-sm font-black uppercase text-[10px] h-11 flex-1 shadow-lg">
+                <Button type="submit" className="flex-1 h-11 rounded-sm font-black uppercase text-[10px] h-11 flex-1 shadow-lg" disabled={isProcessing}>
                   {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
                 </Button>
               </DialogFooter>

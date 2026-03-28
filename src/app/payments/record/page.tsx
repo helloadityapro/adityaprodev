@@ -36,7 +36,8 @@ import {
   ShieldCheck,
   HardHat,
   ShoppingBag,
-  Send
+  Send,
+  IndianRupee
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -235,7 +236,7 @@ export default function RecordPaymentPage() {
     <div className="space-y-8 max-w-4xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2 text-primary">
-          <HandCoins className="h-8 w-8" /> Record Payment
+          <IndianRupee className="h-8 w-8" /> Record Payment
         </h1>
         <p className="text-muted-foreground font-medium">Log organizational disbursements against active purchase or work orders.</p>
       </div>
@@ -254,7 +255,7 @@ export default function RecordPaymentPage() {
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant="outline" role="combobox" className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>
+                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>
                             {field.value ? sites?.find(s => s.id === field.value)?.name : "Choose site..."}
                             <Building2 className="ml-2 h-4 w-4 opacity-50" />
                           </Button>

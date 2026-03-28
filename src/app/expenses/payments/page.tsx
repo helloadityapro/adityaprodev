@@ -22,10 +22,11 @@ import {
   User as UserIcon, 
   Building2, 
   CheckCircle2, 
-  ArrowRight,
+  ArrowRight, 
   Loader2,
   Calendar,
-  Send
+  Send,
+  IndianRupee
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -149,7 +150,7 @@ export default function AccountPaymentsPage() {
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2">
-          <Landmark className="h-8 w-8 text-primary" /> Payment Disbursement
+          <IndianRupee className="h-8 w-8 text-primary" /> Payment Disbursement
         </h1>
         <p className="text-muted-foreground text-sm font-medium">Record and track organizational reimbursements for approved reports.</p>
       </div>

@@ -47,7 +47,8 @@ import {
   Fuel,
   Plus,
   Settings2,
-  Tag
+  Tag,
+  IndianRupee
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -317,7 +318,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton tooltip="Payments" isActive={pathname.startsWith('/payments')} className="rounded-sm">
-                    <HandCoins className="h-4 w-4 text-primary" />
+                    <IndianRupee className="h-4 w-4 text-primary" />
                     <span className="font-medium">Payments</span>
                     <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                   </SidebarMenuButton>
@@ -554,7 +555,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                         <span>Trips</span>
                       </Link>
                     </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
+                  </SidebarMenuSub>
                 </SidebarMenuSub>
               </CollapsibleContent>
             </SidebarMenuItem>
@@ -587,7 +588,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                         <span>Attendance History</span>
                       </Link>
                     </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
+                  </SidebarMenuSub>
                 </SidebarMenuSub>
               </CollapsibleContent>
             </SidebarMenuItem>

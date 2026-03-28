@@ -58,7 +58,8 @@ import {
   HandCoins,
   ExternalLink,
   CreditCard,
-  Wallet
+  Wallet,
+  IndianRupee
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -877,7 +878,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 <Gavel className="h-3.5 w-3.5 mr-1.5" /> WORK ORDERS
               </TabsTrigger>
               <TabsTrigger value="payments" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <HandCoins className="h-3.5 w-3.5 mr-1.5" /> PAYMENTS
+                <IndianRupee className="h-3.5 w-3.5 mr-1.5" /> PAYMENTS
               </TabsTrigger>
               <TabsTrigger value="inventory" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <Warehouse className="h-3.5 w-3.5 mr-1.5" /> INVENTORY
@@ -1310,7 +1311,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
               <CardHeader className="bg-muted/5 border-b py-4">
                 <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                  <HandCoins className="h-4 w-4 text-primary" /> Project Disbursements
+                  <IndianRupee className="h-4 w-4 text-primary" /> Project Disbursements
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
@@ -1657,9 +1658,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       {/* Detail Dialog for Payments */}
       <Dialog open={!!viewingPayment} onOpenChange={(o) => !o && setViewingPayment(null)}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-2 rounded-sm"><Wallet className="h-5 w-5 text-primary" /></div>
+              <div className="bg-primary/10 p-2 rounded-sm"><IndianRupee className="h-5 w-5 text-primary" /></div>
               <div>
                 <DialogTitle className="text-xl font-black uppercase tracking-tight">Payment Audit Log</DialogTitle>
                 <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Ref: {viewingPayment?.referenceNumber}</DialogDescription>
