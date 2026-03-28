@@ -47,6 +47,7 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { format, parse } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const stopSchema = z.object({
   type: z.enum(['Site', 'Other'], { required_error: 'Please select a stop type.' }),
@@ -83,13 +84,14 @@ type UserProfile = {
   assignedProjectIds?: string[];
 };
 
-const formatTo12Hr = (time24?: string) => {
-  if (!time24) return '';
+const formatTo12Hr = (time?: string) => {
+  if (!time) return '';
+  if (time.toLowerCase().includes('am') || time.toLowerCase().includes('pm')) return time;
   try {
-    const date = parse(time24, 'HH:mm', new Date());
+    const date = parse(time, 'HH:mm', new Date());
     return format(date, 'hh:mm a');
   } catch (e) {
-    return time24;
+    return time;
   }
 };
 
@@ -160,7 +162,7 @@ export default function RequestVehiclePage() {
       pickupType: 'Site',
       pickupLocation: '',
       tripDate: format(new Date(), 'yyyy-MM-dd'),
-      reportingTime: '',
+      reportingTime: '09:00 AM',
       intermediateStops: [],
       dropType: 'Site',
       dropLocation: '',
@@ -380,9 +382,39 @@ export default function RequestVehiclePage() {
                       <FormItem>
                         <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Driver Reporting Time (12h)</FormLabel>
                         <FormControl>
-                          <div className="relative">
-                            <Input type="time" {...field} className="h-11 rounded-sm" />
-                            <Clock className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          <div className="flex gap-2">
+                            <Select 
+                              value={field.value?.split(':')[0] || "09"} 
+                              onValueChange={(h) => field.onChange(`${h}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${field.value?.split(' ')[1] || "AM"}`)}
+                            >
+                              <SelectTrigger className="h-11 rounded-sm w-[70px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0')).map(h => (
+                                  <SelectItem key={h} value={h}>{h}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select 
+                              value={field.value?.split(':')[1]?.split(' ')[0] || "00"} 
+                              onValueChange={(m) => field.onChange(`${field.value?.split(':')[0] || "09"}:${m} ${field.value?.split(' ')[1] || "AM"}`)}
+                            >
+                              <SelectTrigger className="h-11 rounded-sm w-[70px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {["00", "15", "30", "45"].map(m => (
+                                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select 
+                              value={field.value?.split(' ')[1] || "AM"} 
+                              onValueChange={(p) => field.onChange(`${field.value?.split(' ')[0] || "09"}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${p}`)}
+                            >
+                              <SelectTrigger className="h-11 rounded-sm w-[80px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="AM">AM</SelectItem>
+                                <SelectItem value="PM">PM</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                         </FormControl>
                         <FormMessage />
