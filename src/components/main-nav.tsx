@@ -119,32 +119,33 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
 
-      {/* Projects Section */}
+      {/* Operations Section */}
       <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Projects</SidebarGroupLabel>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Operations</SidebarGroupLabel>
         <SidebarMenu>
-          <Collapsible asChild defaultOpen={pathname.startsWith('/projects')} className="group/collapsible">
-            <SidebarMenuItem>
-              <CollapsibleTrigger asChild>
-                <SidebarMenuButton tooltip="Projects" isActive={pathname.startsWith('/projects')} className="rounded-sm">
-                  <Briefcase className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Projects</span>
-                  <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                </SidebarMenuButton>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarMenuSub>
-                  {isAdmin && (
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/projects/add'} onClick={handleMobileClose}>
-                        <Link href="/projects/add">
-                          <Plus className="h-4 w-4" />
-                          <span>Add New Project</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  )}
-                  {!isDriver && (
+          {/* Projects Sub-Section */}
+          {!isDriver && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/projects')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Projects" isActive={pathname.startsWith('/projects')} className="rounded-sm">
+                    <Briefcase className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Projects</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {isAdmin && (
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/projects/add'} onClick={handleMobileClose}>
+                          <Link href="/projects/add">
+                            <Plus className="h-4 w-4" />
+                            <span>Add New Project</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    )}
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname === '/projects/list'} onClick={handleMobileClose}>
                         <Link href="/projects/list">
@@ -153,18 +154,13 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
-                  )}
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </SidebarMenuItem>
-          </Collapsible>
-        </SidebarMenu>
-      </SidebarGroup>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
 
-      {/* Operations Section */}
-      <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Operations</SidebarGroupLabel>
-        <SidebarMenu>
+          {/* Inventory Sub-Section */}
           {!isDriver && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/inventory')} className="group/collapsible">
               <SidebarMenuItem>
@@ -207,6 +203,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </Collapsible>
           )}
 
+          {/* PO Sub-Section */}
           {!isDriver && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/purchase-orders')} className="group/collapsible">
               <SidebarMenuItem>
@@ -249,6 +246,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </Collapsible>
           )}
 
+          {/* WO Sub-Section */}
           {!isDriver && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/work-orders')} className="group/collapsible">
               <SidebarMenuItem>
@@ -291,6 +289,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </Collapsible>
           )}
 
+          {/* Payments Sub-Section */}
           {!isDriver && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/payments')} className="group/collapsible">
               <SidebarMenuItem>
@@ -341,6 +340,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </Collapsible>
           )}
 
+          {/* DPR Sub-Section */}
           {!isDriver && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/dpr')} className="group/collapsible">
               <SidebarMenuItem>
@@ -375,6 +375,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </Collapsible>
           )}
 
+          {/* Tasks Sub-Section */}
           {!isDriver && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/tasks')} className="group/collapsible">
               <SidebarMenuItem>
@@ -409,6 +410,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </Collapsible>
           )}
 
+          {/* Permits Sub-Section */}
           {!isDriver && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/ptw')} className="group/collapsible">
               <SidebarMenuItem>
@@ -458,6 +460,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </Collapsible>
           )}
 
+          {/* Visits Sub-Section */}
           {!isDriver && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/site-visits')} className="group/collapsible">
               <SidebarMenuItem>
@@ -499,13 +502,8 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </SidebarMenuItem>
             </Collapsible>
           )}
-        </SidebarMenu>
-      </SidebarGroup>
 
-      {/* Logistics & Fleet */}
-      <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Logistics & Fleet</SidebarGroupLabel>
-        <SidebarMenu>
+          {/* Vehicles Sub-Section (Logistics & Fleet) */}
           <Collapsible asChild defaultOpen={pathname.startsWith('/vehicles')} className="group/collapsible">
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
@@ -539,13 +537,8 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </CollapsibleContent>
             </SidebarMenuItem>
           </Collapsible>
-        </SidebarMenu>
-      </SidebarGroup>
 
-      {/* Attendance Group */}
-      <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Attendance</SidebarGroupLabel>
-        <SidebarMenu>
+          {/* Attendance Sub-Section */}
           <Collapsible asChild defaultOpen={pathname.startsWith('/attendance')} className="group/collapsible">
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
