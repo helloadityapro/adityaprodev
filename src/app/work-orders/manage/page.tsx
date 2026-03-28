@@ -26,7 +26,8 @@ import {
   ChevronUp, 
   Layers,
   FileDown,
-  Plus
+  Plus,
+  Pencil
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -97,6 +98,7 @@ export default function GlobalManageWOsPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const wosQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
@@ -297,6 +299,13 @@ export default function GlobalManageWOsPage() {
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => router.push(`/projects/${wo.siteId}?tab=wo`)}>
                             <Eye className="h-4 w-4" />
                           </Button>
+                          {(isAdmin || isManager) && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
+                              <Link href={`/projects/${wo.siteId}/work-orders/${wo.id}/edit`}>
+                                <Pencil className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          )}
                           {isAdmin && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}>
                               <Trash2 className="h-4 w-4" />
