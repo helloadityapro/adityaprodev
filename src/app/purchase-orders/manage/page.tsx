@@ -26,7 +26,8 @@ import {
   ChevronUp, 
   Layers,
   FileDown,
-  Plus
+  Plus,
+  Pencil
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -55,6 +56,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 type POItem = {
   itemName: string;
@@ -96,7 +98,9 @@ export default function GlobalManagePOsPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+  
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const posQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
@@ -294,9 +298,16 @@ export default function GlobalManagePOsPage() {
                       </TableCell>
                       <TableCell className="text-right px-6">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => router.push(`/projects/${po.siteId}?tab=po`)}>
-                            <Eye className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
+                            <Link href={`/projects/${po.siteId}?tab=po`}><Eye className="h-4 w-4" /></Link>
                           </Button>
+                          {(isAdmin || isManager) && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
+                              <Link href={`/projects/${po.siteId}/procurement/${po.id}/edit`}>
+                                <Pencil className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          )}
                           {isAdmin && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}>
                               <Trash2 className="h-4 w-4" />
@@ -355,7 +366,7 @@ export default function GlobalManagePOsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeletePO} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm">Confirm Delete</AlertDialogAction>
+            <AlertDialogAction onClick={handleDeletePO} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-bold">Confirm Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
