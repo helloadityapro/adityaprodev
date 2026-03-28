@@ -15,6 +15,7 @@ import {
   Coins, 
   History,
   User,
+  Users,
   ExternalLink,
   Building2,
   Phone,
@@ -102,30 +103,9 @@ export default function SupplierSummaryPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-primary/5 border-primary/10 rounded-sm">
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Total Partners</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-black">{suppliers?.length || 0}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-emerald-500/5 border-emerald-500/10 rounded-sm">
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">Active Suppliers</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-2xl font-black text-emerald-700">{aggregateStats.activeSuppliers}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-primary/10 border-primary/20 rounded-sm md:col-span-2">
-          <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-primary tracking-widest">Aggregate Procurement Volume</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-3xl font-black text-primary tabular-nums">₹{aggregateStats.totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-          </CardContent>
-        </Card>
+        <SummaryCard title="Total Partners" value={suppliers?.length || 0} icon={Users} color="primary" />
+        <SummaryCard title="Active Suppliers" value={aggregateStats.activeSuppliers} icon={Truck} color="emerald" />
+        <SummaryCard title="Aggregate Procurement Volume" value={aggregateStats.totalValue} icon={TrendingUp} isCurrency color="primary" span={2} />
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
@@ -200,5 +180,26 @@ export default function SupplierSummaryPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SummaryCard({ title, value, icon: Icon, color, isCurrency, span = 1 }: { title: string, value: number, icon: any, color: 'primary' | 'emerald', isCurrency?: boolean, span?: number }) {
+  const colors = {
+    primary: "bg-primary/5 border-primary/10 text-primary",
+    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+  };
+
+  return (
+    <Card className={cn("rounded-sm border shadow-sm", colors[color], span > 1 && "md:col-span-2")}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
+        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-4 w-4" />
+      </CardHeader>
+      <CardContent className="p-4 pt-0">
+        <div className={cn("font-black tabular-nums", span > 1 ? "text-3xl" : "text-2xl")}>
+          {isCurrency ? `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : value}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
