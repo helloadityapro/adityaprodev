@@ -43,7 +43,8 @@ import {
   Table as TableIcon,
   ArrowLeftRight,
   UserPlus,
-  Activity
+  Activity,
+  Fuel
 } from "lucide-react"
 import {
   SidebarMenu,
