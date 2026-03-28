@@ -68,7 +68,7 @@ type Payment = {
 
 type Contractor = { id: string; name: string; gstin: string };
 type Site = { id: string; name: string };
-type SortKey = 'date' | 'reference' | 'site' | 'company' | 'amount' | 'type' | 'mode';
+type SortKey = 'date' | 'reference' | 'site' | 'company' | 'amount' | 'type' | 'mode' | 'payee';
 
 export default function ContractorWisePaymentsPage() {
   const firestore = useFirestore();
@@ -137,6 +137,7 @@ export default function ContractorWisePaymentsPage() {
       else if (key === 'reference') { valA = a.referenceNumber; valB = b.referenceNumber; }
       else if (key === 'site') { valA = a.siteName; valB = b.siteName; }
       else if (key === 'company') { valA = a.projectCompany || ''; valB = b.projectCompany || ''; }
+      else if (key === 'payee') { valA = a.payeeName; valB = b.payeeName; }
       else if (key === 'amount') { valA = a.amount; valB = b.amount; }
       else if (key === 'type') { valA = a.paymentType; valB = b.paymentType; }
       else if (key === 'mode') { valA = a.paymentMode; valB = b.paymentMode; }
@@ -283,6 +284,9 @@ export default function ContractorWisePaymentsPage() {
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
                     <div className="flex items-center">Project Name <SortIcon column="site" /></div>
                   </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('payee')}>
+                    <div className="flex items-center">Contractor <SortIcon column="payee" /></div>
+                  </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('reference')}>
                     <div className="flex items-center">WO Reference <SortIcon column="reference" /></div>
                   </TableHead>
@@ -304,6 +308,9 @@ export default function ContractorWisePaymentsPage() {
                     </TableCell>
                     <TableCell className="text-sm font-bold text-foreground">
                       {p.siteName}
+                    </TableCell>
+                    <TableCell className="text-sm font-bold text-foreground">
+                      {p.payeeName}
                     </TableCell>
                     <TableCell className="font-mono text-xs font-black text-primary uppercase">{p.referenceNumber}</TableCell>
                     <TableCell className="text-right font-black text-sm font-mono text-foreground">
@@ -339,7 +346,7 @@ export default function ContractorWisePaymentsPage() {
                     </TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No contractor-specific payment logs discovered.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic">No contractor-specific payment logs discovered.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
