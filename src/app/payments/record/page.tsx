@@ -48,6 +48,7 @@ import { format } from 'date-fns';
 const paymentSchema = z.object({
   siteId: z.string().min(1, 'Please select a project.'),
   siteName: z.string(),
+  projectCompany: z.string().optional(),
   paymentAgainst: z.enum(['PO', 'WO']),
   payeeId: z.string().min(1, 'Please select a payee.'),
   payeeName: z.string(),
@@ -60,7 +61,7 @@ const paymentSchema = z.object({
   proofUrl: z.string().optional(),
 });
 
-type Site = { id: string; name: string };
+type Site = { id: string; name: string; projectCompany: string };
 type PO = { id: string; poNumber: string; supplierId: string; totalAmount: number; paidAmount?: number; status: string };
 type WO = { id: string; woNumber: string; contractorId: string; totalAmount: number; paidAmount?: number; status: string };
 
@@ -99,7 +100,7 @@ export default function RecordPaymentPage() {
   const form = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-      siteId: "", siteName: "", paymentAgainst: "PO", payeeId: "", payeeName: "", referenceId: "", referenceNumber: "", amount: 0, paymentType: "Part", paymentMode: "Bank Transfer", paymentDetails: ""
+      siteId: "", siteName: "", projectCompany: "", paymentAgainst: "PO", payeeId: "", payeeName: "", referenceId: "", referenceNumber: "", amount: 0, paymentType: "Part", paymentMode: "Bank Transfer", paymentDetails: ""
     },
   });
 
@@ -259,7 +260,7 @@ export default function RecordPaymentPage() {
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                           <Input placeholder="Search sites..." className="h-10 border-none" value={siteSearch} onChange={e => setSiteSearch(e.target.value)} />
@@ -269,6 +270,7 @@ export default function RecordPaymentPage() {
                             <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { 
                               field.onChange(s.id); 
                               form.setValue('siteName', s.name); 
+                              form.setValue('projectCompany', s.projectCompany);
                               form.setValue('payeeId', '');
                               form.setValue('referenceId', '');
                               setIsSitePopoverOpen(false); 
@@ -353,17 +355,19 @@ export default function RecordPaymentPage() {
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                           <Input placeholder="Filter..." className="h-10 border-none" value={refSearch} onChange={e => setRefSearch(e.target.value)} />
                         </div>
                         <ScrollArea className="h-[200px]">
-                          {filteredRefs.map(o => (
-                            <Button key={o.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs font-mono" onClick={() => { field.onChange(o.id); form.setValue('referenceNumber', o.poNumber || o.woNumber); setIsRefPopoverOpen(false); }}>
-                              {o.poNumber || o.woNumber} (₹{o.totalAmount.toLocaleString()})
-                            </Button>
-                          ))}
+                          <div className="p-1">
+                            {filteredRefs.map(o => (
+                              <Button key={o.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs font-mono" onClick={() => { field.onChange(o.id); form.setValue('referenceNumber', o.poNumber || o.woNumber); setIsRefPopoverOpen(false); }}>
+                                {o.poNumber || o.woNumber} (₹{o.totalAmount.toLocaleString()})
+                              </Button>
+                            ))}
+                          </div>
                         </ScrollArea>
                       </PopoverContent>
                     </Popover>

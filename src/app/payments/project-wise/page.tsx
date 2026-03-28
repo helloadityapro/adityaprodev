@@ -50,6 +50,7 @@ type Payment = {
   id: string;
   siteId: string;
   siteName: string;
+  projectCompany?: string;
   paymentAgainst: 'PO' | 'WO';
   referenceId: string;
   payeeId: string;
@@ -66,7 +67,7 @@ type Payment = {
 };
 
 type Site = { id: string; name: string };
-type SortKey = 'date' | 'reference' | 'payee' | 'amount' | 'type' | 'mode';
+type SortKey = 'date' | 'reference' | 'payee' | 'amount' | 'type' | 'mode' | 'site';
 
 export default function ProjectWisePaymentsPage() {
   const firestore = useFirestore();
@@ -118,6 +119,9 @@ export default function ProjectWisePaymentsPage() {
       const matchesType = typeFilter === 'all' || p.paymentAgainst === typeFilter;
       const matchesSearch = p.payeeName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            p.referenceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           p.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (p.projectCompany || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (p.recordedByName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                            p.paymentDetails.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesSite && matchesType && matchesSearch;
     });
@@ -125,10 +129,10 @@ export default function ProjectWisePaymentsPage() {
     result.sort((a, b) => {
       const { key, direction } = sortConfig;
       let valA: any = ''; let valB: any = '';
-      
       if (key === 'date') { valA = a.date?.toDate?.()?.getTime() || 0; valB = b.date?.toDate?.()?.getTime() || 0; }
       else if (key === 'reference') { valA = a.referenceNumber; valB = b.referenceNumber; }
       else if (key === 'payee') { valA = a.payeeName; valB = b.payeeName; }
+      else if (key === 'site') { valA = a.siteName; valB = b.siteName; }
       else if (key === 'amount') { valA = a.amount; valB = b.amount; }
       else if (key === 'type') { valA = a.paymentType; valB = b.paymentType; }
       else if (key === 'mode') { valA = a.paymentMode; valB = b.paymentMode; }
@@ -254,7 +258,7 @@ export default function ProjectWisePaymentsPage() {
         <div className="flex flex-col gap-1.5 w-full md:w-48">
           <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Context</Label>
           <Input 
-            placeholder="Reference or Payee..." 
+            placeholder="Search all columns..." 
             className="h-10 rounded-sm bg-background border-primary/10 text-xs font-bold"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
@@ -283,6 +287,9 @@ export default function ProjectWisePaymentsPage() {
                   <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
                     <div className="flex items-center">Date <SortIcon column="date" /></div>
                   </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
+                    <div className="flex items-center">Project & Company <SortIcon column="site" /></div>
+                  </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('reference')}>
                     <div className="flex items-center">Reference <SortIcon column="reference" /></div>
                   </TableHead>
@@ -301,6 +308,12 @@ export default function ProjectWisePaymentsPage() {
                   <TableRow key={p.id} className="hover:bg-muted/5 transition-colors">
                     <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
                       {p.date ? format(p.date.toDate(), 'dd MMM yy') : '—'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-sm text-foreground">{p.siteName}</span>
+                        <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tight">{p.projectCompany || 'Aditya Green Energy'}</span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
@@ -342,7 +355,7 @@ export default function ProjectWisePaymentsPage() {
                     </TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">No payment logs found for this project.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No payment logs found matching criteria.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -458,5 +471,26 @@ export default function ProjectWisePaymentsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
+  const colors = {
+    primary: "bg-primary/5 border-primary/10 text-primary",
+    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
+    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
+  };
+
+  return (
+    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-4 w-4" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-black">{value}</div>
+      </CardContent>
+    </Card>
   );
 }

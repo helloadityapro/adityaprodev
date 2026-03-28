@@ -50,6 +50,7 @@ type Payment = {
   id: string;
   siteId: string;
   siteName: string;
+  projectCompany?: string;
   paymentAgainst: 'PO';
   referenceId: string;
   payeeId: string;
@@ -121,7 +122,10 @@ export default function SupplierWisePaymentsPage() {
       const matchesPayee = selectedPayeeId === 'all' || p.payeeId === selectedPayeeId;
       const matchesSite = selectedSiteId === 'all' || p.siteId === selectedSiteId;
       const matchesSearch = p.payeeName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           p.referenceNumber.toLowerCase().includes(searchTerm.toLowerCase());
+                           p.referenceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           p.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (p.projectCompany || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (p.recordedByName || '').toLowerCase().includes(searchTerm.toLowerCase());
       return matchesPayee && matchesSite && matchesSearch;
     });
 
@@ -258,8 +262,8 @@ export default function SupplierWisePaymentsPage() {
         </div>
 
         <div className="flex flex-col gap-1.5 w-full md:w-48">
-          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Ref</Label>
-          <Input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="PO Number..." className="h-10 text-xs font-bold bg-background border-primary/10" />
+          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search</Label>
+          <Input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Filter all columns..." className="h-10 text-xs font-bold bg-background border-primary/10" />
         </div>
       </div>
 
@@ -272,16 +276,16 @@ export default function SupplierWisePaymentsPage() {
                   <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
                     <div className="flex items-center">Date <SortIcon column="date" /></div>
                   </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
+                    <div className="flex items-center">Project & Company <SortIcon column="site" /></div>
+                  </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('reference')}>
                     <div className="flex items-center">PO Reference <SortIcon column="reference" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
-                    <div className="flex items-center">Project Site <SortIcon column="site" /></div>
                   </TableHead>
                   <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('amount')}>
                     <div className="flex items-center justify-end">Amount Paid <SortIcon column="amount" /></div>
                   </TableHead>
-                  <TableHead>Personnel</TableHead>
+                  <TableHead>Recorded By</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -291,8 +295,13 @@ export default function SupplierWisePaymentsPage() {
                     <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
                       {p.date ? format(p.date.toDate(), 'dd MMM yy') : '—'}
                     </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-bold text-sm text-foreground">{p.siteName}</span>
+                        <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tight">{p.projectCompany || 'Aditya Green Energy'}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="font-mono text-xs font-black text-primary uppercase">{p.referenceNumber}</TableCell>
-                    <TableCell className="text-sm font-semibold">{p.siteName}</TableCell>
                     <TableCell className="text-right font-black text-sm font-mono text-foreground">
                       ₹{p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </TableCell>
