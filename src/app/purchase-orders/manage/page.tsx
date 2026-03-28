@@ -16,19 +16,20 @@ import {
   Calendar,
   Building2,
   Truck,
-  ArrowRight,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  History,
-  User,
-  ChevronDown,
-  ChevronUp,
+  ArrowRight, 
+  ArrowUpDown, 
+  ArrowUp, 
+  ArrowDown, 
+  History, 
+  User, 
+  ChevronDown, 
+  ChevronUp, 
   Layers,
-  FileDown
+  FileDown,
+  Plus
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -53,6 +54,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
 type POItem = {
   itemName: string;
@@ -84,6 +86,7 @@ export default function GlobalManagePOsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -278,7 +281,7 @@ export default function GlobalManagePOsPage() {
                       <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={cn(
-                          "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
+                          "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
                           po.status === 'Open' ? "bg-blue-50 text-blue-700 border-blue-200" :
                           po.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
                           "bg-red-50 text-red-700 border-red-200"
