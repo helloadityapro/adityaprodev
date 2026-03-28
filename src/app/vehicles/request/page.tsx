@@ -46,7 +46,7 @@ import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 
 const stopSchema = z.object({
   type: z.enum(['Site', 'Other'], { required_error: 'Please select a stop type.' }),
@@ -81,6 +81,16 @@ type UserProfile = {
   role: string;
   siteManagerId?: string;
   assignedProjectIds?: string[];
+};
+
+const formatTo12Hr = (time24?: string) => {
+  if (!time24) return '';
+  try {
+    const date = parse(time24, 'HH:mm', new Date());
+    return format(date, 'hh:mm a');
+  } catch (e) {
+    return time24;
+  }
 };
 
 export default function RequestVehiclePage() {
@@ -215,6 +225,7 @@ export default function RequestVehiclePage() {
   const triggerWhatsApp = () => {
     if (!submittedData) return;
     
+    const formattedTime = formatTo12Hr(submittedData.reportingTime);
     const stopsText = submittedData.intermediateStops.length > 0 
       ? `\n*Intermediate Stops:*\n${submittedData.intermediateStops.map((d: any, i: number) => `${i + 1}. ${d.location} (${d.purpose})`).join('\n')}`
       : '';
@@ -223,7 +234,7 @@ export default function RequestVehiclePage() {
       ? `\n*Co-passengers:* ${submittedData.coPassengers.map((p: any) => p.name).join(', ')}`
       : '';
     
-    const message = `*Aditya Pro - Vehicle Allotment Request*\n\n*Requester:* ${userProfile?.username || user?.email}\n*Trip Date:* ${format(new Date(submittedData.tripDate), 'dd MMM yyyy')}\n*Pickup:* ${submittedData.pickupLocation}\n*Reporting Time:* ${submittedData.reportingTime}${stopsText}\n*Final Drop:* ${submittedData.dropLocation}${passengerList}\n\n*General Purpose:* ${submittedData.purpose}\n\n_Note: Request is pending approval in the system._`;
+    const message = `*Aditya Pro - Vehicle Allotment Request*\n\n*Requester:* ${userProfile?.username || user?.email}\n*Trip Date:* ${format(new Date(submittedData.tripDate), 'dd MMM yyyy')}\n*Pickup:* ${submittedData.pickupLocation}\n*Reporting Time:* ${formattedTime}${stopsText}\n*Final Drop:* ${submittedData.dropLocation}${passengerList}\n\n*General Purpose:* ${submittedData.purpose}\n\n_Note: Request is pending approval in the system._`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -277,6 +288,7 @@ export default function RequestVehiclePage() {
   ) || [];
 
   if (isSuccess && submittedData) {
+    const displayTime = formatTo12Hr(submittedData.reportingTime);
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
@@ -288,7 +300,7 @@ export default function RequestVehiclePage() {
             </div>
             <CardTitle className="text-2xl font-bold">Request Submitted</CardTitle>
             <CardDescription className="text-base leading-relaxed">
-              Your trip request for <strong>{format(new Date(submittedData.tripDate), 'dd MMM yyyy')}</strong> from <strong>{submittedData.pickupLocation}</strong> to <strong>{submittedData.dropLocation}</strong> has been logged.
+              Your trip request for <strong>{format(new Date(submittedData.tripDate), 'dd MMM yyyy')}</strong> at <strong>{displayTime}</strong> from <strong>{submittedData.pickupLocation}</strong> to <strong>{submittedData.dropLocation}</strong> has been logged.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -336,10 +348,54 @@ export default function RequestVehiclePage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
-              {/* Step 1: Pickup */}
+              {/* Step 1: Schedule */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">1</div>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Trip Schedule</h3>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="tripDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Planned Trip Date</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input type="date" {...field} className="h-11 rounded-sm pr-10" />
+                            <Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="reportingTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Driver Reporting Time (12h)</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input type="time" {...field} className="h-11 rounded-sm" />
+                            <Clock className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Step 2: Pickup */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">2</div>
                   <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Pickup Point</h3>
                 </div>
                 
@@ -445,49 +501,13 @@ export default function RequestVehiclePage() {
                     </FormItem>
                   )}
                 />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="tripDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Trip Date</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input type="date" {...field} className="h-11 rounded-sm pr-10" />
-                            <Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="reportingTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Driver Reporting Time</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input type="time" {...field} className="h-11 rounded-sm" />
-                            <Clock className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
               </div>
 
-              {/* Step 2: Intermediate Stops */}
+              {/* Step 3: Intermediate Stops */}
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">2</div>
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">3</div>
                     <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Intermediate Stops (Optional)</h3>
                   </div>
                   <Button 
@@ -645,11 +665,11 @@ export default function RequestVehiclePage() {
                 </div>
               </div>
 
-              {/* Step 3: Final Drop-off */}
+              {/* Step 4: Final Drop-off */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">3</div>
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">4</div>
                     <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Final Drop-off</h3>
                   </div>
                   <Button 
@@ -767,10 +787,11 @@ export default function RequestVehiclePage() {
                 />
               </div>
 
-              {/* Step 4: Co-passengers */}
+              {/* Step 5: Co-passengers */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/20">5</div>
                     <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Co-passengers</h3>
                   </div>
                   <Popover open={isPassengerPopoverOpen} onOpenChange={setIsPassengerPopoverOpen}>
@@ -855,7 +876,7 @@ export default function RequestVehiclePage() {
                 </div>
               </div>
 
-              {/* Step 5: Purpose */}
+              {/* Step 6: Purpose */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-black uppercase tracking-widest text-foreground">General Trip Note</h3>
