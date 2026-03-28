@@ -267,7 +267,7 @@ export default function ProjectWisePaymentsPage() {
         </div>
 
         <div className="flex flex-col gap-1.5 w-full md:w-48">
-          <Label className="text-[10px) font-black uppercase text-muted-foreground tracking-widest px-1">Payment Type</Label>
+          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Payment Type</Label>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="h-10 rounded-sm bg-background border-primary/20 font-bold"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -288,6 +288,9 @@ export default function ProjectWisePaymentsPage() {
                   <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
                     <div className="flex items-center">Date & Time <SortIcon column="date" /></div>
                   </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('payee')}>
+                    <div className="flex items-center">Paid to <SortIcon column="payee" /></div>
+                  </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('company')}>
                     <div className="flex items-center">Project Company <SortIcon column="company" /></div>
                   </TableHead>
@@ -296,9 +299,6 @@ export default function ProjectWisePaymentsPage() {
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('reference')}>
                     <div className="flex items-center">Reference <SortIcon column="reference" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('payee')}>
-                    <div className="flex items-center">Paid to <SortIcon column="payee" /></div>
                   </TableHead>
                   <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('amount')}>
                     <div className="flex items-center justify-end">Amount Paid <SortIcon column="amount" /></div>
@@ -314,6 +314,9 @@ export default function ProjectWisePaymentsPage() {
                       {p.date ? format(p.date.toDate(), 'dd MMM yy HH:mm') : '—'}
                     </TableCell>
                     <TableCell className="text-sm font-bold text-foreground">
+                      {p.payeeName}
+                    </TableCell>
+                    <TableCell className="text-sm font-bold text-foreground">
                       {p.projectCompany || 'Aditya Green Energy'}
                     </TableCell>
                     <TableCell className="text-sm font-bold text-foreground">
@@ -325,7 +328,6 @@ export default function ProjectWisePaymentsPage() {
                         <Badge variant="outline" className="w-fit text-[8px] h-4 px-1 rounded-sm mt-1">{p.paymentAgainst}</Badge>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm font-bold">{p.payeeName}</TableCell>
                     <TableCell className="text-right font-black text-sm font-mono text-foreground">
                       ₹{p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </TableCell>

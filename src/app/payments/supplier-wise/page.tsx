@@ -31,9 +31,6 @@ import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Select, 
   SelectContent, 
@@ -41,6 +38,9 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -278,14 +278,14 @@ export default function SupplierWisePaymentsPage() {
                   <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
                     <div className="flex items-center">Date & Time <SortIcon column="date" /></div>
                   </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('payee')}>
+                    <div className="flex items-center">Supplier <SortIcon column="payee" /></div>
+                  </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('company')}>
                     <div className="flex items-center">Project Company <SortIcon column="company" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
                     <div className="flex items-center">Project Name <SortIcon column="site" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('payee')}>
-                    <div className="flex items-center">Supplier <SortIcon column="payee" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('reference')}>
                     <div className="flex items-center">PO Reference <SortIcon column="reference" /></div>
@@ -304,13 +304,13 @@ export default function SupplierWisePaymentsPage() {
                       {p.date ? format(p.date.toDate(), 'dd MMM yy HH:mm') : '—'}
                     </TableCell>
                     <TableCell className="text-sm font-bold text-foreground">
+                      {p.payeeName}
+                    </TableCell>
+                    <TableCell className="text-sm font-bold text-foreground">
                       {p.projectCompany || 'Aditya Green Energy'}
                     </TableCell>
                     <TableCell className="text-sm font-bold text-foreground">
                       {p.siteName}
-                    </TableCell>
-                    <TableCell className="text-sm font-bold text-foreground">
-                      {p.payeeName}
                     </TableCell>
                     <TableCell className="font-mono text-xs font-black text-primary uppercase">{p.referenceNumber}</TableCell>
                     <TableCell className="text-right font-black text-sm font-mono text-foreground">
@@ -334,7 +334,7 @@ export default function SupplierWisePaymentsPage() {
                         )}
                         {isAdmin && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => setSupplierToEdit(p)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => setEditingPayment(p)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingPayment(p)}>

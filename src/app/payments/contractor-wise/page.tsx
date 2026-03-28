@@ -278,14 +278,14 @@ export default function ContractorWisePaymentsPage() {
                   <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
                     <div className="flex items-center">Date & Time <SortIcon column="date" /></div>
                   </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('payee')}>
+                    <div className="flex items-center">Contractor <SortIcon column="payee" /></div>
+                  </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('company')}>
                     <div className="flex items-center">Project Company <SortIcon column="company" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
                     <div className="flex items-center">Project Name <SortIcon column="site" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('payee')}>
-                    <div className="flex items-center">Contractor <SortIcon column="payee" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('reference')}>
                     <div className="flex items-center">WO Reference <SortIcon column="reference" /></div>
@@ -304,13 +304,13 @@ export default function ContractorWisePaymentsPage() {
                       {p.date ? format(p.date.toDate(), 'dd MMM yy HH:mm') : '—'}
                     </TableCell>
                     <TableCell className="text-sm font-bold text-foreground">
+                      {p.payeeName}
+                    </TableCell>
+                    <TableCell className="text-sm font-bold text-foreground">
                       {p.projectCompany || 'Aditya Green Energy'}
                     </TableCell>
                     <TableCell className="text-sm font-bold text-foreground">
                       {p.siteName}
-                    </TableCell>
-                    <TableCell className="text-sm font-bold text-foreground">
-                      {p.payeeName}
                     </TableCell>
                     <TableCell className="font-mono text-xs font-black text-primary uppercase">{p.referenceNumber}</TableCell>
                     <TableCell className="text-right font-black text-sm font-mono text-foreground">
@@ -334,10 +334,10 @@ export default function ContractorWisePaymentsPage() {
                         )}
                         {isAdmin && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => setEditingPayment(p)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={() => setEditingPayment(p)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingPayment(p)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingPayment(p)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </>
