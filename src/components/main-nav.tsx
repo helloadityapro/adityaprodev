@@ -41,7 +41,8 @@ import {
   ListTodo,
   FileText,
   Table as TableIcon,
-  ArrowLeftRight
+  ArrowLeftRight,
+  UserPlus
 } from "lucide-react"
 import {
   SidebarMenu,
