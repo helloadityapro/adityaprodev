@@ -44,6 +44,7 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Eye,
   Gavel,
   Save,
@@ -1477,7 +1478,18 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     </TableHeader>
                     <TableBody>
                       {visits.map((visit: any) => (
-                        <TableRow key={visit.id} className="hover:bg-muted/5 group"><TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell><TableCell className="text-sm font-bold text-foreground">{visit.managerName}</TableCell><TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm">{visit.purpose || '—'}</Badge></TableCell><TableCell className="text-right px-6"><Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm"><Link href={`/site-visits/${visit.id}`}><ChevronRight className="h-4 w-4" /></Link></Button></TableCell></TableRow>
+                        <TableRow key={visit.id} className="hover:bg-muted/5 group">
+                          <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
+                          <TableCell className="text-sm font-bold text-foreground">{visit.managerName}</TableCell>
+                          <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm">{visit.purpose || '—'}</Badge></TableCell>
+                          <TableCell className="text-right px-6">
+                            <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm">
+                              <Link href={`/site-visits/${visit.id}`}>
+                                <ChevronRight className="h-4 w-4" />
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
                       ))}
                     </TableBody>
                   </Table>
@@ -1492,7 +1504,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
       {/* Decision Dialog for BoM items */}
       <Dialog open={!!bomActionState} onOpenChange={(o) => !o && setBomActionState(null)}>
-        <DialogContent className="rounded-sm max-w-md">
+        <DialogContent className="rounded-sm max-md">
           <DialogHeader>
             <DialogTitle>Authorize BoM Item</DialogTitle>
             <DialogDescription>Set status for {bomActionState?.item.itemName}. Authorized items enable material movement logging.</DialogDescription>
@@ -1597,7 +1609,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
       {/* Decision Dialog for Work Orders */}
       <Dialog open={!!woActionState} onOpenChange={(o) => !o && setWoActionState(null)}>
-        <DialogContent className="rounded-sm max-w-md">
+        <DialogContent className="rounded-sm max-md">
           <DialogHeader>
             <DialogTitle>Authorize Work Order</DialogTitle>
             <DialogDescription>Process approval for WO {woActionState?.wo.woNumber}.</DialogDescription>
