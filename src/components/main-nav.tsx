@@ -42,7 +42,8 @@ import {
   FileText,
   Table as TableIcon,
   ArrowLeftRight,
-  UserPlus
+  UserPlus,
+  Activity
 } from "lucide-react"
 import {
   SidebarMenu,
