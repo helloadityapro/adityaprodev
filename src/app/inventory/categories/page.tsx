@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -109,7 +108,7 @@ export default function ManageCategoriesPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto">
       <div className="flex flex-col gap-1">
         <Button variant="ghost" size="sm" asChild className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
           <Link href="/inventory"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Inventory</Link>
@@ -120,8 +119,8 @@ export default function ManageCategoriesPage() {
         <p className="text-muted-foreground text-sm font-medium">Define and organize product groups for consistent inventory classification.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-1 rounded-sm border-primary/10 shadow-md h-fit">
+      <div className="space-y-8">
+        <Card className="rounded-sm border-primary/10 shadow-md h-fit max-w-md">
           <CardHeader className="bg-primary/5 border-b py-4">
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <Plus className="h-4 w-4 text-primary" /> Add Category
@@ -145,7 +144,7 @@ export default function ManageCategoriesPage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
+        <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
               <Tag className="h-4 w-4 text-primary" /> Active Categories
