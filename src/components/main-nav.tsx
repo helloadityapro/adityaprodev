@@ -123,26 +123,41 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Projects</SidebarGroupLabel>
         <SidebarMenu>
-          {isAdmin && (
+          <Collapsible asChild defaultOpen={pathname.startsWith('/projects')} className="group/collapsible">
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Add New Project" isActive={pathname === '/projects/add'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/projects/add">
-                  <Plus className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Add New Project</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-          {!isDriver && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Manage Projects" isActive={pathname === '/projects/list'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/projects/list">
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton tooltip="Projects" isActive={pathname.startsWith('/projects')} className="rounded-sm">
                   <Briefcase className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Manage Projects</span>
-                </Link>
-              </SidebarMenuButton>
+                  <span className="font-medium">Projects</span>
+                  <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {isAdmin && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/projects/add'} onClick={handleMobileClose}>
+                        <Link href="/projects/add">
+                          <Plus className="h-4 w-4" />
+                          <span>Add New Project</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                  {!isDriver && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/projects/list'} onClick={handleMobileClose}>
+                        <Link href="/projects/list">
+                          <List className="h-4 w-4" />
+                          <span>Manage Projects</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                </SidebarMenuSub>
+              </CollapsibleContent>
             </SidebarMenuItem>
-          )}
+          </Collapsible>
         </SidebarMenu>
       </SidebarGroup>
 
