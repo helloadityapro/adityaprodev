@@ -33,7 +33,8 @@ import {
   History, 
   UserCheck,
   RefreshCcw,
-  Flag
+  Flag,
+  Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
@@ -54,6 +55,7 @@ const stopSchema = z.object({
 const requestSchema = z.object({
   pickupType: z.enum(['Site', 'Other'], { required_error: 'Please select a pickup type.' }),
   pickupLocation: z.string().min(1, 'Pickup location is required.'),
+  reportingTime: z.string().min(1, 'Reporting time is required.'),
   intermediateStops: z.array(stopSchema).default([]),
   dropType: z.enum(['Site', 'Other'], { required_error: 'Please select a drop-off type.' }),
   dropLocation: z.string().min(1, 'Drop-off location is required.'),
@@ -144,6 +146,7 @@ export default function RequestVehiclePage() {
     defaultValues: { 
       pickupType: 'Site',
       pickupLocation: '',
+      reportingTime: '',
       intermediateStops: [],
       dropType: 'Site',
       dropLocation: '',
@@ -184,6 +187,7 @@ export default function RequestVehiclePage() {
         siteManagerId: userProfile.siteManagerId || null,
         pickupLocation: values.pickupLocation,
         pickupType: values.pickupType,
+        reportingTime: values.reportingTime,
         intermediateStops: values.intermediateStops,
         dropLocation: values.dropLocation,
         dropType: values.dropType,
@@ -214,7 +218,7 @@ export default function RequestVehiclePage() {
       ? `\n*Co-passengers:* ${submittedData.coPassengers.map((p: any) => p.name).join(', ')}`
       : '';
     
-    const message = `*Aditya Pro - Vehicle Allotment Request*\n\n*Requester:* ${userProfile?.username || user?.email}\n*Pickup:* ${submittedData.pickupLocation}${stopsText}\n*Final Drop:* ${submittedData.dropLocation}${passengerList}\n\n*General Purpose:* ${submittedData.purpose}\n\n_Note: Request is pending approval in the system._`;
+    const message = `*Aditya Pro - Vehicle Allotment Request*\n\n*Requester:* ${userProfile?.username || user?.email}\n*Pickup:* ${submittedData.pickupLocation}\n*Reporting Time:* ${submittedData.reportingTime}${stopsText}\n*Final Drop:* ${submittedData.dropLocation}${passengerList}\n\n*General Purpose:* ${submittedData.purpose}\n\n_Note: Request is pending approval in the system._`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -367,74 +371,92 @@ export default function RequestVehiclePage() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="pickupLocation"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      {pickupType === 'Site' ? (
-                        <Popover open={isPickupPopoverOpen} onOpenChange={setIsPickupPopoverOpen}>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                className={cn(
-                                  "w-full justify-between font-normal rounded-sm h-11",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value || "Select pickup site..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                            <div className="flex items-center border-b px-3">
-                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                              <Input
-                                placeholder="Search sites..."
-                                className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
-                                value={pickupSearchQuery}
-                                onChange={(e) => setPickupSearchQuery(e.target.value)}
-                                onKeyDown={(e) => e.stopPropagation()}
-                              />
-                            </div>
-                            <ScrollArea className="h-[200px]">
-                              <div className="p-1">
-                                {filteredPickupSites.length > 0 ? (
-                                  filteredPickupSites.map((site) => (
-                                    <Button
-                                      key={site.id}
-                                      type="button"
-                                      variant="ghost"
-                                      className="w-full justify-start font-normal h-10 text-sm"
-                                      onClick={() => {
-                                        field.onChange(site.name);
-                                        setIsPickupPopoverOpen(false);
-                                        setPickupSearchQuery("");
-                                      }}
-                                    >
-                                      <Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />
-                                      {site.name}
-                                    </Button>
-                                  ))
-                                ) : (
-                                  <p className="p-4 text-center text-xs text-muted-foreground italic">No matching sites found.</p>
-                                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="pickupLocation"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        {pickupType === 'Site' ? (
+                          <Popover open={isPickupPopoverOpen} onOpenChange={setIsPickupPopoverOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className={cn(
+                                    "w-full justify-between font-normal rounded-sm h-11",
+                                    !field.value && "text-muted-foreground"
+                                  )}
+                                >
+                                  {field.value || "Select pickup site..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                              <div className="flex items-center border-b px-3">
+                                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                <Input
+                                  placeholder="Search sites..."
+                                  className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm"
+                                  value={pickupSearchQuery}
+                                  onChange={(e) => setPickupSearchQuery(e.target.value)}
+                                  onKeyDown={(e) => e.stopPropagation()}
+                                />
                               </div>
-                            </ScrollArea>
-                          </PopoverContent>
-                        </Popover>
-                      ) : (
+                              <ScrollArea className="h-[200px]">
+                                <div className="p-1">
+                                  {filteredPickupSites.length > 0 ? (
+                                    filteredPickupSites.map((site) => (
+                                      <Button
+                                        key={site.id}
+                                        type="button"
+                                        variant="ghost"
+                                        className="w-full justify-start font-normal h-10 text-sm"
+                                        onClick={() => {
+                                          field.onChange(site.name);
+                                          setIsPickupPopoverOpen(false);
+                                          setPickupSearchQuery("");
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />
+                                        {site.name}
+                                      </Button>
+                                    ))
+                                  ) : (
+                                    <p className="p-4 text-center text-xs text-muted-foreground italic">No matching sites found.</p>
+                                  )}
+                                </div>
+                              </ScrollArea>
+                            </PopoverContent>
+                          </Popover>
+                        ) : (
+                          <FormControl>
+                            <Input placeholder="Enter pickup address/landmark..." {...field} className="h-11 rounded-sm" />
+                          </FormControl>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="reportingTime"
+                    render={({ field }) => (
+                      <FormItem>
                         <FormControl>
-                          <Input placeholder="Enter pickup address/landmark..." {...field} className="h-11 rounded-sm" />
+                          <div className="relative">
+                            <Input type="time" {...field} className="h-11 rounded-sm" />
+                            <Clock className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          </div>
                         </FormControl>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
 
               {/* Step 2: Intermediate Stops */}
