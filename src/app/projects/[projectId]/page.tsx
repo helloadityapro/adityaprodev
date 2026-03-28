@@ -54,7 +54,11 @@ import {
   ShoppingBag,
   ArrowDownCircle,
   ArrowUpCircle,
-  Package
+  Package,
+  HandCoins,
+  ExternalLink,
+  CreditCard,
+  Wallet
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -213,10 +217,31 @@ type MasterItem = {
   subItems?: { name: string; quantityPerSet: number; unit: string }[];
 };
 
+type Payment = {
+  id: string;
+  siteId: string;
+  siteName: string;
+  projectCompany?: string;
+  paymentAgainst: 'PO' | 'WO';
+  referenceId: string;
+  payeeId: string;
+  payeeName: string;
+  referenceNumber: string;
+  amount: number;
+  paymentType: string;
+  paymentMode: string;
+  paymentDetails: string;
+  proofUrl?: string;
+  date: any;
+  recordedByName?: string;
+  editHistory?: any[];
+};
+
 type SortKey = 'engineer' | 'manager' | 'sites';
 type POSortKey = 'poNumber' | 'supplier' | 'status' | 'date' | 'total';
 type WOSortKey = 'woNumber' | 'contractor' | 'status' | 'date' | 'total';
 type BoMSortKey = 'itemName' | 'category' | 'status' | 'plannedQuantity' | 'approvedQuantity';
+type PaymentSortKey = 'date' | 'payee' | 'amount' | 'reference';
 
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
@@ -277,6 +302,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [woToDelete, setWoToDelete] = React.useState<WorkOrder | null>(null);
   const [expandedWORows, setExpandedWORows] = React.useState<Set<string>>(new Set());
   const [viewingWO, setViewingWO] = React.useState<WorkOrder | null>(null);
+
+  const [paymentSearch, setPaymentSearch] = React.useState("");
+  const [paymentSortConfig, setPaymentSortConfig] = React.useState<{ key: PaymentSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+  const [viewingPayment, setViewingPayment] = React.useState<Payment | null>(null);
 
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
   const { data: project, isLoading: projectLoading } = useDoc<Project>(projectRef);
@@ -340,6 +369,37 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     [firestore, projectId]
   );
   const { data: workOrders } = useCollection<WorkOrder>(wosQuery);
+
+  const paymentsQuery = useMemoFirebase(() => 
+    query(collection(firestore, 'payments'), where('siteId', '==', projectId)), 
+    [firestore, projectId]
+  );
+  const { data: payments } = useCollection<Payment>(paymentsQuery);
+
+  const filteredSortedPayments = React.useMemo(() => {
+    if (!payments) return [];
+    
+    let result = payments.filter(p => 
+      p.payeeName.toLowerCase().includes(paymentSearch.toLowerCase()) || 
+      p.referenceNumber.toLowerCase().includes(paymentSearch.toLowerCase()) ||
+      p.paymentDetails.toLowerCase().includes(paymentSearch.toLowerCase())
+    );
+
+    result.sort((a, b) => {
+      const { key, direction } = paymentSortConfig;
+      let valA: any = ''; let valB: any = '';
+      if (key === 'date') { valA = a.date?.toDate?.()?.getTime() || 0; valB = b.date?.toDate?.()?.getTime() || 0; }
+      else if (key === 'payee') { valA = a.payeeName.toLowerCase(); valB = b.payeeName.toLowerCase(); }
+      else if (key === 'amount') { valA = a.amount; valB = b.amount; }
+      else if (key === 'reference') { valA = a.referenceNumber.toLowerCase(); valB = b.referenceNumber.toLowerCase(); }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [payments, paymentSearch, paymentSortConfig]);
 
   const inventoryQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_inventory'), where('siteId', '==', projectId)), 
@@ -497,6 +557,18 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const BoMSortIcon = ({ column }: { column: BoMSortKey }) => {
     if (bomSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
     return bomSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
+
+  const handlePaymentSort = (key: PaymentSortKey) => {
+    setPaymentSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const PaymentSortIcon = ({ column }: { column: PaymentSortKey }) => {
+    if (paymentSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    return paymentSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
 
   const handleAddBoM = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -803,6 +875,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </TabsTrigger>
               <TabsTrigger value="wo" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <Gavel className="h-3.5 w-3.5 mr-1.5" /> WORK ORDERS
+              </TabsTrigger>
+              <TabsTrigger value="payments" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
+                <HandCoins className="h-3.5 w-3.5 mr-1.5" /> PAYMENTS
               </TabsTrigger>
               <TabsTrigger value="inventory" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <Warehouse className="h-3.5 w-3.5 mr-1.5" /> INVENTORY
@@ -1203,12 +1278,89 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
                             <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-1.5 h-5", wo.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" : wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{wo.status || 'Pending'}</Badge></TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                            <TableCell className="text-right px-6"><div className="flex justify-end items-center gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}><Eye className="h-4 w-4" /></Button>{isAdmin && wo.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Approved' })} title="Approve WO"><CircleCheck className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Rejected' })} title="Reject WO"><CircleX className="h-4 w-4" /></Button></>)}{(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}><Trash2 className="h-4 w-4" /></Button></>)}</div></TableCell>
+                            <TableCell className="text-right px-6"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}><Eye className="h-4 w-4" /></Button>{isAdmin && wo.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Approved' })} title="Approve WO"><CircleCheck className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Rejected' })} title="Reject WO"><CircleX className="h-4 w-4" /></Button></>)}{(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}><Trash2 className="h-4 w-4" /></Button></>)}</div></TableCell>
                           </TableRow>
                           {expandedWORows.has(wo.id) && wo.items && wo.items.length > 0 && (<TableRow className="bg-muted/30"><TableCell colSpan={6} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown for {wo.woNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{wo.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.description}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Amount (Incl. GST)</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div><div className="flex justify-between items-center pt-2 border-t border-primary/10 mt-2"><span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Aggregate Value</span><span className="text-sm font-black text-primary">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></TableCell></TableRow>)}
                         </React.Fragment>
                       )) : (
                         <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No work orders found.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="payments" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search payments..." 
+                  className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
+                  value={paymentSearch} 
+                  onChange={e => setPaymentSearch(e.target.value)} 
+                />
+              </div>
+              <Button asChild className="rounded-sm font-bold shadow-md h-9">
+                <Link href={`/payments/record`}><Plus className="h-4 w-4 mr-2" /> Record New Payment</Link>
+              </Button>
+            </div>
+            <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+              <CardHeader className="bg-muted/5 border-b py-4">
+                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  <HandCoins className="h-4 w-4 text-primary" /> Project Disbursements
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handlePaymentSort('date')}>
+                          <div className="flex items-center">Date & Time <PaymentSortIcon column="date" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePaymentSort('payee')}>
+                          <div className="flex items-center">Paid to <PaymentSortIcon column="payee" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePaymentSort('reference')}>
+                          <div className="flex items-center">Reference <PaymentSortIcon column="reference" /></div>
+                        </TableHead>
+                        <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePaymentSort('amount')}>
+                          <div className="flex items-center justify-end">Amount <PaymentSortIcon column="amount" /></div>
+                        </TableHead>
+                        <TableHead>Mode</TableHead>
+                        <TableHead className="text-right px-6">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredSortedPayments.length > 0 ? filteredSortedPayments.map(p => (
+                        <TableRow key={p.id} className="hover:bg-muted/5 transition-colors">
+                          <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
+                            {p.date ? format(p.date.toDate(), 'dd MMM yy HH:mm') : '—'}
+                          </TableCell>
+                          <TableCell className="text-sm font-bold text-foreground">{p.payeeName}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-mono text-xs font-black text-primary uppercase">{p.referenceNumber}</span>
+                              <span className="text-[8px] font-bold text-muted-foreground uppercase">{p.paymentAgainst}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-black text-sm font-mono text-foreground">
+                            ₹{p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-[9px] font-bold uppercase py-0 px-1.5 h-4">{p.paymentMode}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPayment(p)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )) : (
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No payment records found for this site.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1501,6 +1653,71 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Detail Dialog for Payments */}
+      <Dialog open={!!viewingPayment} onOpenChange={(o) => !o && setViewingPayment(null)}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><Wallet className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Payment Audit Log</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Ref: {viewingPayment?.referenceNumber}</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="max-h-[70vh]">
+            {viewingPayment && (
+              <div className="p-8 space-y-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Paid to</Label>
+                      <p className="text-lg font-black text-foreground leading-tight">{viewingPayment.payeeName}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Notes / Details</Label>
+                      <p className="text-sm font-medium">{viewingPayment.paymentDetails}</p>
+                    </div>
+                  </div>
+                  <div className="bg-primary/5 rounded-sm border-2 border-primary/10 p-6 flex flex-col justify-center items-center text-center shadow-inner">
+                    <span className="text-[10px] font-black uppercase text-primary tracking-widest mb-2">Transaction Value</span>
+                    <span className="text-4xl font-black tabular-nums text-primary">₹{viewingPayment.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground">Mode</Label>
+                    <p className="text-sm font-bold">{viewingPayment.paymentMode}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground">Type</Label>
+                    <p className="text-sm font-bold">{viewingPayment.paymentType}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground">Date & Time</Label>
+                    <p className="text-sm font-bold font-mono">{formatTimestamp(viewingPayment.date)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground">Recorded by</Label>
+                    <p className="text-sm font-bold">{viewingPayment.recordedByName || 'System'}</p>
+                  </div>
+                </div>
+                {viewingPayment.proofUrl && (
+                  <div className="pt-4 border-t">
+                    <Button variant="outline" className="rounded-sm font-bold" asChild>
+                      <a href={viewingPayment.proofUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> View Payment Proof</a>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </ScrollArea>
+          <DialogFooter className="p-4 bg-muted/5 border-t">
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Decision Dialog for BoM items */}
       <Dialog open={!!bomActionState} onOpenChange={(o) => !o && setBomActionState(null)}>
