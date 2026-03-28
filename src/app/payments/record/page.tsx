@@ -33,11 +33,9 @@ import {
   Calendar,
   FileUp,
   Loader2,
-  CircleDollarSign,
-  AlertCircle,
+  ShieldCheck,
   HardHat,
   ShoppingBag,
-  Gavel,
   Send
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -63,10 +61,14 @@ const paymentSchema = z.object({
 });
 
 type Site = { id: string; name: string };
-type Supplier = { id: string; name: string; gstin: string };
-type Contractor = { id: string; name: string; gstin: string };
-type PO = { id: string; poNumber: string; supplierId: string; totalAmount: number; paidAmount?: number };
-type WO = { id: string; woNumber: string; contractorId: string; totalAmount: number; paidAmount?: number };
+type PO = { id: string; poNumber: string; supplierId: string; totalAmount: number; paidAmount?: number; status: string };
+type WO = { id: string; woNumber: string; contractorId: string; totalAmount: number; paidAmount?: number; status: string };
+
+type AvailablePayee = {
+  id: string;
+  name: string;
+  openRefs: string[];
+};
 
 export default function RecordPaymentPage() {
   const firestore = useFirestore();
@@ -85,14 +87,11 @@ export default function RecordPaymentPage() {
   const [isRefPopoverOpen, setIsRefPopoverOpen] = React.useState(false);
   const [refSearch, setRefSearch] = React.useState("");
 
+  const [availablePayees, setAvailablePayees] = React.useState<AvailablePayee[]>([]);
+  const [orders, setOrders] = React.useState<any[]>([]);
+
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites } = useCollection<Site>(sitesQuery);
-
-  const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
-  const { data: suppliers } = useCollection<Supplier>(suppliersQuery);
-
-  const contractorsQuery = useMemoFirebase(() => collection(firestore, 'contractors'), [firestore]);
-  const { data: contractors } = useCollection<Contractor>(contractorsQuery);
 
   const form = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
@@ -106,23 +105,63 @@ export default function RecordPaymentPage() {
   const watchPayeeId = form.watch('payeeId');
   const watchRefId = form.watch('referenceId');
 
-  const [orders, setOrders] = React.useState<any[]>([]);
-  const selectedOrder = React.useMemo(() => orders.find(o => o.id === watchRefId), [orders, watchRefId]);
-
+  // Logic: When Site or Type changes, discover payees who have available orders
   React.useEffect(() => {
-    const fetchOrders = async () => {
-      if (!watchSiteId || !watchPayeeId) {
+    const fetchDiscoveryData = async () => {
+      if (!watchSiteId) {
+        setAvailablePayees([]);
         setOrders([]);
         return;
       }
+
       const coll = watchType === 'PO' ? 'project_pos' : 'project_wos';
-      const payeeField = watchType === 'PO' ? 'supplierId' : 'contractorId';
-      const q = query(collection(firestore, coll), where('siteId', '==', watchSiteId), where(payeeField, '==', watchPayeeId));
-      const snap = await getDocs(q);
-      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const payeeIdField = watchType === 'PO' ? 'supplierId' : 'contractorId';
+      const payeeNameField = watchType === 'PO' ? 'supplierName' : 'contractorName';
+      const refNumField = watchType === 'PO' ? 'poNumber' : 'woNumber';
+
+      try {
+        const q = query(collection(firestore, coll), where('siteId', '==', watchSiteId));
+        const snap = await getDocs(q);
+        
+        const payeeMap = new Map<string, AvailablePayee>();
+        const allFetchedOrders: any[] = [];
+
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const total = data.totalAmount || 0;
+          const paid = data.paidAmount || 0;
+          const status = data.status || '';
+          
+          // Logic: available if not cancelled and has outstanding balance
+          if (status !== 'Cancelled' && (total - paid) > 0.01) {
+            const pid = data[payeeIdField];
+            const pName = data[payeeNameField];
+            const refNum = data[refNumField];
+
+            allFetchedOrders.push({ id: d.id, ...data });
+
+            if (pid) {
+              if (!payeeMap.has(pid)) {
+                payeeMap.set(pid, { id: pid, name: pName, openRefs: [] });
+              }
+              if (refNum) {
+                payeeMap.get(pid)!.openRefs.push(refNum);
+              }
+            }
+          }
+        });
+
+        setAvailablePayees(Array.from(payeeMap.values()).sort((a, b) => a.name.localeCompare(b.name)));
+        setOrders(allFetchedOrders);
+      } catch (err) {
+        console.error("Discovery failed", err);
+      }
     };
-    fetchOrders();
-  }, [watchSiteId, watchType, watchPayeeId, firestore]);
+
+    fetchDiscoveryData();
+  }, [watchSiteId, watchType, firestore]);
+
+  const selectedOrder = React.useMemo(() => orders.find(o => o.id === watchRefId), [orders, watchRefId]);
 
   const remainingPayable = selectedOrder 
     ? (selectedOrder.totalAmount - (selectedOrder.paidAmount || 0)) 
@@ -171,9 +210,15 @@ export default function RecordPaymentPage() {
   };
 
   const filteredSites = sites?.filter(s => s.name.toLowerCase().includes(siteSearch.toLowerCase())) || [];
-  const payees = watchType === 'PO' ? suppliers : contractors;
-  const filteredPayees = payees?.filter(p => p.name.toLowerCase().includes(payeeSearch.toLowerCase())) || [];
-  const filteredRefs = orders.filter(o => (o.poNumber || o.woNumber).toLowerCase().includes(refSearch.toLowerCase()));
+  
+  const filteredPayees = availablePayees.filter(p => p.name.toLowerCase().includes(payeeSearch.toLowerCase()));
+  
+  const filteredRefs = orders
+    .filter(o => {
+      const payeeField = watchType === 'PO' ? 'supplierId' : 'contractorId';
+      return o[payeeField] === watchPayeeId;
+    })
+    .filter(o => (o.poNumber || o.woNumber).toLowerCase().includes(refSearch.toLowerCase()));
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-20 px-4">
@@ -188,13 +233,13 @@ export default function RecordPaymentPage() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
             <CardHeader className="bg-primary/5 border-b py-4">
-              <CardTitle className="text-sm font-black uppercase tracking-widest">Source & Target</CardTitle>
+              <CardTitle className="text-sm font-black uppercase tracking-widest">Route Selection</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="siteId" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Project Site</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">1. Select Project</FormLabel>
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -211,7 +256,13 @@ export default function RecordPaymentPage() {
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredSites.map(s => (
-                            <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.id); form.setValue('siteName', s.name); setIsSitePopoverOpen(false); }}>
+                            <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { 
+                              field.onChange(s.id); 
+                              form.setValue('siteName', s.name); 
+                              form.setValue('payeeId', '');
+                              form.setValue('referenceId', '');
+                              setIsSitePopoverOpen(false); 
+                            }}>
                               {s.name}
                             </Button>
                           ))}
@@ -224,7 +275,7 @@ export default function RecordPaymentPage() {
 
                 <FormField control={form.control} name="paymentAgainst" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Payment Against</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">2. Payment Against</FormLabel>
                     <Select onValueChange={(val: any) => { field.onChange(val); form.setValue('payeeId', ''); form.setValue('referenceId', ''); }} value={field.value}>
                       <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
@@ -237,27 +288,42 @@ export default function RecordPaymentPage() {
 
                 <FormField control={form.control} name="payeeId" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">{watchType === 'PO' ? 'Supplier' : 'Contractor'}</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">3. Select Payee (Site Associated)</FormLabel>
                     <Popover open={isPayeePopoverOpen} onOpenChange={setIsPayeePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button variant="outline" disabled={!watchSiteId} className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>
-                            {field.value ? payees?.find(p => p.id === field.value)?.name : `Select ${watchType === 'PO' ? 'Supplier' : 'Contractor'}...`}
+                            {field.value ? availablePayees.find(p => p.id === field.value)?.name : `Select ${watchType === 'PO' ? 'Supplier' : 'Contractor'}...`}
                             {watchType === 'PO' ? <Truck className="ml-2 h-4 w-4 opacity-50" /> : <HardHat className="ml-2 h-4 w-4 opacity-50" />}
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input placeholder="Search..." className="h-10 border-none" value={payeeSearch} onChange={e => setPayeeSearch(e.target.value)} />
+                          <Input placeholder="Search associated payees..." className="h-10 border-none" value={payeeSearch} onChange={(e) => setPayeeSearch(e.target.value)} />
                         </div>
                         <ScrollArea className="h-[200px]">
-                          {filteredPayees.map(p => (
-                            <Button key={p.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(p.id); form.setValue('payeeName', p.name); setIsPayeePopoverOpen(false); }}>
-                              {p.name}
-                            </Button>
-                          ))}
+                          <div className="p-1">
+                            {filteredPayees.length > 0 ? filteredPayees.map(p => (
+                              <Button key={p.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs rounded-sm" onClick={() => { 
+                                field.onChange(p.id); 
+                                form.setValue('payeeName', p.name); 
+                                form.setValue('referenceId', '');
+                                setIsPayeePopoverOpen(false); 
+                                setPayeeSearch("");
+                              }}>
+                                <div className="flex flex-col items-start min-w-0 text-left">
+                                  <span className="font-bold truncate w-full">{p.name}</span>
+                                  <span className="text-[8px] font-mono text-muted-foreground mt-0.5 uppercase tracking-tighter">Available Refs: {p.openRefs.join(', ')}</span>
+                                </div>
+                              </Button>
+                            )) : (
+                              <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground/40 italic leading-relaxed">
+                                No {watchType === 'PO' ? 'Suppliers' : 'Contractors'} with available balance found for this site.
+                              </div>
+                            )}
+                          </div>
                         </ScrollArea>
                       </PopoverContent>
                     </Popover>
@@ -267,12 +333,12 @@ export default function RecordPaymentPage() {
 
                 <FormField control={form.control} name="referenceId" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">{watchType} Reference</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">4. Select {watchType}</FormLabel>
                     <Popover open={isRefPopoverOpen} onOpenChange={setIsRefPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button variant="outline" disabled={!watchPayeeId} className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>
-                            {field.value ? (watchType === 'PO' ? selectedOrder?.poNumber : selectedOrder?.woNumber) : `Select ${watchType}...`}
+                            {field.value ? (watchType === 'PO' ? selectedOrder?.poNumber : selectedOrder?.woNumber) : `Choose ${watchType}...`}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -395,5 +461,26 @@ export default function RecordPaymentPage() {
         </form>
       </Form>
     </div>
+  );
+}
+
+function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
+  const colors = {
+    primary: "bg-primary/5 border-primary/10 text-primary",
+    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
+    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
+  };
+
+  return (
+    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
+        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-4 w-4" />
+      </CardHeader>
+      <CardContent className="p-4 pt-0">
+        <div className="text-2xl font-black">{value}</div>
+      </CardContent>
+    </Card>
   );
 }
