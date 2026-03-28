@@ -277,11 +277,11 @@ export default function SupplierWisePaymentsPage() {
                   <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
                     <div className="flex items-center">Date <SortIcon column="date" /></div>
                   </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('company')}>
+                    <div className="flex items-center">Project Company <SortIcon column="company" /></div>
+                  </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
                     <div className="flex items-center">Project Name <SortIcon column="site" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('company')}>
-                    <div className="flex items-center">Parent Company <SortIcon column="company" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('reference')}>
                     <div className="flex items-center">PO Reference <SortIcon column="reference" /></div>
@@ -299,11 +299,11 @@ export default function SupplierWisePaymentsPage() {
                     <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
                       {p.date ? format(p.date.toDate(), 'dd MMM yy') : '—'}
                     </TableCell>
-                    <TableCell className="font-bold text-sm text-foreground">
-                      {p.siteName}
-                    </TableCell>
-                    <TableCell className="text-[9px] text-muted-foreground uppercase font-black tracking-tight">
+                    <TableCell className="text-sm font-semibold text-foreground">
                       {p.projectCompany || 'Aditya Green Energy'}
+                    </TableCell>
+                    <TableCell className="text-sm font-semibold text-foreground">
+                      {p.siteName}
                     </TableCell>
                     <TableCell className="font-mono text-xs font-black text-primary uppercase">{p.referenceNumber}</TableCell>
                     <TableCell className="text-right font-black text-sm font-mono text-foreground">
