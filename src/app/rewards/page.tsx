@@ -332,7 +332,7 @@ export default function RewardsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-black tracking-tight text-foreground flex items-center gap-2">
-            <Trophy className="h-8 w-8 text-amber-500" /> Points Bank
+            <Trophy className="h-8 w-8 text-amber-500" /> Rewards
           </h1>
           <p className="text-muted-foreground text-sm">Track your earned rewards and performance ranking.</p>
         </div>

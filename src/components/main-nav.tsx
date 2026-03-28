@@ -75,7 +75,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
 
   return (
     <div className="flex flex-col gap-4 py-2 flex-1">
-      {/* High Priority Section - ALWAYS ON TOP */}
+      {/* High Priority Section */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Main Hub</SidebarGroupLabel>
         <SidebarMenu>
@@ -107,10 +107,10 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           </SidebarMenuItem>
           
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Points Bank" isActive={pathname === '/rewards'} className="rounded-sm" onClick={handleMobileClose}>
+            <SidebarMenuButton asChild tooltip="Rewards" isActive={pathname === '/rewards'} className="rounded-sm" onClick={handleMobileClose}>
               <Link href="/rewards">
                 <Trophy className="h-4 w-4 text-amber-500" />
-                <span className="font-medium">Points Bank</span>
+                <span className="font-medium">Rewards</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -270,7 +270,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                         </Link>
                       </SidebarMenuSubButton>
                       {(isAdmin || isManager) && pendingPtwCount > 0 && (
-                        <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
+                        <SidebarMenuBadge className="bg-red-600 text-white rounded-full font-black h-5 w-5 flex items-center justify-center text-[9px] shadow-sm animate-in zoom-in duration-300">
                           {pendingPtwCount}
                         </SidebarMenuBadge>
                       )}
