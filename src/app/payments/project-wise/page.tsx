@@ -1,8 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, doc, limit } from 'firebase/firestore';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, query, where, orderBy, doc, limit, increment, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,13 @@ import {
   CreditCard,
   FileText,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Pencil,
+  Trash2,
+  History
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -32,12 +39,18 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { isSuperAdmin } from '@/lib/auth-constants';
 
 type Payment = {
   id: string;
   siteId: string;
   siteName: string;
   paymentAgainst: 'PO' | 'WO';
+  referenceId: string;
+  payeeId: string;
   payeeName: string;
   referenceNumber: string;
   amount: number;
@@ -49,38 +62,153 @@ type Payment = {
 };
 
 type Site = { id: string; name: string };
+type SortKey = 'date' | 'reference' | 'payee' | 'amount' | 'type' | 'mode';
 
 export default function ProjectWisePaymentsPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
+  const { toast } = useToast();
+  
   const [selectedSiteId, setSelectedSiteId] = React.useState<string>("all");
   const [typeFilter, setTypeFilter] = React.useState<string>("all");
+  const [searchTerm, setSearchTerm] = React.useState("");
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearch, setSiteSearch] = React.useState("");
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+
+  const [editingPayment, setEditingPayment] = React.useState<Payment | null>(null);
+  const [deletingPayment, setDeletingPayment] = React.useState<Payment | null>(null);
+  const [isProcessing, setIsProcessing] = React.useState(false);
+
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile } = useDoc<any>(userProfileRef);
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites } = useCollection<Site>(sitesQuery);
 
   const paymentsQuery = useMemoFirebase(() => {
-    let q = query(collection(firestore, 'payments'), orderBy('date', 'desc'), limit(500));
-    if (selectedSiteId !== 'all') {
-      q = query(collection(firestore, 'payments'), where('siteId', '==', selectedSiteId), orderBy('date', 'desc'));
-    }
-    return q;
-  }, [firestore, selectedSiteId]);
+    // Basic query, filtering and sorting handled in memory for maximum flexibility without complex index requirements
+    return query(collection(firestore, 'payments'), limit(1000));
+  }, [firestore]);
 
   const { data: payments, isLoading } = useCollection<Payment>(paymentsQuery);
 
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+  };
+
   const filteredPayments = React.useMemo(() => {
     if (!payments) return [];
-    return payments.filter(p => typeFilter === 'all' || p.paymentAgainst === typeFilter);
-  }, [payments, typeFilter]);
+    
+    let result = payments.filter(p => {
+      const matchesSite = selectedSiteId === 'all' || p.siteId === selectedSiteId;
+      const matchesType = typeFilter === 'all' || p.paymentAgainst === typeFilter;
+      const matchesSearch = p.payeeName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                           p.referenceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           p.paymentDetails.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesSite && matchesType && matchesSearch;
+    });
+
+    result.sort((a, b) => {
+      const { key, direction } = sortConfig;
+      let valA: any = ''; let valB: any = '';
+      
+      if (key === 'date') { valA = a.date?.toDate?.()?.getTime() || 0; valB = b.date?.toDate?.()?.getTime() || 0; }
+      else if (key === 'reference') { valA = a.referenceNumber; valB = b.referenceNumber; }
+      else if (key === 'payee') { valA = a.payeeName; valB = b.payeeName; }
+      else if (key === 'amount') { valA = a.amount; valB = b.amount; }
+      else if (key === 'type') { valA = a.paymentType; valB = b.paymentType; }
+      else if (key === 'mode') { valA = a.paymentMode; valB = b.paymentMode; }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [payments, selectedSiteId, typeFilter, searchTerm, sortConfig]);
+
+  const handleDelete = async () => {
+    if (!deletingPayment) return;
+    setIsProcessing(true);
+    try {
+      // Reconcile balance in PO/WO
+      const sourceColl = deletingPayment.paymentAgainst === 'PO' ? 'project_pos' : 'project_wos';
+      const sourceRef = doc(firestore, sourceColl, deletingPayment.referenceId);
+      
+      updateDocumentNonBlocking(sourceRef, {
+        paidAmount: increment(-deletingPayment.amount),
+        updatedAt: serverTimestamp()
+      });
+
+      deleteDocumentNonBlocking(doc(firestore, 'payments', deletingPayment.id));
+      
+      toast({ title: 'Payment Removed', description: 'Transaction deleted and balance reconciled.' });
+      setDeletingPayment(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleEdit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingPayment) return;
+    setIsProcessing(true);
+
+    const formData = new FormData(e.currentTarget);
+    const newAmount = parseFloat(formData.get('amount') as string);
+    const newDetails = formData.get('details') as string;
+    const newType = formData.get('type') as string;
+    const newMode = formData.get('mode') as string;
+
+    const diff = newAmount - editingPayment.amount;
+
+    try {
+      const sourceColl = editingPayment.paymentAgainst === 'PO' ? 'project_pos' : 'project_wos';
+      const sourceRef = doc(firestore, sourceColl, editingPayment.referenceId);
+      
+      // Update balance if amount changed
+      if (Math.abs(diff) > 0.01) {
+        updateDocumentNonBlocking(sourceRef, {
+          paidAmount: increment(diff),
+          updatedAt: serverTimestamp()
+        });
+      }
+
+      updateDocumentNonBlocking(doc(firestore, 'payments', editingPayment.id), {
+        amount: newAmount,
+        paymentDetails: newDetails,
+        paymentType: newType,
+        paymentMode: newMode,
+        updatedAt: serverTimestamp()
+      });
+
+      toast({ title: 'Payment Updated', description: 'Changes saved and balance synchronized.' });
+      setEditingPayment(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-2"><Building2 className="h-8 w-8 text-primary" /> Project-wise Payments</h1>
+        <h1 className="flex items-center gap-2 text-primary font-black"><Building2 className="h-8 w-8" /> Project-wise Payments</h1>
         <p className="text-muted-foreground font-medium">Audit historical disbursements filtered by project location.</p>
       </div>
 
@@ -89,7 +217,7 @@ export default function ProjectWisePaymentsPage() {
           <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Filter by Site</Label>
           <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full justify-between h-10 rounded-sm bg-background">
+              <Button variant="outline" className="w-full justify-between h-10 rounded-sm bg-background border-primary/10 font-bold">
                 {selectedSiteId === 'all' ? "All Active Projects" : sites?.find(s => s.id === selectedSiteId)?.name}
                 <Building2 className="ml-2 h-4 w-4 opacity-50" />
               </Button>
@@ -112,13 +240,23 @@ export default function ProjectWisePaymentsPage() {
         </div>
 
         <div className="flex flex-col gap-1.5 w-full md:w-48">
+          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Context</Label>
+          <Input 
+            placeholder="Reference or Payee..." 
+            className="h-10 rounded-sm bg-background border-primary/10 text-xs font-bold"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5 w-full md:w-48">
           <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Payment Type</Label>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="h-10 rounded-sm bg-background border-primary/20"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 rounded-sm bg-background border-primary/20 font-bold"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Records</SelectItem>
-              <SelectItem value="PO">Against PO</SelectItem>
-              <SelectItem value="WO">Against WO</SelectItem>
+              <SelectItem value="all" className="text-xs font-bold uppercase">All Records</SelectItem>
+              <SelectItem value="PO" className="text-xs font-bold uppercase">Against PO</SelectItem>
+              <SelectItem value="WO" className="text-xs font-bold uppercase">Against WO</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -130,13 +268,25 @@ export default function ProjectWisePaymentsPage() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="px-6">Date</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead>Payee (Supplier/Contractor)</TableHead>
-                  <TableHead className="text-right">Amount Paid</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Mode</TableHead>
-                  <TableHead className="text-right px-6">Audit</TableHead>
+                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
+                    <div className="flex items-center">Date <SortIcon column="date" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('reference')}>
+                    <div className="flex items-center">Reference <SortIcon column="reference" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('payee')}>
+                    <div className="flex items-center">Payee <SortIcon column="payee" /></div>
+                  </TableHead>
+                  <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('amount')}>
+                    <div className="flex items-center justify-end">Amount Paid <SortIcon column="amount" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('type')}>
+                    <div className="flex items-center">Type <SortIcon column="type" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('mode')}>
+                    <div className="flex items-center">Mode <SortIcon column="mode" /></div>
+                  </TableHead>
+                  <TableHead className="text-right px-6">Manage</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -160,11 +310,23 @@ export default function ProjectWisePaymentsPage() {
                     </TableCell>
                     <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{p.paymentMode}</TableCell>
                     <TableCell className="text-right px-6">
-                      {p.proofUrl && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
-                          <a href={p.proofUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
-                        </Button>
-                      )}
+                      <div className="flex justify-end gap-1">
+                        {p.proofUrl && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" asChild>
+                            <a href={p.proofUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
+                          </Button>
+                        )}
+                        {(isAdmin) && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => setEditingPayment(p)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingPayment(p)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )) : (
@@ -175,6 +337,78 @@ export default function ProjectWisePaymentsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingPayment} onOpenChange={(o) => !o && setEditingPayment(null)}>
+        <DialogContent className="max-w-md rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Pencil className="h-5 w-5 text-primary" /> Edit Payment Entry</DialogTitle>
+            <DialogDescription>Modify transaction details. Balances will be updated automatically.</DialogDescription>
+          </DialogHeader>
+          {editingPayment && (
+            <form onSubmit={handleEdit} className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase">Payment Amount (₹)</Label>
+                <Input name="amount" type="number" step="0.01" defaultValue={editingPayment.amount} required className="font-mono font-bold h-11" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase">Type</Label>
+                  <Select name="type" defaultValue={editingPayment.paymentType}>
+                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Advance">Advance</SelectItem>
+                      <SelectItem value="Part">Part</SelectItem>
+                      <SelectItem value="Final">Final</SelectItem>
+                      <SelectItem value="Full">Full</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase">Mode</Label>
+                  <Select name="mode" defaultValue={editingPayment.paymentMode}>
+                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="UPI">UPI</SelectItem>
+                      <SelectItem value="Cheque">Cheque</SelectItem>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase">Reference / Notes</Label>
+                <Input name="details" defaultValue={editingPayment.paymentDetails} className="h-10" />
+              </div>
+              <DialogFooter className="pt-4 gap-2">
+                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
+                <Button type="submit" disabled={isProcessing} className="rounded-sm font-black uppercase text-[10px] min-w-[120px]">
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deletingPayment} onOpenChange={(o) => !o && setDeletingPayment(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2"><Trash2 className="h-5 w-5" /> Confirm Deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this payment entry for ₹{deletingPayment?.amount.toLocaleString()}? This will restore the balance on the associated PO/WO.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={isProcessing} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px]">
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
