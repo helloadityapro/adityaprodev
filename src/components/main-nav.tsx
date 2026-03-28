@@ -45,7 +45,9 @@ import {
   UserPlus,
   Activity,
   Fuel,
-  Plus
+  Plus,
+  Settings2,
+  Tag
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -197,6 +199,26 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
+                    {isAdmin && (
+                      <>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === '/inventory/manage'} onClick={handleMobileClose}>
+                            <Link href="/inventory/manage">
+                              <Settings2 className="h-4 w-4 text-primary" />
+                              <span>Manage Items</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={pathname === '/inventory/categories'} onClick={handleMobileClose}>
+                            <Link href="/inventory/categories">
+                              <Tag className="h-4 w-4 text-primary" />
+                              <span>Categories</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </>
+                    )}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>
