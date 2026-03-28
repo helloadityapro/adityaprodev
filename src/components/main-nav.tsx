@@ -252,6 +252,11 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
+                {(isAdmin || isManager) && pendingPtwCount > 0 && (
+                  <SidebarMenuBadge className="bg-red-600 text-white rounded-full font-black h-5 w-5 flex items-center justify-center text-[9px] shadow-sm animate-in zoom-in duration-300">
+                    {pendingPtwCount}
+                  </SidebarMenuBadge>
+                )}
                 <CollapsibleContent>
                   <SidebarMenuSub>
                     <SidebarMenuSubItem>
@@ -262,18 +267,13 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
-                    <SidebarMenuSubItem className="relative">
+                    <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname === '/ptw/list'} onClick={handleMobileClose}>
                         <Link href="/ptw/list">
                           <List className="h-4 w-4" />
                           <span>My PtWs</span>
                         </Link>
                       </SidebarMenuSubButton>
-                      {(isAdmin || isManager) && pendingPtwCount > 0 && (
-                        <SidebarMenuBadge className="bg-red-600 text-white rounded-full font-black h-5 w-5 flex items-center justify-center text-[9px] shadow-sm animate-in zoom-in duration-300">
-                          {pendingPtwCount}
-                        </SidebarMenuBadge>
-                      )}
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname === '/ptw/activities'} onClick={handleMobileClose}>
