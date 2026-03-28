@@ -42,7 +42,9 @@ import {
   PackageCheck,
   Layers,
   ShieldCheck,
-  UserPlus
+  UserPlus,
+  ShoppingBag,
+  CirclePlus
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -165,6 +167,48 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                         <Link href="/inventory/data">
                           <TableIcon className="h-4 w-4" />
                           <span>Movement Data</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {!isDriver && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/purchase-orders')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Purchase Orders" isActive={pathname.startsWith('/purchase-orders')} className="rounded-sm">
+                    <ShoppingBag className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Purchase Orders</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/purchase-orders/create'} onClick={handleMobileClose}>
+                        <Link href="/purchase-orders/create">
+                          <CirclePlus className="h-4 w-4" />
+                          <span>Add New PO</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/purchase-orders/manage'} onClick={handleMobileClose}>
+                        <Link href="/purchase-orders/manage">
+                          <List className="h-4 w-4" />
+                          <span>Manage PO</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/purchase-orders/suppliers'} onClick={handleMobileClose}>
+                        <Link href="/purchase-orders/suppliers">
+                          <TrendingUp className="h-4 w-4" />
+                          <span>Supplier Summary</span>
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
