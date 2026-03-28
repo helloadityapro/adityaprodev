@@ -267,7 +267,7 @@ export default function ProjectWisePaymentsPage() {
         </div>
 
         <div className="flex flex-col gap-1.5 w-full md:w-48">
-          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Payment Type</Label>
+          <Label className="text-[10px) font-black uppercase text-muted-foreground tracking-widest px-1">Payment Type</Label>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="h-10 rounded-sm bg-background border-primary/20 font-bold"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -298,7 +298,7 @@ export default function ProjectWisePaymentsPage() {
                     <div className="flex items-center">Reference <SortIcon column="reference" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('payee')}>
-                    <div className="flex items-center">Payee <SortIcon column="payee" /></div>
+                    <div className="flex items-center">Paid to <SortIcon column="payee" /></div>
                   </TableHead>
                   <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('amount')}>
                     <div className="flex items-center justify-end">Amount Paid <SortIcon column="amount" /></div>
