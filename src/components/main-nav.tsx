@@ -44,7 +44,8 @@ import {
   ShieldCheck,
   UserPlus,
   ShoppingBag,
-  CirclePlus
+  CirclePlus,
+  TrendingUp
 } from "lucide-react"
 import {
   SidebarMenu,
