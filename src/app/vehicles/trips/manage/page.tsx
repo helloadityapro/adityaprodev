@@ -59,6 +59,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Assignment = {
   id: string;
@@ -111,6 +121,8 @@ export default function ManageAllTripsPage() {
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [approvalTarget, setApprovalState] = React.useState<{ assignment: Assignment, vehicleId: string, driverId: string } | null>(null);
   const [detailsAssignment, setDetailsAssignment] = React.useState<Assignment | null>(null);
+  const [cancelTarget, setCancelTarget] = React.useState<Assignment | null>(null);
+  const [isCancelling, setIsCancelling] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -230,12 +242,38 @@ export default function ManageAllTripsPage() {
     }
   };
 
-  const handleReject = (id: string) => {
-    updateDocumentNonBlocking(doc(firestore, 'vehicle_assignments', id), {
-      status: 'Rejected',
-      processedDate: serverTimestamp(),
-    });
-    toast({ title: 'Request Rejected' });
+  const handleConfirmCancel = async () => {
+    if (!cancelTarget) return;
+    setIsCancelling(true);
+
+    try {
+      // 1. Mark trip as Rejected (Cancellation status)
+      updateDocumentNonBlocking(doc(firestore, 'vehicle_assignments', cancelTarget.id), {
+        status: 'Rejected',
+        updatedAt: serverTimestamp(),
+        cancelledAt: serverTimestamp(),
+        cancelledById: user?.uid
+      });
+
+      // 2. Release vehicle if it was already alloted
+      if (cancelTarget.vehicleId) {
+        updateDocumentNonBlocking(doc(firestore, 'vehicles', cancelTarget.vehicleId), {
+          status: 'Available'
+        });
+      }
+
+      toast({ title: 'Trip Cancelled', description: 'The trip request has been revoked and fleet resources released.' });
+      setCancelTarget(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Cancellation Failed', description: e.message });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleReject = (assignment: Assignment) => {
+    // Reuse cancellation logic for rejection to ensure vehicle release
+    setCancelTarget(assignment);
   };
 
   const handleExport = () => {
@@ -347,6 +385,7 @@ export default function ManageAllTripsPage() {
                       const isRequester = trip.userId === user?.uid;
                       const canFinishTrip = isAssignedDriver || isAdmin || isRequester;
                       const canStartTrip = isAssignedDriver;
+                      const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
 
                       return (
                         <TableRow key={trip.id} className="hover:bg-muted/5 transition-colors">
@@ -399,6 +438,17 @@ export default function ManageAllTripsPage() {
                           </TableCell>
                           <TableCell className="text-right px-6">
                             <div className="flex justify-end gap-1">
+                              {canCancel && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" 
+                                  onClick={(e) => { e.stopPropagation(); setCancelTarget(trip); }}
+                                  title="Cancel Trip"
+                                >
+                                  <CircleX className="h-4 w-4" />
+                                </Button>
+                              )}
                               {(canStartTrip && trip.status === 'Approved') && (
                                 <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" asChild>
                                   <Link href={`/vehicles/trips/${trip.id}/start`}>Start Trip</Link>
@@ -466,7 +516,7 @@ export default function ManageAllTripsPage() {
                               <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "" })}>
                                 Allot Vehicle
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => handleReject(trip.id)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => handleReject(trip)}>
                                 <CircleX className="h-4 w-4" />
                               </Button>
                             </div>
@@ -570,7 +620,7 @@ export default function ManageAllTripsPage() {
       {/* Trip Details Modal */}
       <Dialog open={!!detailsAssignment} onOpenChange={(o) => !o && handleCloseDetails()}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Navigation className="h-5 w-5 text-primary" /></div>
               <div>
@@ -740,6 +790,31 @@ export default function ManageAllTripsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cancellation Confirmation */}
+      <AlertDialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
+              <CircleX className="h-5 w-5" /> Revoke Trip Request
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+              Are you sure you want to cancel this trip request? If a vehicle has already been alloted, it will be automatically released back into the available pool.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Back</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmCancel} 
+              disabled={isCancelling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] shadow-lg"
+            >
+              {isCancelling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirm Cancellation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
