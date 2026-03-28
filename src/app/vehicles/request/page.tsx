@@ -10,7 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, useCollection } from '@/firebase';
+import { 
+  useFirestore, 
+  useUser, 
+  useDoc, 
+  useMemoFirebase, 
+  addDocumentNonBlocking, 
+  useCollection 
+} from '@/firebase';
 import { collection, doc, serverTimestamp, query, where } from 'firebase/firestore';
 import { 
   Fuel, 
@@ -33,9 +40,8 @@ import {
   History, 
   UserCheck,
   RefreshCcw,
-  Flag,
-  Clock,
-  Calendar
+  Calendar,
+  Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
@@ -45,7 +51,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { format, parse } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -382,32 +387,31 @@ export default function RequestVehiclePage() {
                       <FormItem>
                         <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Driver Reporting Time (12h)</FormLabel>
                         <FormControl>
-                          <div className="flex gap-2">
-                            <Select 
-                              value={field.value?.split(':')[0] || "09"} 
-                              onValueChange={(h) => field.onChange(`${h}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${field.value?.split(' ')[1] || "AM"}`)}
-                            >
-                              <SelectTrigger className="h-11 rounded-sm w-[70px]"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0')).map(h => (
-                                  <SelectItem key={h} value={h}>{h}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select 
-                              value={field.value?.split(':')[1]?.split(' ')[0] || "00"} 
-                              onValueChange={(m) => field.onChange(`${field.value?.split(':')[0] || "09"}:${m} ${field.value?.split(' ')[1] || "AM"}`)}
-                            >
-                              <SelectTrigger className="h-11 rounded-sm w-[70px]"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {["00", "15", "30", "45"].map(m => (
-                                  <SelectItem key={m} value={m}>{m}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                          <div className="flex items-center gap-2">
+                            <Input 
+                              className="h-11 rounded-sm w-[60px] text-center font-bold" 
+                              placeholder="HH"
+                              maxLength={2}
+                              value={field.value?.split(':')[0] || "09"}
+                              onChange={(e) => {
+                                const h = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                field.onChange(`${h}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${field.value?.split(' ')[1] || "AM"}`);
+                              }}
+                            />
+                            <span className="font-bold">:</span>
+                            <Input 
+                              className="h-11 rounded-sm w-[60px] text-center font-bold" 
+                              placeholder="MM"
+                              maxLength={2}
+                              value={field.value?.split(':')[1]?.split(' ')[0] || "00"}
+                              onChange={(e) => {
+                                const m = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                field.onChange(`${field.value?.split(':')[0] || "09"}:${m} ${field.value?.split(' ')[1] || "AM"}`);
+                              }}
+                            />
                             <Select 
                               value={field.value?.split(' ')[1] || "AM"} 
-                              onValueChange={(p) => field.onChange(`${field.value?.split(' ')[0] || "09"}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${p}`)}
+                              onValueChange={(p) => field.onChange(`${field.value?.split(':')[0] || "09"}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${p}`)}
                             >
                               <SelectTrigger className="h-11 rounded-sm w-[80px]"><SelectValue /></SelectTrigger>
                               <SelectContent>
