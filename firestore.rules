@@ -58,7 +58,7 @@ service cloud.firestore {
 
     match /project_pos/{poId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isAdmin() || (isSignedIn() && getUserData().role == 'Site Manager');
     }
 
     match /project_wos/{woId} {
@@ -194,6 +194,11 @@ service cloud.firestore {
     match /ptw_types/{typeId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && getUserData().role == 'Site Manager');
     }
   }
 }

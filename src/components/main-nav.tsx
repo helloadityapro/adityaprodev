@@ -3,25 +3,16 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-  FilePlus,
-  List,
   ChevronDown,
-  CalendarCheck,
-  Clock,
   History,
   FolderOpen,
   GraduationCap,
   Trophy,
-  Fuel,
-  MapPinned,
-  Car,
   Navigation,
-  Activity,
   CheckSquare,
   ListTodo,
   FileText,
   Table as TableIcon,
-  Package,
   ArrowLeftRight,
   FileBarChart,
   CalendarDays,
@@ -40,12 +31,17 @@ import {
   HardHat,
   Gavel,
   PackageCheck,
-  Layers,
   ShieldCheck,
-  UserPlus,
   ShoppingBag,
   CirclePlus,
-  TrendingUp
+  TrendingUp,
+  HandCoins,
+  FilePlus,
+  MapPinned,
+  Car,
+  CalendarCheck,
+  Clock,
+  List
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -53,7 +49,6 @@ import {
   SidebarMenuButton,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarMenuBadge,
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
@@ -103,7 +98,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Learning Hub" isActive={pathname.startsWith('/lms')} className="rounded-sm" onClick={handleMobileClose}>
               <Link href="/lms">
-                <GraduationCap className="h-4 w-4" />
+                <BookOpen className="h-4 w-4" />
                 <span className="font-medium">Learning Hub</span>
               </Link>
             </SidebarMenuButton>
@@ -252,6 +247,56 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                         <Link href="/work-orders/contractors">
                           <TrendingUp className="h-4 w-4" />
                           <span>Contractor Summary</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {!isDriver && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/payments')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Payments" isActive={pathname.startsWith('/payments')} className="rounded-sm">
+                    <HandCoins className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Payments</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/payments/record'} onClick={handleMobileClose}>
+                        <Link href="/payments/record">
+                          <CirclePlus className="h-4 w-4" />
+                          <span>Record Payment</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/payments/project-wise'} onClick={handleMobileClose}>
+                        <Link href="/payments/project-wise">
+                          <Building2 className="h-4 w-4" />
+                          <span>Project-wise</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/payments/supplier-wise'} onClick={handleMobileClose}>
+                        <Link href="/payments/supplier-wise">
+                          <Truck className="h-4 w-4" />
+                          <span>Supplier-wise</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/payments/contractor-wise'} onClick={handleMobileClose}>
+                        <Link href="/payments/contractor-wise">
+                          <HardHat className="h-4 w-4" />
+                          <span>Contractor-wise</span>
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
