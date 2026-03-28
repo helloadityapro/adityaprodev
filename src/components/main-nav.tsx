@@ -220,6 +220,48 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           )}
 
           {!isDriver && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/work-orders')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Work Orders" isActive={pathname.startsWith('/work-orders')} className="rounded-sm">
+                    <Gavel className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Work Orders</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/work-orders/create'} onClick={handleMobileClose}>
+                        <Link href="/work-orders/create">
+                          <CirclePlus className="h-4 w-4" />
+                          <span>Add New WO</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/work-orders/manage'} onClick={handleMobileClose}>
+                        <Link href="/work-orders/manage">
+                          <List className="h-4 w-4" />
+                          <span>Manage WO</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/work-orders/contractors'} onClick={handleMobileClose}>
+                        <Link href="/work-orders/contractors">
+                          <TrendingUp className="h-4 w-4" />
+                          <span>Contractor Summary</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {!isDriver && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/dpr')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
