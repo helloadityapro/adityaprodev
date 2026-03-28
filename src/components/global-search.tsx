@@ -91,7 +91,7 @@ export function GlobalSearch() {
             type: 'Site',
             title: data.name,
             subtitle: `${data.projectCompany} • ID: ${d.id.slice(0, 8)}`,
-            link: `/sites/${d.id}/activities`
+            link: `/projects/${d.id}`
           });
         }
       });
