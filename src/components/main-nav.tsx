@@ -44,7 +44,8 @@ import {
   ArrowLeftRight,
   UserPlus,
   Activity,
-  Fuel
+  Fuel,
+  Plus
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -118,13 +119,23 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         </SidebarMenu>
       </SidebarGroup>
 
-      {/* Operations Section */}
+      {/* Projects Section */}
       <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Operations</SidebarGroupLabel>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Projects</SidebarGroupLabel>
         <SidebarMenu>
+          {isAdmin && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Add New Project" isActive={pathname === '/projects/add'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/projects/add">
+                  <Plus className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Add New Project</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           {!isDriver && (
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Manage Projects" isActive={pathname.startsWith('/projects')} className="rounded-sm" onClick={handleMobileClose}>
+              <SidebarMenuButton asChild tooltip="Manage Projects" isActive={pathname === '/projects/list'} className="rounded-sm" onClick={handleMobileClose}>
                 <Link href="/projects/list">
                   <Briefcase className="h-4 w-4 text-primary" />
                   <span className="font-medium">Manage Projects</span>
@@ -132,7 +143,13 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
+        </SidebarMenu>
+      </SidebarGroup>
 
+      {/* Operations Section */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Operations</SidebarGroupLabel>
+        <SidebarMenu>
           {!isDriver && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/inventory')} className="group/collapsible">
               <SidebarMenuItem>
@@ -592,14 +609,6 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <Link href="/settings/permits">
                       <FileCheck className="h-4 w-4 text-primary" />
                       <span className="font-bold">Permit Management</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Manage Sites" isActive={pathname === '/settings/manage-sites'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/manage-sites">
-                      <MapPin className="h-4 w-4" />
-                      <span className="font-medium">Manage Sites</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

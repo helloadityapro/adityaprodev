@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -12,7 +11,6 @@ import {
   LifeBuoy, 
   Phone, 
   Settings2, 
-  MapPin, 
   Coins, 
   Users, 
   Workflow, 
@@ -58,7 +56,6 @@ export default function SettingsPage() {
   };
 
   const adminTools = [
-    { label: 'Manage Sites', href: '/settings/manage-sites', icon: MapPin, color: 'text-blue-600' },
     { label: 'Rewards Setup', href: '/settings/rewards', icon: Coins, color: 'text-amber-600' },
     { label: 'User Directory', href: '/settings/users', icon: Users, color: 'text-purple-600' },
     { label: 'Team Mapping', href: '/settings/teams', icon: Workflow, color: 'text-emerald-600' },
