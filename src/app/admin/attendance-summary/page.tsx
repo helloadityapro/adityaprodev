@@ -127,7 +127,6 @@ export default function AttendanceSummaryPage() {
     if (!allUsers || !attendanceRecords) return [];
 
     const data = allUsers
-      .filter(u => u.role !== 'Admin' && u.role !== 'Manager - Human Resources') // Only show operations staff
       .map(u => {
         const record = attendanceRecords.find(r => r.userId === u.id);
         return {
@@ -332,7 +331,7 @@ export default function AttendanceSummaryPage() {
                     placeholder="Name or email..." 
                     className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
                     value={searchTerm} 
-                    onChange={(e) => setSearchTerm(item.target.value)} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
                   />
                 </div>
               </div>
