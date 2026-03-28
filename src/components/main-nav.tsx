@@ -22,7 +22,6 @@ import {
   FileText,
   Table as TableIcon,
   Package,
-  ClipboardList,
   ArrowLeftRight,
   FileBarChart,
   CalendarDays,
@@ -41,7 +40,9 @@ import {
   HardHat,
   Gavel,
   PackageCheck,
-  Layers
+  Layers,
+  ShieldCheck,
+  UserPlus
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -74,7 +75,49 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
 
   return (
     <div className="flex flex-col gap-4 py-2 flex-1">
-      {/* Main Operations Section */}
+      {/* High Priority Section - ALWAYS ON TOP */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Main Hub</SidebarGroupLabel>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/reports'} className="rounded-sm" onClick={handleMobileClose}>
+              <Link href="/reports">
+                <FileBarChart className="h-4 w-4 text-primary" />
+                <span className="font-bold">Dashboard</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Documents" isActive={pathname.startsWith('/documents')} className="rounded-sm" onClick={handleMobileClose}>
+              <Link href="/documents">
+                <FolderOpen className="h-4 w-4" />
+                <span className="font-medium">Documents</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Learning Hub" isActive={pathname.startsWith('/lms')} className="rounded-sm" onClick={handleMobileClose}>
+              <Link href="/lms">
+                <GraduationCap className="h-4 w-4" />
+                <span className="font-medium">Learning Hub</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Points Bank" isActive={pathname === '/rewards'} className="rounded-sm" onClick={handleMobileClose}>
+              <Link href="/rewards">
+                <Trophy className="h-4 w-4 text-amber-500" />
+                <span className="font-medium">Points Bank</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarGroup>
+
+      {/* Operations Section */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Operations</SidebarGroupLabel>
         <SidebarMenu>
@@ -83,7 +126,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               <SidebarMenuButton asChild tooltip="Manage Projects" isActive={pathname.startsWith('/projects')} className="rounded-sm" onClick={handleMobileClose}>
                 <Link href="/projects/list">
                   <Briefcase className="h-4 w-4 text-primary" />
-                  <span className="font-bold">Manage Projects</span>
+                  <span className="font-medium">Manage Projects</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -132,16 +175,208 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           )}
 
           {!isDriver && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/reports'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/reports">
-                  <FileBarChart className="h-4 w-4" />
-                  <span className="font-medium">Dashboard</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <Collapsible asChild defaultOpen={pathname.startsWith('/dpr')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="DPR" isActive={pathname.startsWith('/dpr')} className="rounded-sm">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <span className="font-medium">DPR</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/dpr/submit'} onClick={handleMobileClose}>
+                        <Link href="/dpr/submit">
+                          <FilePlus className="h-4 w-4" />
+                          <span>Submit DPR</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/dpr/list'} onClick={handleMobileClose}>
+                        <Link href="/dpr/list">
+                          <TableIcon className="h-4 w-4" />
+                          <span>DPR Data</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
           )}
-          
+
+          {!isDriver && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/tasks')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Tasks" isActive={pathname.startsWith('/tasks')} className="rounded-sm">
+                    <CheckSquare className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Tasks</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/tasks/create'} onClick={handleMobileClose}>
+                        <Link href="/tasks/create">
+                          <UserPlus className="h-4 w-4" />
+                          <span>Assign Task</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/tasks/list'} onClick={handleMobileClose}>
+                        <Link href="/tasks/list">
+                          <ListTodo className="h-4 w-4" />
+                          <span>Task Board</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {!isDriver && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/ptw')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Permits" isActive={pathname.startsWith('/ptw')} className="rounded-sm">
+                    <ShieldCheck className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Permits</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/ptw/raise'} onClick={handleMobileClose}>
+                        <Link href="/ptw/raise">
+                          <FilePlus className="h-4 w-4" />
+                          <span>Request a PtW</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem className="relative">
+                      <SidebarMenuSubButton asChild isActive={pathname === '/ptw/list'} onClick={handleMobileClose}>
+                        <Link href="/ptw/list">
+                          <List className="h-4 w-4" />
+                          <span>My PtWs</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                      {(isAdmin || isManager) && pendingPtwCount > 0 && (
+                        <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
+                          {pendingPtwCount}
+                        </SidebarMenuBadge>
+                      )}
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/ptw/activities'} onClick={handleMobileClose}>
+                        <Link href="/ptw/activities">
+                          <History className="h-4 w-4" />
+                          <span>PtW Activities</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {!isDriver && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/site-visits')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Visits" isActive={pathname.startsWith('/site-visits')} className="rounded-sm">
+                    <Navigation className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Visits</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/site-visits/start'} onClick={handleMobileClose}>
+                        <Link href="/site-visits/start">
+                          <Navigation className="h-4 w-4" />
+                          <span>Start a Site Visit</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/site-visits/active'} onClick={handleMobileClose}>
+                        <Link href="/site-visits/active">
+                          <Activity className="h-4 w-4" />
+                          <span>Active Visits</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/site-visits/history'} onClick={handleMobileClose}>
+                        <Link href="/site-visits/history">
+                          <History className="h-4 w-4" />
+                          <span>Visits Data</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+        </SidebarMenu>
+      </SidebarGroup>
+
+      {/* Logistics & Fleet */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Logistics & Fleet</SidebarGroupLabel>
+        <SidebarMenu>
+          <Collapsible asChild defaultOpen={pathname.startsWith('/vehicles')} className="group/collapsible">
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton tooltip="Vehicles" isActive={pathname.startsWith('/vehicles')} className="rounded-sm">
+                  <Car className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Vehicles</span>
+                  <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {!isDriver && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/vehicles/request'} onClick={handleMobileClose}>
+                        <Link href="/vehicles/request">
+                          <Fuel className="h-4 w-4" />
+                          <span>Request a Vehicle</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/vehicles/trips/manage'} onClick={handleMobileClose}>
+                      <Link href="/vehicles/trips/manage">
+                        <MapPinned className="h-4 w-4" />
+                        <span>Trips</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
+        </SidebarMenu>
+      </SidebarGroup>
+
+      {/* Attendance Group */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Attendance</SidebarGroupLabel>
+        <SidebarMenu>
           <Collapsible asChild defaultOpen={pathname.startsWith('/attendance')} className="group/collapsible">
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
@@ -173,206 +408,6 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
               </CollapsibleContent>
             </SidebarMenuItem>
           </Collapsible>
-
-          {!isDriver && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Documents" isActive={pathname.startsWith('/documents')} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/documents">
-                  <FolderOpen className="h-4 w-4" />
-                  <span className="font-medium">Documents</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-          
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Learning Hub" isActive={pathname.startsWith('/lms')} className="rounded-sm" onClick={handleMobileClose}>
-              <Link href="/lms">
-                <GraduationCap className="h-4 w-4" />
-                <span className="font-medium">Learning Hub</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Rewards & Points" isActive={pathname === '/rewards'} className="rounded-sm" onClick={handleMobileClose}>
-              <Link href="/rewards">
-                <Trophy className="h-4 w-4 text-amber-500" />
-                <span className="font-medium">Points Bank</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarGroup>
-
-      {/* SITE VISITS Group */}
-      {!isDriver && (
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">SITE VISITS</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Start a Site Visit" isActive={pathname === '/site-visits/start'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/site-visits/start">
-                  <Navigation className="h-4 w-4" />
-                  <span className="font-medium">Start a Site Visit</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Active Visits" isActive={pathname === '/site-visits/active'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/site-visits/active">
-                  <Activity className="h-4 w-4" />
-                  <span className="font-medium">Ongoing Visits</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Visit History" isActive={pathname === '/site-visits/history'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/site-visits/history">
-                  <History className="h-4 w-4" />
-                  <span className="font-medium">Visit Archive</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      )}
-
-      {/* TASKS Group */}
-      {!isDriver && (
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">TASKS</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Assign New Task" isActive={pathname === '/tasks/create'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/tasks/create">
-                  <CheckSquare className="h-4 w-4" />
-                  <span className="font-medium">Assign Task</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Tasks Audit" isActive={pathname === '/tasks/list'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/tasks/list">
-                  <ListTodo className="h-4 w-4" />
-                  <span className="font-medium">Tasks Audit</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      )}
-
-      {/* PERMIT TO WORK Group */}
-      {!isDriver && (
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">PERMIT TO WORK</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Request a PtW" isActive={pathname === '/ptw/raise'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/ptw/raise">
-                  <FilePlus className="h-4 w-4" />
-                  <span className="font-medium">Request a PtW</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem className="relative">
-              <SidebarMenuButton asChild tooltip="My PtWs" isActive={pathname === '/ptw/list'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/ptw/list">
-                  <List className="h-4 w-4" />
-                  <span className="font-medium">My PtWs</span>
-                </Link>
-              </SidebarMenuButton>
-              {(isAdmin || isManager) && pendingPtwCount > 0 && (
-                <SidebarMenuBadge className="bg-red-500 text-white rounded-sm font-bold h-4 min-w-4 text-[10px]">
-                  {pendingPtwCount}
-                </SidebarMenuBadge>
-              )}
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="PtW Activities" isActive={pathname === '/ptw/activities'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/ptw/activities">
-                  <History className="h-4 w-4" />
-                  <span className="font-medium">PtW Activities</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      )}
-
-      {/* Documentation Group */}
-      {!isDriver && (
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Documentation</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Submit DPR" isActive={pathname === '/dpr/submit'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/dpr/submit">
-                  <FilePlus className="h-4 w-4" />
-                  <span className="font-medium">Submit Daily Report</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="DPR Data" isActive={pathname === '/dpr/list'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/dpr/list">
-                  <TableIcon className="h-4 w-4" />
-                  <span className="font-medium">DPR Data</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      )}
-
-      {/* SITE REQUIREMENTS Group */}
-      {!isDriver && (
-        <SidebarGroup>
-          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">SITE REQUIREMENTS</SidebarGroupLabel>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Submit Requirement" isActive={pathname === '/requirements/submit'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/requirements/submit">
-                  <Package className="h-4 w-4" />
-                  <span className="font-medium">Submit Requirement</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Requirement Data" isActive={pathname === '/requirements/list'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/requirements/list">
-                  <ClipboardList className="h-4 w-4" />
-                  <span className="font-medium">Requirement Data</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroup>
-      )}
-
-      {/* Logistics & Fleet */}
-      <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Logistics & Fleet</SidebarGroupLabel>
-        <SidebarMenu>
-          {!isDriver && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Request a Vehicle" isActive={pathname === '/vehicles/request'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/vehicles/request">
-                  <Fuel className="h-4 w-4" />
-                  <span className="font-medium">Vehicle Request</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Manage Trips" isActive={pathname === '/vehicles/trips/manage'} className="rounded-sm" onClick={handleMobileClose}>
-              <Link href="/vehicles/trips/manage">
-                <MapPinned className="h-4 w-4 text-indigo-600" />
-                <span className="font-bold">Trip Management</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroup>
       
@@ -408,7 +443,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/admin/dashboard'} className="rounded-sm" onClick={handleMobileClose}>
+                  <SidebarMenuButton asChild tooltip="Admin Dashboard" isActive={pathname === '/admin/dashboard'} className="rounded-sm" onClick={handleMobileClose}>
                     <Link href="/admin/dashboard">
                       <LayoutDashboard className="h-4 w-4" />
                       <span className="font-medium">Dashboard</span>

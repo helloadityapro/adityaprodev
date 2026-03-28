@@ -160,13 +160,13 @@ export default function CheckInPage() {
           <h1 className="flex items-center gap-2">
             <CalendarCheck className="h-6 w-6 text-primary" /> Check-in
           </h1>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <p className="text-muted-foreground text-xs font-medium">Verify your site presence.</p>
             <Badge variant="outline" className={cn(
-              "h-5 px-1.5 text-[8px] font-black uppercase rounded-sm border-none shadow-sm",
-              isCheckedIn ? "bg-emerald-500 text-white" : "bg-amber-500 text-white"
+              "h-8 sm:h-9 px-3 sm:px-4 text-[10px] sm:text-xs font-black uppercase rounded-sm border-none shadow-md animate-in fade-in zoom-in-95 duration-500",
+              isCheckedIn ? "bg-emerald-600 text-white" : "bg-amber-600 text-white"
             )}>
-              Status: {isCheckedIn ? 'Checked-in' : 'Checked-out'}
+              {isCheckedIn ? 'Status: Session Active' : 'Status: Checked-out'}
             </Badge>
           </div>
         </div>
@@ -182,7 +182,6 @@ export default function CheckInPage() {
         </CardHeader>
         <CardContent className="pt-6 space-y-6">
           <div className="flex flex-col items-center gap-4">
-            {/* Doubled height and full preview logic */}
             <div className={cn("relative w-full h-80 bg-black rounded-sm overflow-hidden shadow-2xl border-4 border-primary/10", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
               <div className="absolute top-4 left-4">
