@@ -286,7 +286,7 @@ export default function ProjectWisePaymentsPage() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
-                    <div className="flex items-center">Date <SortIcon column="date" /></div>
+                    <div className="flex items-center">Date & Time <SortIcon column="date" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('company')}>
                     <div className="flex items-center">Project Company <SortIcon column="company" /></div>
@@ -311,12 +311,12 @@ export default function ProjectWisePaymentsPage() {
                 {filteredPayments.length > 0 ? filteredPayments.map((p) => (
                   <TableRow key={p.id} className="hover:bg-muted/5 transition-colors">
                     <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
-                      {p.date ? format(p.date.toDate(), 'dd MMM yy') : '—'}
+                      {p.date ? format(p.date.toDate(), 'dd MMM yy HH:mm') : '—'}
                     </TableCell>
-                    <TableCell className="text-sm font-semibold text-foreground">
+                    <TableCell className="text-sm font-bold text-foreground">
                       {p.projectCompany || 'Aditya Green Energy'}
                     </TableCell>
-                    <TableCell className="text-sm font-semibold text-foreground">
+                    <TableCell className="text-sm font-bold text-foreground">
                       {p.siteName}
                     </TableCell>
                     <TableCell>
@@ -325,7 +325,7 @@ export default function ProjectWisePaymentsPage() {
                         <Badge variant="outline" className="w-fit text-[8px] h-4 px-1 rounded-sm mt-1">{p.paymentAgainst}</Badge>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm font-semibold">{p.payeeName}</TableCell>
+                    <TableCell className="text-sm font-bold">{p.payeeName}</TableCell>
                     <TableCell className="text-right font-black text-sm font-mono text-foreground">
                       ₹{p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </TableCell>

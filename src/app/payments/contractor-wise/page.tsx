@@ -275,7 +275,7 @@ export default function ContractorWisePaymentsPage() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
-                    <div className="flex items-center">Date <SortIcon column="date" /></div>
+                    <div className="flex items-center">Date & Time <SortIcon column="date" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('company')}>
                     <div className="flex items-center">Project Company <SortIcon column="company" /></div>
@@ -297,12 +297,12 @@ export default function ContractorWisePaymentsPage() {
                 {filteredPayments.length > 0 ? filteredPayments.map((p) => (
                   <TableRow key={p.id} className="hover:bg-muted/5 transition-colors">
                     <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
-                      {p.date ? format(p.date.toDate(), 'dd MMM yy') : '—'}
+                      {p.date ? format(p.date.toDate(), 'dd MMM yy HH:mm') : '—'}
                     </TableCell>
-                    <TableCell className="text-sm font-semibold text-foreground">
+                    <TableCell className="text-sm font-bold text-foreground">
                       {p.projectCompany || 'Aditya Green Energy'}
                     </TableCell>
-                    <TableCell className="text-sm font-semibold text-foreground">
+                    <TableCell className="text-sm font-bold text-foreground">
                       {p.siteName}
                     </TableCell>
                     <TableCell className="font-mono text-xs font-black text-primary uppercase">{p.referenceNumber}</TableCell>
