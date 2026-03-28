@@ -90,6 +90,9 @@ export default function RecordPaymentPage() {
   const [availablePayees, setAvailablePayees] = React.useState<AvailablePayee[]>([]);
   const [orders, setOrders] = React.useState<any[]>([]);
 
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile } = useDoc<any>(userProfileRef);
+
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites } = useCollection<Site>(sitesQuery);
 
@@ -105,7 +108,6 @@ export default function RecordPaymentPage() {
   const watchPayeeId = form.watch('payeeId');
   const watchRefId = form.watch('referenceId');
 
-  // Logic: When Site or Type changes, discover payees who have available orders
   React.useEffect(() => {
     const fetchDiscoveryData = async () => {
       if (!watchSiteId) {
@@ -132,7 +134,6 @@ export default function RecordPaymentPage() {
           const paid = data.paidAmount || 0;
           const status = data.status || '';
           
-          // Logic: available if not cancelled and has outstanding balance
           if (status !== 'Cancelled' && (total - paid) > 0.01) {
             const pid = data[payeeIdField];
             const pName = data[payeeNameField];
@@ -168,6 +169,7 @@ export default function RecordPaymentPage() {
     : 0;
 
   const onSubmit = async (values: z.infer<typeof paymentSchema>) => {
+    if (!user || !userProfile) return;
     if (values.amount > remainingPayable + 0.01) {
       toast({ variant: 'destructive', title: 'Overpayment Restricted', description: `Maximum allowed amount is ₹${remainingPayable.toFixed(2)}` });
       return;
@@ -184,15 +186,23 @@ export default function RecordPaymentPage() {
         proofUrl = await getDownloadURL(sRef);
       }
 
+      const recorderName = userProfile.username || user.displayName || user.email || 'System User';
+
       await addDocumentNonBlocking(collection(firestore, 'payments'), {
         ...values,
         proofUrl,
         date: serverTimestamp(),
-        recordedById: user?.uid,
-        recordedByName: user?.displayName || user?.email
+        recordedById: user.uid,
+        recordedByName: recorderName,
+        editHistory: [{
+          action: 'Created',
+          timestamp: new Date().toISOString(),
+          userId: user.uid,
+          userName: recorderName,
+          details: 'Initial payment entry recorded.'
+        }]
       });
 
-      // Update source document totals
       const coll = values.paymentAgainst === 'PO' ? 'project_pos' : 'project_wos';
       const docRef = doc(firestore, coll, values.referenceId);
       updateDocumentNonBlocking(docRef, {
@@ -243,7 +253,7 @@ export default function RecordPaymentPage() {
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant="outline" className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>
+                          <Button variant="outline" role="combobox" className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>
                             {field.value ? sites?.find(s => s.id === field.value)?.name : "Choose site..."}
                             <Building2 className="ml-2 h-4 w-4 opacity-50" />
                           </Button>
@@ -461,26 +471,5 @@ export default function RecordPaymentPage() {
         </form>
       </Form>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
-  const colors = {
-    primary: "bg-primary/5 border-primary/10 text-primary",
-    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
-    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
-    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
-  };
-
-  return (
-    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4" />
-      </CardHeader>
-      <CardContent className="p-4 pt-0">
-        <div className="text-2xl font-black">{value}</div>
-      </CardContent>
-    </Card>
   );
 }

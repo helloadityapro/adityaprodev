@@ -1,9 +1,8 @@
-
 'use client';
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, orderBy, doc, limit, increment, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, limit, increment, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -23,11 +22,15 @@ import {
   ArrowDown,
   Pencil,
   Trash2,
-  History
+  History,
+  Eye,
+  User,
+  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   Select, 
   SelectContent, 
@@ -38,7 +41,6 @@ import {
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -59,6 +61,8 @@ type Payment = {
   paymentDetails: string;
   proofUrl?: string;
   date: any;
+  recordedByName?: string;
+  editHistory?: any[];
 };
 
 type Site = { id: string; name: string };
@@ -78,6 +82,7 @@ export default function ProjectWisePaymentsPage() {
 
   const [editingPayment, setEditingPayment] = React.useState<Payment | null>(null);
   const [deletingPayment, setDeletingPayment] = React.useState<Payment | null>(null);
+  const [viewHistoryPayment, setViewHistoryPayment] = React.useState<Payment | null>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -88,7 +93,6 @@ export default function ProjectWisePaymentsPage() {
   const { data: sites } = useCollection<Site>(sitesQuery);
 
   const paymentsQuery = useMemoFirebase(() => {
-    // Basic query, filtering and sorting handled in memory for maximum flexibility without complex index requirements
     return query(collection(firestore, 'payments'), limit(1000));
   }, [firestore]);
 
@@ -141,7 +145,6 @@ export default function ProjectWisePaymentsPage() {
     if (!deletingPayment) return;
     setIsProcessing(true);
     try {
-      // Reconcile balance in PO/WO
       const sourceColl = deletingPayment.paymentAgainst === 'PO' ? 'project_pos' : 'project_wos';
       const sourceRef = doc(firestore, sourceColl, deletingPayment.referenceId);
       
@@ -163,7 +166,7 @@ export default function ProjectWisePaymentsPage() {
 
   const handleEdit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!editingPayment) return;
+    if (!editingPayment || !user) return;
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
@@ -178,7 +181,6 @@ export default function ProjectWisePaymentsPage() {
       const sourceColl = editingPayment.paymentAgainst === 'PO' ? 'project_pos' : 'project_wos';
       const sourceRef = doc(firestore, sourceColl, editingPayment.referenceId);
       
-      // Update balance if amount changed
       if (Math.abs(diff) > 0.01) {
         updateDocumentNonBlocking(sourceRef, {
           paidAmount: increment(diff),
@@ -186,12 +188,22 @@ export default function ProjectWisePaymentsPage() {
         });
       }
 
+      const editorName = userProfile?.username || user.displayName || user.email || 'Admin';
+      const editEntry = {
+        action: 'Modified',
+        timestamp: new Date().toISOString(),
+        userId: user.uid,
+        userName: editorName,
+        details: `Updated values: Amount ₹${editingPayment.amount}->₹${newAmount}, Mode ${editingPayment.paymentMode}->${newMode}, Type ${editingPayment.paymentType}->${newType}.`
+      };
+
       updateDocumentNonBlocking(doc(firestore, 'payments', editingPayment.id), {
         amount: newAmount,
         paymentDetails: newDetails,
         paymentType: newType,
         paymentMode: newMode,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        editHistory: arrayUnion(editEntry)
       });
 
       toast({ title: 'Payment Updated', description: 'Changes saved and balance synchronized.' });
@@ -280,20 +292,15 @@ export default function ProjectWisePaymentsPage() {
                   <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('amount')}>
                     <div className="flex items-center justify-end">Amount Paid <SortIcon column="amount" /></div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('type')}>
-                    <div className="flex items-center">Type <SortIcon column="type" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('mode')}>
-                    <div className="flex items-center">Mode <SortIcon column="mode" /></div>
-                  </TableHead>
-                  <TableHead className="text-right px-6">Manage</TableHead>
+                  <TableHead>Recorded By</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredPayments.length > 0 ? filteredPayments.map((p) => (
                   <TableRow key={p.id} className="hover:bg-muted/5 transition-colors">
                     <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
-                      {p.date ? format(p.date.toDate(), 'dd MMM yy, HH:mm') : '—'}
+                      {p.date ? format(p.date.toDate(), 'dd MMM yy') : '—'}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
@@ -306,22 +313,27 @@ export default function ProjectWisePaymentsPage() {
                       ₹{p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="text-[9px] font-bold uppercase px-1.5 h-5 rounded-sm">{p.paymentType}</Badge>
+                      <div className="flex items-center gap-2">
+                        <User className="h-3 w-3 text-primary" />
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{p.recordedByName || 'System'}</span>
+                      </div>
                     </TableCell>
-                    <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{p.paymentMode}</TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm" onClick={() => setViewHistoryPayment(p)} title="View Edit History">
+                          <History className="h-4 w-4" />
+                        </Button>
                         {p.proofUrl && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild title="View Proof">
                             <a href={p.proofUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
                           </Button>
                         )}
                         {(isAdmin) && (
                           <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => setEditingPayment(p)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={() => setEditingPayment(p)} title="Edit Entry">
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingPayment(p)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingPayment(p)} title="Delete Entry">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </>
@@ -330,7 +342,7 @@ export default function ProjectWisePaymentsPage() {
                     </TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No payment logs found for this project.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">No payment logs found for this project.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -389,6 +401,42 @@ export default function ProjectWisePaymentsPage() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* History Dialog */}
+      <Dialog open={!!viewHistoryPayment} onOpenChange={(o) => !o && setViewHistoryPayment(null)}>
+        <DialogContent className="max-w-lg rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" /> Payment Lifecycle Log</DialogTitle>
+            <DialogDescription className="text-xs">Audit history for Ref: {viewHistoryPayment?.referenceNumber}</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[400px] mt-4 pr-4">
+            <div className="space-y-6 relative border-l-2 border-muted ml-3 pl-6 py-2">
+              <div className="relative">
+                <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                <div className="flex flex-col gap-1 text-left">
+                  <span className="text-xs font-bold text-emerald-700 uppercase tracking-tight">Created — {viewHistoryPayment?.recordedByName || 'System'}</span>
+                  <p className="text-[10px] text-muted-foreground font-mono font-bold uppercase">
+                    {viewHistoryPayment?.date ? format(viewHistoryPayment.date.toDate(), 'dd MMM yy HH:mm') : '—'}
+                  </p>
+                  <p className="text-xs italic text-foreground/80 mt-1 leading-relaxed">"Initial payment entry of ₹{viewHistoryPayment?.amount.toLocaleString()} recorded."</p>
+                </div>
+              </div>
+              {viewHistoryPayment?.editHistory?.map((entry, idx) => (
+                <div key={idx} className="relative">
+                  <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="text-xs font-bold text-primary uppercase tracking-tight">{entry.action} — {entry.userName}</span>
+                    <p className="text-[10px] text-muted-foreground font-mono font-bold uppercase">
+                      {entry.timestamp ? format(new Date(entry.timestamp), 'dd MMM yy HH:mm') : '—'}
+                    </p>
+                    <p className="text-xs italic text-foreground/80 mt-1 leading-relaxed">"{entry.details}"</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 

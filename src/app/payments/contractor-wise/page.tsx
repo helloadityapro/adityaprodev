@@ -1,9 +1,8 @@
-
 'use client';
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, orderBy, doc, limit, increment, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, limit, increment, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +22,10 @@ import {
   ArrowDown,
   Pencil,
   Trash2,
-  Loader2
+  Loader2,
+  History,
+  User,
+  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -59,6 +61,8 @@ type Payment = {
   paymentDetails: string;
   proofUrl?: string;
   date: any;
+  recordedByName?: string;
+  editHistory?: any[];
 };
 
 type Contractor = { id: string; name: string; gstin: string };
@@ -79,6 +83,7 @@ export default function ContractorWisePaymentsPage() {
 
   const [editingPayment, setEditingPayment] = React.useState<Payment | null>(null);
   const [deletingPayment, setDeletingPayment] = React.useState<Payment | null>(null);
+  const [viewHistoryPayment, setViewHistoryPayment] = React.useState<Payment | null>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -160,7 +165,7 @@ export default function ContractorWisePaymentsPage() {
 
   const handleEdit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!editingPayment) return;
+    if (!editingPayment || !user) return;
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
@@ -176,12 +181,22 @@ export default function ContractorWisePaymentsPage() {
         });
       }
 
+      const editorName = userProfile?.username || user.displayName || user.email || 'Admin';
+      const editEntry = {
+        action: 'Modified',
+        timestamp: new Date().toISOString(),
+        userId: user.uid,
+        userName: editorName,
+        details: `Updated values: Amount ₹${editingPayment.amount}->₹${newAmount}, Mode ${editingPayment.paymentMode}->${formData.get('mode')}, Type ${editingPayment.paymentType}->${formData.get('type')}.`
+      };
+
       updateDocumentNonBlocking(doc(firestore, 'payments', editingPayment.id), {
         amount: newAmount,
         paymentDetails: formData.get('details') as string,
         paymentType: formData.get('type') as string,
         paymentMode: formData.get('mode') as string,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        editHistory: arrayUnion(editEntry)
       });
 
       toast({ title: 'Record Updated', description: 'Changes finalized and balance updated.' });
@@ -221,7 +236,7 @@ export default function ContractorWisePaymentsPage() {
                 <div className="p-1">
                   <Button variant="ghost" className="w-full justify-start h-9 text-xs font-bold uppercase" onClick={() => { setSelectedPayeeId('all'); setIsPayeePopoverOpen(false); }}>All Contractors</Button>
                   {contractors?.filter(c => c.name.toLowerCase().includes(payeeSearch.toLowerCase())).map(c => (
-                    <Button key={c.id} variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { setSelectedPayeeId(c.id); setIsPayeePopoverOpen(false); }}>{c.name}</Button>
+                    <Button key={c.id} variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { setSelectedPayeeId(c.id); setIsPayeePopoverOpen(false); }}>{s.name}</Button>
                   ))}
                 </div>
               </ScrollArea>
@@ -266,12 +281,7 @@ export default function ContractorWisePaymentsPage() {
                   <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('amount')}>
                     <div className="flex items-center justify-end">Amount Paid <SortIcon column="amount" /></div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('type')}>
-                    <div className="flex items-center">Type <SortIcon column="type" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('mode')}>
-                    <div className="flex items-center">Mode <SortIcon column="mode" /></div>
-                  </TableHead>
+                  <TableHead>Personnel</TableHead>
                   <TableHead className="text-right px-6">Manage</TableHead>
                 </TableRow>
               </TableHeader>
@@ -287,11 +297,16 @@ export default function ContractorWisePaymentsPage() {
                       ₹{p.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary" className="text-[9px] font-bold uppercase px-1.5 h-5 rounded-sm">{p.paymentType}</Badge>
+                      <div className="flex items-center gap-2">
+                        <User className="h-3 w-3 text-primary" />
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{p.recordedByName || 'System'}</span>
+                      </div>
                     </TableCell>
-                    <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{p.paymentMode}</TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm" onClick={() => setViewHistoryPayment(p)} title="View Edit History">
+                          <History className="h-4 w-4" />
+                        </Button>
                         {p.proofUrl && (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
                             <a href={p.proofUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
@@ -311,7 +326,7 @@ export default function ContractorWisePaymentsPage() {
                     </TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No contractor-specific payment logs discovered.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">No contractor-specific payment logs discovered.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -321,7 +336,7 @@ export default function ContractorWisePaymentsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={!!editingPayment} onOpenChange={(o) => !o && setEditingPayment(null)}>
-        <DialogContent className="max-w-md rounded-sm">
+        <DialogContent className="max-md rounded-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-black text-primary"><Pencil className="h-5 w-5" /> Edit Transaction</DialogTitle>
             <DialogDescription className="text-xs">Updating amount will synchronize the WO balance.</DialogDescription>
@@ -370,6 +385,42 @@ export default function ContractorWisePaymentsPage() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* History Dialog */}
+      <Dialog open={!!viewHistoryPayment} onOpenChange={(o) => !o && setViewHistoryPayment(null)}>
+        <DialogContent className="max-w-lg rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" /> Lifecycle Audit</DialogTitle>
+            <DialogDescription className="text-xs">Audit history for WO Ref: {viewHistoryPayment?.referenceNumber}</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[400px] mt-4 pr-4">
+            <div className="space-y-6 relative border-l-2 border-muted ml-3 pl-6 py-2">
+              <div className="relative">
+                <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                <div className="flex flex-col gap-1 text-left">
+                  <span className="text-xs font-bold text-emerald-700 uppercase tracking-tight">Created — {viewHistoryPayment?.recordedByName || 'System'}</span>
+                  <p className="text-[10px] text-muted-foreground font-mono font-bold uppercase">
+                    {viewHistoryPayment?.date ? format(viewHistoryPayment.date.toDate(), 'dd MMM yy HH:mm') : '—'}
+                  </p>
+                  <p className="text-xs italic text-foreground/80 mt-1 leading-relaxed">"Payment entry of ₹{viewHistoryPayment?.amount.toLocaleString()} initialized."</p>
+                </div>
+              </div>
+              {viewHistoryPayment?.editHistory?.map((entry, idx) => (
+                <div key={idx} className="relative">
+                  <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                  <div className="flex flex-col gap-1 text-left">
+                    <span className="text-xs font-bold text-primary uppercase tracking-tight">{entry.action} — {entry.userName}</span>
+                    <p className="text-[10px] text-muted-foreground font-mono font-bold uppercase">
+                      {entry.timestamp ? format(new Date(entry.timestamp), 'dd MMM yy HH:mm') : '—'}
+                    </p>
+                    <p className="text-xs italic text-foreground/80 mt-1 leading-relaxed">"{entry.details}"</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
