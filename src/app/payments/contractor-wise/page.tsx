@@ -68,7 +68,7 @@ type Payment = {
 
 type Contractor = { id: string; name: string; gstin: string };
 type Site = { id: string; name: string };
-type SortKey = 'date' | 'reference' | 'site' | 'amount' | 'type' | 'mode';
+type SortKey = 'date' | 'reference' | 'site' | 'company' | 'amount' | 'type' | 'mode';
 
 export default function ContractorWisePaymentsPage() {
   const firestore = useFirestore();
@@ -136,6 +136,7 @@ export default function ContractorWisePaymentsPage() {
       if (key === 'date') { valA = a.date?.toDate?.()?.getTime() || 0; valB = b.date?.toDate?.()?.getTime() || 0; }
       else if (key === 'reference') { valA = a.referenceNumber; valB = b.referenceNumber; }
       else if (key === 'site') { valA = a.siteName; valB = b.siteName; }
+      else if (key === 'company') { valA = a.projectCompany || ''; valB = b.projectCompany || ''; }
       else if (key === 'amount') { valA = a.amount; valB = b.amount; }
       else if (key === 'type') { valA = a.paymentType; valB = b.paymentType; }
       else if (key === 'mode') { valA = a.paymentMode; valB = b.paymentMode; }
@@ -277,7 +278,10 @@ export default function ContractorWisePaymentsPage() {
                     <div className="flex items-center">Date <SortIcon column="date" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
-                    <div className="flex items-center">Project & Company <SortIcon column="site" /></div>
+                    <div className="flex items-center">Project Name <SortIcon column="site" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('company')}>
+                    <div className="flex items-center">Parent Company <SortIcon column="company" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('reference')}>
                     <div className="flex items-center">WO Reference <SortIcon column="reference" /></div>
@@ -295,11 +299,11 @@ export default function ContractorWisePaymentsPage() {
                     <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
                       {p.date ? format(p.date.toDate(), 'dd MMM yy') : '—'}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-sm text-foreground">{p.siteName}</span>
-                        <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tight">{p.projectCompany || 'Aditya Green Energy'}</span>
-                      </div>
+                    <TableCell className="font-bold text-sm text-foreground">
+                      {p.siteName}
+                    </TableCell>
+                    <TableCell className="text-[9px] text-muted-foreground uppercase font-black tracking-tight">
+                      {p.projectCompany || 'Aditya Green Energy'}
                     </TableCell>
                     <TableCell className="font-mono text-xs font-black text-primary uppercase">{p.referenceNumber}</TableCell>
                     <TableCell className="text-right font-black text-sm font-mono text-foreground">
@@ -335,7 +339,7 @@ export default function ContractorWisePaymentsPage() {
                     </TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">No contractor-specific payment logs discovered.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No contractor-specific payment logs discovered.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
