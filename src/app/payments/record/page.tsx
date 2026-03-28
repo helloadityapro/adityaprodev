@@ -17,7 +17,7 @@ import {
 } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp, getDocs, increment } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,7 +37,8 @@ import {
   AlertCircle,
   HardHat,
   ShoppingBag,
-  Gavel
+  Gavel,
+  Send
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -272,7 +273,7 @@ export default function RecordPaymentPage() {
                         <FormControl>
                           <Button variant="outline" disabled={!watchPayeeId} className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>
                             {field.value ? (watchType === 'PO' ? selectedOrder?.poNumber : selectedOrder?.woNumber) : `Select ${watchType}...`}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
