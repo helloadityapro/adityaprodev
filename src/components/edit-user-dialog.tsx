@@ -104,7 +104,10 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
     setIsSubmitting(true);
     try {
       const userRef = doc(firestore, 'users', user.id);
-      updateDocumentNonBlocking(userRef, values);
+      updateDocumentNonBlocking(userRef, {
+        ...values,
+        panNumber: values.panNumber.toUpperCase()
+      });
 
       toast({
         title: 'User Updated',
@@ -291,7 +294,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
             </Form>
           )}
         </ScrollArea>
-        <DialogFooter className="p-6 border-t gap-2 flex-col sm:flex-row">
+        <DialogFooter className="p-6 border-t gap-2 flex flex-col sm:flex-row">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting} className="rounded-sm font-bold uppercase text-[10px]">
             Cancel
           </Button>
