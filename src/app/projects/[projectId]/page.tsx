@@ -730,7 +730,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     const newSet = new Set(expandedBomRows);
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
-    setExpandedBomRows(newSet);
+    setExpandedRows(newSet);
   };
 
   const toggleInvRow = (id: string) => {
@@ -1420,18 +1420,19 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableRow>
                         <TableHead className="px-6 min-w-[250px]">Item & Description</TableHead>
                         <TableHead>Make</TableHead>
-                        <TableHead>Supplier</TableHead>
+                        <TableHead className="text-center">Total Received Stock</TableHead>
+                        <TableHead className="text-center">Utilised Stock</TableHead>
                         <TableHead className="text-center">Available Stock</TableHead>
-                        <TableHead className="text-center">Utilised Qty</TableHead>
                         <TableHead className="text-right px-6">Logs</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {inventory && inventory.length > 0 ? inventory.map(invRecord => {
                         const bomItem = bomItems?.find(i => i.itemName === invRecord.itemName && i.status === 'Approved');
-                        const pos = purchaseOrders?.filter(po => po.items.some(pi => pi.itemName === invRecord.itemName)) || [];
-                        const suppliers = Array.from(new Set(pos.map(p => p.supplierName))).join(', ') || '—';
                         const itemMovements = movements?.filter(m => m.itemName === invRecord.itemName) || [];
+                        const utilised = invRecord.utilisedQuantity || 0;
+                        const available = invRecord.stockLevel;
+                        const total = utilised + available;
 
                         return (
                           <React.Fragment key={invRecord.id}>
@@ -1447,18 +1448,22 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                   {bomItem?.make || 'Standard'}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-xs font-medium text-muted-foreground truncate max-w-[150px]" title={suppliers}>{suppliers}</TableCell>
                               <TableCell className="text-center">
-                                <Badge className={cn(
-                                  "font-mono font-bold rounded-sm px-3 h-7 border-none shadow-sm",
-                                  invRecord.stockLevel > 0 ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
-                                )}>
-                                  {invRecord.stockLevel} {invRecord.unit}
+                                <Badge variant="outline" className="font-mono font-bold rounded-sm px-3 h-7 bg-primary/5 text-primary border-primary/10">
+                                  {total} {invRecord.unit}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-center">
                                 <Badge variant="secondary" className="font-mono font-bold rounded-sm px-3 h-7 bg-amber-100 text-amber-800 border-amber-200">
-                                  {invRecord.utilisedQuantity || 0} {invRecord.unit}
+                                  {utilised} {invRecord.unit}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge className={cn(
+                                  "font-mono font-bold rounded-sm px-3 h-7 border-none shadow-sm",
+                                  available > 0 ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
+                                )}>
+                                  {available} {invRecord.unit}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right px-6">
