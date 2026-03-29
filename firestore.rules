@@ -12,13 +12,10 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      let superAdminEmails = ['khalil@adityagreenenergy.com'];
       let userEmail = request.auth.token.get('email', '').lower();
-      let isSuperAdmin = userEmail in superAdminEmails;
-      
+      let isSuperAdmin = userEmail == 'khalil@adityagreenenergy.com';
       let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
       let hasAdminRole = exists(userDocPath) && get(userDocPath).data.get('role', '') == 'Admin';
-                         
       return isSignedIn() && (isSuperAdmin || hasAdminRole);
     }
 
@@ -129,6 +126,17 @@ service cloud.firestore {
     }
 
     match /material_movements/{movementId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && (
+        request.auth.uid == resource.data.userId || 
+        request.auth.uid == resource.data.siteManagerId || 
+        isAdmin()
+      );
+    }
+
+    match /material_utilisations/{utilId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn();
