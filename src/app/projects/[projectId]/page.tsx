@@ -289,6 +289,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     }
   }, [tabParam]);
 
+  const [searchTerm, setSearchTerm] = React.useState("");
   const [bomTableSearch, setBomTableSearch] = React.useState("");
   const [bomStatusFilter, setBomStatusFilter] = React.useState("all");
   const [bomCategoryFilter, setBomCategoryFilter] = React.useState("all");
@@ -323,8 +324,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [paymentSearch, setPaymentSearch] = React.useState("");
   const [paymentSortConfig, setPaymentSortConfig] = React.useState<{ key: PaymentSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [viewingPayment, setViewingPayment] = React.useState<Payment | null>(null);
-
-  const [searchTerm, setSearchTerm] = React.useState("");
 
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
   const { data: project, isLoading: projectLoading } = useDoc<Project>(projectRef);
@@ -370,12 +369,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
     return result;
   }, [bomItems, bomTableSearch, bomStatusFilter, bomCategoryFilter, bomSortConfig]);
-
-  const bomCategories = React.useMemo(() => {
-    if (!bomItems) return [];
-    const cats = new Set(bomItems.map(item => item.category).filter(Boolean));
-    return Array.from(cats).sort();
-  }, [bomItems]);
 
   const posQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_pos'), where('siteId', '==', projectId)), 
@@ -546,20 +539,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     });
     return result;
   }, [workOrders, woSearch, woSortConfig]);
-
-  const [siteManagementSortConfig, setSiteManagementSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
-
-  const handleSiteManagementSort = (key: SortKey) => {
-    setSiteManagementSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  const SiteManagementSortIcon = ({ column }: { column: SortKey }) => {
-    if (siteManagementSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
-    return siteManagementSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
-  };
 
   const handlePOSort = (key: POSortKey) => {
     setPoSortConfig(prev => ({
@@ -957,15 +936,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <Table>
                       <TableHeader className="bg-muted/30">
                         <TableRow>
-                          <TableHead className="px-6 cursor-pointer" onClick={() => handleSiteManagementSort('engineer')}>
-                            <div className="flex items-center">Personnel <SiteManagementSortIcon column="engineer" /></div>
-                          </TableHead>
-                          <TableHead className="cursor-pointer" onClick={() => handleSiteManagementSort('manager')}>
-                            <div className="flex items-center">Supervisor <SiteManagementSortIcon column="manager" /></div>
-                          </TableHead>
-                          <TableHead className="text-center cursor-pointer" onClick={() => handleSiteManagementSort('sites')}>
-                            <div className="flex items-center justify-center">Sites <SiteManagementSortIcon column="sites" /></div>
-                          </TableHead>
+                          <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest">Personnel</TableHead>
+                          <TableHead className="font-black uppercase text-[10px] tracking-widest">Supervisor</TableHead>
+                          <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Sites</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1103,7 +1076,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     
                     <div className="flex flex-col md:flex-row gap-4 items-start">
                       <div className="flex-1 min-w-0 space-y-1.5 w-full">
-                        <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-tight">Specifications / Breakdown Preview</Label>
+                        <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-tight">Breakdown Preview</Label>
                         <div className="h-20 p-3 rounded-sm bg-muted/10 border border-primary/5 overflow-auto shadow-inner">
                           {selectedMasterItem ? (
                             <div className="space-y-2">
@@ -1188,10 +1161,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                   "bg-yellow-50 text-yellow-700 border-yellow-200"
                                 )}>{item.status || 'Pending'}</Badge>
                                 {item.processedByName && (
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className="text-[8px] font-bold text-muted-foreground uppercase">By: {item.processedByName}</span>
-                                    {item.remarks && <span className="text-[9px] italic text-muted-foreground line-clamp-1">"{item.remarks}"</span>}
-                                  </div>
+                                  <span className="text-[8px] font-bold text-muted-foreground uppercase">By: {item.processedByName}</span>
                                 )}
                               </div>
                             </TableCell>
@@ -1248,10 +1218,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           <TabsContent value="po" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
               <div className="relative w-full md:w-80"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search PO or Supplier" className="pl-8 h-9 rounded-sm border-primary/20 text-xs" value={poSearch} onChange={e => setPoSearch(e.target.value)} /></div>
-              <Button asChild className="rounded-sm font-bold shadow-md h-9"><Link href={`/projects/${projectId}/procurement/create`}><Plus className="h-4 w-4 mr-2" /> Create Purchase Order</Link></Button>
+              <Button asChild className="rounded-sm font-bold shadow-md h-9"><Link href={`/projects/${projectId}/procurement/create`}><Plus className="h-4 w-4 mr-2" /> Create PO</Link></Button>
             </div>
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-              <CardHeader className="bg-muted/5 border-b py-4"><CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><ShoppingBag className="h-4 w-4 text-primary" /> Active Purchase Orders</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
@@ -1262,7 +1231,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('date')}><div className="flex items-center">Date <POSortIcon column="date" /></div></TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('status')}><div className="flex items-center">Status <POSortIcon column="status" /></div></TableHead>
                         <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}><div className="flex items-center justify-end">Total Value <POSortIcon column="total" /></div></TableHead>
-                        <TableHead>Audit Log</TableHead>
                         <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1270,18 +1238,17 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       {filteredSortedPOs.length > 0 ? filteredSortedPOs.map(po => (
                         <React.Fragment key={po.id}>
                           <TableRow className="hover:bg-muted/5 transition-colors">
-                            <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => togglePORow(po.id)}>{expandedPORows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><div className="flex flex-col"><span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span><span className="text-[9px] font-bold text-muted-foreground uppercase">{po.itemsCount || 1} Material(s)</span></div></div></TableCell>
+                            <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => togglePORow(po.id)}>{expandedPORows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span></div></TableCell>
                             <TableCell className="text-sm font-semibold text-foreground">{po.supplierName}</TableCell>
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                             <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{po.status}</Badge></TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                            <TableCell><Popover><PopoverTrigger asChild><Button variant="ghost" size="sm" className="h-8 rounded-sm font-bold text-[10px] uppercase tracking-wider text-muted-foreground hover:text-primary"><History className="h-3.5 w-3.5 mr-1.5" /> View Log</Button></PopoverTrigger><PopoverContent className="w-80 p-0 rounded-sm shadow-2xl border-primary/10"><div className="p-3 border-b bg-muted/5"><p className="text-[10px] font-black uppercase tracking-widest text-primary">Audit Log: {po.poNumber}</p></div><ScrollArea className="h-[250px]"><div className="p-4 space-y-4">{getLogHistory(po).map((entry, idx) => (<div key={idx} className="relative pl-4 border-l border-primary/20 pb-4 last:pb-0"><div className="absolute -left-[4.5px] top-1 h-2 w-2 rounded-full bg-primary" /><div className="flex flex-col gap-0.5"><p className="text-[10px] font-black uppercase text-primary leading-none">{entry.action}</p><p className="text-[9px] font-bold text-muted-foreground">{formatTimestamp(entry.timestamp)}</p><div className="flex items-center gap-1 mt-1"><User className="h-2.5 w-2.5 text-muted-foreground/60" /><span className="text-[9px] font-medium">{entry.userName}</span></div>{entry.details && (<p className="text-[9px] italic text-muted-foreground/80 mt-1 leading-tight border-t border-primary/5 pt-1">{entry.details}</p>)}</div></div>))}</div></ScrollArea></PopoverContent></Popover></TableCell>
                             <TableCell className="text-right px-6"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}><Eye className="h-4 w-4" /></Button>{(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/procurement/${po.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}><Trash2 className="h-4 w-4" /></Button></>)}</div></TableCell>
                           </TableRow>
-                          {expandedPORows.has(po.id) && po.items && (<TableRow className="bg-muted/30"><TableCell colSpan={7} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Purchase Breakdown for {po.poNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{po.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.itemName}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Subtotal (Incl. GST)</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div><div className="flex justify-between items-center pt-2 border-t border-primary/10 mt-2"><span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Aggregate Total (Incl. GST)</span><span className="text-sm font-black text-primary">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></TableCell></TableRow>)}
+                          {expandedPORows.has(po.id) && po.items && (<TableRow className="bg-muted/30"><TableCell colSpan={6} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Breakdown for {po.poNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{po.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.itemName}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Subtotal</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
                         </React.Fragment>
                       )) : (
-                        <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic text-xs">No POs found in project records.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No POs found.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1293,10 +1260,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           <TabsContent value="wo" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
               <div className="relative w-full md:w-80"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search WO or Contractor" className="pl-8 h-9 rounded-sm border-primary/20 text-xs" value={woSearch} onChange={e => setWoSearch(e.target.value)} /></div>
-              <Button asChild className="rounded-sm font-bold shadow-md h-9"><Link href={`/projects/${projectId}/work-orders/create`}><Plus className="h-4 w-4 mr-2" /> Create Work Order</Link></Button>
+              <Button asChild className="rounded-sm font-bold shadow-md h-9"><Link href={`/projects/${projectId}/work-orders/create`}><Plus className="h-4 w-4 mr-2" /> Create WO</Link></Button>
             </div>
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-              <CardHeader className="bg-muted/5 border-b py-4"><CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Gavel className="h-4 w-4 text-primary" /> Service Work Orders</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
@@ -1321,7 +1287,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                             <TableCell className="text-right px-6"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}><Eye className="h-4 w-4" /></Button>{isAdmin && wo.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Approved' })} title="Approve WO"><CircleCheck className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Rejected' })} title="Reject WO"><CircleX className="h-4 w-4" /></Button></>)}{(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}><Trash2 className="h-4 w-4" /></Button></>)}</div></TableCell>
                           </TableRow>
-                          {expandedWORows.has(wo.id) && wo.items && wo.items.length > 0 && (<TableRow className="bg-muted/30"><TableCell colSpan={6} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown for {wo.woNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{wo.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.description}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Amount (Incl. GST)</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div><div className="flex justify-between items-center pt-2 border-t border-primary/10 mt-2"><span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Aggregate Value</span><span className="text-sm font-black text-primary">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></TableCell></TableRow>)}
+                          {expandedWORows.has(wo.id) && wo.items && wo.items.length > 0 && (<TableRow className="bg-muted/30"><TableCell colSpan={6} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown for {wo.woNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{wo.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.description}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Amount</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
                         </React.Fragment>
                       )) : (
                         <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No work orders found.</TableCell></TableRow>
@@ -1349,11 +1315,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Button>
             </div>
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-              <CardHeader className="bg-muted/5 border-b py-4">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                  <IndianRupee className="h-4 w-4 text-primary" /> Project Disbursements
-                </CardTitle>
-              </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
@@ -1401,7 +1362,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           </TableCell>
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No payment records found for this site.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No payment records found.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1414,14 +1375,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
               <CardHeader className="bg-muted/5 border-b py-4">
                 <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" /> On-Site Inventory Registry</CardTitle>
-                <CardDescription>Strictly showing items tracked through formal Material Movement Logs.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-muted/30">
                       <TableRow>
-                        <TableHead className="px-6 min-w-[250px]">Item & Description</TableHead>
+                        <TableHead className="px-6 min-w-[250px]">Material / Component</TableHead>
                         <TableHead>Make</TableHead>
                         <TableHead className="text-center">Total Received Stock</TableHead>
                         <TableHead className="text-center">Utilised Stock</TableHead>
@@ -1480,11 +1440,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               <TableRow className="bg-primary/[0.01]">
                                 <TableCell colSpan={6} className="p-0 border-b">
                                   <div className="p-6 px-12 animate-in slide-in-from-top-1 duration-200 space-y-8">
-                                    {/* Movement Section */}
                                     <div className="space-y-4">
                                       <div className="flex items-center gap-2 mb-2">
                                         <History className="h-3.5 w-3.5 text-primary" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Movement History: {invRecord.itemName}</span>
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Movement History</span>
                                       </div>
                                       {itemMovements.length > 0 ? (
                                         <div className="grid gap-2">
@@ -1500,25 +1459,22 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                                   <span className="text-[9px] text-muted-foreground uppercase">{m.movementType === 'Inward' ? 'From' : 'To'}: {m.sourceOrDestination}</span>
                                                 </div>
                                               </div>
-                                              <div className="flex items-center gap-4 text-right">
-                                                <div className="flex flex-col items-end">
-                                                  <span className="font-bold text-muted-foreground uppercase text-[9px]">{m.userName}</span>
-                                                  <span className="text-[9px] text-muted-foreground/60">{m.movementDate}</span>
-                                                </div>
+                                              <div className="flex flex-col items-end">
+                                                <span className="font-bold text-muted-foreground uppercase text-[9px]">{m.userName}</span>
+                                                <span className="text-[9px] text-muted-foreground/60">{m.movementDate}</span>
                                               </div>
                                             </div>
                                           ))}
                                         </div>
                                       ) : (
-                                        <div className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/10 rounded-sm border border-dashed">No material movements logged for this item.</div>
+                                        <p className="text-[10px] text-center text-muted-foreground italic uppercase">No material movements logged.</p>
                                       )}
                                     </div>
 
-                                    {/* Utilisation Section */}
                                     <div className="space-y-4">
                                       <div className="flex items-center gap-2 mb-2">
                                         <History className="h-3.5 w-3.5 text-amber-600" />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">Utilisation History: {invRecord.itemName}</span>
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">Utilisation History</span>
                                       </div>
                                       {itemUtilisations.length > 0 ? (
                                         <div className="grid gap-2">
@@ -1534,17 +1490,15 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                                   <span className="text-[9px] text-muted-foreground italic leading-tight">"{u.remarks}"</span>
                                                 </div>
                                               </div>
-                                              <div className="flex items-center gap-4 text-right">
-                                                <div className="flex flex-col items-end">
-                                                  <span className="font-bold text-muted-foreground uppercase text-[9px]">{u.userName}</span>
-                                                  <span className="text-[9px] text-muted-foreground/60">{u.utilisationDate}</span>
-                                                </div>
+                                              <div className="flex flex-col items-end">
+                                                <span className="font-bold text-muted-foreground uppercase text-[9px]">{u.userName}</span>
+                                                <span className="text-[9px] text-muted-foreground/60">{u.utilisationDate}</span>
                                               </div>
                                             </div>
                                           ))}
                                         </div>
                                       ) : (
-                                        <div className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/10 rounded-sm border border-dashed">No material consumption logged for this item.</div>
+                                        <p className="text-[10px] text-center text-muted-foreground italic uppercase">No material consumption logged.</p>
                                       )}
                                     </div>
                                   </div>
@@ -1554,10 +1508,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           </React.Fragment>
                         );
                       }) : (
-                        <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic flex flex-col items-center justify-center gap-3">
-                          <Package className="h-10 w-10 opacity-20" />
-                          <p className="text-sm font-bold uppercase tracking-widest">No site movements recorded yet</p>
-                        </TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">No site stock recorded.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1578,17 +1529,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 />
               </div>
               <Button asChild className="rounded-sm font-bold shadow-md h-9">
-                <Link href={`/inventory/utilisation/record`}>
-                  <Plus className="h-4 w-4 mr-2" /> Log Consumption
-                </Link>
+                <Link href={`/inventory/utilisation/record`}><Plus className="h-4 w-4 mr-2" /> Log Consumption</Link>
               </Button>
             </div>
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-              <CardHeader className="bg-muted/5 border-b py-4">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                  <PieChart className="h-4 w-4 text-primary" /> On-Site Material Utilisation
-                </CardTitle>
-              </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
@@ -1604,18 +1548,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <TableBody>
                       {filteredUtilisations.length > 0 ? filteredUtilisations.map(u => (
                         <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
-                          <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground">
-                            {u.utilisationDate}
-                          </TableCell>
+                          <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground">{u.utilisationDate}</TableCell>
                           <TableCell className="text-sm font-bold text-foreground">{u.itemName}</TableCell>
                           <TableCell className="text-center">
                             <Badge variant="secondary" className="font-mono font-bold bg-amber-50 text-amber-700 border-amber-200">
                               {u.quantity} {u.unit}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs italic text-muted-foreground">
-                            "{u.remarks}"
-                          </TableCell>
+                          <TableCell className="text-xs italic text-muted-foreground">"{u.remarks}"</TableCell>
                           <TableCell className="text-right px-6">
                             <div className="flex items-center justify-end gap-2 text-[10px] font-bold text-muted-foreground uppercase">
                               <User className="h-3 w-3 text-primary" />
@@ -1624,7 +1564,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           </TableCell>
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">No utilisation records logged for this site.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">No records found.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1659,7 +1599,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <TableCell className="px-6 py-4 font-mono text-xs font-bold whitespace-nowrap">{mov.movementDate}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm h-5 px-1.5", mov.movementType === 'Inward' ? "bg-green-50 text-green-700 border-green-200" : "bg-blue-50 text-blue-700 border-blue-200")}>
-                              {mov.movementType === 'Inward' ? <ArrowDownCircle className="h-2.5 w-2.5 mr-1" /> : <ArrowUpCircle className="h-2.5 w-2.5 mr-1" />}
                               {mov.movementType}
                             </Badge>
                           </TableCell>
@@ -1671,7 +1610,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="p-20 text-center text-muted-foreground italic">No movements recorded for this project yet.</div>
+                  <div className="p-20 text-center text-muted-foreground italic">No movements recorded.</div>
                 )}
               </CardContent>
             </Card>
@@ -1679,7 +1618,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
           <TabsContent value="ptw" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
-              <CardHeader className="bg-muted/5 border-b py-4"><CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Compliance Audit: PtWs</CardTitle></CardHeader>
               <CardContent className="p-0">
                 {permits && permits.length > 0 ? (
                   <Table>
@@ -1689,18 +1627,25 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead>Type</TableHead>
                         <TableHead>Engineer</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Date & Time</TableHead>
                         <TableHead className="text-right px-6">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {permits.sort((a: any, b: any) => (b.requestDate?.toDate?.() || 0) - (a.requestDate?.toDate?.() || 0)).map((permit: any) => (
-                        <TableRow key={permit.id} className="hover:bg-muted/5 group"><TableCell className="px-6 py-4 font-mono text-xs font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell><TableCell className="text-sm font-semibold">{permit.ptwType}</TableCell><TableCell className="text-xs font-medium">{permit.siteEngineerName || '—'}</TableCell><TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm h-5 px-1.5 whitespace-nowrap", permit.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" : permit.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{permit.status}</Badge></TableCell><TableCell className="text-[10px] font-bold text-muted-foreground uppercase whitespace-nowrap">{formatTimestamp(permit.requestDate)}</TableCell><TableCell className="text-right px-6"><Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm"><Link href={`/ptw/list?view=${permit.id}`} title="View Permit Audit Log"><Eye className="h-4 w-4" /></Link></Button></TableCell></TableRow>
+                        <TableRow key={permit.id} className="hover:bg-muted/5">
+                          <TableCell className="px-6 py-4 font-mono text-xs font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
+                          <TableCell className="text-sm font-semibold">{permit.ptwType}</TableCell>
+                          <TableCell className="text-xs font-medium">{permit.siteEngineerName || '—'}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm h-5 px-1.5", permit.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" : permit.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{permit.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right px-6"><Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm"><Link href={`/ptw/list?view=${permit.id}`}><Eye className="h-4 w-4" /></Link></Button></TableCell>
+                        </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="p-20 text-center text-muted-foreground italic">No permits found for this project.</div>
+                  <div className="p-20 text-center text-muted-foreground italic">No permits found.</div>
                 )}
               </CardContent>
             </Card>
@@ -1708,7 +1653,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
           <TabsContent value="dpr" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
-              <CardHeader className="bg-muted/5 border-b py-4"><CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Daily Progress Reports</CardTitle></CardHeader>
               <CardContent className="p-0">
                 {dprs && dprs.length > 0 ? (
                   <Table>
@@ -1721,12 +1665,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     </TableHeader>
                     <TableBody>
                       {dprs.sort((a: any, b: any) => new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime()).map((dpr: any) => (
-                        <TableRow key={dpr.id} className="hover:bg-muted/5"><TableCell className="px-6 py-4 font-mono text-xs font-bold whitespace-nowrap align-top">{dpr.reportDate}</TableCell><TableCell className="text-xs font-semibold align-top">{dpr.userName}</TableCell><TableCell className="py-4"><div className="space-y-3">{dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx, arr) => (<React.Fragment key={pIdx}><p className="text-sm italic text-muted-foreground leading-relaxed">"{para.trim()}"</p>{pIdx < arr.length - 1 && (<div className="h-px bg-primary/10 my-2" />)}</React.Fragment>))}</div></TableCell></TableRow>
+                        <TableRow key={dpr.id} className="hover:bg-muted/5"><TableCell className="px-6 py-4 font-mono text-xs font-bold">{dpr.reportDate}</TableCell><TableCell className="text-xs font-semibold">{dpr.userName}</TableCell><TableCell className="py-4"><div className="text-sm italic text-muted-foreground">"{dpr.description}"</div></TableCell></TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="p-20 text-center text-muted-foreground italic">No reports found for this project.</div>
+                  <div className="p-20 text-center text-muted-foreground italic">No reports found.</div>
                 )}
               </CardContent>
             </Card>
@@ -1734,7 +1678,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
           <TabsContent value="tasks" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
-              <CardHeader className="bg-muted/5 border-b py-4"><CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><CheckSquare className="h-4 w-4 text-primary" /> Open Assignments</CardTitle></CardHeader>
               <CardContent className="p-0">
                 {tasks && tasks.length > 0 ? (
                   <Table>
@@ -1742,7 +1685,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableRow>
                         <TableHead className="px-6">Title</TableHead>
                         <TableHead>Assigned To</TableHead>
-                        <TableHead>Assigned By</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right px-6">Due</TableHead>
                       </TableRow>
@@ -1752,7 +1694,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableRow key={task.id} className="hover:bg-muted/5">
                           <TableCell className="px-6 py-4 font-bold text-sm">{task.title}</TableCell>
                           <TableCell className="text-xs font-medium">{task.assignedToName}</TableCell>
-                          <TableCell className="text-xs font-medium">{task.assignedByName}</TableCell>
                           <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm">{task.status}</Badge></TableCell>
                           <TableCell className="text-right px-6 text-[10px] font-mono font-black text-muted-foreground">{task.dueDate}</TableCell>
                         </TableRow>
@@ -1760,7 +1701,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="p-20 text-center text-muted-foreground italic">No active tasks.</div>
+                  <div className="p-20 text-center text-muted-foreground italic">No tasks.</div>
                 )}
               </CardContent>
             </Card>
@@ -1768,7 +1709,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
           <TabsContent value="visits" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
-              <CardHeader className="bg-muted/5 border-b py-4"><CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><Navigation className="h-4 w-4 text-primary" /> Manager Visit Audit</CardTitle></CardHeader>
               <CardContent className="p-0">
                 {visits && visits.length > 0 ? (
                   <Table>
@@ -1786,19 +1726,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
                           <TableCell className="text-sm font-bold text-foreground">{visit.managerName}</TableCell>
                           <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm">{visit.purpose || '—'}</Badge></TableCell>
-                          <TableCell className="text-right px-6">
-                            <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm">
-                              <Link href={`/site-visits/${visit.id}`}>
-                                <ChevronRight className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          </TableCell>
+                          <TableCell className="text-right px-6"><Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm"><Link href={`/site-visits/${visit.id}`}><ChevronRight className="h-4 w-4" /></Link></Button></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="p-20 text-center text-muted-foreground italic">No audits recorded.</div>
+                  <div className="p-20 text-center text-muted-foreground italic">No audits.</div>
                 )}
               </CardContent>
             </Card>
@@ -1806,77 +1740,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </Tabs>
       </div>
 
-      {/* Detail Dialog for Payments */}
-      <Dialog open={!!viewingPayment} onOpenChange={(o) => !o && setViewingPayment(null)}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-2 rounded-sm"><IndianRupee className="h-5 w-5 text-primary" /></div>
-              <div>
-                <DialogTitle className="text-xl font-black uppercase tracking-tight">Payment Audit Log</DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Ref: {viewingPayment?.referenceNumber}</DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-          <ScrollArea className="max-h-[70vh]">
-            {viewingPayment && (
-              <div className="p-8 space-y-10">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Paid to</Label>
-                      <p className="text-lg font-black text-foreground leading-tight">{viewingPayment.payeeName}</p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Notes / Details</Label>
-                      <p className="text-sm font-medium">{viewingPayment.paymentDetails}</p>
-                    </div>
-                  </div>
-                  <div className="bg-primary/5 rounded-sm border-2 border-primary/10 p-6 flex flex-col justify-center items-center text-center shadow-inner">
-                    <span className="text-[10px] font-black uppercase text-primary tracking-widest mb-2">Transaction Value</span>
-                    <span className="text-4xl font-black tabular-nums text-primary">₹{viewingPayment.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground">Mode</Label>
-                    <p className="text-sm font-bold">{viewingPayment.paymentMode}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground">Type</Label>
-                    <p className="text-sm font-bold">{viewingPayment.paymentType}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground">Date & Time</Label>
-                    <p className="text-sm font-bold font-mono">{formatTimestamp(viewingPayment.date)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground">Recorded by</Label>
-                    <p className="text-sm font-bold">{viewingPayment.recordedByName || 'System'}</p>
-                  </div>
-                </div>
-                {viewingPayment.proofUrl && (
-                  <div className="pt-4 border-t">
-                    <Button variant="outline" className="rounded-sm font-bold" asChild>
-                      <a href={viewingPayment.proofUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> View Payment Proof</a>
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </ScrollArea>
-          <DialogFooter className="p-4 bg-muted/5 border-t">
-            <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Decision Dialog for BoM items */}
+      {/* Decision Dialogs & Modals */}
       <Dialog open={!!bomActionState} onOpenChange={(o) => !o && setBomActionState(null)}>
         <DialogContent className="rounded-sm max-md">
           <DialogHeader>
             <DialogTitle>Authorize BoM Item</DialogTitle>
-            <DialogDescription>Set status for {bomActionState?.item.itemName}. Authorized items enable material movement logging.</DialogDescription>
+            <DialogDescription>Set status for {bomActionState?.item.itemName}.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
             <div className="space-y-2">
@@ -1884,16 +1753,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               {bomActionState?.type === 'Approved' && (
                 <div className="space-y-2 pt-2">
                   <Label>Final Approved Quantity</Label>
-                  <Input 
-                    type="number" 
-                    defaultValue={bomActionState.item.plannedQuantity} 
-                    id="approved-qty"
-                    className="rounded-sm" 
-                  />
+                  <Input type="number" defaultValue={bomActionState.item.plannedQuantity} id="approved-qty" />
                 </div>
               )}
               <Label className="text-xs font-bold pt-2 block">Remarks</Label>
-              <Textarea id="action-remarks" placeholder="Provide justification or comments..." className="min-h-[100px] rounded-sm" />
+              <Textarea id="action-remarks" placeholder="Provide reason..." className="min-h-[100px] rounded-sm" />
             </div>
           </div>
           <DialogFooter>
@@ -1913,60 +1777,37 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </DialogContent>
       </Dialog>
 
-      {/* Edit BoM Dialog */}
       <Dialog open={!!editingBomItem} onOpenChange={(o) => !o && setEditingBomItem(null)}>
         <DialogContent className="rounded-sm max-lg w-full">
-          <DialogHeader>
-            <DialogTitle>Edit BoM Entry</DialogTitle>
-            <DialogDescription>Modify planned materials for {siteName}.</DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Edit BoM Entry</DialogTitle></DialogHeader>
           {editingBomItem && (
             <form onSubmit={handleUpdateBoM} className="space-y-4 py-4">
-              <div className="grid gap-2">
-                <Label>Item Name</Label>
-                <Input name="itemName" defaultValue={editingBomItem.itemName} />
-              </div>
+              <div className="grid gap-2"><Label>Item Name</Label><Input name="itemName" defaultValue={editingBomItem.itemName} /></div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Planned Qty</Label>
-                  <Input name="plannedQty" type="number" defaultValue={editingBomItem.plannedQuantity} />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Unit</Label>
-                  <Select name="unit" defaultValue={editingBomItem.unit}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
+                <div className="grid gap-2"><Label>Planned Qty</Label><Input name="plannedQty" type="number" defaultValue={editingBomItem.plannedQuantity} /></div>
+                <div className="grid gap-2"><Label>Unit</Label><Select name="unit" defaultValue={editingBomItem.unit}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></div>
               </div>
-              <div className="grid gap-2">
-                <Label>Specification</Label>
-                <Textarea name="specification" defaultValue={editingBomItem.specification} />
-              </div>
+              <div className="grid gap-2"><Label>Specification</Label><Textarea name="specification" defaultValue={editingBomItem.specification} /></div>
               <DialogFooter className="pt-4">
-                <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
-                <Button type="submit" className="rounded-sm font-bold" disabled={isUpdatingBom}>{isUpdatingBom ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : 'Update & Re-Submit'}</Button>
+                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                <Button type="submit" disabled={isUpdatingBom}>{isUpdatingBom ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : 'Update'}</Button>
               </DialogFooter>
             </form>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* BoM Audit Log Dialog */}
       <Dialog open={!!viewingBomLog} onOpenChange={(o) => !o && setViewingBomLog(null)}>
         <DialogContent className="rounded-sm max-w-lg">
-          <DialogHeader>
-            <DialogTitle>BoM Life-cycle Log</DialogTitle>
-            <DialogDescription>Historical changes for {viewingBomLog?.itemName}</DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>BoM Life-cycle Log</DialogTitle></DialogHeader>
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-6 relative border-l-2 border-muted ml-3 pl-6 py-2">
               {viewingBomLog?.auditLog?.map((entry, idx) => (
                 <div key={idx} className="relative">
                   <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary" />
                   <div className="flex flex-col gap-1 text-left">
-                    <span className="text-xs font-bold text-primary uppercase tracking-tight">{entry.action} — {entry.userName}</span>
-                    <p className="text-[10px] text-muted-foreground font-mono font-bold uppercase">{formatTimestamp(entry.timestamp)}</p>
+                    <span className="text-xs font-bold text-primary uppercase">{entry.action} — {entry.userName}</span>
+                    <p className="text-[10px] text-muted-foreground font-mono">{formatTimestamp(entry.timestamp)}</p>
                     <p className="text-xs italic leading-relaxed text-foreground/80 mt-1">"{entry.details}"</p>
                   </div>
                 </div>
@@ -1976,32 +1817,33 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </DialogContent>
       </Dialog>
 
-      {/* Decision Dialog for Work Orders */}
-      <Dialog open={!!woActionState} onOpenChange={(o) => !o && setWoActionState(null)}>
-        <DialogContent className="rounded-sm max-md">
-          <DialogHeader>
-            <DialogTitle>Authorize Work Order</DialogTitle>
-            <DialogDescription>Process approval for WO {woActionState?.wo.woNumber}.</DialogDescription>
-          </DialogHeader>
-          <div className="py-6 space-y-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase text-muted-foreground">Decision Remarks</Label>
-              <Textarea id="wo-action-remarks" placeholder="Enter comments for the contractor/engineer..." className="min-h-[100px] rounded-sm" />
+      {/* Detail Dialog for Payments */}
+      <Dialog open={!!viewingPayment} onOpenChange={(o) => !o && setViewingPayment(null)}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><IndianRupee className="h-5 w-5 text-primary" /></div>
+              <div><DialogTitle className="text-xl font-black uppercase tracking-tight">Payment Audit Log</DialogTitle><DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Ref: {viewingPayment?.referenceNumber}</DialogDescription></div>
             </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-            <Button 
-              className={cn("min-w-[120px]", woActionState?.type === 'Approved' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
-              disabled={isActionProcessing}
-              onClick={() => {
-                const remarks = (document.getElementById('wo-action-remarks') as HTMLTextAreaElement)?.value || "";
-                handleProcessWO(remarks);
-              }}
-            >
-              {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${woActionState?.type}`}
-            </Button>
-          </DialogFooter>
+          </DialogHeader>
+          <ScrollArea className="max-h-[70vh]">
+            {viewingPayment && (
+              <div className="p-8 space-y-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground">Paid to</Label><p className="text-lg font-black text-foreground">{viewingPayment.payeeName}</p></div>
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground">Details</Label><p className="text-sm font-medium">{viewingPayment.paymentDetails}</p></div>
+                  </div>
+                  <div className="bg-primary/5 rounded-sm border-2 border-primary/10 p-6 flex flex-col justify-center items-center text-center shadow-inner">
+                    <span className="text-[10px] font-black uppercase text-primary tracking-widest mb-2">Transaction Value</span>
+                    <span className="text-4xl font-black tabular-nums text-primary">₹{viewingPayment.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+                {viewingPayment.proofUrl && (<div className="pt-4 border-t"><Button variant="outline" className="rounded-sm font-bold" asChild><a href={viewingPayment.proofUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 h-4 w-4" /> View Proof</a></Button></div>)}
+              </div>
+            )}
+          </ScrollArea>
+          <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
 
