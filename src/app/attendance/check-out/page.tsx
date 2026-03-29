@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { CredentialsPromptDialog } from "@/components/credentials-prompt-dialog";
 
 export default function CheckOutPage() {
   const firestore = useFirestore();
@@ -171,6 +172,12 @@ export default function CheckOutPage() {
 
   return (
     <div className="space-y-8 max-w-2xl mx-auto py-8 px-4">
+      {/* 
+        The CredentialsPromptDialog will automatically trigger if the user 
+        profile is incomplete (missing DOJ, DOB, Aadhar, or PAN).
+      */}
+      <CredentialsPromptDialog />
+
       <div className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2">
           <CalendarCheck className="h-8 w-8 text-primary" /> Workday In Progress
@@ -190,7 +197,6 @@ export default function CheckOutPage() {
         </CardHeader>
         <CardContent className="pt-8 pb-8 space-y-6">
           <div className="flex flex-col items-center gap-4">
-            {/* Doubled height and full preview logic */}
             <div className={cn("relative w-full h-80 bg-black rounded-sm overflow-hidden shadow-2xl border-4 border-emerald-500/20", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
               
