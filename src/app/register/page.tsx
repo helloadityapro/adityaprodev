@@ -23,6 +23,10 @@ const registerSchema = z.object({
   mobile: z.string().min(1, { message: "Mobile number is required." }),
   role: z.string().min(1, "Please select a role."),
   department: z.string().min(1, "Please select a department."),
+  dob: z.string().min(1, "Date of Birth is required."),
+  doj: z.string().min(1, "Date of Joining is required."),
+  aadharNumber: z.string().min(12, "Aadhar Number must be 12 digits.").max(12, "Aadhar Number must be 12 digits."),
+  panNumber: z.string().min(10, "PAN Number must be 10 characters.").max(10, "PAN Number must be 10 characters."),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string()
 }).refine(data => data.password === data.confirmPassword, {
@@ -68,6 +72,10 @@ export default function RegisterPage() {
       confirmPassword: "",
       role: "",
       department: "",
+      dob: "",
+      doj: "",
+      aadharNumber: "",
+      panNumber: "",
     },
   })
 
@@ -87,6 +95,10 @@ export default function RegisterPage() {
         mobile: values.mobile,
         role: values.role,
         department: values.department,
+        dob: values.dob,
+        doj: values.doj,
+        aadharNumber: values.aadharNumber,
+        panNumber: values.panNumber,
         registrationRequest: true,
         assignedProjectIds: [],
         totalPoints: 0,
@@ -153,7 +165,7 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 py-12">
-      <Card className="mx-auto w-full max-w-md animate-in fade-in zoom-in-95 duration-300">
+      <Card className="mx-auto w-full max-w-lg animate-in fade-in zoom-in-95 duration-300">
         <CardHeader className="text-center pb-8 pt-10">
           <CardTitle className="text-3xl font-bold tracking-tight text-primary">Aditya Pro</CardTitle>
           <CardDescription className="mt-2">
@@ -163,74 +175,78 @@ export default function RegisterPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-5">
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-semibold text-foreground">Full Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter your full name" {...field} className="rounded-sm h-11" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-semibold text-foreground">Email</FormLabel>
-                    <FormControl>
-                      <Input placeholder="name@adityagreenenergy.com" {...field} className="rounded-sm h-11" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="mobile"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-semibold text-foreground">Contact Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="10-digit mobile number" {...field} className="rounded-sm h-11" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-semibold text-foreground">Designation</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                            <SelectTrigger className="rounded-sm h-11">
-                                <SelectValue placeholder="Select Designation" />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            {roles?.length ? roles.map(r => (
-                              <SelectItem key={r.id} value={r.name} className="font-medium">{r.name}</SelectItem>
-                            )) : (
-                              <>
-                                <SelectItem value="Site Engineer">Site Engineer</SelectItem>
-                                <SelectItem value="Site Manager">Site Manager</SelectItem>
-                                <SelectItem value="Driver">Driver</SelectItem>
-                              </>
-                            )}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground">Full Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter your full name" {...field} className="rounded-sm h-11" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground">Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="name@adityagreenenergy.com" {...field} className="rounded-sm h-11" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="mobile"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground">Contact Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="10-digit mobile number" {...field} className="rounded-sm h-11" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground">Designation</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                              <SelectTrigger className="rounded-sm h-11">
+                                  <SelectValue placeholder="Select Designation" />
+                              </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                              {roles?.length ? roles.map(r => (
+                                <SelectItem key={r.id} value={r.name} className="font-medium">{r.name}</SelectItem>
+                              )) : (
+                                <>
+                                  <SelectItem value="Site Engineer">Site Engineer</SelectItem>
+                                  <SelectItem value="Site Manager">Site Manager</SelectItem>
+                                  <SelectItem value="Driver">Driver</SelectItem>
+                                </>
+                              )}
+                          </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               
               <FormField
                 control={form.control}
@@ -259,6 +275,64 @@ export default function RegisterPage() {
                   </FormItem>
                 )}
               />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="dob"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground">Date of Birth</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} className="rounded-sm h-11" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="doj"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground">Date of Joining</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} className="rounded-sm h-11" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="aadharNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground">Aadhar Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="12-digit number" {...field} className="rounded-sm h-11" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="panNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground">PAN Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="10-character code" {...field} className="rounded-sm h-11 uppercase" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField

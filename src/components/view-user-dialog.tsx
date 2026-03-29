@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -15,7 +14,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { useCollection, useFirestore, useMemoFirebase, useDoc, useUser, updateDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, doc, orderBy, getDocs } from 'firebase/firestore';
-import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight, X, UserPlus, Check, ChevronsUpDown, Search, Loader2, Building2, Truck } from 'lucide-react';
+import { MapPin, User, Mail, Smartphone, ShieldCheck, UserCog, Trophy, Award, HardHat, ExternalLink, ChevronRight, X, UserPlus, Check, ChevronsUpDown, Search, Loader2, Building2, Truck, Calendar, Fingerprint, CreditCard } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -32,6 +31,10 @@ type UserProfile = {
   mobile: string;
   role: 'Admin' | 'Site Manager' | 'Site Engineer' | 'Driver';
   department?: 'Projects' | 'O&M';
+  dob?: string;
+  doj?: string;
+  aadharNumber?: string;
+  panNumber?: string;
   assignedProjectIds?: string[];
   siteManagerId?: string;
   totalPoints?: number;
@@ -205,7 +208,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Mail className="h-3.5 w-3.5" />
                 <span className="text-xs font-semibold">{user.email}</span>
@@ -214,6 +217,33 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                 <Smartphone className="h-3.5 w-3.5" />
                 <span className="text-xs font-semibold">{user.mobile || 'N/A'}</span>
               </div>
+              {user.dob && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span className="text-xs font-semibold">DOB: {format(new Date(user.dob), 'dd MMM yyyy')}</span>
+                </div>
+              )}
+              {user.doj && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span className="text-xs font-semibold">DOJ: {format(new Date(user.doj), 'dd MMM yyyy')}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {user.aadharNumber && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Fingerprint className="h-3.5 w-3.5" />
+                  <span className="text-xs font-semibold">Aadhar: {user.aadharNumber}</span>
+                </div>
+              )}
+              {user.panNumber && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <CreditCard className="h-3.5 w-3.5" />
+                  <span className="text-xs font-semibold uppercase">PAN: {user.panNumber}</span>
+                </div>
+              )}
             </div>
           </div>
         </DialogHeader>

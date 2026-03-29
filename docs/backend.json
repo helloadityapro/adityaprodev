@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -13,6 +12,10 @@
         "mobile": { "type": "string" },
         "role": { "type": "string" },
         "department": { "type": "string" },
+        "dob": { "type": "string", "format": "date", "description": "Date of Birth" },
+        "doj": { "type": "string", "format": "date", "description": "Date of Joining" },
+        "aadharNumber": { "type": "string", "description": "12-digit Aadhar Number" },
+        "panNumber": { "type": "string", "description": "10-character PAN Number" },
         "registrationRequest": { "type": "boolean" },
         "siteManagerId": { "type": "string" },
         "assignedProjectIds": { "type": "array", "items": { "type": "string" } },
