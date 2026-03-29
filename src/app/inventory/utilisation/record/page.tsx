@@ -91,9 +91,12 @@ export default function RecordUtilisationPage() {
   React.useEffect(() => {
     if (selectedSiteId) {
       const fetchAvailable = async () => {
-        const q = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId), where('stockLevel', '>', 0));
+        // Updated: Removed the inequality filter (stockLevel > 0) to avoid composite index requirement.
+        // We now filter the results in-memory.
+        const q = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId));
         const snap = await getDocs(q);
-        setAvailableMaterials(snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem)));
+        const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem));
+        setAvailableMaterials(results.filter(m => m.stockLevel > 0));
       };
       fetchAvailable();
     } else {
