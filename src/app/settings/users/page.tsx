@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react";
@@ -13,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { User, Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp, Building2, Truck } from "lucide-react"
+import { User, Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp, Building2, Truck, Calendar, Fingerprint, CreditCard } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
@@ -37,6 +36,7 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { format } from "date-fns";
 
 type User = {
   id: string;
@@ -45,6 +45,10 @@ type User = {
   mobile?: string;
   role?: string;
   department?: string;
+  dob?: string;
+  doj?: string;
+  aadharNumber?: string;
+  panNumber?: string;
   registrationRequest?: boolean;
   assignedProjectIds?: string[];
   siteManagerId?: string;
@@ -75,7 +79,7 @@ function StatusBadge({ isPending }: { isPending: boolean }) {
   )
 }
 
-type SortKey = 'username' | 'role' | 'registrationRequest' | 'createdAt' | 'department';
+type SortKey = 'username' | 'role' | 'registrationRequest' | 'createdAt' | 'department' | 'dob' | 'doj' | 'aadharNumber' | 'panNumber';
 
 export default function UsersPage() {
     const firestore = useFirestore();
@@ -161,8 +165,6 @@ export default function UsersPage() {
         
         counts.total = users.length;
         
-        const knownRoles = dbRoles?.length ? dbRoles.map(r => r.name) : ['Admin', 'Site Manager', 'Site Engineer', 'Driver'];
-        
         users.forEach(u => {
             if (u.registrationRequest) {
                 counts.pending++;
@@ -172,7 +174,7 @@ export default function UsersPage() {
             }
         });
         return counts;
-    }, [users, dbRoles]);
+    }, [users]);
 
     const sortedAndFilteredUsers = React.useMemo(() => {
         if (!users) return [];
@@ -193,6 +195,9 @@ export default function UsersPage() {
                 valA = a.createdAt?.toDate?.()?.getTime() || 0;
                 valB = b.createdAt?.toDate?.()?.getTime() || 0;
             }
+            if (typeof valA === 'string') valA = valA.toLowerCase();
+            if (typeof valB === 'string') valB = valB.toLowerCase();
+
             if (valA < valB) return direction === 'asc' ? -1 : 1;
             if (valA > valB) return direction === 'asc' ? 1 : -1;
             return 0;
@@ -263,6 +268,8 @@ export default function UsersPage() {
                                 <TableHead onClick={() => handleSort('username')} className="cursor-pointer hover:text-primary transition-colors">User <SortIcon column="username" /></TableHead>
                                 <TableHead onClick={() => handleSort('role')} className="cursor-pointer hover:text-primary transition-colors">Role <SortIcon column="role" /></TableHead>
                                 <TableHead onClick={() => handleSort('department')} className="cursor-pointer hover:text-primary transition-colors">Dept <SortIcon column="department" /></TableHead>
+                                <TableHead onClick={() => handleSort('doj')} className="cursor-pointer hover:text-primary transition-colors">DOJ <SortIcon column="doj" /></TableHead>
+                                <TableHead>Aadhar / PAN</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right px-6">Actions</TableHead>
                             </TableRow>
@@ -294,6 +301,22 @@ export default function UsersPage() {
                                             <span className="text-[10px] text-muted-foreground italic font-medium">No Dept</span>
                                         )}
                                     </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-xs font-mono font-bold text-primary">{u.doj ? format(new Date(u.doj), 'dd/MM/yy') : '—'}</span>
+                                            {u.dob && <span className="text-[9px] text-muted-foreground">DOB: {format(new Date(u.dob), 'dd/MM/yy')}</span>}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-1.5 text-[10px] font-mono font-medium text-muted-foreground">
+                                                <Fingerprint className="h-3 w-3 opacity-50" /> {u.aadharNumber || '—'}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 text-[10px] font-mono font-medium text-muted-foreground uppercase">
+                                                <CreditCard className="h-3 w-3 opacity-50" /> {u.panNumber || '—'}
+                                            </div>
+                                        </div>
+                                    </TableCell>
                                     <TableCell><StatusBadge isPending={!!u.registrationRequest} /></TableCell>
                                     <TableCell className="text-right px-6">
                                         <div className="flex justify-end gap-1">
@@ -314,7 +337,7 @@ export default function UsersPage() {
                                 </TableRow>
                             )) : (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">No users found matching your filters.</TableCell>
+                                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No users found matching your filters.</TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
