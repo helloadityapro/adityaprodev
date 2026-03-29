@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp, orderBy, or, getDoc, increment, arrayUnion } from 'firebase/firestore';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
+import { collection, doc, query, where, serverTimestamp, orderBy, or, and, getDoc, increment, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -730,7 +730,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     const newSet = new Set(expandedBomRows);
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
-    setExpandedRows(newSet);
+    setExpandedBomRows(newSet);
   };
 
   const toggleInvRow = (id: string) => {
@@ -1430,6 +1430,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       {inventory && inventory.length > 0 ? inventory.map(invRecord => {
                         const bomItem = bomItems?.find(i => i.itemName === invRecord.itemName && i.status === 'Approved');
                         const itemMovements = movements?.filter(m => m.itemName === invRecord.itemName) || [];
+                        const itemUtilisations = utilisations?.filter(u => u.itemName === invRecord.itemName) || [];
                         const utilised = invRecord.utilisedQuantity || 0;
                         const available = invRecord.stockLevel;
                         const total = utilised + available;
@@ -1475,37 +1476,73 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             {expandedInvRows.has(invRecord.id) && (
                               <TableRow className="bg-primary/[0.01]">
                                 <TableCell colSpan={6} className="p-0 border-b">
-                                  <div className="p-6 px-12 animate-in slide-in-from-top-1 duration-200">
-                                    <div className="flex items-center gap-2 mb-4">
-                                      <History className="h-3.5 w-3.5 text-primary" />
-                                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Movement History: {invRecord.itemName}</span>
-                                    </div>
-                                    {itemMovements.length > 0 ? (
-                                      <div className="grid gap-2">
-                                        {itemMovements.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map((m: any) => (
-                                          <div key={m.id} className="flex items-center justify-between p-3 bg-background border rounded-sm text-[11px] shadow-sm">
-                                            <div className="flex items-center gap-4">
-                                              <Badge variant="outline" className={cn("text-[8px] font-black h-5 px-1.5 uppercase", m.movementType === 'Inward' ? "bg-green-50 text-green-700 border-green-200" : "bg-blue-50 text-blue-700 border-blue-200")}>
-                                                {m.movementType === 'Inward' ? <ArrowDownCircle className="h-2.5 w-2.5 mr-1" /> : <ArrowUpCircle className="h-2.5 w-2.5 mr-1" />}
-                                                {m.movementType}
-                                              </Badge>
-                                              <div className="flex flex-col">
-                                                <span className="font-bold text-foreground">Qty: {m.quantity} {m.unit}</span>
-                                                <span className="text-[9px] text-muted-foreground uppercase">{m.movementType === 'Inward' ? 'From' : 'To'}: {m.sourceOrDestination}</span>
-                                              </div>
-                                            </div>
-                                            <div className="flex items-center gap-4 text-right">
-                                              <div className="flex flex-col items-end">
-                                                <span className="font-bold text-muted-foreground uppercase text-[9px]">{m.userName}</span>
-                                                <span className="text-[9px] text-muted-foreground/60">{m.movementDate}</span>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ))}
+                                  <div className="p-6 px-12 animate-in slide-in-from-top-1 duration-200 space-y-8">
+                                    {/* Movement Section */}
+                                    <div className="space-y-4">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <History className="h-3.5 w-3.5 text-primary" />
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Movement History: {invRecord.itemName}</span>
                                       </div>
-                                    ) : (
-                                      <div className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/10 rounded-sm border border-dashed">No material movements logged for this item.</div>
-                                    )}
+                                      {itemMovements.length > 0 ? (
+                                        <div className="grid gap-2">
+                                          {itemMovements.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map((m: any) => (
+                                            <div key={m.id} className="flex items-center justify-between p-3 bg-background border rounded-sm text-[11px] shadow-sm">
+                                              <div className="flex items-center gap-4">
+                                                <Badge variant="outline" className={cn("text-[8px] font-black h-5 px-1.5 uppercase", m.movementType === 'Inward' ? "bg-green-50 text-green-700 border-green-200" : "bg-blue-50 text-blue-700 border-blue-200")}>
+                                                  {m.movementType === 'Inward' ? <ArrowDownCircle className="h-2.5 w-2.5 mr-1" /> : <ArrowUpCircle className="h-2.5 w-2.5 mr-1" />}
+                                                  {m.movementType}
+                                                </Badge>
+                                                <div className="flex flex-col">
+                                                  <span className="font-bold text-foreground">Qty: {m.quantity} {m.unit}</span>
+                                                  <span className="text-[9px] text-muted-foreground uppercase">{m.movementType === 'Inward' ? 'From' : 'To'}: {m.sourceOrDestination}</span>
+                                                </div>
+                                              </div>
+                                              <div className="flex items-center gap-4 text-right">
+                                                <div className="flex flex-col items-end">
+                                                  <span className="font-bold text-muted-foreground uppercase text-[9px]">{m.userName}</span>
+                                                  <span className="text-[9px] text-muted-foreground/60">{m.movementDate}</span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/10 rounded-sm border border-dashed">No material movements logged for this item.</div>
+                                      )}
+                                    </div>
+
+                                    {/* Utilisation Section */}
+                                    <div className="space-y-4">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <PieChart className="h-3.5 w-3.5 text-amber-600" />
+                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">Utilisation History: {invRecord.itemName}</span>
+                                      </div>
+                                      {itemUtilisations.length > 0 ? (
+                                        <div className="grid gap-2">
+                                          {itemUtilisations.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map((u: any) => (
+                                            <div key={u.id} className="flex items-center justify-between p-3 bg-amber-50/30 border border-amber-100 rounded-sm text-[11px] shadow-sm">
+                                              <div className="flex items-center gap-4">
+                                                <div className="p-1.5 bg-amber-100 rounded-full">
+                                                  <PieChart className="h-3 w-3 text-amber-700" />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                  <span className="font-bold text-foreground">Utilised: {u.quantity} {u.unit}</span>
+                                                  <span className="text-[9px] text-muted-foreground italic leading-tight">"{u.remarks}"</span>
+                                                </div>
+                                              </div>
+                                              <div className="flex items-center gap-4 text-right">
+                                                <div className="flex flex-col items-end">
+                                                  <span className="font-bold text-muted-foreground uppercase text-[9px]">{u.userName}</span>
+                                                  <span className="text-[9px] text-muted-foreground/60">{u.utilisationDate}</span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="p-8 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/10 rounded-sm border border-dashed">No material consumption logged for this item.</div>
+                                      )}
+                                    </div>
                                   </div>
                                 </TableCell>
                               </TableRow>
