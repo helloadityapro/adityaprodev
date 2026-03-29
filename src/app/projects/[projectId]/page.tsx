@@ -60,7 +60,8 @@ import {
   CreditCard,
   Wallet,
   IndianRupee,
-  PieChart
+  PieChart,
+  AlertCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -257,6 +258,8 @@ type WOSortKey = 'woNumber' | 'contractor' | 'status' | 'date' | 'total';
 type BoMSortKey = 'itemName' | 'category' | 'status' | 'plannedQuantity' | 'approvedQuantity';
 type PaymentSortKey = 'date' | 'payee' | 'amount' | 'reference';
 
+const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"];
+
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
   const date = ts.toDate ? ts.toDate() : new Date(ts);
@@ -327,7 +330,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const { data: project, isLoading: projectLoading } = useDoc<Project>(projectRef);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<any>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
@@ -544,18 +547,18 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     return result;
   }, [workOrders, woSearch, woSortConfig]);
 
-  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
+  const [siteManagementSortConfig, setSiteManagementSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
 
-  const handleSort = (key: SortKey) => {
-    setSortConfig(prev => ({
+  const handleSiteManagementSort = (key: SortKey) => {
+    setSiteManagementSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
   };
 
-  const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+  const SiteManagementSortIcon = ({ column }: { column: SortKey }) => {
+    if (siteManagementSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
+    return siteManagementSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
   };
 
   const handlePOSort = (key: POSortKey) => {
@@ -744,10 +747,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     setSelectedMasterItem(item);
     setIsBomItemPopoverOpen(false);
     setBomItemSearchQuery("");
-  };
-
-  const toggleSelectOne = (id: string) => {
-    // Legacy support for projects list selection
   };
 
   const togglePORow = (id: string) => {
@@ -958,14 +957,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <Table>
                       <TableHeader className="bg-muted/30">
                         <TableRow>
-                          <TableHead className="px-6 cursor-pointer" onClick={() => handleSort('engineer')}>
-                            <div className="flex items-center">Personnel <SortIcon column="engineer" /></div>
+                          <TableHead className="px-6 cursor-pointer" onClick={() => handleSiteManagementSort('engineer')}>
+                            <div className="flex items-center">Personnel <SiteManagementSortIcon column="engineer" /></div>
                           </TableHead>
-                          <TableHead className="cursor-pointer" onClick={() => handleSort('manager')}>
-                            <div className="flex items-center">Supervisor <SortIcon column="manager" /></div>
+                          <TableHead className="cursor-pointer" onClick={() => handleSiteManagementSort('manager')}>
+                            <div className="flex items-center">Supervisor <SiteManagementSortIcon column="manager" /></div>
                           </TableHead>
-                          <TableHead className="text-center cursor-pointer" onClick={() => handleSort('sites')}>
-                            <div className="flex items-center justify-center">Sites <SortIcon column="sites" /></div>
+                          <TableHead className="text-center cursor-pointer" onClick={() => handleSiteManagementSort('sites')}>
+                            <div className="flex items-center justify-center">Sites <SiteManagementSortIcon column="sites" /></div>
                           </TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1518,7 +1517,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                     {/* Utilisation Section */}
                                     <div className="space-y-4">
                                       <div className="flex items-center gap-2 mb-2">
-                                        <PieChart className="h-3.5 w-3.5 text-amber-600" />
+                                        <History className="h-3.5 w-3.5 text-amber-600" />
                                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">Utilisation History: {invRecord.itemName}</span>
                                       </div>
                                       {itemUtilisations.length > 0 ? (
@@ -2034,5 +2033,3 @@ function StatRow({ label, value, color }: { label: string, value: number, color:
     <div className={cn("flex items-center justify-between p-3 rounded-sm border", (colors as any)[color])}><span className="text-[10px] font-black uppercase tracking-wider">{label}</span><span className="text-lg font-black">{value}</span></div>
   );
 }
-
-const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"];
