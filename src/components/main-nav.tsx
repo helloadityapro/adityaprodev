@@ -555,7 +555,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                         <span>Trips</span>
                       </Link>
                     </SidebarMenuSubButton>
-                  </SidebarMenuSub>
+                  </SidebarMenuSubItem>
                 </SidebarMenuSub>
               </CollapsibleContent>
             </SidebarMenuItem>
@@ -588,7 +588,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                         <span>Attendance History</span>
                       </Link>
                     </SidebarMenuSubButton>
-                  </SidebarMenuSub>
+                  </SidebarMenuSubItem>
                 </SidebarMenuSub>
               </CollapsibleContent>
             </SidebarMenuItem>
