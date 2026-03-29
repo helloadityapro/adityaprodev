@@ -196,7 +196,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                       <SidebarMenuSubButton asChild isActive={pathname === '/inventory/data'} onClick={handleMobileClose}>
                         <Link href="/inventory/data">
                           <TableIcon className="h-4 w-4" />
-                          <span>Movement Data</span>
+                          <span>Global Movement Data</span>
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
