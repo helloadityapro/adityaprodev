@@ -21,6 +21,7 @@ import { GlobalSearch } from "@/components/global-search";
 import { AttendanceGate } from "@/components/attendance-gate";
 import { BottomNav } from "@/components/bottom-nav";
 import { QuickActions } from "@/components/quick-actions";
+import { CredentialsPromptDialog } from "@/components/credentials-prompt-dialog";
 import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
@@ -416,6 +417,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/40">
           <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6 min-h-full pb-36 md:pb-6 relative">
             <AttendanceGate />
+            <CredentialsPromptDialog />
             {children}
           </div>
         </div>

@@ -14,7 +14,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { CredentialsPromptDialog } from "@/components/credentials-prompt-dialog";
 
 export default function CheckOutPage() {
   const firestore = useFirestore();
@@ -172,12 +171,6 @@ export default function CheckOutPage() {
 
   return (
     <div className="space-y-8 max-w-2xl mx-auto py-8 px-4">
-      {/* 
-        The CredentialsPromptDialog will automatically trigger if the user 
-        profile is incomplete (missing DOJ, DOB, Aadhar, or PAN).
-      */}
-      <CredentialsPromptDialog />
-
       <div className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2">
           <CalendarCheck className="h-8 w-8 text-primary" /> Workday In Progress
@@ -225,7 +218,7 @@ export default function CheckOutPage() {
               <div className="relative w-full h-80 group">
                 <img src={selfie} className="w-full h-full object-cover rounded-sm border-2 border-emerald-200 shadow-md" alt="Checkout Selfie" />
                 <div className="absolute top-4 left-4 bg-black/60 text-white text-[10px] font-bold px-3 py-1 rounded-sm uppercase tracking-widest backdrop-blur-md">Exit Profile Snapshot</div>
-                <Button variant="destructive" size="icon" className="absolute top-4 right-4 rounded-full h-10 w-10 shadow-lg" onClick={() => setSelfie(null)}><Trash2 className="h-5 w-5" /></Button>
+                <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full h-8 w-8 shadow-lg" onClick={() => setSelfie(null)}><Trash2 className="h-4 w-4" /></Button>
               </div>
             )}
 
