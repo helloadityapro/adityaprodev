@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -59,7 +60,8 @@ import {
   ExternalLink,
   CreditCard,
   Wallet,
-  IndianRupee
+  IndianRupee,
+  PieChart
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -204,6 +206,7 @@ type InventoryItem = {
   id: string;
   itemName: string;
   stockLevel: number;
+  utilisedQuantity?: number;
   unit: string;
   lastUpdated: any;
 };
@@ -236,6 +239,17 @@ type Payment = {
   date: any;
   recordedByName?: string;
   editHistory?: any[];
+};
+
+type MaterialUtilisation = {
+  id: string;
+  itemName: string;
+  quantity: number;
+  unit: string;
+  utilisationDate: string;
+  remarks: string;
+  userName: string;
+  createdAt: any;
 };
 
 type SortKey = 'engineer' | 'manager' | 'sites';
@@ -407,6 +421,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     [firestore, projectId]
   );
   const { data: inventory } = useCollection<InventoryItem>(inventoryQuery);
+
+  const utilisationQuery = useMemoFirebase(() => 
+    query(collection(firestore, 'material_utilisations'), where('siteId', '==', projectId)), 
+    [firestore, projectId]
+  );
+  const { data: utilisations } = useCollection<MaterialUtilisation>(utilisationQuery);
 
   const masterInventoryQuery = useMemoFirebase(() => collection(firestore, 'master_inventory'), [firestore]);
   const { data: masterItems } = useCollection<MasterItem>(masterInventoryQuery);
@@ -882,6 +902,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </TabsTrigger>
               <TabsTrigger value="inventory" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <Warehouse className="h-3.5 w-3.5 mr-1.5" /> INVENTORY
+              </TabsTrigger>
+              <TabsTrigger value="utilisation" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
+                <PieChart className="h-3.5 w-3.5 mr-1.5" /> UTILISATION
               </TabsTrigger>
               <TabsTrigger value="movements" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
                 <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" /> MOVEMENTS
@@ -1384,8 +1407,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead className="px-6 min-w-[250px]">Item & Description</TableHead>
                         <TableHead>Make</TableHead>
                         <TableHead>Supplier</TableHead>
-                        <TableHead className="text-center">Approved Qty</TableHead>
-                        <TableHead className="text-center">Available Qty</TableHead>
+                        <TableHead className="text-center">Available Stock</TableHead>
+                        <TableHead className="text-center">Utilised Qty</TableHead>
                         <TableHead className="text-right px-6">Logs</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1412,15 +1435,16 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               </TableCell>
                               <TableCell className="text-xs font-medium text-muted-foreground truncate max-w-[150px]" title={suppliers}>{suppliers}</TableCell>
                               <TableCell className="text-center">
-                                <div className="font-mono font-bold text-sm text-foreground">{bomItem ? (bomItem.approvedQuantity || bomItem.plannedQuantity) : '—'}</div>
-                                <div className="text-[10px] text-muted-foreground uppercase font-medium">{invRecord.unit}</div>
-                              </TableCell>
-                              <TableCell className="text-center">
                                 <Badge className={cn(
                                   "font-mono font-bold rounded-sm px-3 h-7 border-none shadow-sm",
                                   invRecord.stockLevel > 0 ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
                                 )}>
                                   {invRecord.stockLevel} {invRecord.unit}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant="secondary" className="font-mono font-bold rounded-sm px-3 h-7 bg-amber-100 text-amber-800 border-amber-200">
+                                  {invRecord.utilisedQuantity || 0} {invRecord.unit}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right px-6">
@@ -1474,6 +1498,73 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <Package className="h-10 w-10 opacity-20" />
                           <p className="text-sm font-bold uppercase tracking-widest">No site movements recorded yet</p>
                         </TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="utilisation" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search material or personnel..." 
+                  className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
+                  value={searchTerm} 
+                  onChange={e => setSearchTerm(e.target.value)} 
+                />
+              </div>
+              <Button asChild className="rounded-sm font-bold shadow-md h-9">
+                <Link href={`/inventory/utilisation/record`}>
+                  <Plus className="h-4 w-4 mr-2" /> Log Consumption
+                </Link>
+              </Button>
+            </div>
+            <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+              <CardHeader className="bg-muted/5 border-b py-4">
+                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                  <PieChart className="h-4 w-4 text-primary" /> On-Site Material Utilisation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6">Date</TableHead>
+                        <TableHead>Material Item</TableHead>
+                        <TableHead className="text-center">Quantity Used</TableHead>
+                        <TableHead className="min-w-[200px]">Remarks / Work Done</TableHead>
+                        <TableHead className="text-right px-6">Personnel</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {utilisations && utilisations.length > 0 ? utilisations.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map(u => (
+                        <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
+                          <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground">
+                            {u.utilisationDate}
+                          </TableCell>
+                          <TableCell className="text-sm font-bold text-foreground">{u.itemName}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary" className="font-mono font-bold bg-amber-50 text-amber-700 border-amber-200">
+                              {u.quantity} {u.unit}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs italic text-muted-foreground">
+                            "{u.remarks}"
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            <div className="flex items-center justify-end gap-2 text-[10px] font-bold text-muted-foreground uppercase">
+                              <User className="h-3 w-3 text-primary" />
+                              {u.userName}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )) : (
+                        <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">No utilisation records logged for this site.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>

@@ -48,7 +48,8 @@ import {
   Plus,
   Settings2,
   Tag,
-  IndianRupee
+  IndianRupee,
+  PieChart
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -193,10 +194,26 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                     <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/inventory/utilisation/record'} onClick={handleMobileClose}>
+                        <Link href="/inventory/utilisation/record">
+                          <PieChart className="h-4 w-4" />
+                          <span>Record Utilisation</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname === '/inventory/data'} onClick={handleMobileClose}>
                         <Link href="/inventory/data">
                           <TableIcon className="h-4 w-4" />
                           <span>Global Movement Data</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/inventory/utilisation/data'} onClick={handleMobileClose}>
+                        <Link href="/inventory/utilisation/data">
+                          <History className="h-4 w-4" />
+                          <span>Global Utilisation Data</span>
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>

@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -126,9 +127,29 @@
         "siteId": { "type": "string" },
         "itemName": { "type": "string" },
         "stockLevel": { "type": "number" },
+        "utilisedQuantity": { "type": "number", "default": 0 },
         "unit": { "type": "string" },
         "lastUpdated": { "type": "string", "format": "date-time" }
       }
+    },
+    "MaterialUtilisation": {
+      "title": "Material Utilisation",
+      "type": "object",
+      "description": "Records of material consumption on site.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "itemName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string" },
+        "utilisationDate": { "type": "string", "format": "date" },
+        "remarks": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "itemName", "quantity", "utilisationDate"]
     },
     "MasterInventoryItem": {
       "title": "Master Inventory Item",
@@ -202,6 +223,10 @@
     "/project_inventory/{invId}": {
       "schema": { "$ref": "#/backend/entities/InventoryItem" },
       "description": "Current inventory stock levels at project sites."
+    },
+    "/material_utilisations/{utilId}": {
+      "schema": { "$ref": "#/backend/entities/MaterialUtilisation" },
+      "description": "Consumption logs for project sites."
     },
     "/master_inventory/{itemId}": {
       "schema": { "$ref": "#/backend/entities/MasterInventoryItem" },

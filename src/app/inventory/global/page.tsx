@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -6,7 +7,7 @@ import { collection, query, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PackageCheck, Search, FilterX, Building2, Layers, Boxes, Clock } from "lucide-react";
+import { PackageCheck, Search, FilterX, Building2, Layers, Boxes, Clock, PieChart } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ type InventoryItem = {
   siteName: string;
   itemName: string;
   stockLevel: number;
+  utilisedQuantity?: number;
   unit: string;
   lastUpdated: any;
 };
@@ -55,7 +57,7 @@ export default function GlobalInventoryPage() {
         <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <PackageCheck className="h-8 w-8" /> Global Inventory
         </h1>
-        <p className="text-muted-foreground font-medium">Real-time component-level stock availability across all organizational project sites.</p>
+        <p className="text-muted-foreground font-medium">Real-time component-level stock availability and utilisation across all project sites.</p>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
@@ -86,8 +88,9 @@ export default function GlobalInventoryPage() {
                 <TableRow>
                   <TableHead className="px-6 min-w-[200px]">Project Site</TableHead>
                   <TableHead className="min-w-[250px]">Material / Component</TableHead>
-                  <TableHead className="text-center">Current Availability</TableHead>
-                  <TableHead className="text-right px-6">Last Physical Audit</TableHead>
+                  <TableHead className="text-center">Available Stock</TableHead>
+                  <TableHead className="text-center">Utilised Qty</TableHead>
+                  <TableHead className="text-right px-6">Last Update</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -115,6 +118,12 @@ export default function GlobalInventoryPage() {
                         {item.stockLevel} {item.unit}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary" className="font-mono font-bold rounded-sm px-3 h-7 bg-amber-100 text-amber-800 border-amber-200">
+                        <PieChart className="h-3 w-3 mr-1.5 opacity-60" />
+                        {item.utilisedQuantity || 0} {item.unit}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex flex-col items-end gap-1">
                         <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase">
@@ -126,7 +135,7 @@ export default function GlobalInventoryPage() {
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic">
+                    <TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic">
                       <div className="flex flex-col items-center gap-2 opacity-40">
                         <Boxes className="h-10 w-10" />
                         <p className="text-sm font-bold uppercase tracking-widest">No stock records found</p>
