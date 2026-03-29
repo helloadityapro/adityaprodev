@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -322,6 +321,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [paymentSortConfig, setPaymentSortConfig] = React.useState<{ key: PaymentSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [viewingPayment, setViewingPayment] = React.useState<Payment | null>(null);
 
+  const [searchTerm, setSearchTerm] = React.useState("");
+
   const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
   const { data: project, isLoading: projectLoading } = useDoc<Project>(projectRef);
 
@@ -427,6 +428,19 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     [firestore, projectId]
   );
   const { data: utilisations } = useCollection<MaterialUtilisation>(utilisationQuery);
+
+  const filteredUtilisations = React.useMemo(() => {
+    if (!utilisations) return [];
+    return utilisations.filter(u => 
+      u.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.remarks.toLowerCase().includes(searchTerm.toLowerCase())
+    ).sort((a: any, b: any) => {
+      const da = a.createdAt?.toDate?.()?.getTime() || 0;
+      const db = b.createdAt?.toDate?.()?.getTime() || 0;
+      return db - da;
+    });
+  }, [utilisations, searchTerm]);
 
   const masterInventoryQuery = useMemoFirebase(() => collection(firestore, 'master_inventory'), [firestore]);
   const { data: masterItems } = useCollection<MasterItem>(masterInventoryQuery);
@@ -1542,7 +1556,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {utilisations && utilisations.length > 0 ? utilisations.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map(u => (
+                      {filteredUtilisations.length > 0 ? filteredUtilisations.map(u => (
                         <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
                           <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground">
                             {u.utilisationDate}
