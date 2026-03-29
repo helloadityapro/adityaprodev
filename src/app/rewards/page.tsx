@@ -6,7 +6,7 @@ import { collection, doc, query, orderBy, limit, where, or, and, getDocs, server
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send, MapPin, Clock, AlertCircle, Search } from "lucide-react";
+import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send, MapPin, Clock, AlertCircle, Search, FileDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from 'xlsx';
 
 const MIN_REDEEM_VALUE_RS = 500;
 
@@ -276,6 +277,24 @@ export default function RewardsPage() {
     );
   }, [leaders, searchTerm]);
 
+  const handleExportLeaderboard = () => {
+    if (!filteredLeaders || filteredLeaders.length === 0) return;
+    
+    const exportData = filteredLeaders.map((leader, index) => ({
+      'Rank': index + 1,
+      'Name': leader.username,
+      'Email': leader.email,
+      'Role': leader.role,
+      'Points': leader.totalPoints?.toFixed(2) || '0.00',
+      'Value (INR)': ((leader.totalPoints || 0) * pointValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Leaderboard");
+    XLSX.writeFile(wb, `AdityaPro_Leaderboard_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  };
+
   const handleInitiateRedemption = async () => {
     if (!canRedeem) {
       toast({ variant: 'destructive', title: 'Threshold Not Met', description: `A minimum balance of ₹${MIN_REDEEM_VALUE_RS} is required to redeem.` });
@@ -415,11 +434,18 @@ export default function RewardsPage() {
 
       <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
         <CardHeader className="bg-muted/5 border-b flex flex-col gap-4">
-          <div className="space-y-1">
-              <CardTitle className="text-lg flex items-center gap-2">
-                  <Medal className="h-5 w-5 text-amber-500" /> Leaderboard
-              </CardTitle>
-              <CardDescription className="text-xs">Top contributors across the organization.</CardDescription>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+                <CardTitle className="text-lg flex items-center gap-2">
+                    <Medal className="h-5 w-5 text-amber-500" /> Leaderboard
+                </CardTitle>
+                <CardDescription className="text-xs">Top contributors across the organization.</CardDescription>
+            </div>
+            {isAdmin && (
+              <Button onClick={handleExportLeaderboard} variant="outline" size="sm" className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 hidden sm:flex">
+                <FileDown className="h-4 w-4 mr-2" /> Export
+              </Button>
+            )}
           </div>
           <div className="relative w-full">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
