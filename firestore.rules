@@ -7,7 +7,8 @@ service cloud.firestore {
     }
 
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(path) ? get(path).data : {};
     }
 
     function isAdmin() {
@@ -15,14 +16,10 @@ service cloud.firestore {
       let userEmail = request.auth.token.get('email', '').lower();
       let isSuperAdmin = userEmail in superAdminEmails;
       
-      if (isSuperAdmin) {
-        return true;
-      }
-                         
       let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
       let hasAdminRole = exists(userDocPath) && get(userDocPath).data.get('role', '') == 'Admin';
                          
-      return isSignedIn() && hasAdminRole;
+      return isSignedIn() && (isSuperAdmin || hasAdminRole);
     }
 
     match /users/{userId} {
@@ -53,17 +50,17 @@ service cloud.firestore {
 
     match /project_boms/{bomId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && getUserData().role == 'Site Manager');
+      allow write: if isAdmin() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
     }
 
     match /project_pos/{poId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && getUserData().role == 'Site Manager');
+      allow write: if isAdmin() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
     }
 
     match /project_wos/{woId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && getUserData().role == 'Site Manager');
+      allow write: if isAdmin() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
     }
 
     match /project_inventory/{invId} {
@@ -73,7 +70,7 @@ service cloud.firestore {
 
     match /master_inventory/{itemId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && getUserData().role == 'Site Manager');
+      allow write: if isAdmin() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
     }
 
     match /inventory_categories/{categoryId} {
@@ -198,7 +195,7 @@ service cloud.firestore {
 
     match /payments/{paymentId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && getUserData().role == 'Site Manager');
+      allow write: if isAdmin() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
     }
   }
 }
