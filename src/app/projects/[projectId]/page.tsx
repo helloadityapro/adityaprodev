@@ -746,6 +746,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     setBomItemSearchQuery("");
   };
 
+  const toggleSelectOne = (id: string) => {
+    // Legacy support for projects list selection
+  };
+
   const togglePORow = (id: string) => {
     const newSet = new Set(expandedPORows);
     if (newSet.has(id)) newSet.delete(id);
@@ -1520,13 +1524,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                       {itemUtilisations.length > 0 ? (
                                         <div className="grid gap-2">
                                           {itemUtilisations.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map((u: any) => (
-                                            <div key={u.id} className="flex items-center justify-between p-3 bg-amber-50/30 border border-amber-100 rounded-sm text-[11px] shadow-sm">
+                                            <div key={u.id} className="flex items-center justify-between p-3 bg-background border rounded-sm text-[11px] shadow-sm">
                                               <div className="flex items-center gap-4">
-                                                <div className="p-1.5 bg-amber-100 rounded-full">
-                                                  <PieChart className="h-3 w-3 text-amber-700" />
-                                                </div>
+                                                <Badge variant="outline" className="text-[8px] font-black h-5 px-1.5 uppercase bg-amber-50 text-amber-700 border-amber-200">
+                                                  <PieChart className="h-2.5 w-2.5 mr-1" />
+                                                  Utilised
+                                                </Badge>
                                                 <div className="flex flex-col">
-                                                  <span className="font-bold text-foreground">Utilised: {u.quantity} {u.unit}</span>
+                                                  <span className="font-bold text-foreground">Qty: {u.quantity} {u.unit}</span>
                                                   <span className="text-[9px] text-muted-foreground italic leading-tight">"{u.remarks}"</span>
                                                 </div>
                                               </div>
