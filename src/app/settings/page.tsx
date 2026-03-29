@@ -18,7 +18,8 @@ import {
   ChevronRight,
   ShieldCheck,
   Truck,
-  HardHat
+  HardHat,
+  Quote
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -57,6 +58,7 @@ export default function SettingsPage() {
 
   const adminTools = [
     { label: 'Rewards Setup', href: '/settings/rewards', icon: Coins, color: 'text-amber-600' },
+    { label: 'Quotes Hub', href: '/settings/quotes', icon: Quote, color: 'text-blue-600' },
     { label: 'User Directory', href: '/settings/users', icon: Users, color: 'text-purple-600' },
     { label: 'Team Mapping', href: '/settings/teams', icon: Workflow, color: 'text-emerald-600' },
     { label: 'Supplier Registry', href: '/settings/suppliers', icon: Truck, color: 'text-indigo-600' },

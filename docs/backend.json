@@ -25,6 +25,17 @@
       },
       "required": ["id", "username", "email", "mobile", "role"]
     },
+    "Quote": {
+      "title": "Motivational Quote",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "author": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text"]
+    },
     "Vehicle": {
       "title": "Vehicle",
       "type": "object",
@@ -198,6 +209,10 @@
     "/users/{userId}": {
       "schema": { "$ref": "#/backend/entities/User" },
       "description": "User profiles and performance data."
+    },
+    "/quotes/{quoteId}": {
+      "schema": { "$ref": "#/backend/entities/Quote" },
+      "description": "Motivational quotes displayed during loading."
     },
     "/vehicles/{vehicleId}": {
       "schema": { "$ref": "#/backend/entities/Vehicle" },

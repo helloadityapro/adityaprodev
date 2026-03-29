@@ -3,7 +3,7 @@
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser, useDoc, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection, useFirestore } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, or, and } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, or, and, getDocs } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import { MainNav } from "@/components/main-nav";
 import {
@@ -61,16 +61,55 @@ function TopLoadingBar({ isVisible }: { isVisible: boolean }) {
 }
 
 function FullPageLoader() {
+  const [quote, setQuote] = React.useState("");
+  const firestore = useFirestore();
+
+  React.useEffect(() => {
+    const fetchQuote = async () => {
+      const defaultQuotes = [
+        "Individual commitment to a group effort—that is what makes a team work.",
+        "Unity is strength... when there is teamwork and collaboration, wonderful things can be achieved.",
+        "Coming together is a beginning. Keeping together is progress. Working together is success.",
+        "Alone we can do so little; together we can do so much."
+      ];
+
+      try {
+        const snap = await getDocs(collection(firestore, 'quotes'));
+        const dbQuotes = snap.docs.map(d => d.data().text);
+        const combined = dbQuotes.length > 0 ? dbQuotes : defaultQuotes;
+        setQuote(combined[Math.floor(Math.random() * combined.length)]);
+      } catch (e) {
+        setQuote(defaultQuotes[Math.floor(Math.random() * defaultQuotes.length)]);
+      }
+    };
+    fetchQuote();
+  }, [firestore]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background animate-in fade-in duration-300">
-      <div className="flex flex-col items-center gap-4">
-        <div className="relative">
+    <div className="flex min-h-screen items-center justify-center bg-background animate-in fade-in duration-300 px-6">
+      <div className="flex flex-col items-center gap-8 max-w-md w-full text-center">
+        <div className="relative scale-125">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="h-2 w-2 rounded-full bg-primary animate-ping" />
           </div>
         </div>
-        <p className="text-xs font-black text-muted-foreground tracking-[0.3em] uppercase">Aditya Pro</p>
+        
+        <AnimatePresence mode="wait">
+          {quote && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-3"
+            >
+              <p className="text-sm font-medium italic text-muted-foreground leading-relaxed">
+                "{quote}"
+              </p>
+              <div className="h-0.5 w-12 bg-primary/20 mx-auto rounded-full" />
+              <p className="text-[10px] font-black text-primary/40 uppercase tracking-[0.3em]">Aditya Pro</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -387,8 +426,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <Sidebar>
         <SidebarHeader className="px-6 py-4 border-b">
           <div className="flex items-baseline gap-0.5">
-            <span className="text-lg font-black tracking-tighter text-primary uppercase">Aditya</span>
-            <span className="text-xs font-light tracking-[0.3em] text-muted-foreground uppercase ml-1">Pro</span>
+            <span className="text-lg font-black tracking-tighter text-primary uppercase">AdityaPro</span>
           </div>
         </SidebarHeader>
         <SidebarContent>
