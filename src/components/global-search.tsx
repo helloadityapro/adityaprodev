@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, where, getDocs, limit, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, orderBy } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
@@ -55,6 +55,7 @@ export function GlobalSearch() {
   const { data: userProfile } = useDoc(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
+  // Keyboard shortcut listener
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
@@ -66,129 +67,117 @@ export function GlobalSearch() {
     return () => document.removeEventListener('keydown', down);
   }, []);
 
-  const handleSearch = async (val: string) => {
-    setSearchQuery(val);
-    if (val.trim().length < 2) {
+  // Debounced search trigger to reduce database load and latency
+  React.useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery('');
       setResults([]);
       return;
     }
 
+    const timer = setTimeout(() => {
+      if (searchQuery.trim().length >= 2) {
+        performSearch(searchQuery.trim().toLowerCase());
+      } else {
+        setResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, isOpen]);
+
+  /**
+   * Parallelizes searches across different collections and updates state progressively.
+   */
+  const performSearch = async (term: string) => {
     setIsSearching(true);
-    const term = val.toLowerCase().trim();
-    const searchResults: SearchResult[] = [];
+    setResults([]); // Reset results for new search
 
-    try {
-      const sitesSnap = await getDocs(collection(firestore, 'sites'));
-      sitesSnap.docs.forEach(d => {
-        const data = d.data();
-        if (
-          data.name?.toLowerCase().includes(term) || 
-          data.projectCompany?.toLowerCase().includes(term) ||
-          d.id.toLowerCase().includes(term)
-        ) {
-          searchResults.push({
-            id: d.id,
-            type: 'Site',
-            title: data.name,
-            subtitle: `${data.projectCompany} • ID: ${d.id.slice(0, 8)}`,
-            link: `/projects/${d.id}`
+    const searchCollection = async (
+      collName: string, 
+      type: SearchResult['type'], 
+      fields: string[], 
+      limitCount: number = 50
+    ) => {
+      try {
+        const q = query(collection(firestore, collName), limit(limitCount));
+        const snap = await getDocs(q);
+        
+        const matches: SearchResult[] = [];
+        snap.docs.forEach(d => {
+          const data = d.data();
+          const isMatch = fields.some(field => {
+            const val = data[field];
+            return typeof val === 'string' && val.toLowerCase().includes(term);
+          }) || d.id.toLowerCase().includes(term);
+
+          if (isMatch) {
+            let title = '';
+            let subtitle = '';
+            let link = '';
+            let userData = null;
+
+            switch (type) {
+              case 'Site':
+                title = data.name;
+                subtitle = `${data.projectCompany} • ID: ${d.id.slice(0, 8)}`;
+                link = `/projects/${d.id}`;
+                break;
+              case 'Permit':
+                title = data.serialNumber || `Permit ${d.id.slice(0, 8)}`;
+                subtitle = `${data.siteName} • ${data.ptwType} • ${data.status}`;
+                link = `/ptw/list?view=${d.id}`;
+                break;
+              case 'Task':
+                title = data.title;
+                subtitle = `Site: ${data.siteName} • Assignee: ${data.assignedToName} • Status: ${data.status}`;
+                link = `/tasks/list`;
+                break;
+              case 'DPR':
+                title = `DPR: ${data.siteName}`;
+                subtitle = `By: ${data.userName} • Date: ${data.reportDate || 'N/A'}`;
+                link = `/dpr/list`;
+                break;
+              case 'Movement':
+                title = data.itemName;
+                subtitle = `${data.movementType} at ${data.siteName} • ${data.quantity} ${data.unit}`;
+                link = `/movements/list`;
+                break;
+              case 'User':
+                title = data.username || 'N/A';
+                subtitle = `${data.role} • ${data.email}`;
+                link = `/settings/users`;
+                userData = { id: d.id, ...data };
+                break;
+            }
+
+            matches.push({ id: d.id, type, title, subtitle, link, userData });
+          }
+        });
+
+        if (matches.length > 0) {
+          setResults(prev => {
+            const existingIds = new Set(prev.map(r => r.id));
+            const newOnes = matches.filter(m => !existingIds.has(m.id));
+            return [...prev, ...newOnes];
           });
         }
-      });
+      } catch (e) {
+        console.error(`Search failed in ${collName}:`, e);
+      }
+    };
 
-      const permitsSnap = await getDocs(query(collection(firestore, 'permits_to_work'), limit(200)));
-      permitsSnap.docs.forEach(d => {
-        const data = d.data();
-        if (
-          data.serialNumber?.toLowerCase().includes(term) || 
-          data.siteName?.toLowerCase().includes(term) ||
-          data.ptwType?.toLowerCase().includes(term)
-        ) {
-          searchResults.push({
-            id: d.id,
-            type: 'Permit',
-            title: data.serialNumber || `Permit ${d.id.slice(0, 8)}`,
-            subtitle: `${data.siteName} • ${data.ptwType} • ${data.status}`,
-            link: `/ptw/list?view=${d.id}`
-          });
-        }
-      });
-
-      const tasksSnap = await getDocs(query(collection(firestore, 'tasks'), limit(150)));
-      tasksSnap.docs.forEach(d => {
-        const data = d.data();
-        if (
-          data.title?.toLowerCase().includes(term) || 
-          data.siteName?.toLowerCase().includes(term) ||
-          data.assignedToName?.toLowerCase().includes(term)
-        ) {
-          searchResults.push({
-            id: d.id,
-            type: 'Task',
-            title: data.title,
-            subtitle: `Site: ${data.siteName} • Assignee: ${data.assignedToName} • Status: ${data.status}`,
-            link: `/tasks/list`
-          });
-        }
-      });
-
-      const dprsSnap = await getDocs(query(collection(firestore, 'dprs'), limit(100)));
-      dprsSnap.docs.forEach(d => {
-        const data = d.data();
-        if (
-          data.siteName?.toLowerCase().includes(term) || 
-          data.description?.toLowerCase().includes(term) ||
-          data.userName?.toLowerCase().includes(term)
-        ) {
-          searchResults.push({
-            id: d.id,
-            type: 'DPR',
-            title: `DPR: ${data.siteName}`,
-            subtitle: `By: ${data.userName} • Date: ${data.reportDate || 'N/A'}`,
-            link: `/dpr/list`
-          });
-        }
-      });
-
-      const movsSnap = await getDocs(query(collection(firestore, 'material_movements'), limit(100)));
-      movsSnap.docs.forEach(d => {
-        const data = d.data();
-        if (
-          data.itemName?.toLowerCase().includes(term) || 
-          data.siteName?.toLowerCase().includes(term) ||
-          data.sourceOrDestination?.toLowerCase().includes(term)
-        ) {
-          searchResults.push({
-            id: d.id,
-            type: 'Movement',
-            title: data.itemName,
-            subtitle: `${data.movementType} at ${data.siteName} • ${data.quantity} ${data.unit}`,
-            link: `/movements/list`
-          });
-        }
-      });
-
-      const usersSnap = await getDocs(query(collection(firestore, 'users'), limit(500)));
-      usersSnap.docs.forEach(d => {
-        const data = d.data();
-        if (data.username?.toLowerCase().includes(term) || data.email?.toLowerCase().includes(term)) {
-          searchResults.push({
-            id: d.id,
-            type: 'User',
-            title: data.username || 'N/A',
-            subtitle: `${data.role} • ${data.email}`,
-            link: `/settings/users`,
-            userData: { id: d.id, ...data }
-          });
-        }
-      });
-
-      setResults(searchResults.slice(0, 100));
-    } catch (e) {
-      console.error("Search failed", e);
-    } finally {
+    // Dispatch all searches in parallel
+    Promise.allSettled([
+      searchCollection('sites', 'Site', ['name', 'projectCompany'], 100),
+      searchCollection('permits_to_work', 'Permit', ['serialNumber', 'siteName', 'ptwType'], 100),
+      searchCollection('tasks', 'Task', ['title', 'siteName', 'assignedToName'], 100),
+      searchCollection('dprs', 'DPR', ['siteName', 'description', 'userName'], 50),
+      searchCollection('material_movements', 'Movement', ['itemName', 'siteName', 'sourceOrDestination'], 50),
+      searchCollection('users', 'User', ['username', 'email'], 150)
+    ]).finally(() => {
       setIsSearching(false);
-    }
+    });
   };
 
   const navigateTo = (result: SearchResult) => {
@@ -249,7 +238,7 @@ export function GlobalSearch() {
                 placeholder="Type to find anything..." 
                 className="pl-10 h-12 text-base rounded-sm border-primary/20 focus-visible:ring-primary/30"
                 value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 autoFocus
               />
               {isSearching && (
