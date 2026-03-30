@@ -20,7 +20,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  ListFilter
+  ListFilter,
+  FileDown
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import * as XLSX from 'xlsx';
 
 type Movement = {
   id: string;
@@ -133,15 +135,42 @@ export default function MovementDataPage() {
     setSiteFilter("all");
   };
 
+  const handleExport = () => {
+    if (filteredData.length === 0) return;
+    
+    const exportData = filteredData.map(m => ({
+      'Date': m.movementDate,
+      'Project Site': m.siteName,
+      'Flow': m.movementType,
+      'Item Name': m.itemName,
+      'Quantity': m.quantity,
+      'Unit': m.unit,
+      'Source/Destination': m.sourceOrDestination,
+      'Personnel': m.userName,
+      'Log Timestamp': m.createdAt ? format(m.createdAt.toDate(), 'dd/MM/yyyy HH:mm:ss') : 'N/A'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Material Movements");
+    XLSX.writeFile(wb, `Material_Movements_Registry_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  };
+
   if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <TableIcon className="h-8 w-8" /> Global Movement Data
-        </h1>
-        <p className="text-muted-foreground font-medium">Chronological history of all material transactions recorded across organizational projects.</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+            <TableIcon className="h-8 w-8" /> Global Movement Data
+          </h1>
+          <p className="text-muted-foreground font-medium">Chronological history of all material transactions recorded across organizational projects.</p>
+        </div>
+        <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
+          <FileDown className="h-4 w-4 mr-2" />
+          Export to Excel
+        </Button>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
