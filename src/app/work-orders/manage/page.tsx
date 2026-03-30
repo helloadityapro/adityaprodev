@@ -97,13 +97,21 @@ export default function GlobalManageWOsPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+  
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
   const isManager = userProfile?.role === 'Site Manager';
 
+  React.useEffect(() => {
+    if (!isProfileLoading && user && !isProcurement) {
+      router.replace('/ptw/list');
+    }
+  }, [user, isProfileLoading, isProcurement, router]);
+
   const wosQuery = useMemoFirebase(() => {
-    if (!user || isProfileLoading) return null;
+    if (!user || isProfileLoading || !isProcurement) return null;
     return query(collection(firestore, 'project_wos'), orderBy('createdAt', 'desc'), limit(500));
-  }, [firestore, user, isProfileLoading]);
+  }, [firestore, user, isProfileLoading, isProcurement]);
 
   const { data: allWOs, isLoading: isWOsLoading } = useCollection<WorkOrder>(wosQuery);
 
@@ -190,6 +198,8 @@ export default function GlobalManageWOsPage() {
   if (isProfileLoading || isWOsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
+
+  if (!isProcurement) return null;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">

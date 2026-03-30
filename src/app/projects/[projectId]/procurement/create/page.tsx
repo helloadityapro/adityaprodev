@@ -43,6 +43,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { isSuperAdmin } from '@/lib/auth-constants';
 
 const poItemSchema = z.object({
   bomItemId: z.string().min(1, 'Please select a material.'),
@@ -111,7 +112,16 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
   const { data: site } = useDoc<Site>(projectRef);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<any>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
+
+  React.useEffect(() => {
+    if (!isProfileLoading && user && !isProcurement) {
+      router.replace('/ptw/list');
+    }
+  }, [user, isProfileLoading, isProcurement, router]);
 
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
@@ -247,6 +257,10 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
     }
   };
 
+  if (isProfileLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
+
+  if (!isProcurement) return null;
+
   if (isSuccess) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -268,7 +282,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
-        <Button variant="ghost" size="sm" onClick={() => router.back()} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary"><ArrowLeft className="mr-2 h-4 w-4" /> Cancel</Button>
         <h1 className="flex items-center gap-2"><ShoppingBag className="h-8 w-8 text-primary" /> Create Purchase Order</h1>
         <p className="text-muted-foreground font-medium">Link procurement line items to authorized site materials.</p>
       </div>
@@ -306,7 +319,13 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                       <div className="md:col-span-3"><FormField control={form.control} name={`items.${index}.bomItemId`} render={({ field: bomField }) => (<FormItem className="flex flex-col"><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Authorized Material</FormLabel><Popover open={openBomIndex === index} onOpenChange={(o) => setOpenBomIndex(o ? index : null)}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10", !bomField.value && "text-muted-foreground")}><span className="truncate">{bomField.value ? approvedBomItems?.find(i => i.id === bomField.value)?.itemName : "Select Item..."}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[350px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter available authorized materials..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearch} onChange={(e) => setBomSearch(e.target.value)} /></div><ScrollArea className="h-[200px]"><div className="p-1">{filteredBomItems.length > 0 ? filteredBomItems.map((item) => (<Button key={item.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { bomField.onChange(item.id); form.setValue(`items.${index}.itemName`, item.itemName); setOpenBomIndex(null); setBomSearch(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", item.id === bomField.value ? "opacity-100" : "opacity-0")} /><div className="flex flex-col items-start overflow-hidden"><span className="font-bold truncate w-full">{item.itemName}</span><span className="text-[8px] font-black uppercase text-muted-foreground">Remaining: {item.remaining.toFixed(2)} / {item.authorized} {item.unit}</span></div></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No authorized items with remaining balance found for this site.</div>)}</div></ScrollArea></PopoverContent></Popover><FormMessage /></FormItem>)} /></div>
                       <div className="md:col-span-2"><div className="space-y-2"><Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5"><ShieldCheck className="h-3 w-3 text-primary" /> Remaining Limit</Label><div className="h-10 px-3 bg-muted/20 border border-border/50 rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground"><span>{maxRemaining.toFixed(2)}</span><span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit}</span></div></div></div>
-                      <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Order Quantity</FormLabel><FormControl><div className="relative"><Input type="number" step="0.01" max={maxRemaining} {...field} className={cn("h-10 rounded-sm bg-background font-mono font-bold", qty > maxRemaining && "border-destructive text-destructive")} />{qty > maxRemaining && (<div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1"><AlertCircle className="h-2.5 w-2.5" /> Balance exceeded</div>)}</div></FormControl><FormMessage /></FormItem>)} /></div>
+                      <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Order Quantity</FormLabel>
+                          <FormControl><div className="relative"><Input type="number" step="0.01" max={maxRemaining} {...field} className={cn("h-10 rounded-sm bg-background font-mono font-bold", qty > maxRemaining && "border-destructive text-destructive")} />{qty > maxRemaining && (<div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1"><AlertCircle className="h-2.5 w-2.5" /> Balance exceeded</div>)}</div></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} /></div>
                       <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Unit Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} /></div>
                       <div className="md:col-span-1"><FormField control={form.control} name={`items.${index}.gstPercent`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Tax %</FormLabel><FormControl><div className="relative"><Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold pr-6 px-2 text-center" /><span className="absolute right-1.5 top-2.5 text-[10px] font-bold text-muted-foreground">%</span></div></FormControl><FormMessage /></FormItem>)} /></div>
                       <div className="md:col-span-2"><div className="space-y-2"><Label className="text-[10px] font-black uppercase text-primary tracking-widest">Line Total (₹)</Label><div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div></div></div>

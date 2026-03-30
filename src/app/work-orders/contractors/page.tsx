@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { useRouter } from 'next/navigation';
 
 type Contractor = {
   id: string;
@@ -48,11 +49,20 @@ type WorkOrder = {
 export default function ContractorSummaryPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = React.useState("");
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+  
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
+
+  React.useEffect(() => {
+    if (!isProfileLoading && user && !isProcurement) {
+      router.replace('/ptw/list');
+    }
+  }, [user, isProfileLoading, isProcurement, router]);
 
   const contractorsQuery = useMemoFirebase(() => query(collection(firestore, 'contractors'), orderBy('name', 'asc')), [firestore]);
   const { data: contractors, isLoading: isContractorsLoading } = useCollection<Contractor>(contractorsQuery);
@@ -91,8 +101,8 @@ export default function ContractorSummaryPage() {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
   }
 
-  if (!isAdmin) {
-    return <div className="p-20 text-center text-destructive font-black uppercase">Unauthorized Access</div>;
+  if (!isProcurement) {
+    return null;
   }
 
   return (

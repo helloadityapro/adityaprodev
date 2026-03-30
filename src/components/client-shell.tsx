@@ -214,6 +214,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   }, [user, userProfile, isProfileLoading, firestore]);
 
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
+  const userDepartment = userProfile?.department || "";
   
   const ptwQueryForBadge = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
@@ -430,7 +431,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <MainNav userRole={userRole} pendingPtwCount={pendingPtwCount} />
+          <MainNav userRole={userRole} userDepartment={userDepartment} pendingPtwCount={pendingPtwCount} />
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="flex flex-col h-full overflow-hidden relative">

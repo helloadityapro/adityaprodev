@@ -88,15 +88,16 @@ export default function AddNewProjectPage() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
 
   React.useEffect(() => {
-    if (!isUserLoading && !isProfileLoading && !isAdmin) {
-      router.replace('/projects/list');
+    if (!isUserLoading && !isProfileLoading && !isProcurement) {
+      router.replace('/ptw/list');
     }
-  }, [isUserLoading, isProfileLoading, isAdmin, router]);
+  }, [isUserLoading, isProfileLoading, isProcurement, router]);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites, isLoading: sitesLoading } = useCollection<any>(sitesQuery);
@@ -284,7 +285,7 @@ export default function AddNewProjectPage() {
     );
   }
 
-  if (!isAdmin) return null;
+  if (!isProcurement) return null;
 
   return (
     <div className="space-y-6">

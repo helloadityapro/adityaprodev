@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -47,17 +46,22 @@ export default function ProjectsListPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
+
+  React.useEffect(() => {
+    if (!isProfileLoading && user && !isProcurement) {
+      router.replace('/ptw/list');
+    }
+  }, [user, isProfileLoading, isProcurement, router]);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
   const accessibleSites = React.useMemo(() => {
-    if (!allSites) return [];
-    if (isAdmin) return allSites;
-    
-    const assignedIds = new Set<string>(userProfile?.assignedProjectIds || []);
-    return allSites.filter(s => assignedIds.has(s.id));
-  }, [allSites, userProfile, isAdmin]);
+    if (!allSites || !isProcurement) return [];
+    // Only authorized personnel (Admin/Procurement) can access the project list.
+    return allSites;
+  }, [allSites, isProcurement]);
 
   const filteredSites = React.useMemo(() => {
     return accessibleSites.filter(s => 
@@ -74,6 +78,8 @@ export default function ProjectsListPage() {
       </div>
     );
   }
+
+  if (!isProcurement) return null;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">

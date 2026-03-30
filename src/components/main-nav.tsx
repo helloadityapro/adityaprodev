@@ -64,12 +64,13 @@ import {
 } from "@/components/ui/sidebar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
-export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendingPtwCount: number }) {
+export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRole: string, userDepartment: string, pendingPtwCount: number }) {
   const pathname = usePathname()
   const isDriver = userRole === 'Driver';
   const isAdmin = userRole === 'Admin';
   const isManager = userRole === 'Site Manager';
   const isAdminOrHR = isAdmin || userRole === 'Manager - Human Resources';
+  const isProcurement = isAdmin || userDepartment === 'Procurement and Supply-chain';
   
   const { setOpenMobile, isMobile } = useSidebar();
 
@@ -128,7 +129,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Operations</SidebarGroupLabel>
         <SidebarMenu>
           {/* Projects Sub-Section */}
-          {!isDriver && (
+          {!isDriver && isProcurement && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/projects')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -244,7 +245,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           )}
 
           {/* PO Sub-Section */}
-          {!isDriver && (
+          {!isDriver && isProcurement && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/purchase-orders')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -287,7 +288,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
           )}
 
           {/* WO Sub-Section */}
-          {!isDriver && (
+          {!isDriver && isProcurement && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/work-orders')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -543,13 +544,13 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
             </Collapsible>
           )}
 
-          {/* Vehicles Sub-Section (Logistics & Fleet) */}
+          {/* Trips Sub-Section (Logistics & Fleet) */}
           <Collapsible asChild defaultOpen={pathname.startsWith('/vehicles')} className="group/collapsible">
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
-                <SidebarMenuButton tooltip="Vehicles" isActive={pathname.startsWith('/vehicles')} className="rounded-sm">
+                <SidebarMenuButton tooltip="Trips" isActive={pathname.startsWith('/vehicles')} className="rounded-sm">
                   <Car className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Vehicles</span>
+                  <span className="font-medium">Trips</span>
                   <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                 </SidebarMenuButton>
               </CollapsibleTrigger>
@@ -569,7 +570,7 @@ export function MainNav({ userRole, pendingPtwCount }: { userRole: string, pendi
                     <SidebarMenuSubButton asChild isActive={pathname === '/vehicles/trips/manage'} onClick={handleMobileClose}>
                       <Link href="/vehicles/trips/manage">
                         <MapPinned className="h-4 w-4" />
-                        <span>Trips</span>
+                        <span>Manage Trips</span>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>

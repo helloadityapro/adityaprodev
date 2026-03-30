@@ -119,6 +119,7 @@ type UserProfile = {
   assignedProjectIds?: string[];
   siteManagerId?: string;
   mobile?: string;
+  department?: string;
 };
 
 type AuditEntry = {
@@ -329,9 +330,17 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const { data: project, isLoading: projectLoading } = useDoc<Project>(projectRef);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+  
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
   const isManager = userProfile?.role === 'Site Manager';
+
+  React.useEffect(() => {
+    if (!isProfileLoading && user && !isProcurement) {
+      router.replace('/ptw/list');
+    }
+  }, [user, isProfileLoading, isProcurement, router]);
 
   const siteName = project?.name || "";
 
@@ -360,7 +369,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       let valB: any = b[key] ?? '';
       
       if (typeof valA === 'string') valA = valA.toLowerCase();
-      if (typeof valB === 'string') valB = valB.toLowerCase();
+      if (typeof valB === 'string') valB = b.toLowerCase();
 
       if (valA < valB) return direction === 'asc' ? -1 : 1;
       if (valA > valB) return direction === 'asc' ? 1 : -1;
@@ -792,7 +801,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     });
   };
 
-  if (projectLoading) return (
+  if (projectLoading || isProfileLoading) return (
     <div className="space-y-8 p-6 animate-pulse">
       <Skeleton className="h-12 w-1/3" />
       <div className="grid grid-cols-4 gap-4">
@@ -805,6 +814,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     </div>
   );
 
+  if (!isProcurement) return null;
   if (!project) return <div className="p-20 text-center">Project site not found in registry.</div>;
 
   return (
@@ -1215,7 +1225,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          <TabsContent value="po" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
+          <TabsContent value="po" className="mt-6 animate-in fade-in-50 duration-300 transition-all space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
               <div className="relative w-full md:w-80"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search PO or Supplier" className="pl-8 h-9 rounded-sm border-primary/20 text-xs" value={poSearch} onChange={e => setPoSearch(e.target.value)} /></div>
               <Button asChild className="rounded-sm font-bold shadow-md h-9"><Link href={`/projects/${projectId}/procurement/create`}><Plus className="h-4 w-4 mr-2" /> Create PO</Link></Button>
@@ -1257,7 +1267,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          <TabsContent value="wo" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
+          <TabsContent value="wo" className="mt-6 animate-in fade-in-50 duration-300 transition-all space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
               <div className="relative w-full md:w-80"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search WO or Contractor" className="pl-8 h-9 rounded-sm border-primary/20 text-xs" value={woSearch} onChange={e => setWoSearch(e.target.value)} /></div>
               <Button asChild className="rounded-sm font-bold shadow-md h-9"><Link href={`/projects/${projectId}/work-orders/create`}><Plus className="h-4 w-4 mr-2" /> Create WO</Link></Button>
@@ -1299,7 +1309,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          <TabsContent value="payments" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
+          <TabsContent value="payments" className="mt-6 animate-in fade-in-50 duration-300 transition-all space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
               <div className="relative w-full md:w-80">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1517,7 +1527,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          <TabsContent value="utilisation" className="mt-6 animate-in fade-in-50 duration-300 space-y-6">
+          <TabsContent value="utilisation" className="mt-6 animate-in fade-in-50 duration-300 transition-all space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
               <div className="relative w-full md:w-80">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1616,7 +1626,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          <TabsContent value="ptw" className="mt-6 animate-in fade-in-50 duration-300">
+          <TabsContent value="ptw" className="mt-6 animate-in fade-in-50 duration-300 transition-all">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardContent className="p-0">
                 {permits && permits.length > 0 ? (
@@ -1651,7 +1661,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          <TabsContent value="dpr" className="mt-6 animate-in fade-in-50 duration-300">
+          <TabsContent value="dpr" className="mt-6 animate-in fade-in-50 duration-300 transition-all">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardContent className="p-0">
                 {dprs && dprs.length > 0 ? (
@@ -1676,7 +1686,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          <TabsContent value="tasks" className="mt-6 animate-in fade-in-50 duration-300">
+          <TabsContent value="tasks" className="mt-6 animate-in fade-in-50 duration-300 transition-all">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardContent className="p-0">
                 {tasks && tasks.length > 0 ? (
@@ -1707,7 +1717,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
-          <TabsContent value="visits" className="mt-6 animate-in fade-in-50 duration-300">
+          <TabsContent value="visits" className="mt-6 animate-in fade-in-50 duration-300 transition-all">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardContent className="p-0">
                 {visits && visits.length > 0 ? (

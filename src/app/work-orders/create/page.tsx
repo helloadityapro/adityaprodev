@@ -13,7 +13,7 @@ import {
   useCollection, 
   addDocumentNonBlocking 
 } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,7 +92,15 @@ export default function GlobalCreateWOPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+  
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
+
+  React.useEffect(() => {
+    if (!isProfileLoading && user && !isProcurement) {
+      router.replace('/ptw/list');
+    }
+  }, [user, isProfileLoading, isProcurement, router]);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -193,6 +201,10 @@ export default function GlobalCreateWOPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (isProfileLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
+
+  if (!isProcurement) return null;
 
   if (isSuccess) {
     return (
@@ -309,7 +321,7 @@ export default function GlobalCreateWOPage() {
                 <ListPlus className="h-4 w-4 text-primary" />
                 <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Service Line Items</h3>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => appendStop({ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 })} className="h-8 rounded-sm font-bold border-primary text-primary">
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 })} className="h-8 rounded-sm font-bold border-primary text-primary">
                 <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Service
               </Button>
             </div>
