@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -21,7 +20,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  ListFilter
+  ListFilter,
+  FileDown
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import * as XLSX from 'xlsx';
 
 type Utilisation = {
   id: string;
@@ -125,6 +126,26 @@ export default function UtilisationDataPage() {
     return result;
   }, [utilisations, searchTerm, siteFilter, sortConfig]);
 
+  const handleExport = () => {
+    if (filteredData.length === 0) return;
+    
+    const exportData = filteredData.map(u => ({
+      'Date': u.utilisationDate,
+      'Project Site': u.siteName,
+      'Material Consumed': u.itemName,
+      'Quantity': u.quantity,
+      'Unit': u.unit,
+      'Remarks': u.remarks,
+      'Personnel': u.userName,
+      'Log Timestamp': u.createdAt ? format(u.createdAt.toDate(), 'dd/MM/yyyy HH:mm:ss') : 'N/A'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Material Utilisations");
+    XLSX.writeFile(wb, `Material_Utilisations_Registry_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  };
+
   const clearFilters = () => {
     setSearchTerm("");
     setSiteFilter("all");
@@ -134,11 +155,17 @@ export default function UtilisationDataPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <History className="h-8 w-8" /> Global Utilisation Data
-        </h1>
-        <p className="text-muted-foreground font-medium">Historical audit trail of material consumption across organizational project sites.</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+            <History className="h-8 w-8" /> Global Utilisation Data
+          </h1>
+          <p className="text-muted-foreground font-medium">Historical audit trail of material consumption across organizational project sites.</p>
+        </div>
+        <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
+          <FileDown className="h-4 w-4 mr-2" />
+          Export to Excel
+        </Button>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
