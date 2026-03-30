@@ -7,12 +7,13 @@ import { collection, query, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PackageCheck, Search, FilterX, Building2, Layers, Boxes, Clock, PieChart } from "lucide-react";
+import { PackageCheck, Search, FilterX, Building2, Layers, Boxes, Clock, PieChart, FileDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import * as XLSX from 'xlsx';
 
 type InventoryItem = {
   id: string;
@@ -49,15 +50,39 @@ export default function GlobalInventoryPage() {
     );
   }, [inventory, searchTerm]);
 
+  const handleExport = () => {
+    if (filteredInventory.length === 0) return;
+    
+    const exportData = filteredInventory.map(item => ({
+      'Project Site': item.siteName,
+      'Material / Component': item.itemName,
+      'Available Stock': item.stockLevel,
+      'Utilised Qty': item.utilisedQuantity || 0,
+      'Unit': item.unit,
+      'Last Updated': item.lastUpdated ? format(item.lastUpdated.toDate(), 'dd/MM/yyyy HH:mm') : '—'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Global Inventory");
+    XLSX.writeFile(wb, `Global_Inventory_Status_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  };
+
   if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <PackageCheck className="h-8 w-8" /> Global Inventory
-        </h1>
-        <p className="text-muted-foreground font-medium">Real-time component-level stock availability and utilisation across all project sites.</p>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+            <PackageCheck className="h-8 w-8" /> Global Inventory
+          </h1>
+          <p className="text-muted-foreground font-medium">Real-time component-level stock availability and utilisation across all project sites.</p>
+        </div>
+        <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
+          <FileDown className="h-4 w-4 mr-2" />
+          Export to Excel
+        </Button>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
@@ -113,7 +138,7 @@ export default function GlobalInventoryPage() {
                     <TableCell className="text-center">
                       <Badge className={cn(
                         "font-mono font-bold rounded-sm px-3 h-7 border-none shadow-sm",
-                        item.stockLevel > 0 ? "bg-emerald-600 text-white" : "bg-red-500 text-white"
+                        item.stockLevel > 0 ? "bg-emerald-600 text-white" : "bg-red-50 text-white"
                       )}>
                         {item.stockLevel} {item.unit}
                       </Badge>
