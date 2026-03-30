@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { User, Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp, Building2, Truck, Calendar, Fingerprint, CreditCard } from "lucide-react"
+import { User, Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp, Building2, Truck, Calendar, Fingerprint, CreditCard, FileDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
@@ -37,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
+import * as XLSX from 'xlsx';
 
 type User = {
   id: string;
@@ -204,6 +205,29 @@ export default function UsersPage() {
         });
     }, [users, filter, sortConfig, searchTerm]);
 
+    const handleExport = () => {
+        if (!sortedAndFilteredUsers || sortedAndFilteredUsers.length === 0) return;
+        
+        const exportData = sortedAndFilteredUsers.map(u => ({
+            'Name': u.username || 'N/A',
+            'Email': u.email || 'N/A',
+            'Mobile': u.mobile || 'N/A',
+            'Role': u.role || 'Unassigned',
+            'Department': u.department || 'N/A',
+            'Date of Joining': u.doj ? format(new Date(u.doj), 'dd/MM/yyyy') : 'N/A',
+            'Date of Birth': u.dob ? format(new Date(u.dob), 'dd/MM/yyyy') : 'N/A',
+            'Aadhar Number': u.aadharNumber || 'N/A',
+            'PAN Number': u.panNumber || 'N/A',
+            'Status': u.registrationRequest ? 'Pending' : 'Active',
+            'Date Created': u.createdAt ? format(u.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : 'N/A'
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Users");
+        XLSX.writeFile(wb, `AdityaPro_UserRegistry_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    };
+
     if(isUserLoading || isProfileLoading || (isAdmin && isUsersLoading)) {
         return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>
     }
@@ -256,9 +280,14 @@ export default function UsersPage() {
                         <CardTitle className="text-lg">Users Management</CardTitle>
                         <CardDescription>Manage organizational accounts and access approvals.</CardDescription>
                     </div>
-                    <div className="relative w-full md:w-72">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Search name or email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 rounded-sm h-10" />
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        <Button onClick={handleExport} variant="outline" size="sm" className="h-10 rounded-sm font-bold border-primary/20 text-primary">
+                            <FileDown className="mr-2 h-4 w-4" /> Export Excel
+                        </Button>
+                        <div className="relative w-full md:w-72">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="Search name or email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 rounded-sm h-10" />
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
