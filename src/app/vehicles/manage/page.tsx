@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, doc, where, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,10 @@ import {
   ArrowUp, 
   ArrowDown, 
   Settings2,
-  CheckCircle2
+  CheckCircle2,
+  Loader2,
+  Save,
+  X
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
@@ -27,13 +30,44 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+
+const editVehicleSchema = z.object({
+  make: z.string().min(1, 'Make is required.'),
+  model: z.string().min(1, 'Model is required.'),
+  plateNumber: z.string().min(4, 'Registration number is required.'),
+  ownership: z.enum(['Owned', 'Rented']),
+  currentReading: z.coerce.number().min(0, 'Odometer reading cannot be negative.'),
+  status: z.enum(['Available', 'Assigned', 'Maintenance']),
+});
 
 type Vehicle = {
   id: string;
   make: string;
   model: string;
   plateNumber: string;
-  ownership: string;
+  ownership: 'Owned' | 'Rented';
   status: 'Available' | 'Assigned' | 'Maintenance';
   currentReading: number;
   createdAt?: any;
@@ -51,6 +85,7 @@ export default function ManageVehiclesPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -58,15 +93,69 @@ export default function ManageVehiclesPage() {
 
   const [vehicleSearch, setVehicleSearch] = React.useState("");
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'plate', direction: 'asc' });
+  const [vehicleToEdit, setVehicleToEdit] = React.useState<Vehicle | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const vehiclesQuery = useMemoFirebase(() => collection(firestore, 'vehicles'), [firestore]);
   const { data: vehicles, isLoading: vehiclesLoading } = useCollection<Vehicle>(vehiclesQuery);
+
+  const form = useForm<z.infer<typeof editVehicleSchema>>({
+    resolver: zodResolver(editVehicleSchema),
+    defaultValues: {
+      make: '',
+      model: '',
+      plateNumber: '',
+      ownership: 'Owned',
+      currentReading: 0,
+      status: 'Available',
+    },
+  });
+
+  React.useEffect(() => {
+    if (vehicleToEdit) {
+      form.reset({
+        make: vehicleToEdit.make,
+        model: vehicleToEdit.model,
+        plateNumber: vehicleToEdit.plateNumber,
+        ownership: vehicleToEdit.ownership,
+        currentReading: vehicleToEdit.currentReading,
+        status: vehicleToEdit.status,
+      });
+    }
+  }, [vehicleToEdit, form]);
 
   React.useEffect(() => {
     if (!isUserLoading && !isProfileLoading && !isAdmin) {
       router.replace('/vehicles/trips/manage');
     }
   }, [isUserLoading, isProfileLoading, isAdmin, router]);
+
+  const onEditSubmit = async (values: z.infer<typeof editVehicleSchema>) => {
+    if (!vehicleToEdit) return;
+    setIsSubmitting(true);
+    try {
+      const vehicleRef = doc(firestore, 'vehicles', vehicleToEdit.id);
+      updateDocumentNonBlocking(vehicleRef, {
+        ...values,
+        plateNumber: values.plateNumber.toUpperCase(),
+        updatedAt: serverTimestamp(),
+      });
+
+      toast({
+        title: 'Vehicle Updated',
+        description: `${values.plateNumber} record has been modified successfully.`,
+      });
+      setVehicleToEdit(null);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Update Failed',
+        description: error.message || 'Could not save changes.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -215,7 +304,12 @@ export default function ManageVehiclesPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right px-6">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm text-primary hover:bg-primary/10">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 rounded-sm text-primary hover:bg-primary/10"
+                      onClick={() => setVehicleToEdit(v)}
+                    >
                       <Settings2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -227,6 +321,117 @@ export default function ManageVehiclesPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit Vehicle Dialog */}
+      <Dialog open={!!vehicleToEdit} onOpenChange={(o) => !o && setVehicleToEdit(null)}>
+        <DialogContent className="sm:max-w-[500px] rounded-sm p-0 overflow-hidden border-none shadow-2xl">
+          <DialogHeader className="p-6 bg-primary/5 border-b">
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Edit Vehicle Details</DialogTitle>
+            <DialogDescription className="text-xs font-medium">Update registry information for {vehicleToEdit?.plateNumber}.</DialogDescription>
+          </DialogHeader>
+          <div className="p-6">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="make"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Make / Brand</FormLabel>
+                        <FormControl><Input {...field} className="rounded-sm" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="model"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Model</FormLabel>
+                        <FormControl><Input {...field} className="rounded-sm" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="plateNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Plate Number</FormLabel>
+                        <FormControl><Input {...field} className="rounded-sm font-mono uppercase" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="ownership"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Ownership</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="Owned" className="text-xs font-bold">Owned</SelectItem>
+                            <SelectItem value="Rented" className="text-xs font-bold">Rented</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="currentReading"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Odometer (KM)</FormLabel>
+                        <FormControl><Input type="number" {...field} className="rounded-sm font-mono" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Current Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="Available" className="text-xs font-bold text-emerald-600">Available</SelectItem>
+                            <SelectItem value="Assigned" className="text-xs font-bold text-blue-600">Assigned</SelectItem>
+                            <SelectItem value="Maintenance" className="text-xs font-bold text-amber-600">Maintenance</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <DialogFooter className="pt-4 border-t gap-2 flex flex-col sm:flex-row">
+                  <DialogClose asChild><Button variant="outline" className="flex-1 h-11 rounded-sm font-bold uppercase text-[10px] tracking-widest">Cancel</Button></DialogClose>
+                  <Button type="submit" className="flex-1 h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-lg" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Confirm Changes
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
