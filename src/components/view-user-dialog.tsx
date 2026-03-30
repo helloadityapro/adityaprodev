@@ -23,6 +23,7 @@ import Link from 'next/link';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 type UserProfile = {
   id: string;
