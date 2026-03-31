@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, MessageCircle, FileUp, FileText, X, MapPin, Hash, Smartphone, Layers, AlertCircle } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
@@ -272,31 +272,15 @@ export default function RecordMovementPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 1. Date */}
+                {/* Row 1: Date | Movement Direction */}
                 <FormField control={form.control} name="movementDate" render={({ field }) => (
                   <FormItem><FormLabel>Movement Date</FormLabel><FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
 
-                {/* 2. Movement Direction */}
                 <FormField control={form.control} name="movementType" render={({ field }) => (
                   <FormItem><FormLabel>Movement Direction</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Inward">Inward (Add to Stock)</SelectItem><SelectItem value="Outward">Outward (Remove from Stock)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
 
-                {/* 3. Source Type & Name */}
-                <div className="space-y-4">
-                  <FormField control={form.control} name="sourceOrDestinationType" render={({ field }) => (
-                    <FormItem className="space-y-3"><FormLabel>{movementType === 'Inward' ? 'Source' : 'Destination'} Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4"><div className="flex items-center space-x-2"><RadioGroupItem value="Supplier" id="src-supp" /><Label htmlFor="src-supp">Supplier</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="Site" id="src-site" /><Label htmlFor="src-site">Project Site</Label></div></RadioGroup></FormControl></FormItem>
-                  )} />
-                  <FormField control={form.control} name="sourceOrDestination" render={({ field }) => (
-                    <FormItem>
-                      {sourceOrDestinationType === 'Supplier' ? (
-                        <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search suppliers..." className="h-9 border-none" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} /></div><ScrollArea className="h-[200px]">{filteredSuppliers.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />{s.name}</Button>))}</ScrollArea></PopoverContent></Popover>
-                      ) : (<FormControl><Input placeholder="Site name or address..." {...field} className="h-11 rounded-sm" /></FormControl>)}
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-
-                {/* 4. Project Site */}
+                {/* Row 2: Project Site | Source Type */}
                 <FormField control={form.control} name="siteName" render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Project Site (Recording Site)</FormLabel>
@@ -314,10 +298,41 @@ export default function RecordMovementPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
+
+                <FormField control={form.control} name="sourceOrDestinationType" render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>{movementType === 'Inward' ? 'Source' : 'Destination'} Type</FormLabel>
+                    <FormControl>
+                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Supplier" id="src-supp" />
+                          <Label htmlFor="src-supp">Supplier</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Site" id="src-site" />
+                          <Label htmlFor="src-site">Project Site</Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </div>
+
+              {/* Specific Entity Name Input */}
+              <FormField control={form.control} name="sourceOrDestination" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{movementType === 'Inward' ? 'Received From' : 'Sent To'} Name</FormLabel>
+                  {sourceOrDestinationType === 'Supplier' ? (
+                    <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search suppliers..." className="h-9 border-none" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} /></div><ScrollArea className="h-[200px]">{filteredSuppliers.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />{s.name}</Button>))}</ScrollArea></PopoverContent></Popover>
+                  ) : (<FormControl><Input placeholder="Site name or address..." {...field} className="h-11 rounded-sm" /></FormControl>)}
+                  <FormMessage />
+                </FormItem>
+              )} />
 
               <Separator />
 
+              {/* Invoice Documentation Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
@@ -389,7 +404,7 @@ export default function RecordMovementPage() {
                           <FormLabel>Authorized Item</FormLabel>
                           <Popover open={openItemPopoverIndex === index} onOpenChange={o => setOpenItemPopoverIndex(o ? index : null)}>
                             <PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-10 bg-background", !itemField.value && "text-muted-foreground")}><span className="truncate">{itemField.value || "Search approved BoM items..."}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
-                            <PopoverContent className="w-[400px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} />{lookup.name}</Button>)) : (<div className="p-8 text-center text-[10px] uppercase font-bold text-muted-foreground italic leading-relaxed">No approved items found for this site.</div>)}</div></ScrollArea></PopoverContent>
+                            <PopoverContent className="w-[400px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} />{lookup.name}</Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No approved items found for this site.</div>)}</div></ScrollArea></PopoverContent>
                           </Popover>
                           <FormMessage />
                         </FormItem>
@@ -403,7 +418,7 @@ export default function RecordMovementPage() {
                 ))}</div>
               </div>
 
-              <div className="flex justify-end gap-4 pt-6 border-t"><Button type="submit" className="min-w-[200px] h-12 text-lg font-black uppercase" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loging...</> : "Record Movements"}</Button></div>
+              <div className="flex justify-end gap-4 pt-6 border-t"><Button type="submit" className="min-w-[200px] h-12 text-lg font-black uppercase" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Recording...</> : "Record Movements"}</Button></div>
             </form>
           </Form>
         </CardContent>
