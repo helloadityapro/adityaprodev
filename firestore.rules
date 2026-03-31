@@ -172,12 +172,12 @@ service cloud.firestore {
     match /system_settings/{settingId} {
       allow read: if isSignedIn();
       allow write: if isAdmin() || (settingId == 'counters' && isSignedIn());
-      
-      // Fixed nesting for access roles subcollection
-      match /roles/{roleId} {
-        allow read: if isSignedIn();
-        allow write: if isAdmin();
-      }
+    }
+
+    // Explicit path for access roles to ensure list/get operations work correctly
+    match /system_settings/access/roles/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /site_documents/{docId} {
