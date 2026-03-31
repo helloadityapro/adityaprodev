@@ -128,22 +128,11 @@ export default function RequestVehiclePage() {
   const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
   const accessibleSites = React.useMemo(() => {
-    if (!allSites || !userProfile) return [];
-    if (isAdmin) {
-      return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-    }
-    
-    // Aggregated site visibility for Managers
-    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
-    if (isManager && teamMembers) {
-      teamMembers.forEach(member => {
-        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
-      });
-    }
-
-    const filtered = allSites.filter(s => assignedIds.has(s.id));
-    return Array.from(new Map(filtered.map(s => [s.name, s])).values());
-  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
+    if (!allSites) return [];
+    // Requirement: Display all available sites in the dropdown for Pickup and Drop Location for all users.
+    // Deduplicate by name just in case.
+    return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+  }, [allSites]);
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
