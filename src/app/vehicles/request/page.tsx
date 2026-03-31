@@ -348,11 +348,7 @@ export default function RequestVehiclePage() {
       </div>
 
       <Card className="rounded-sm shadow-md border-primary/10">
-        <CardHeader>
-          <CardTitle>Trip Itinerary Form</CardTitle>
-          <CardDescription>Plan your route including intermediate stops and the final destination.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
               {/* Step 1: Schedule */}
@@ -861,7 +857,7 @@ export default function RequestVehiclePage() {
                               onClick={addExternalPassenger}
                             >
                               <UserCheck className="mr-2 h-4 w-4" />
-                              <div className="flex flex-col items-start overflow-hidden">
+                              <div className="flex flex-col items-start overflow-hidden text-left min-w-0">
                                 <span className="text-xs font-black uppercase truncate">Add "{passengerSearchQuery}"</span>
                                 <span className="text-[9px] text-muted-foreground uppercase">Manual External Entry</span>
                               </div>
