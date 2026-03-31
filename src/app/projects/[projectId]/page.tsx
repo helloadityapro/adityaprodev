@@ -102,6 +102,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
+import type { PageKey } from '@/lib/access-control';
 
 type Project = {
   id: string;
@@ -115,11 +116,17 @@ type UserProfile = {
   id: string;
   username: string;
   email: string;
-  role: 'Admin' | 'Site Manager' | 'Site Engineer' | 'Driver';
+  role: string;
   assignedProjectIds?: string[];
   siteManagerId?: string;
   mobile?: string;
   department?: string;
+  customPermissions?: PageKey[];
+};
+
+type AccessConfig = {
+  id: string;
+  allowedPageKeys: PageKey[];
 };
 
 type AuditEntry = {
@@ -253,7 +260,6 @@ type MaterialUtilisation = {
   createdAt: any;
 };
 
-type SortKey = 'engineer' | 'manager' | 'sites';
 type POSortKey = 'poNumber' | 'supplier' | 'status' | 'date' | 'total';
 type WOSortKey = 'woNumber' | 'contractor' | 'status' | 'date' | 'total';
 type BoMSortKey = 'itemName' | 'category' | 'status' | 'plannedQuantity' | 'approvedQuantity';
@@ -283,12 +289,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const tabParam = searchParams.get('tab');
   const [activeTab, setActiveTab] = React.useState(tabParam || "dashboard");
-
-  React.useEffect(() => {
-    if (tabParam) {
-      setActiveTab(tabParam);
-    }
-  }, [tabParam]);
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [bomTableSearch, setBomTableSearch] = React.useState("");
@@ -326,21 +326,58 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [paymentSortConfig, setPaymentSortConfig] = React.useState<{ key: PaymentSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [viewingPayment, setViewingPayment] = React.useState<Payment | null>(null);
 
-  const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
-  const { data: project, isLoading: projectLoading } = useDoc<Project>(projectRef);
-
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
-  
+
+  const roleConfigsQuery = useMemoFirebase(() => user ? collection(firestore, 'system_settings', 'access', 'roles') : null, [firestore, user]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
-  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
   const isManager = userProfile?.role === 'Site Manager';
 
+  // Define All Tabs
+  const ALL_TABS = React.useMemo(() => [
+    { id: "dashboard", key: "project-tab-dashboard", label: "BOARD", icon: LayoutDashboard },
+    { id: "bom", key: "project-tab-bom", label: "BOM", icon: ClipboardList },
+    { id: "po", key: "project-tab-po", label: "PURCHASE ORDERS", icon: ShoppingBag },
+    { id: "wo", key: "project-tab-wo", label: "WORK ORDERS", icon: Gavel },
+    { id: "payments", key: "project-tab-payments", label: "PAYMENTS", icon: IndianRupee },
+    { id: "inventory", key: "project-tab-inventory", label: "INVENTORY", icon: Warehouse },
+    { id: "utilisation", key: "project-tab-utilisation", label: "UTILISATION", icon: PieChart },
+    { id: "movements", key: "project-tab-movements", label: "MOVEMENTS", icon: ArrowLeftRight },
+    { id: "ptw", key: "project-tab-ptw", label: "PERMITS", icon: ShieldCheck },
+    { id: "dpr", key: "project-tab-dpr", label: "DPR", icon: TableIcon },
+    { id: "tasks", key: "project-tab-tasks", label: "TASKS", icon: CheckSquare },
+    { id: "visits", key: "project-tab-visits", label: "VISITS", icon: Navigation },
+  ], []);
+
+  // Filter Authorized Tabs
+  const authorizedTabs = React.useMemo(() => {
+    if (!user || isProfileLoading || !userProfile) return [];
+    if (isSuperAdmin(user.email)) return ALL_TABS;
+
+    const allowedKeys = userProfile.customPermissions 
+      ? new Set(userProfile.customPermissions) 
+      : new Set(roleConfigs?.find(c => c.id === userProfile.role)?.allowedPageKeys || []);
+
+    // If no specific tab config exists, fallback to legacy behavior (show all if user can see projects)
+    if (allowedKeys.size === 0) return ALL_TABS;
+
+    return ALL_TABS.filter(tab => allowedKeys.has(tab.key as PageKey));
+  }, [user, userProfile, isProfileLoading, roleConfigs, ALL_TABS]);
+
+  // Handle active tab authorization redirect
   React.useEffect(() => {
-    if (!isProfileLoading && user && !isProcurement) {
-      router.replace('/ptw/list');
+    if (authorizedTabs.length > 0) {
+      const isAuthorized = authorizedTabs.some(t => t.id === activeTab);
+      if (!isAuthorized) {
+        setActiveTab(authorizedTabs[0].id);
+      }
     }
-  }, [user, isProfileLoading, isProcurement, router]);
+  }, [authorizedTabs, activeTab]);
+
+  const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
+  const { data: project, isLoading: projectLoading } = useDoc<Project>(projectRef);
 
   const siteName = project?.name || "";
 
@@ -492,7 +529,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     const combined = [...directTeam];
     linkedManagers.forEach(m => { if (!combined.find(u => u.id === m.id)) combined.push(m); });
     return combined.sort((a, b) => {
-      const h = { 'Admin': 0, 'Site Manager': 1, 'Site Engineer': 2 };
+      const h: any = { 'Admin': 0, 'Site Manager': 1, 'Site Engineer': 2 };
       return (h[a.role] ?? 3) - (h[b.role] ?? 3);
     });
   }, [allUsers, projectId]);
@@ -773,32 +810,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     }
   };
 
-  const getLogHistory = (item: any) => {
-    if (item.history && item.history.length > 0) return item.history;
-    const fallback: POHistoryEntry[] = [];
-    if (item.createdAt) {
-      fallback.push({
-        action: 'Created',
-        userName: item.createdByName || 'Unknown',
-        userId: '',
-        timestamp: item.createdAt,
-        details: 'Initial order creation'
-      });
-    }
-    if (item.updatedAt) {
-      fallback.push({
-        action: 'Modified',
-        userName: item.updatedByName || 'Unknown',
-        userId: '',
-        timestamp: item.updatedAt,
-        details: 'Order details updated'
-      });
-    }
-    return fallback.sort((a, b) => {
-      const da = a.timestamp?.toDate?.()?.getTime() || 0;
-      const db = b.timestamp?.toDate?.()?.getTime() || 0;
-      return db - da;
-    });
+  const handleCloseDetails = () => {
+    setDetailsAssignment(null);
   };
 
   if (projectLoading || isProfileLoading) return (
@@ -814,7 +827,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     </div>
   );
 
-  if (!isProcurement) return null;
   if (!project) return <div className="p-20 text-center">Project site not found in registry.</div>;
 
   return (
@@ -891,42 +903,15 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <ScrollArea className="w-full">
             <TabsList className="flex w-max min-w-full rounded-sm bg-muted/50 border border-primary/10 p-1 h-11">
-              <TabsTrigger value="dashboard" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" /> BOARD
-              </TabsTrigger>
-              <TabsTrigger value="bom" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <ClipboardList className="h-3.5 w-3.5 mr-1.5" /> BOM
-              </TabsTrigger>
-              <TabsTrigger value="po" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <ShoppingBag className="h-3.5 w-3.5 mr-1.5" /> PURCHASE ORDERS
-              </TabsTrigger>
-              <TabsTrigger value="wo" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <Gavel className="h-3.5 w-3.5 mr-1.5" /> WORK ORDERS
-              </TabsTrigger>
-              <TabsTrigger value="payments" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <IndianRupee className="h-3.5 w-3.5 mr-1.5" /> PAYMENTS
-              </TabsTrigger>
-              <TabsTrigger value="inventory" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <Warehouse className="h-3.5 w-3.5 mr-1.5" /> INVENTORY
-              </TabsTrigger>
-              <TabsTrigger value="utilisation" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <PieChart className="h-3.5 w-3.5 mr-1.5" /> UTILISATION
-              </TabsTrigger>
-              <TabsTrigger value="movements" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <ArrowLeftRight className="h-3.5 w-3.5 mr-1.5" /> MOVEMENTS
-              </TabsTrigger>
-              <TabsTrigger value="ptw" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> PERMITS
-              </TabsTrigger>
-              <TabsTrigger value="dpr" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <TableIcon className="h-3.5 w-3.5 mr-1.5" /> DPR
-              </TabsTrigger>
-              <TabsTrigger value="tasks" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <CheckSquare className="h-3.5 w-3.5 mr-1.5" /> TASKS
-              </TabsTrigger>
-              <TabsTrigger value="visits" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all">
-                <Navigation className="h-3.5 w-3.5 mr-1.5" /> VISITS
-              </TabsTrigger>
+              {authorizedTabs.map(tab => (
+                <TabsTrigger 
+                  key={tab.id}
+                  value={tab.id} 
+                  className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+                >
+                  <tab.icon className="h-3.5 w-3.5 mr-1.5" /> {tab.label}
+                </TabsTrigger>
+              ))}
             </TabsList>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -1827,18 +1812,75 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </DialogContent>
       </Dialog>
 
-      {/* Detail Dialog for Payments */}
+      <Dialog open={!!viewingPO} onOpenChange={(o) => !o && setViewingPO(null)}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><ShoppingBag className="h-5 w-5 text-primary" /></div>
+              <div><DialogTitle className="text-xl font-black uppercase tracking-tight">PO Detail Audit</DialogTitle><DialogDescription className="text-xs font-bold text-muted-foreground">{viewingPO?.poNumber}</DialogDescription></div>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="max-h-[70vh]">
+            {viewingPO && (
+              <div className="p-8 space-y-10 text-left">
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground">Supplier</Label><p className="text-sm font-bold">{viewingPO.supplierName}</p></div>
+                  <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground">Date</Label><p className="text-sm font-bold">{viewingPO.orderDate}</p></div>
+                </div>
+                <Separator />
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground">Material Breakdown</Label>
+                  <div className="border rounded-sm overflow-hidden"><Table><TableHeader className="bg-muted/30"><TableRow><TableHead className="text-[10px] font-black uppercase">Item</TableHead><TableHead className="text-[10px] font-black uppercase">Qty</TableHead><TableHead className="text-[10px] font-black uppercase">Rate</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Total</TableHead></TableRow></TableHeader><TableBody>{viewingPO.items.map((item, idx) => (<TableRow key={idx}><TableCell className="text-xs font-bold">{item.itemName}</TableCell><TableCell className="text-xs font-mono">{item.quantity}</TableCell><TableCell className="text-xs font-mono">₹{item.rate.toLocaleString()}</TableCell><TableCell className="text-right font-mono font-black text-xs text-primary">₹{item.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></div>
+                </div>
+                <div className="bg-primary/5 p-6 rounded-sm border-2 border-primary/10 flex flex-col items-center gap-2"><span className="text-[10px] font-black uppercase text-primary tracking-widest">Aggregate PO Value</span><span className="text-4xl font-black text-primary">₹{viewingPO.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+              </div>
+            )}
+          </ScrollArea>
+          <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Audit</Button></DialogClose></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingWO} onOpenChange={(o) => !o && setViewingWO(null)}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><Gavel className="h-5 w-5 text-primary" /></div>
+              <div><DialogTitle className="text-xl font-black uppercase tracking-tight">WO Detail Audit</DialogTitle><DialogDescription className="text-xs font-bold text-muted-foreground">{viewingWO?.woNumber}</DialogDescription></div>
+            </div>
+          </DialogHeader>
+          <ScrollArea className="max-h-[70vh]">
+            {viewingWO && (
+              <div className="p-8 space-y-10 text-left">
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground">Contractor</Label><p className="text-sm font-bold">{viewingWO.contractorName}</p></div>
+                  <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground">Date</Label><p className="text-sm font-bold">{viewingWO.orderDate}</p></div>
+                </div>
+                <div className="space-y-2"><Label className="text-[10px] font-black uppercase text-muted-foreground">Scope of Work</Label><div className="p-4 bg-muted/20 border rounded-sm text-sm italic">"{viewingWO.description}"</div></div>
+                {viewingWO.items && viewingWO.items.length > 0 && (
+                  <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground">Service Breakdown</Label>
+                    <div className="border rounded-sm overflow-hidden"><Table><TableHeader className="bg-muted/30"><TableRow><TableHead className="text-[10px] font-black uppercase">Service</TableHead><TableHead className="text-[10px] font-black uppercase">Qty</TableHead><TableHead className="text-[10px] font-black uppercase">Rate</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Total</TableHead></TableRow></TableHeader><TableBody>{viewingWO.items.map((item, idx) => (<TableRow key={idx}><TableCell className="text-xs font-bold">{item.description}</TableCell><TableCell className="text-xs font-mono">{item.quantity}</TableCell><TableCell className="text-xs font-mono">₹{item.rate.toLocaleString()}</TableCell><TableCell className="text-right font-mono font-black text-xs text-primary">₹{item.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></div>
+                  </div>
+                )}
+                <div className="bg-primary/5 p-6 rounded-sm border-2 border-primary/10 flex flex-col items-center gap-2"><span className="text-[10px] font-black uppercase text-primary tracking-widest">Total Contract Value</span><span className="text-4xl font-black text-primary">₹{viewingWO.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+              </div>
+            )}
+          </ScrollArea>
+          <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Audit</Button></DialogClose></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!viewingPayment} onOpenChange={(o) => !o && setViewingPayment(null)}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><IndianRupee className="h-5 w-5 text-primary" /></div>
-              <div><DialogTitle className="text-xl font-black uppercase tracking-tight">Payment Audit Log</DialogTitle><DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Ref: {viewingPayment?.referenceNumber}</DialogDescription></div>
+              <div><DialogTitle className="text-xl font-black uppercase tracking-tight">Payment Audit Log</DialogTitle><DialogDescription className="text-[10px] font-bold text-muted-foreground">Ref: {viewingPayment?.referenceNumber}</DialogDescription></div>
             </div>
           </DialogHeader>
           <ScrollArea className="max-h-[75vh]">
             {viewingPayment && (
-              <div className="p-8 space-y-10">
+              <div className="p-8 space-y-10 text-left">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground">Paid to</Label><p className="text-lg font-black text-foreground">{viewingPayment.payeeName}</p></div>

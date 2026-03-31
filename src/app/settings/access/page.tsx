@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -11,20 +10,17 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  ShieldCheck, 
-  Users, 
-  UserCog, 
-  ArrowLeft, 
-  Save, 
-  Loader2, 
-  CheckCircle2, 
-  Search, 
-  FilterX, 
   Lock,
+  UserCog,
+  Users,
+  ArrowLeft,
+  Save,
+  Loader2,
+  Database,
   LayoutGrid,
   ChevronRight,
   Info,
-  Database
+  Search
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -191,7 +187,7 @@ export default function UserAccessManagementPage() {
     }
   };
 
-  const categories = ['Main Hub', 'Operations', 'Administration'] as const;
+  const categories = ['Main Hub', 'Operations', 'Project Detail Tabs', 'Administration'] as const;
 
   const filteredUsers = React.useMemo(() => {
     if (!allUsers) return [];

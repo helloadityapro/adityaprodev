@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview Definition of all available sidebar pages and their keys.
  * This acts as the source of truth for the User Access Management system.
@@ -32,12 +31,24 @@ export type PageKey =
   | 'admin-users'
   | 'admin-teams'
   | 'admin-access'
-  | 'admin-settings';
+  | 'admin-settings'
+  | 'project-tab-dashboard'
+  | 'project-tab-bom'
+  | 'project-tab-po'
+  | 'project-tab-wo'
+  | 'project-tab-payments'
+  | 'project-tab-inventory'
+  | 'project-tab-utilisation'
+  | 'project-tab-movements'
+  | 'project-tab-ptw'
+  | 'project-tab-dpr'
+  | 'project-tab-tasks'
+  | 'project-tab-visits';
 
 export interface AppPage {
   id: PageKey;
   label: string;
-  category: 'Main Hub' | 'Operations' | 'Administration';
+  category: 'Main Hub' | 'Operations' | 'Administration' | 'Project Detail Tabs';
   path: string;
 }
 
@@ -72,6 +83,20 @@ export const APP_PAGES: AppPage[] = [
   { id: 'admin-teams', label: 'Reporting & Teams', category: 'Administration', path: '/settings/teams' },
   { id: 'admin-access', label: 'User Access Management', category: 'Administration', path: '/settings/access' },
   { id: 'admin-settings', label: 'System Dropdowns', category: 'Administration', path: '/settings/dropdown-management' },
+
+  // Project Tabs
+  { id: 'project-tab-dashboard', label: 'Project: Board', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-bom', label: 'Project: BOM', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-po', label: 'Project: Purchase Orders', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-wo', label: 'Project: Work Orders', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-payments', label: 'Project: Payments', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-inventory', label: 'Project: Inventory', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-utilisation', label: 'Project: Utilisation', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-movements', label: 'Project: Movements', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-ptw', label: 'Project: Permits', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-dpr', label: 'Project: DPR', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-tasks', label: 'Project: Tasks', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-visits', label: 'Project: Visits', category: 'Project Detail Tabs', path: '' },
 ];
 
 /**
