@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp, increment, getDoc } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp, increment, getDoc, limit } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -122,10 +122,10 @@ export default function TaskListPage() {
 
   const tasksQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
-    const colRef = collection(firestore, 'tasks');
-    if (isAdmin) return colRef;
-    return query(colRef, or(where('assignedToId', '==', user.uid), where('assignedById', '==', user.uid)));
-  }, [firestore, user, userProfile, isAdmin]);
+    // Fetching all tasks and filtering in memory is more robust for prototypes 
+    // to avoid silent query failures or complex index requirements.
+    return query(collection(firestore, 'tasks'), limit(1000));
+  }, [firestore, user, userProfile]);
 
   const { data: tasks, isLoading } = useCollection<Task>(tasksQuery);
 
@@ -135,24 +135,29 @@ export default function TaskListPage() {
   const filteredTasks = React.useMemo(() => {
     if (!tasks || !userProfile) return [];
     
+    let list = tasks;
+
+    // 1. Mandatory Visibility Filter: Non-admins only see tasks assigned to/by them
+    if (!isAdmin) {
+      list = list.filter(task => 
+        task.assignedToId === user?.uid || task.assignedById === user?.uid
+      );
+    }
+
+    // 2. Data Sovereignty Filter: "Own Data Only"
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
       : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
 
-    let list = tasks;
-
     if (isOwnDataOnly && !isSuper) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
       list = list.filter(task => {
-        // Relevant tasks (assigned to/by user) should be visible if either:
-        // 1. They have a siteId that is in the user's assigned projects
-        // 2. They don't have a siteId yet (legacy records) - we let these through 
-        // because the Firestore query already restricts them to the user's relevant tasks.
-        if (!task.siteId) return true;
+        if (!task.siteId) return true; // Let legacy tasks through
         return assignedIds.has(task.siteId);
       });
     }
 
+    // 3. User Filters
     list = list.filter(task => {
       const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         task.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -172,7 +177,7 @@ export default function TaskListPage() {
         const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
     });
-  }, [tasks, searchTerm, statusFilter, activeTab, user, userProfile, roleConfigs, isSuper]);
+  }, [tasks, searchTerm, statusFilter, activeTab, user, userProfile, roleConfigs, isSuper, isAdmin]);
 
   const stats = React.useMemo(() => {
     const myTasks = filteredTasks.filter(t => t.assignedToId === user?.uid);
