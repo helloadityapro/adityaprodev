@@ -130,7 +130,7 @@ export default function ManageAllTripsPage() {
   const [activeTab, setActiveTab] = React.useState("registry");
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
-  const [approvalTarget, setApprovalState] = React.useState<{ assignment: Assignment, vehicleId: string, driverId: string } | null>(null);
+  const [approvalTarget, setApprovalState] = React.useState<{ assignment: Assignment, vehicleId: string, driverId: string, rentedDriverDetails: string } | null>(null);
   const [detailsAssignment, setDetailsAssignment] = React.useState<Assignment | null>(null);
   const [cancelTarget, setCancelTarget] = React.useState<Assignment | null>(null);
   const [isCancelling, setIsCancelling] = React.useState(false);
@@ -222,9 +222,19 @@ export default function ManageAllTripsPage() {
       return;
     }
 
-    const { assignment, vehicleId, driverId } = approvalTarget;
+    const { assignment, vehicleId, driverId, rentedDriverDetails } = approvalTarget;
     const vehicle = vehicles?.find(v => v.id === vehicleId);
-    const driver = driversList?.find(d => d.id === driverId);
+    
+    let finalDriverId = driverId;
+    let finalDriverName = "";
+
+    if (driverId === 'RENTED') {
+      finalDriverId = "RENTED";
+      finalDriverName = rentedDriverDetails ? `Rented: ${rentedDriverDetails}` : "Rented Driver";
+    } else {
+      const driver = driversList?.find(d => d.id === driverId);
+      finalDriverName = driver?.username || 'Assigned Driver';
+    }
 
     try {
       updateDocumentNonBlocking(doc(firestore, 'vehicle_assignments', assignment.id), {
@@ -232,8 +242,8 @@ export default function ManageAllTripsPage() {
         vehicleId,
         vehicleDetails: `${vehicle?.make} ${vehicle?.model} (${vehicle?.plateNumber})`,
         vehicleOwnership: vehicle?.ownership || 'Owned',
-        driverId,
-        driverName: driver?.username || 'Assigned Driver',
+        driverId: finalDriverId,
+        driverName: finalDriverName,
         approvalDate: serverTimestamp(),
       });
 
@@ -487,7 +497,7 @@ export default function ManageAllTripsPage() {
                         </TableCell>
                         <TableCell className="text-right px-6">
                           <div className="flex justify-end gap-1">
-                            <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "" })}>
+                            <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>
                               Allot Vehicle
                             </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setCancelTarget(trip)}>
@@ -542,10 +552,17 @@ export default function ManageAllTripsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Select Fleet Vehicle</Label>
-                  <Select onValueChange={(val) => setApprovalState(prev => prev ? { ...prev, vehicleId: val } : null)}>
+                  <Select onValueChange={(val) => {
+                    const v = vehicles?.find(x => x.id === val);
+                    setApprovalState(prev => prev ? { 
+                      ...prev, 
+                      vehicleId: val, 
+                      driverId: v?.ownership === 'Rented' ? 'RENTED' : '' 
+                    } : null);
+                  }}>
                     <SelectTrigger className="rounded-sm border-primary/20 h-11 font-bold text-sm bg-muted/5">
                       <SelectValue placeholder="Allot Vehicle..." />
                     </SelectTrigger>
@@ -560,17 +577,36 @@ export default function ManageAllTripsPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Assign Driver</Label>
-                  <Select onValueChange={(val) => setApprovalState(prev => prev ? { ...prev, driverId: val } : null)}>
-                    <SelectTrigger className="rounded-sm border-primary/20 h-11 font-bold text-sm bg-muted/5">
-                      <SelectValue placeholder="Designate Driver..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {driversList.map(d => (
-                        <SelectItem key={d.id} value={d.id} className="text-xs font-bold">{d.username}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {vehicles?.find(v => v.id === approvalTarget?.vehicleId)?.ownership === 'Rented' ? (
+                    <>
+                      <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Rented Driver Info (Optional)</Label>
+                      <Input 
+                        placeholder="Name / Phone..." 
+                        className="h-11 font-bold text-sm rounded-sm"
+                        value={approvalTarget?.rentedDriverDetails || ""}
+                        onChange={(e) => setApprovalState(prev => prev ? { ...prev, rentedDriverDetails: e.target.value } : null)}
+                      />
+                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver — No system selection required.</p>
+                    </>
+                  ) : (
+                    <>
+                      <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Assign System Driver</Label>
+                      <Select 
+                        disabled={!approvalTarget?.vehicleId}
+                        value={approvalTarget?.driverId}
+                        onValueChange={(val) => setApprovalState(prev => prev ? { ...prev, driverId: val } : null)}
+                      >
+                        <SelectTrigger className="rounded-sm border-primary/20 h-11 font-bold text-sm bg-muted/5">
+                          <SelectValue placeholder="Designate Driver..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {driversList.map(d => (
+                            <SelectItem key={d.id} value={d.id} className="text-xs font-bold">{d.username}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
