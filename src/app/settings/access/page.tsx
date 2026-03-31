@@ -20,7 +20,8 @@ import {
   LayoutGrid,
   ChevronRight,
   Info,
-  Search
+  Search,
+  ShieldCheck
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
