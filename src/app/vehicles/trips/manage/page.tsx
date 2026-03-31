@@ -40,6 +40,7 @@ import {
   ListFilter,
   MessageCircle,
   UserCircle2,
+  UserCog,
   ArrowLeftRight,
   Maximize2
 } from 'lucide-react';
@@ -255,7 +256,7 @@ export default function ManageAllTripsPage() {
     switch (trip.status) {
       case 'Pending':
         header = "🚨 *Aditya Pro - New Vehicle Request*";
-        body = `*Requester:* ${trip.userName}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.dropLocation || trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
+        body = `*Requester:* ${trip.userName}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
         break;
       case 'Approved':
         header = "✅ *Aditya Pro - Vehicle Allotted*";
@@ -923,7 +924,7 @@ export default function ManageAllTripsPage() {
               Revoke this trip request? If a vehicle was alloted, it will be returned to the available pool.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-3">
+          <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Back</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleConfirmCancel} 
