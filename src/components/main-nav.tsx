@@ -89,6 +89,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userRole === 'Admin';
 
   const allowedKeys = React.useMemo(() => {
     // Super Admins see everything
@@ -508,7 +509,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                     <ShieldCheck className="h-4 w-4 text-primary" />
                     <span className="font-medium flex items-center gap-2">
                       Permits
-                      {(isAdmin || isManager) && pendingPtwCount > 0 && (
+                      {(isAdmin || userRole === 'Site Manager') && pendingPtwCount > 0 && (
                         <div className="bg-red-600 text-white rounded-full font-black h-5 min-w-5 flex items-center justify-center text-[9px] shadow-sm animate-in zoom-in duration-300 px-1 shrink-0">
                           {pendingPtwCount}
                         </div>
