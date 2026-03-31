@@ -141,9 +141,11 @@ export default function CreateTaskPage() {
     setIsSubmitting(true);
     try {
       const assignedUser = teamUsers?.find(u => u.id === values.assignedToId);
+      const selectedSiteObj = accessibleSites.find(s => s.name === values.siteName);
       
       const taskData = {
         ...values,
+        siteId: selectedSiteObj?.id || "",
         assignedToName: assignedUser?.username || assignedUser?.email || "Unknown",
         assignedById: user.uid,
         assignedByName: userProfile.username || user.email || "Unknown",

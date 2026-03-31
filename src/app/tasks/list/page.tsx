@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -144,7 +143,14 @@ export default function TaskListPage() {
 
     if (isOwnDataOnly && !isSuper) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
-      list = list.filter(task => assignedIds.has(task.siteId || ""));
+      list = list.filter(task => {
+        // Relevant tasks (assigned to/by user) should be visible if either:
+        // 1. They have a siteId that is in the user's assigned projects
+        // 2. They don't have a siteId yet (legacy records) - we let these through 
+        // because the Firestore query already restricts them to the user's relevant tasks.
+        if (!task.siteId) return true;
+        return assignedIds.has(task.siteId);
+      });
     }
 
     list = list.filter(task => {
