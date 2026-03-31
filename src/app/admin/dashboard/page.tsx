@@ -1,7 +1,6 @@
+
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,7 +56,6 @@ function AdminDashboardSkeleton() {
 
 export default function AdminDashboardPage() {
     const firestore = useFirestore();
-    const router = useRouter();
     const { user, isUserLoading } = useUser();
 
     const userProfileRef = useMemoFirebase(() => {
@@ -69,36 +67,26 @@ export default function AdminDashboardPage() {
 
     const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
-    useEffect(() => {
-        if (!isUserLoading && !isProfileLoading && !isAdmin) {
-            router.replace('/ptw/raise');
-        }
-    }, [isUserLoading, isProfileLoading, isAdmin, router]);
-
     const usersQuery = useMemoFirebase(() => {
-        if (!isAdmin || isProfileLoading) return null;
+        if (isProfileLoading) return null;
         return collection(firestore, 'users');
-    }, [firestore, isAdmin, isProfileLoading]);
+    }, [firestore, isProfileLoading]);
     const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
 
     const permitsQuery = useMemoFirebase(() => {
-        if (!isAdmin || isProfileLoading) return null;
+        if (isProfileLoading) return null;
         return collection(firestore, 'permits_to_work');
-    }, [firestore, isAdmin, isProfileLoading]);
+    }, [firestore, isProfileLoading]);
     const { data: permits, isLoading: permitsLoading } = useCollection(permitsQuery);
 
     const projectsQuery = useMemoFirebase(() => {
-        if (!isAdmin || isProfileLoading) return null;
+        if (isProfileLoading) return null;
         return collection(firestore, 'projects');
-    }, [firestore, isAdmin, isProfileLoading]);
+    }, [firestore, isProfileLoading]);
     const { data: projects, isLoading: projectsLoading } = useCollection(projectsQuery);
 
-    if (isUserLoading || isProfileLoading || (isAdmin && (usersLoading || permitsLoading || projectsLoading))) {
+    if (isUserLoading || isProfileLoading || usersLoading || permitsLoading || projectsLoading) {
         return <AdminDashboardSkeleton />
-    }
-
-    if (!isAdmin) {
-        return null;
     }
     
     const summary = {

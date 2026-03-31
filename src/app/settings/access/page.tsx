@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -85,12 +86,6 @@ export default function UserAccessManagementPage() {
     return collection(firestore, 'users');
   }, [firestore, user]);
   const { data: allUsers } = useCollection<UserProfile>(usersQuery);
-
-  React.useEffect(() => {
-    if (!isUserLoading && !isProfileLoading && !isAdmin) {
-      router.replace('/dashboard');
-    }
-  }, [isUserLoading, isProfileLoading, isAdmin, router]);
 
   // Load permissions for selected role
   React.useEffect(() => {
@@ -199,8 +194,6 @@ export default function UserAccessManagementPage() {
   }, [allUsers, userSearch]);
 
   if (isUserLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
-
-  if (!isAdmin) return null;
 
   return (
     <div className="space-y-8 pb-20">

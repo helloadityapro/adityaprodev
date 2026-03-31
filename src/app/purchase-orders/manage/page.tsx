@@ -111,19 +111,12 @@ export default function GlobalManagePOsPage() {
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
-  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
   const isManager = userProfile?.role === 'Site Manager';
 
-  React.useEffect(() => {
-    if (!isProfileLoading && user && !isProcurement) {
-      router.replace('/ptw/list');
-    }
-  }, [user, isProfileLoading, isProcurement, router]);
-
   const posQuery = useMemoFirebase(() => {
-    if (!user || isProfileLoading || !isProcurement) return null;
+    if (!user || isProfileLoading) return null;
     return query(collection(firestore, 'project_pos'), orderBy('createdAt', 'desc'), limit(500));
-  }, [firestore, user, isProfileLoading, isProcurement]);
+  }, [firestore, user, isProfileLoading]);
 
   const { data: allPOs, isLoading: isPOsLoading } = useCollection<PurchaseOrder>(posQuery);
 
@@ -134,7 +127,7 @@ export default function GlobalManagePOsPage() {
     }));
   };
 
-  const SortIcon = ({ column }: { column: POSortKey }) => {
+  const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
     return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
@@ -221,8 +214,6 @@ export default function GlobalManagePOsPage() {
   if (isProfileLoading || isPOsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
-
-  if (!isProcurement) return null;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -402,26 +393,5 @@ export default function GlobalManagePOsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
-  const colors = {
-    primary: "bg-primary/5 border-primary/10 text-primary",
-    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
-    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
-    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
-  };
-
-  return (
-    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4" />
-      </CardHeader>
-      <CardContent className="p-4 pt-0">
-        <div className="text-2xl font-black">{value}</div>
-      </CardContent>
-    </Card>
   );
 }

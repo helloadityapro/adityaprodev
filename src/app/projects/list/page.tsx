@@ -57,19 +57,12 @@ export default function ProjectsListPage() {
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
-  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
-
-  React.useEffect(() => {
-    if (!isProfileLoading && user && !isProcurement) {
-      router.replace('/ptw/list');
-    }
-  }, [user, isProfileLoading, isProcurement, router]);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
   const accessibleSites = React.useMemo(() => {
-    if (!allSites || !isProcurement || !userProfile) return [];
+    if (!allSites || !userProfile) return [];
     
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
@@ -84,7 +77,7 @@ export default function ProjectsListPage() {
     }
     
     return allSites;
-  }, [allSites, isProcurement, userProfile, roleConfigs, isSuper]);
+  }, [allSites, userProfile, roleConfigs, isSuper]);
 
   const filteredSites = React.useMemo(() => {
     return accessibleSites.filter(s => 
@@ -101,8 +94,6 @@ export default function ProjectsListPage() {
       </div>
     );
   }
-
-  if (!isProcurement) return null;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">

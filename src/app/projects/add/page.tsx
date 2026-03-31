@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -91,13 +92,6 @@ export default function AddNewProjectPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
-  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
-
-  React.useEffect(() => {
-    if (!isUserLoading && !isProfileLoading && !isProcurement) {
-      router.replace('/ptw/list');
-    }
-  }, [isUserLoading, isProfileLoading, isProcurement, router]);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites, isLoading: sitesLoading } = useCollection<any>(sitesQuery);
@@ -285,11 +279,9 @@ export default function AddNewProjectPage() {
     );
   }
 
-  if (!isProcurement) return null;
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col gap-1">
         <div className="flex flex-col gap-1">
           <Button variant="ghost" size="sm" onClick={() => router.push('/projects/list')} className="w-fit mb-2 -ml-2 text-muted-foreground">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
@@ -300,7 +292,7 @@ export default function AddNewProjectPage() {
           <p className="text-muted-foreground">Define and organize project locations for organizational operations.</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 mt-4">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -486,7 +478,7 @@ export default function AddNewProjectPage() {
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
               Confirm Bulk Deletion
-            </AlertDialogTitle>
+            </AlertCircle>
             <AlertDialogDescription>
               You are about to permanently remove <strong>{selectedIds.length} project sites</strong> from the organization registry. 
               This action will remove them from all dropdowns across the platform and cannot be undone.

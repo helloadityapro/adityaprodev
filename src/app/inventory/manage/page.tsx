@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -72,12 +73,6 @@ export default function ManageMasterInventoryPage() {
   const categoriesQuery = useMemoFirebase(() => collection(firestore, 'inventory_categories'), [firestore]);
   const { data: categories } = useCollection<{ name: string }>(categoriesQuery);
 
-  React.useEffect(() => {
-    if (!isUserLoading && !isProfileLoading && !isAdmin) {
-      router.replace('/inventory/global');
-    }
-  }, [isUserLoading, isProfileLoading, isAdmin, router]);
-
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
       key,
@@ -138,8 +133,6 @@ export default function ManageMasterInventoryPage() {
     );
   }
 
-  if (!isAdmin) return null;
-
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -149,11 +142,13 @@ export default function ManageMasterInventoryPage() {
           </h1>
           <p className="text-muted-foreground text-sm font-medium">Define global materials, components, and set-breakdowns for organizational use.</p>
         </div>
-        <Button asChild className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-6">
-          <Link href="/inventory/manage/add">
-            <Plus className="mr-2 h-4 w-4" /> Add New Item
-          </Link>
-        </Button>
+        {isAdmin && (
+          <Button asChild className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-6">
+            <Link href="/inventory/manage/add">
+              <Plus className="mr-2 h-4 w-4" /> Add New Item
+            </Link>
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
@@ -213,7 +208,7 @@ export default function ManageMasterInventoryPage() {
                   <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('unit')}>
                     <div className="flex items-center justify-center">Base Unit <SortIcon column="unit" /></div>
                   </TableHead>
-                  <TableHead className="text-right px-6">Action</TableHead>
+                  {isAdmin && <TableHead className="text-right px-6">Action</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -244,20 +239,22 @@ export default function ManageMasterInventoryPage() {
                           {item.unit}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => {
-                            deleteDocumentNonBlocking(doc(firestore, 'master_inventory', item.id));
-                            toast({ title: 'Item Removed' });
-                          }}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {isAdmin && (
+                        <TableCell className="text-right px-6">
+                          <div className="flex justify-end items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => {
+                              deleteDocumentNonBlocking(doc(firestore, 'master_inventory', item.id));
+                              toast({ title: 'Item Removed' });
+                            }}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                     {expandedRows.has(item.id) && item.subItems && (
                       <TableRow className="bg-primary/[0.02]">
-                        <TableCell colSpan={5} className="p-0 border-b">
+                        <TableCell colSpan={isAdmin ? 5 : 4} className="p-0 border-b">
                           <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200">
                             <div className="flex items-center gap-2 mb-2">
                               <Layers className="h-3.5 w-3.5 text-primary" />
@@ -281,7 +278,7 @@ export default function ManageMasterInventoryPage() {
                   </React.Fragment>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic flex flex-col items-center justify-center gap-2">
+                    <TableCell colSpan={isAdmin ? 5 : 4} className="h-48 text-center text-muted-foreground italic flex flex-col items-center justify-center gap-2">
                       <Boxes className="h-10 w-10 opacity-20" />
                       <p className="text-sm font-bold uppercase tracking-widest">No items matching current filters</p>
                     </TableCell>

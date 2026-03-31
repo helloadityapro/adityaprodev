@@ -109,19 +109,12 @@ export default function GlobalManageWOsPage() {
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
-  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
   const isManager = userProfile?.role === 'Site Manager';
 
-  React.useEffect(() => {
-    if (!isProfileLoading && user && !isProcurement) {
-      router.replace('/ptw/list');
-    }
-  }, [user, isProfileLoading, isProcurement, router]);
-
   const wosQuery = useMemoFirebase(() => {
-    if (!user || isProfileLoading || !isProcurement) return null;
+    if (!user || isProfileLoading) return null;
     return query(collection(firestore, 'project_wos'), orderBy('createdAt', 'desc'), limit(500));
-  }, [firestore, user, isProfileLoading, isProcurement]);
+  }, [firestore, user, isProfileLoading]);
 
   const { data: allWOs, isLoading: isWOsLoading } = useCollection<WorkOrder>(wosQuery);
 
@@ -219,8 +212,6 @@ export default function GlobalManageWOsPage() {
   if (isProfileLoading || isWOsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
-
-  if (!isProcurement) return null;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -22,7 +23,7 @@ import { AttendanceGate } from "@/components/attendance-gate";
 import { BottomNav } from "@/components/bottom-nav";
 import { QuickActions } from "@/components/quick-actions";
 import { CredentialsPromptDialog } from "@/components/credentials-prompt-dialog";
-import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw } from "lucide-react";
+import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from '@capacitor/core';
@@ -179,26 +180,23 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
 
-  // Dynamic Access Gate
-  React.useEffect(() => {
-    if (!user || isProfileLoading || !userProfile || isAuthPage) return;
-    
-    // Super Admins bypass all gates
-    if (isSuperAdmin(user.email)) return;
+  // Dynamic Access Gate (Inline Visibility Control)
+  const isAuthorized = React.useMemo(() => {
+    if (isAuthPage || isSuperAdmin(user?.email)) return true;
+    if (isUserLoading || isProfileLoading || !userProfile) return true; // Wait for data before restricting
 
     const pageKey = getPageKeyByPath(pathname);
-    if (!pageKey) return;
+    if (!pageKey) return true; // Path not in controlled registry (e.g. /profile)
 
     const allowedKeys = userProfile.customPermissions 
       ? new Set(userProfile.customPermissions) 
       : new Set(roleConfigs?.find(c => c.id === userProfile.role)?.allowedPageKeys || []);
 
-    // If page is defined in registry but not allowed for this user
-    if (allowedKeys.size > 0 && !allowedKeys.has(pageKey)) {
-      toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have authorization to view this module.' });
-      router.replace('/rewards');
-    }
-  }, [user, userProfile, isProfileLoading, pathname, isAuthPage, roleConfigs, router, toast]);
+    // If no policy is defined yet, default to open for prototype usability
+    if (allowedKeys.size === 0) return true; 
+    
+    return allowedKeys.has(pageKey);
+  }, [user, userProfile, isUserLoading, isProfileLoading, pathname, isAuthPage, roleConfigs]);
 
   React.useEffect(() => {
     if (!isUserLoading && !user && !isAuthPage) {
@@ -436,7 +434,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         </div>
         <h1 className="text-3xl font-black uppercase tracking-tight">Authorization Pending</h1>
         <p className="text-muted-foreground max-sm text-lg leading-relaxed">Your account is awaiting administrative approval. You will be notified via email once your profile is verified.</p>
-        <div className="flex flex-col gap-3 w-full max-w-xs">
+        <div className="flex flex-col gap-3 w-full max-xs">
           <Button variant="outline" onClick={() => auth.signOut()} className="rounded-sm font-bold h-11">Sign Out & Exit</Button>
         </div>
       </div>
@@ -479,7 +477,20 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6 min-h-full pb-36 md:pb-6 relative">
             <AttendanceGate />
             <CredentialsPromptDialog />
-            {children}
+            {isAuthorized ? children : (
+              <div className="flex flex-col items-center justify-center py-32 text-center animate-in fade-in zoom-in-95 duration-500">
+                <div className="bg-destructive/5 p-6 rounded-full mb-6 border border-destructive/10">
+                  <Lock className="h-12 w-12 text-destructive opacity-60" />
+                </div>
+                <h2 className="text-2xl font-black uppercase tracking-tight">Access Restricted</h2>
+                <p className="text-muted-foreground max-w-sm mt-2 font-medium">
+                  Your organizational account does not have authorization to view this module. Please contact administration for access keys.
+                </p>
+                <Button variant="outline" onClick={() => router.push('/rewards')} className="mt-8 rounded-sm font-bold uppercase text-xs tracking-widest px-8">
+                  Return to Hub
+                </Button>
+              </div>
+            )}
           </div>
         </div>
         <BottomNav />
