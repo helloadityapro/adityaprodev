@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, doc, where, or, serverTimestamp, and, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -38,7 +38,10 @@ import {
   TrendingUp,
   CircleX,
   ListFilter,
-  MessageCircle
+  MessageCircle,
+  UserCircle2,
+  ArrowLeftRight,
+  Maximize2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -122,6 +125,12 @@ type AccessConfig = {
   ownDataOnly?: boolean;
 };
 
+const formatTimestamp = (ts: any) => {
+  if (!ts) return '—';
+  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
+  return format(date, 'dd MMM yyyy HH:mm');
+};
+
 export default function ManageAllTripsPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -175,6 +184,25 @@ export default function ManageAllTripsPage() {
   const { data: allUsers } = useCollection<UserProfile>(usersQuery);
 
   const driversList = React.useMemo(() => allUsers?.filter(u => u.role === 'Driver') || [], [allUsers]);
+
+  // Deep Link Handling
+  React.useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId && assignments && assignments.length > 0) {
+      const found = assignments.find(a => a.id === viewId);
+      if (found) {
+        setDetailsAssignment(found);
+      }
+    }
+  }, [searchParams, assignments]);
+
+  const handleCloseDetail = () => {
+    setDetailsAssignment(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    const queryStr = params.toString();
+    router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
+  };
 
   const filteredAssignments = React.useMemo(() => {
     if (!assignments || !userProfile) return [];
@@ -493,8 +521,13 @@ export default function ManageAllTripsPage() {
                                   <CircleX className="h-4 w-4" />
                                 </Button>
                               )}
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
-                                <Link href={`/vehicles/trips/manage?view=${trip.id}`}><Eye className="h-4 w-4" /></Link>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-primary rounded-sm" 
+                                onClick={() => setDetailsAssignment(trip)}
+                              >
+                                <Eye className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
@@ -679,6 +712,203 @@ export default function ManageAllTripsPage() {
             >
               Confirm Allotment
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!detailsAssignment} onOpenChange={(o) => !o && handleCloseDetail()}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><MapPinned className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Trip Audit Log</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Request ID: {detailsAssignment?.id.slice(0, 8)}</DialogDescription>
+              </div>
+            </div>
+            {detailsAssignment && (
+              <Badge variant="outline" className={cn(
+                "text-[9px] font-black uppercase rounded-sm px-2 h-6",
+                detailsAssignment.status === 'Completed' ? "bg-green-100 text-green-800" : 
+                detailsAssignment.status === 'Ongoing' ? "bg-primary text-white border-none" : "bg-muted"
+              )}>
+                {detailsAssignment.status}
+              </Badge>
+            )}
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[75vh]">
+            {detailsAssignment && (
+              <div className="p-8 space-y-12">
+                {/* Section 1: Route */}
+                <section className="space-y-6">
+                  <div className="flex items-center gap-2 border-b pb-2">
+                    <Navigation className="h-4 w-4 text-primary" />
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Trip Itinerary</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-6 relative border-l-2 border-primary/10 ml-3 pl-6">
+                      <div className="relative">
+                        <div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
+                        <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Pickup Location</p>
+                        <p className="text-sm font-black">{detailsAssignment.pickupLocation}</p>
+                        <Badge variant="secondary" className="mt-1 text-[8px] h-4 rounded-sm px-1.5 font-bold uppercase">{detailsAssignment.pickupType}</Badge>
+                      </div>
+
+                      {detailsAssignment.destinations.map((dest, idx) => (
+                        <div key={idx} className="relative">
+                          <div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
+                          <p className="text-[9px] font-black uppercase text-primary tracking-tighter">
+                            {idx === detailsAssignment.destinations.length - 1 ? 'Final Drop' : `Stop #${idx + 1}`}
+                          </p>
+                          <p className="text-sm font-black">{dest.location}</p>
+                          <p className="text-[10px] font-medium italic text-muted-foreground">"{dest.purpose}"</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="p-4 bg-muted/20 border rounded-sm space-y-3">
+                        <div className="flex justify-between items-center text-[10px] font-black uppercase text-muted-foreground">
+                          <span className="flex items-center gap-1.5"><Calendar className="h-3 w-3" /> Trip Date</span>
+                          <span className="text-foreground">{detailsAssignment.tripDate}</span>
+                        </div>
+                        <Separator className="opacity-50" />
+                        <div className="flex justify-between items-center text-[10px] font-black uppercase text-muted-foreground">
+                          <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Reporting</span>
+                          <span className="text-foreground">{detailsAssignment.reportingTime}</span>
+                        </div>
+                      </div>
+                      <div className="p-4 bg-primary/[0.02] border border-primary/10 rounded-sm">
+                        <Label className="text-[9px] font-black uppercase text-primary tracking-widest block mb-2">Trip Purpose</Label>
+                        <p className="text-xs font-medium italic text-foreground/80 leading-relaxed">"{detailsAssignment.purpose}"</p>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Section 2: Fleet & Personnel */}
+                <section className="space-y-6">
+                  <div className="flex items-center gap-2 border-b pb-2">
+                    <HardHat className="h-4 w-4 text-primary" />
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Fleet & Personnel</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-sm bg-primary/10 flex items-center justify-center text-primary"><UserCircle2 className="h-6 w-6" /></div>
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Requester</span>
+                          <span className="text-sm font-black">{detailsAssignment.userName}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-sm bg-muted flex items-center justify-center text-muted-foreground"><UserCog className="h-6 w-6" /></div>
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Assigned Driver</span>
+                          <span className="text-sm font-black">{detailsAssignment.driverName || '—'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-sm bg-primary/5 border border-primary/10 flex items-center justify-center text-primary font-black text-xs">V</div>
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Resource</span>
+                          <span className="text-sm font-black uppercase">{detailsAssignment.vehicleDetails || 'Allotment Pending'}</span>
+                        </div>
+                      </div>
+                      {detailsAssignment.coPassengers && detailsAssignment.coPassengers.length > 0 && (
+                        <div className="p-3 bg-muted/10 border rounded-sm">
+                          <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest block mb-2">Co-passengers ({detailsAssignment.coPassengers.length})</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {detailsAssignment.coPassengers.map((p, i) => (
+                              <Badge key={i} variant="outline" className="text-[8px] rounded-full px-2 h-4 border-primary/10 bg-background">{p.name}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </section>
+
+                {/* Section 3: Audit (If Ongoing or Completed) */}
+                {(detailsAssignment.status === 'Ongoing' || detailsAssignment.status === 'Completed') && (
+                  <section className="space-y-6">
+                    <div className="flex items-center gap-2 border-b pb-2">
+                      <ShieldCheck className="h-4 w-4 text-primary" />
+                      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Digital Audit Proof</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-4">
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                          <PlayCircle className="h-3 w-3" /> Start Verification
+                        </Label>
+                        <div className="bg-muted/20 border rounded-sm p-4 space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold uppercase text-muted-foreground">Odometer Reading</span>
+                            <span className="text-lg font-black text-primary font-mono">{detailsAssignment.startReading} KM</span>
+                          </div>
+                          {detailsAssignment.startReadingPhoto && (
+                            <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/5 shadow-md group">
+                              <img src={detailsAssignment.startReadingPhoto} className="w-full h-full object-cover" alt="Start Proof" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <Maximize2 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {detailsAssignment.status === 'Completed' && (
+                        <div className="space-y-4">
+                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                            <Flag className="h-3 w-3" /> Conclusion Audit
+                          </Label>
+                          <div className="bg-emerald-50/50 border border-emerald-100 rounded-sm p-4 space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-bold uppercase text-emerald-700">Final Reading</span>
+                              <span className="text-lg font-black text-emerald-900 font-mono">{detailsAssignment.endReading} KM</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t border-emerald-100">
+                              <span className="text-[10px] font-bold uppercase text-emerald-700">Total Distance</span>
+                              <span className="text-sm font-black text-emerald-900">
+                                {((detailsAssignment.endReading || 0) - (detailsAssignment.startReading || 0)).toFixed(1)} KM
+                              </span>
+                            </div>
+                            {detailsAssignment.endReadingPhoto && (
+                              <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-emerald-100 shadow-md group">
+                                <img src={detailsAssignment.endReadingPhoto} className="w-full h-full object-cover" alt="End Proof" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                  <Maximize2 className="h-6 w-6 text-white" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+          </ScrollArea>
+
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0">
+            {detailsAssignment && (
+              <Button 
+                variant="outline" 
+                className="mr-auto h-10 rounded-sm font-black uppercase text-[10px] tracking-widest text-green-700 border-green-200 hover:bg-green-50"
+                onClick={() => handleWhatsAppShare(detailsAssignment)}
+              >
+                <MessageCircle className="h-4 w-4 mr-1.5" /> Share WA
+              </Button>
+            )}
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
