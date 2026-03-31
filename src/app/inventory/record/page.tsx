@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -107,7 +106,6 @@ export default function RecordMovementPage() {
   const [submittedData, setSubmittedData] = React.useState<any>(null);
   const [invoiceFiles, setInvoiceFiles] = React.useState<File[]>([]);
 
-  // BoM lookup for approved items only
   const [approvedBomItems, setApprovedBomItems] = React.useState<BoMItem[]>([]);
   const currentSiteNameRef = React.useRef("");
 
@@ -131,7 +129,6 @@ export default function RecordMovementPage() {
   const movementType = form.watch("movementType");
   const sourceOrDestinationType = form.watch("sourceOrDestinationType");
 
-  // Fetch approved BoM for current site
   React.useEffect(() => {
     if (watchSiteName && watchSiteName !== currentSiteNameRef.current) {
       currentSiteNameRef.current = watchSiteName;
@@ -177,7 +174,6 @@ export default function RecordMovementPage() {
       const siteId = allSites?.find(s => s.name === values.siteName)?.id;
 
       for (const item of values.items) {
-        // 1. Log Movement
         await addDocumentNonBlocking(collection(firestore, 'material_movements'), {
           ...values,
           itemName: item.itemName,
@@ -190,7 +186,6 @@ export default function RecordMovementPage() {
           createdAt: serverTimestamp()
         });
 
-        // 2. Update Inventory (Real-time synchronization)
         const invQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', siteId), where('itemName', '==', item.itemName));
         const invSnap = await getDocs(invQuery);
         const adjustment = values.movementType === 'Inward' ? item.quantity : -item.quantity;
@@ -277,9 +272,34 @@ export default function RecordMovementPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 1. Date */}
+                <FormField control={form.control} name="movementDate" render={({ field }) => (
+                  <FormItem><FormLabel>Movement Date</FormLabel><FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>
+                )} />
+
+                {/* 2. Movement Direction */}
+                <FormField control={form.control} name="movementType" render={({ field }) => (
+                  <FormItem><FormLabel>Movement Direction</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Inward">Inward (Add to Stock)</SelectItem><SelectItem value="Outward">Outward (Remove from Stock)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+
+                {/* 3. Source Type & Name */}
+                <div className="space-y-4">
+                  <FormField control={form.control} name="sourceOrDestinationType" render={({ field }) => (
+                    <FormItem className="space-y-3"><FormLabel>{movementType === 'Inward' ? 'Source' : 'Destination'} Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4"><div className="flex items-center space-x-2"><RadioGroupItem value="Supplier" id="src-supp" /><Label htmlFor="src-supp">Supplier</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="Site" id="src-site" /><Label htmlFor="src-site">Project Site</Label></div></RadioGroup></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name="sourceOrDestination" render={({ field }) => (
+                    <FormItem>
+                      {sourceOrDestinationType === 'Supplier' ? (
+                        <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search suppliers..." className="h-9 border-none" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} /></div><ScrollArea className="h-[200px]">{filteredSuppliers.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />{s.name}</Button>))}</ScrollArea></PopoverContent></Popover>
+                      ) : (<FormControl><Input placeholder="Site name or address..." {...field} className="h-11 rounded-sm" /></FormControl>)}
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+
+                {/* 4. Project Site */}
                 <FormField control={form.control} name="siteName" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Project Site</FormLabel>
+                    <FormLabel>Project Site (Recording Site)</FormLabel>
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
@@ -294,32 +314,10 @@ export default function RecordMovementPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-
-                <FormField control={form.control} name="movementDate" render={({ field }) => (
-                  <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>
-                )} />
-
-                <FormField control={form.control} name="movementType" render={({ field }) => (
-                  <FormItem><FormLabel>Movement Direction</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Inward">Inward (Add to Stock)</SelectItem><SelectItem value="Outward">Outward (Remove from Stock)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-
-                <div className="space-y-4">
-                  <FormField control={form.control} name="sourceOrDestinationType" render={({ field }) => (
-                    <FormItem className="space-y-3"><FormLabel>{movementType === 'Inward' ? 'Source' : 'Destination'} Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4"><div className="flex items-center space-x-2"><RadioGroupItem value="Supplier" id="src-supp" /><Label htmlFor="src-supp">Supplier</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="Site" id="src-site" /><Label htmlFor="src-site">Project Site</Label></div></RadioGroup></FormControl></FormItem>
-                  )} />
-                  <FormField control={form.control} name="sourceOrDestination" render={({ field }) => (
-                    <FormItem>
-                      {sourceOrDestinationType === 'Supplier' ? (
-                        <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search suppliers..." className="h-9 border-none" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} /></div><ScrollArea className="h-[200px]">{filteredSuppliers.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />{s.name}</Button>))}</ScrollArea></PopoverContent></Popover>
-                      ) : (<FormControl><Input placeholder="Site name or address..." {...field} className="h-11 rounded-sm" /></FormControl>)}
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
               </div>
 
               <Separator />
 
-              {/* Invoice Details Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
