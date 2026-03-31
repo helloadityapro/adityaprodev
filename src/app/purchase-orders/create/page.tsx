@@ -16,7 +16,7 @@ import {
 } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -55,6 +55,8 @@ const poItemSchema = z.object({
 });
 
 const poSchema = z.object({
+  siteId: z.string().min(1, 'Please select a project site.'),
+  siteName: z.string(),
   poNumber: z.string().min(3, 'PO Number is required.'),
   orderDate: z.string().min(1, 'Date is required.'),
   supplierId: z.string().min(1, 'Please select a supplier.'),
@@ -90,11 +92,8 @@ type PurchaseOrder = {
   items: { bomItemId: string; quantity: number }[];
 };
 
-export default function CreatePOPage({ params }: { params: Promise<{ projectId: string }> }) {
-  const resolvedParams = React.use(params);
-  const projectId = resolvedParams.projectId;
+export default function CreatePOPage() {
   const firestore = useFirestore();
-  const firebaseApp = useFirebaseApp();
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
@@ -103,51 +102,27 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [finalTotal, setFinalTotal] = React.useState(0);
 
+  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
+  const [siteSearch, setSiteSearch] = React.useState("");
   const [isSupplierPopoverOpen, setIsSupplierPopoverOpen] = React.useState(false);
   const [supplierSearch, setSupplierSearch] = React.useState("");
   const [openBomIndex, setOpenBomIndex] = React.useState<number | null>(null);
   const [bomSearch, setBomSearch] = React.useState("");
 
-  const projectRef = useMemoFirebase(() => doc(firestore, 'sites', projectId), [firestore, projectId]);
-  const { data: site } = useDoc<Site>(projectRef);
-
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
-  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: allSites } = useCollection<Site>(sitesQuery);
 
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
 
-  const approvedBomQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'project_boms'), where('siteId', '==', projectId), where('status', '==', 'Approved')),
-    [firestore, projectId]
-  );
-  const { data: approvedBomItems } = useCollection<BoMItem>(approvedBomQuery);
-
-  const posQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'project_pos'), where('siteId', '==', projectId)), 
-    [firestore, projectId]
-  );
-  const { data: existingPOs } = useCollection<PurchaseOrder>(posQuery);
-
-  const consumedQuantities = React.useMemo(() => {
-    const counts: Record<string, number> = {};
-    if (!existingPOs) return counts;
-    existingPOs.forEach(po => {
-      if (po.status !== 'Cancelled') {
-        po.items.forEach(item => {
-          counts[item.bomItemId] = (counts[item.bomItemId] || 0) + (Number(item.quantity) || 0);
-        });
-      }
-    });
-    return counts;
-  }, [existingPOs]);
-
   const form = useForm<z.infer<typeof poSchema>>({
     resolver: zodResolver(poSchema),
     defaultValues: {
+      siteId: "",
+      siteName: "",
       poNumber: "",
       orderDate: format(new Date(), 'yyyy-MM-dd'),
       supplierId: "",
@@ -165,6 +140,33 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
     control: form.control,
     name: "items",
   }) || [];
+
+  const watchSiteId = form.watch('siteId');
+
+  const approvedBomQuery = useMemoFirebase(() => 
+    watchSiteId ? query(collection(firestore, 'project_boms'), where('siteId', '==', watchSiteId), where('status', '==', 'Approved')) : null,
+    [firestore, watchSiteId]
+  );
+  const { data: approvedBomItems } = useCollection<BoMItem>(approvedBomQuery);
+
+  const posQuery = useMemoFirebase(() => 
+    watchSiteId ? query(collection(firestore, 'project_pos'), where('siteId', '==', watchSiteId)) : null, 
+    [firestore, watchSiteId]
+  );
+  const { data: existingPOs } = useCollection<PurchaseOrder>(posQuery);
+
+  const consumedQuantities = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    if (!existingPOs) return counts;
+    existingPOs.forEach(po => {
+      if (po.status !== 'Cancelled') {
+        po.items.forEach(item => {
+          counts[item.bomItemId] = (counts[item.bomItemId] || 0) + (Number(item.quantity) || 0);
+        });
+      }
+    });
+    return counts;
+  }, [existingPOs]);
 
   const totalAmount = React.useMemo(() => {
     return watchedItems.reduce((sum, item) => {
@@ -189,6 +191,10 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
     });
   }, [watchedItems, form]);
 
+  const filteredSites = allSites?.filter(s => 
+    s.name.toLowerCase().includes(siteSearch.toLowerCase())
+  ) || [];
+
   const filteredSuppliers = allSuppliers?.filter(s => 
     s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
     s.gstin.toLowerCase().includes(supplierSearch.toLowerCase())
@@ -204,7 +210,8 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
   }, [approvedBomItems, consumedQuantities, bomSearch]);
 
   const onSubmit = async (values: z.infer<typeof poSchema>) => {
-    if (!user || !userProfile || !site) return;
+    if (!user || !userProfile) return;
+    
     const newOrderCounts: Record<string, number> = {};
     for (const item of values.items) {
       const original = approvedBomItems?.find(i => i.id === item.bomItemId);
@@ -212,11 +219,13 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
       const consumed = consumedQuantities[item.bomItemId] || 0;
       const remaining = authorized - consumed;
       newOrderCounts[item.bomItemId] = (newOrderCounts[item.bomItemId] || 0) + item.quantity;
+      
       if (newOrderCounts[item.bomItemId] > remaining) {
-        toast({ variant: 'destructive', title: 'Authorization Exceeded', description: `Line item "${item.itemName}" exceeds remaining approved quantity (${remaining.toFixed(2)} ${original?.unit}). Please obtain additional quantity approval from the site BoM before proceeding.` });
+        toast({ variant: 'destructive', title: 'Authorization Exceeded', description: `Line item "${item.itemName}" exceeds remaining approved quantity (${remaining.toFixed(2)} ${original?.unit}).` });
         return;
       }
     }
+
     setIsSubmitting(true);
     try {
       const historyEntry = {
@@ -226,9 +235,10 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
         timestamp: new Date(),
         details: `Initial order generated for ₹${totalAmount.toLocaleString('en-IN')}`
       };
+
       await addDocumentNonBlocking(collection(firestore, 'project_pos'), {
-        siteId: projectId,
-        siteName: site.name,
+        siteId: values.siteId,
+        siteName: values.siteName,
         poNumber: values.poNumber,
         supplierId: values.supplierId,
         supplierName: values.supplierName,
@@ -241,9 +251,10 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
         createdByName: userProfile.username || user.email,
         history: [historyEntry]
       });
+
       setFinalTotal(totalAmount);
       setIsSuccess(true);
-      toast({ title: 'PO Created', description: `Purchase Order ${values.poNumber} for ${values.supplierName} has been recorded.` });
+      toast({ title: 'PO Created', description: `Purchase Order ${values.poNumber} has been recorded.` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
@@ -260,10 +271,10 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4"><div className="bg-primary/10 p-4 rounded-full"><CheckCircle2 className="h-12 w-12 text-primary" /></div></div>
             <CardTitle className="text-2xl font-bold uppercase tracking-tight">PO Generated</CardTitle>
-            <CardDescription className="text-base leading-relaxed">Purchase Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated for <strong className="text-foreground">{form.getValues('supplierName')}</strong> at <strong className="text-primary">{site?.name}</strong>.</CardDescription>
+            <CardDescription className="text-base leading-relaxed">Purchase Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated successfully.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push(`/projects/${projectId}?tab=po`)}>Back to Procurement</Button>
+            <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push(`/purchase-orders/manage`)}>View PO Hub</Button>
             <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); }}>Create Another PO</Button>
           </CardContent>
         </Card>
@@ -282,19 +293,92 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
           <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
             <CardHeader className="bg-primary/5 border-b"><CardTitle className="text-sm font-black uppercase tracking-widest">Order Context</CardTitle></CardHeader>
             <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <FormField control={form.control} name="siteId" render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Target Project Site</FormLabel>
+                    <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>
+                            {field.value ? allSites?.find(s => s.id === field.value)?.name : "Select site..."}
+                            <Building2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <div className="flex items-center border-b px-3">
+                          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                          <Input placeholder="Search sites..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={siteSearch} onChange={(e) => setSiteSearch(e.target.value)} />
+                        </div>
+                        <ScrollArea className="h-[200px]">
+                          <div className="p-1">
+                            {filteredSites.map((s) => (
+                              <Button key={s.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { 
+                                field.onChange(s.id); 
+                                form.setValue('siteName', s.name); 
+                                setIsSitePopoverOpen(false); 
+                                setSiteSearch("");
+                                // Reset items if site changes
+                                form.setValue('items', [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }]);
+                              }}>
+                                <Check className={cn("mr-2 h-4 w-4 text-primary", s.id === field.value ? "opacity-100" : "opacity-0")} />
+                                {s.name}
+                              </Button>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="supplierId" render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Select Supplier</FormLabel>
+                    <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>
+                            {field.value ? allSuppliers?.find(s => s.id === field.value)?.name : "Choose Vendor..."}
+                            <Truck className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <div className="flex items-center border-b px-3">
+                          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                          <Input placeholder="Search vendors..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} />
+                        </div>
+                        <ScrollArea className="h-[200px]">
+                          <div className="p-1">
+                            {filteredSuppliers.map((s) => (
+                              <Button key={s.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { field.onChange(s.id); form.setValue('supplierName', s.name); setIsSupplierPopoverOpen(false); setSupplierSearch(""); }}>
+                                <Check className={cn("mr-2 h-4 w-4 text-primary", s.id === field.value ? "opacity-100" : "opacity-0")} />
+                                <div className="flex flex-col items-start"><span className="font-bold">{s.name}</span><span className="text-[8px] font-mono text-muted-foreground">{s.gstin}</span></div>
+                              </Button>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="poNumber" render={({ field }) => (
                   <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">PO Number</FormLabel><FormControl><Input placeholder="e.g. AGEPL/PO/2026/001" {...field} className="h-11 rounded-sm uppercase font-mono font-bold" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="orderDate" render={({ field }) => (
                   <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Order Date</FormLabel><FormControl><div className="relative"><Input type="date" {...field} className="h-11 rounded-sm pr-10" /><Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" /></div></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={form.control} name="supplierId" render={({ field }) => (
-                  <FormItem className="flex flex-col"><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Select Supplier</FormLabel><Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>{field.value ? allSuppliers?.find(s => s.id === field.value)?.name : "Choose Supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search vendors..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} /></div><ScrollArea className="h-[200px]"><div className="p-1">{allSuppliers?.filter(s => s.name.toLowerCase().includes(supplierSearch.toLowerCase())).map((s) => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { field.onChange(s.id); form.setValue('supplierName', s.name); setIsSupplierPopoverOpen(false); setSupplierSearch(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", s.id === field.value ? "opacity-100" : "opacity-0")} /><div className="flex flex-col items-start"><span className="font-bold">{s.name}</span><span className="text-[8px] font-mono text-muted-foreground">{s.gstin}</span></div></Button>))}</div></ScrollArea></PopoverContent></Popover><FormMessage /></FormItem>
-                )} />
               </div>
             </CardContent>
           </Card>
+
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b pb-2 px-1"><div className="flex items-center gap-2"><Truck className="h-4 w-4 text-primary" /><h3 className="text-sm font-black uppercase tracking-widest text-foreground">Order Line Items</h3></div><Button type="button" variant="outline" size="sm" onClick={() => append({ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"><Plus className="h-3.5 w-3.5 mr-1.5" /> Add Row</Button></div>
             <div className="space-y-4">
@@ -309,7 +393,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                   <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2 duration-300">
                     {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>)}
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                      <div className="md:col-span-3"><FormField control={form.control} name={`items.${index}.bomItemId`} render={({ field: bomField }) => (<FormItem className="flex flex-col"><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Authorized Material</FormLabel><Popover open={openBomIndex === index} onOpenChange={(o) => setOpenBomIndex(o ? index : null)}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10", !bomField.value && "text-muted-foreground")}><span className="truncate">{bomField.value ? approvedBomItems?.find(i => i.id === bomField.value)?.itemName : "Select Item..."}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[350px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter available authorized materials..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearch} onChange={(e) => setBomSearch(e.target.value)} /></div><ScrollArea className="h-[200px]"><div className="p-1">{filteredBomItems.length > 0 ? filteredBomItems.map((item) => (<Button key={item.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { bomField.onChange(item.id); form.setValue(`items.${index}.itemName`, item.itemName); setOpenBomIndex(null); setBomSearch(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", item.id === bomField.value ? "opacity-100" : "opacity-0")} /><div className="flex flex-col items-start overflow-hidden"><span className="font-bold truncate w-full">{item.itemName}</span><span className="text-[8px] font-black uppercase text-muted-foreground">Remaining: {item.remaining.toFixed(2)} / {item.authorized} {item.unit}</span></div></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No authorized items with remaining balance found for this site.</div>)}</div></ScrollArea></PopoverContent></Popover><FormMessage /></FormItem>)} /></div>
+                      <div className="md:col-span-3"><FormField control={form.control} name={`items.${index}.bomItemId`} render={({ field: bomField }) => (<FormItem className="flex flex-col"><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Authorized Material</FormLabel><Popover open={openBomIndex === index} onOpenChange={(o) => setOpenBomIndex(o ? index : null)}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" disabled={!watchSiteId} className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10", !bomField.value && "text-muted-foreground")}><span className="truncate">{bomField.value ? approvedBomItems?.find(i => i.id === bomField.value)?.itemName : "Select Item..."}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[350px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter available authorized materials..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearch} onChange={(e) => setBomSearch(e.target.value)} /></div><ScrollArea className="h-[200px]"><div className="p-1">{filteredBomItems.length > 0 ? filteredBomItems.map((item) => (<Button key={item.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { bomField.onChange(item.id); form.setValue(`items.${index}.itemName`, item.itemName); setOpenBomIndex(null); setBomSearch(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", item.id === bomField.value ? "opacity-100" : "opacity-0")} /><div className="flex flex-col items-start overflow-hidden"><span className="font-bold truncate w-full">{item.itemName}</span><span className="text-[8px] font-black uppercase text-muted-foreground">Remaining: {item.remaining.toFixed(2)} / {item.authorized} {item.unit}</span></div></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No authorized items with remaining balance found for this site.</div>)}</div></ScrollArea></PopoverContent></Popover><FormMessage /></FormItem>)} /></div>
                       <div className="md:col-span-2"><div className="space-y-2"><Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5"><ShieldCheck className="h-3 w-3 text-primary" /> Remaining Limit</Label><div className="h-10 px-3 bg-muted/20 border border-border/50 rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground"><span>{maxRemaining.toFixed(2)}</span><span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit}</span></div></div></div>
                       <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
                         <FormItem>
