@@ -43,9 +43,15 @@ import {
   UserCog,
   ArrowLeftRight,
   Maximize2,
-  Pencil
+  Pencil,
+  Plus,
+  X,
+  PlusCircle,
+  UserPlus,
+  ChevronsUpDown,
+  Save
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,6 +82,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from '@/components/ui/form';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
 
 type Assignment = {
   id: string;
@@ -103,6 +122,9 @@ type Assignment = {
   endReading?: number;
   endReadingPhoto?: string;
   coPassengers?: { id: string, name: string }[];
+  intermediateStops?: { type: 'Site' | 'Other', location: string, purpose: string }[];
+  dropLocation?: string;
+  dropType?: 'Site' | 'Other';
 };
 
 type Vehicle = {
@@ -127,11 +149,366 @@ type AccessConfig = {
   ownDataOnly?: boolean;
 };
 
-const formatTimestamp = (ts: any) => {
-  if (!ts) return '—';
-  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
-  return format(date, 'dd MMM yyyy HH:mm');
+type Site = {
+  id: string;
+  name: string;
 };
+
+const stopSchema = z.object({
+  type: z.enum(['Site', 'Other']),
+  location: z.string().min(1, 'Stop location is required.'),
+  purpose: z.string().min(1, 'Purpose for this stop is required.'),
+});
+
+const editRequestSchema = z.object({
+  pickupType: z.enum(['Site', 'Other']),
+  pickupLocation: z.string().min(1, 'Pickup location is required.'),
+  tripDate: z.string().min(1, 'Trip date is required.'),
+  reportingTime: z.string().min(1, 'Reporting time is required.'),
+  intermediateStops: z.array(stopSchema).default([]),
+  dropType: z.enum(['Site', 'Other']),
+  dropLocation: z.string().min(1, 'Drop-off location is required.'),
+  purpose: z.string().min(5, 'Purpose must be detailed (min 5 chars).'),
+  coPassengers: z.array(z.object({
+    id: z.string(),
+    name: z.string()
+  })).default([]),
+});
+
+const formatTo12Hr = (time?: string) => {
+  if (!time) return '';
+  if (time.toLowerCase().includes('am') || time.toLowerCase().includes('pm')) return time;
+  try {
+    const date = parse(time, 'HH:mm', new Date());
+    return format(date, 'hh:mm a');
+  } catch (e) {
+    return time;
+  }
+};
+
+/**
+ * Dialog component to edit trip request details.
+ */
+function EditTripDialog({ 
+  assignment, 
+  open, 
+  onOpenChange, 
+  sites, 
+  allUsers,
+  onSave
+}: { 
+  assignment: Assignment | null, 
+  open: boolean, 
+  onOpenChange: (o: boolean) => void,
+  sites: Site[],
+  allUsers: UserProfile[],
+  onSave: (values: z.infer<typeof editRequestSchema>) => Promise<void>
+}) {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isPickupPopoverOpen, setIsPickupPopoverOpen] = React.useState(false);
+  const [pickupSearchQuery, setPickupSearchQuery] = React.useState("");
+  const [openStopPopoverIndex, setOpenStopPopoverIndex] = React.useState<number | null>(null);
+  const [stopSearchQuery, setStopSearchQuery] = React.useState("");
+  const [isDropPopoverOpen, setIsDropPopoverOpen] = React.useState(false);
+  const [dropSearchQuery, setDropSearchQuery] = React.useState("");
+  const [isPassengerPopoverOpen, setIsPassengerPopoverOpen] = React.useState(false);
+  const [passengerSearchQuery, setPassengerSearchQuery] = React.useState("");
+
+  const form = useForm<z.infer<typeof editRequestSchema>>({
+    resolver: zodResolver(editRequestSchema),
+    defaultValues: { 
+      pickupType: 'Site',
+      pickupLocation: '',
+      tripDate: '',
+      reportingTime: '09:00 AM',
+      intermediateStops: [],
+      dropType: 'Site',
+      dropLocation: '',
+      purpose: '',
+      coPassengers: []
+    },
+  });
+
+  const { fields: stopFields, append: appendStop, remove: removeStop } = useFieldArray({
+    control: form.control,
+    name: "intermediateStops"
+  });
+
+  const pickupType = form.watch('pickupType');
+  const dropType = form.watch('dropType');
+  const coPassengers = form.watch('coPassengers');
+
+  React.useEffect(() => {
+    if (assignment) {
+      form.reset({
+        pickupType: assignment.pickupType || 'Site',
+        pickupLocation: assignment.pickupLocation || '',
+        tripDate: assignment.tripDate || '',
+        reportingTime: assignment.reportingTime || '09:00 AM',
+        intermediateStops: assignment.intermediateStops || [],
+        dropType: assignment.dropType || 'Site',
+        dropLocation: assignment.dropLocation || '',
+        purpose: assignment.purpose || '',
+        coPassengers: assignment.coPassengers || []
+      });
+    }
+  }, [assignment, form]);
+
+  const handleSubmit = async (values: z.infer<typeof editRequestSchema>) => {
+    setIsSubmitting(true);
+    await onSave(values);
+    setIsSubmitting(false);
+  };
+
+  const filteredPickupSites = sites.filter(s => s.name.toLowerCase().includes(pickupSearchQuery.toLowerCase()));
+  const filteredStopSites = sites.filter(s => s.name.toLowerCase().includes(stopSearchQuery.toLowerCase()));
+  const filteredDropSites = sites.filter(s => s.name.toLowerCase().includes(dropSearchQuery.toLowerCase()));
+  const filteredPotentialPassengers = allUsers.filter(u => 
+    (u.username || '').toLowerCase().includes(passengerSearchQuery.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(passengerSearchQuery.toLowerCase())
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] p-0 overflow-hidden flex flex-col rounded-sm border-none shadow-2xl bg-background">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
+          <DialogTitle className="text-xl font-black uppercase tracking-tight">Modify Trip Request</DialogTitle>
+          <DialogDescription className="text-xs font-medium">Update itinerary and trip metadata for: {assignment?.userName}</DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="flex-1">
+          <div className="p-6">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="tripDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider">Trip Date</FormLabel>
+                        <FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="reportingTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider">Reporting Time (12h)</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center gap-2">
+                            <Input 
+                              className="h-11 rounded-sm w-[60px] text-center font-bold" 
+                              placeholder="HH"
+                              maxLength={2}
+                              value={field.value?.split(':')[0] || "09"}
+                              onChange={(e) => {
+                                const h = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                field.onChange(`${h}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${field.value?.split(' ')[1] || "AM"}`);
+                              }}
+                            />
+                            <span className="font-bold">:</span>
+                            <Input 
+                              className="h-11 rounded-sm w-[60px] text-center font-bold" 
+                              placeholder="MM"
+                              maxLength={2}
+                              value={field.value?.split(':')[1]?.split(' ')[0] || "00"}
+                              onChange={(e) => {
+                                const m = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                field.onChange(`${field.value?.split(':')[0] || "09"}:${m} ${field.value?.split(' ')[1] || "AM"}`);
+                              }}
+                            />
+                            <Select 
+                              value={field.value?.split(' ')[1] || "AM"} 
+                              onValueChange={(p) => field.onChange(`${field.value?.split(':')[0] || "09"}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${p}`)}
+                            >
+                              <SelectTrigger className="h-11 rounded-sm w-[80px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="AM">AM</SelectItem>
+                                <SelectItem value="PM">PM</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Route Details</Label>
+                  <Card className="rounded-sm border-dashed">
+                    <CardContent className="pt-6 space-y-6">
+                      <div className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="pickupType"
+                          render={({ field }) => (
+                            <FormItem className="space-y-3">
+                              <FormLabel className="text-xs font-bold uppercase">Pickup Type</FormLabel>
+                              <FormControl>
+                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id="edit-src-site" /><Label htmlFor="edit-src-site" className="text-xs font-bold">Project Site</Label></div>
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id="edit-src-other" /><Label htmlFor="edit-src-other" className="text-xs font-bold">Other</Label></div>
+                                </RadioGroup>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="pickupLocation"
+                          render={({ field }) => (
+                            <FormItem>
+                              {pickupType === 'Site' ? (
+                                <Popover open={isPickupPopoverOpen} onOpenChange={setIsPickupPopoverOpen}>
+                                  <PopoverTrigger asChild>
+                                    <FormControl><Button variant="outline" className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select pickup..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                    <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none" value={pickupSearchQuery} onChange={e => setPickupSearchQuery(e.target.value)} /></div>
+                                    <ScrollArea className="h-[150px]">{filteredPickupSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsPickupPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea>
+                                  </PopoverContent>
+                                </Popover>
+                              ) : (
+                                <FormControl><Input placeholder="Enter pickup address..." {...field} className="h-11 rounded-sm" /></FormControl>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold uppercase">Intermediate Stops</Label>
+                          <Button type="button" variant="outline" size="sm" onClick={() => appendStop({ type: 'Site', location: '', purpose: '' })} className="h-7 text-[10px] font-bold"><Plus className="h-3 w-3 mr-1" /> Add Stop</Button>
+                        </div>
+                        {stopFields.map((field, idx) => (
+                          <div key={field.id} className="p-4 border rounded-sm bg-muted/5 space-y-3 relative group">
+                            <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6 text-destructive" onClick={() => removeStop(idx)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                            <FormField
+                              control={form.control}
+                              name={`intermediateStops.${idx}.type`}
+                              render={({ field: typeField }) => (
+                                <RadioGroup onValueChange={typeField.onChange} value={typeField.value} className="flex gap-4 mb-2">
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id={`stop-${idx}-site`} /><Label htmlFor={`stop-${idx}-site`} className="text-[10px] font-bold">Site</Label></div>
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id={`stop-${idx}-other`} /><Label htmlFor={`stop-${idx}-other`} className="text-[10px] font-bold">Other</Label></div>
+                                </RadioGroup>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`intermediateStops.${idx}.location`}
+                              render={({ field: locField }) => (
+                                <FormItem>
+                                  {form.watch(`intermediateStops.${idx}.type`) === 'Site' ? (
+                                    <Popover open={openStopPopoverIndex === idx} onOpenChange={o => setOpenStopPopoverIndex(o ? idx : null)}>
+                                      <PopoverTrigger asChild><FormControl><Button variant="outline" className="w-full justify-between h-9 rounded-sm bg-background">{locField.value || "Choose Site..."}<ChevronsUpDown className="ml-2 h-3.5 w-3.5 opacity-50" /></Button></FormControl></PopoverTrigger>
+                                      <PopoverContent className="w-[300px] p-0"><ScrollArea className="h-[150px]">{filteredStopSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { locField.onChange(s.name); setOpenStopPopoverIndex(null); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
+                                    </Popover>
+                                  ) : (
+                                    <FormControl><Input placeholder="Address..." {...locField} className="h-9 rounded-sm bg-background" /></FormControl>
+                                  )}
+                                </FormItem>
+                              )}
+                            />
+                            <FormField control={form.control} name={`intermediateStops.${idx}.purpose`} render={({ field }) => (<Input placeholder="Purpose of stop..." {...field} className="h-9 rounded-sm bg-background text-xs" />)} />
+                          </div>
+                        ))}
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="dropType"
+                          render={({ field }) => (
+                            <FormItem className="space-y-3">
+                              <FormLabel className="text-xs font-bold uppercase">Final Drop-off</FormLabel>
+                              <FormControl>
+                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id="edit-drop-site" /><Label htmlFor="edit-drop-site" className="text-xs font-bold">Project Site</Label></div>
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id="edit-drop-other" /><Label htmlFor="edit-drop-other" className="text-xs font-bold">Other</Label></div>
+                                </RadioGroup>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="dropLocation"
+                          render={({ field }) => (
+                            <FormItem>
+                              {dropType === 'Site' ? (
+                                <Popover open={isDropPopoverOpen} onOpenChange={setIsDropPopoverOpen}>
+                                  <PopoverTrigger asChild>
+                                    <FormControl><Button variant="outline" className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select destination..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><ScrollArea className="h-[150px]">{filteredDropSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsDropPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
+                                </Popover>
+                              ) : (
+                                <FormControl><Input placeholder="Enter destination address..." {...field} className="h-11 rounded-sm" /></FormControl>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Co-passengers</Label>
+                    <Popover open={isPassengerPopoverOpen} onOpenChange={setIsPassengerPopoverOpen}>
+                      <PopoverTrigger asChild><Button variant="outline" size="sm" className="h-7 text-[10px] font-bold"><UserPlus className="h-3 w-3 mr-1" /> Add</Button></PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="end">
+                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 opacity-50" /><Input placeholder="Search personnel..." className="h-10 border-none" value={passengerSearchQuery} onChange={e => setPassengerSearchQuery(e.target.value)} /></div>
+                        <ScrollArea className="h-[200px]">{filteredPotentialPassengers.map(u => (<Button key={u.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { if(!coPassengers.some(p => p.id === u.id)) { form.setValue('coPassengers', [...coPassengers, { id: u.id, name: u.username }]); } setIsPassengerPopoverOpen(false); }}>{u.username}</Button>))}</ScrollArea>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="flex flex-wrap gap-2 min-h-[40px] p-3 border rounded-sm bg-muted/5">
+                    {coPassengers.map(p => (
+                      <Badge key={p.id} variant="secondary" className="gap-1.5 h-7 px-2 rounded-sm font-bold text-[10px] uppercase">
+                        {p.name}
+                        <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => form.setValue('coPassengers', coPassengers.filter(x => x.id !== p.id))} />
+                      </Badge>
+                    ))}
+                    {coPassengers.length === 0 && <span className="text-[10px] font-bold text-muted-foreground/40 italic">No co-passengers added.</span>}
+                  </div>
+                </div>
+
+                <FormField control={form.control} name="purpose" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider">General Trip Note</FormLabel>
+                    <FormControl><Textarea rows={3} placeholder="Describe the trip context..." {...field} className="rounded-sm" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </form>
+            </Form>
+          </div>
+        </ScrollArea>
+        <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0">
+          <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
+          <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            Apply Updates
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function ManageAllTripsPage() {
   const firestore = useFirestore();
@@ -146,6 +523,7 @@ export default function ManageAllTripsPage() {
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [approvalTarget, setApprovalState] = React.useState<{ assignment: Assignment, vehicleId: string, driverId: string, rentedDriverDetails: string } | null>(null);
   const [detailsAssignment, setDetailsAssignment] = React.useState<Assignment | null>(null);
+  const [editingAssignment, setEditingAssignment] = React.useState<Assignment | null>(null);
   const [cancelTarget, setCancelTarget] = React.useState<Assignment | null>(null);
   const [isCancelling, setIsCancelling] = React.useState(false);
 
@@ -184,6 +562,9 @@ export default function ManageAllTripsPage() {
 
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers } = useCollection<UserProfile>(usersQuery);
+
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: sites } = useCollection<Site>(sitesQuery);
 
   const driversList = React.useMemo(() => allUsers?.filter(u => u.role === 'Driver') || [], [allUsers]);
 
@@ -323,6 +704,27 @@ export default function ManageAllTripsPage() {
       setApprovalState(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
+    }
+  };
+
+  const handleSaveEdit = async (values: z.infer<typeof editRequestSchema>) => {
+    if (!editingAssignment) return;
+    try {
+      const combinedDestinations = [
+        ...values.intermediateStops,
+        { type: values.dropType, location: values.dropLocation, purpose: 'Final Destination' }
+      ];
+
+      await updateDocumentNonBlocking(doc(firestore, 'vehicle_assignments', editingAssignment.id), {
+        ...values,
+        destinations: combinedDestinations,
+        updatedAt: serverTimestamp()
+      });
+
+      toast({ title: 'Request Updated', description: 'Itinerary changes applied successfully.' });
+      setEditingAssignment(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
     }
   };
 
@@ -535,11 +937,10 @@ export default function ManageAllTripsPage() {
                                   variant="ghost" 
                                   size="icon" 
                                   className="h-8 w-8 text-slate-600 rounded-sm"
-                                  asChild
+                                  onClick={(e) => { e.stopPropagation(); setEditingAssignment(trip); }}
+                                  title="Edit Request"
                                 >
-                                  <Link href={`/vehicles/request?edit=${trip.id}`}>
-                                    <Pencil className="h-4 w-4" />
-                                  </Link>
+                                  <Pencil className="h-4 w-4" />
                                 </Button>
                               )}
 
@@ -637,7 +1038,7 @@ export default function ManageAllTripsPage() {
                               <MessageCircle className="h-4 w-4" />
                             </Button>
                             
-                            <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>
+                            <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>
                               Allot Vehicle
                             </Button>
 
@@ -647,11 +1048,10 @@ export default function ManageAllTripsPage() {
                                 variant="ghost" 
                                 size="icon" 
                                 className="h-8 w-8 text-slate-600 rounded-sm"
-                                asChild
+                                onClick={(e) => { e.stopPropagation(); setEditingAssignment(trip); }}
+                                title="Edit Request"
                               >
-                                <Link href={`/vehicles/request?edit=${trip.id}`}>
-                                  <Pencil className="h-4 w-4" />
-                                </Link>
+                                <Pencil className="h-4 w-4" />
                               </Button>
                             )}
 
@@ -671,6 +1071,15 @@ export default function ManageAllTripsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <EditTripDialog 
+        assignment={editingAssignment} 
+        open={!!editingAssignment} 
+        onOpenChange={(o) => !o && setEditingAssignment(null)} 
+        sites={sites || []}
+        allUsers={allUsers || []}
+        onSave={handleSaveEdit}
+      />
 
       <Dialog open={!!approvalTarget} onOpenChange={(o) => !o && setApprovalState(null)}>
         <DialogContent className="max-w-xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
