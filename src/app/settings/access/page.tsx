@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -280,39 +279,44 @@ export default function UserAccessManagementPage() {
                     </div>
 
                     <div className="space-y-8">
-                      {categories.map(cat => (
-                        <div key={cat} className="space-y-4">
-                          <div className="flex items-center gap-2 border-b pb-2">
-                            <LayoutGrid className="h-3.5 w-3.5 text-primary opacity-50" />
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{cat}</h3>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {APP_PAGES.filter(p => p.category === cat).map(page => (
-                              <div 
-                                key={page.id} 
-                                className={cn(
-                                  "flex items-center space-x-3 p-3 rounded-sm border transition-all cursor-pointer",
-                                  rolePermissions.includes(page.id) ? "bg-primary/5 border-primary/20 shadow-sm" : "bg-background border-border/50 hover:border-primary/10"
-                                )}
-                                onClick={() => togglePermission(page.id, 'role')}
-                              >
-                                <Checkbox 
-                                  id={`role-${page.id}`} 
-                                  checked={rolePermissions.includes(page.id)} 
-                                  onCheckedChange={() => togglePermission(page.id, 'role')}
-                                  className="rounded-full h-5 w-5"
-                                />
-                                <Label 
-                                  htmlFor={`role-${page.id}`} 
-                                  className="flex-1 cursor-pointer font-bold text-xs uppercase tracking-tight"
+                      {categories.map(cat => {
+                        // Conditional rendering: Show "Project Detail Tabs" category only if "Projects" is selected
+                        if (cat === 'Project Detail Tabs' && !rolePermissions.includes('projects')) return null;
+
+                        return (
+                          <div key={cat} className="space-y-4">
+                            <div className="flex items-center gap-2 border-b pb-2">
+                              <LayoutGrid className="h-3.5 w-3.5 text-primary opacity-50" />
+                              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{cat}</h3>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {APP_PAGES.filter(p => p.category === cat).map(page => (
+                                <div 
+                                  key={page.id} 
+                                  className={cn(
+                                    "flex items-center space-x-3 p-3 rounded-sm border transition-all cursor-pointer",
+                                    rolePermissions.includes(page.id) ? "bg-primary/5 border-primary/20 shadow-sm" : "bg-background border-border/50 hover:border-primary/10"
+                                  )}
+                                  onClick={() => togglePermission(page.id, 'role')}
                                 >
-                                  {page.label}
-                                </Label>
-                              </div>
-                            ))}
+                                  <Checkbox 
+                                    id={`role-${page.id}`} 
+                                    checked={rolePermissions.includes(page.id)} 
+                                    onCheckedChange={() => togglePermission(page.id, 'role')}
+                                    className="rounded-full h-5 w-5"
+                                  />
+                                  <Label 
+                                    htmlFor={`role-${page.id}`} 
+                                    className="flex-1 cursor-pointer font-bold text-xs uppercase tracking-tight"
+                                  >
+                                    {page.label}
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -408,39 +412,44 @@ export default function UserAccessManagementPage() {
                     </div>
 
                     <div className="space-y-8">
-                      {categories.map(cat => (
-                        <div key={cat} className="space-y-4">
-                          <div className="flex items-center gap-2 border-b pb-2">
-                            <LayoutGrid className="h-3.5 w-3.5 text-primary opacity-50" />
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{cat}</h3>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {APP_PAGES.filter(p => p.category === cat).map(page => (
-                              <div 
-                                key={page.id} 
-                                className={cn(
-                                  "flex items-center space-x-3 p-3 rounded-sm border transition-all cursor-pointer",
-                                  userPermissions.includes(page.id) ? "bg-primary/5 border-primary/20 shadow-sm" : "bg-background border-border/50 hover:border-primary/10"
-                                )}
-                                onClick={() => togglePermission(page.id, 'user')}
-                              >
-                                <Checkbox 
-                                  id={`user-${page.id}`} 
-                                  checked={userPermissions.includes(page.id)} 
-                                  onCheckedChange={() => togglePermission(page.id, 'user')}
-                                  className="rounded-full h-5 w-5"
-                                />
-                                <Label 
-                                  htmlFor={`user-${page.id}`} 
-                                  className="flex-1 cursor-pointer font-bold text-xs uppercase tracking-tight"
+                      {categories.map(cat => {
+                        // Conditional rendering: Show "Project Detail Tabs" category only if "Projects" is selected
+                        if (cat === 'Project Detail Tabs' && !userPermissions.includes('projects')) return null;
+
+                        return (
+                          <div key={cat} className="space-y-4">
+                            <div className="flex items-center gap-2 border-b pb-2">
+                              <LayoutGrid className="h-3.5 w-3.5 text-primary opacity-50" />
+                              <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{cat}</h3>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {APP_PAGES.filter(p => p.category === cat).map(page => (
+                                <div 
+                                  key={page.id} 
+                                  className={cn(
+                                    "flex items-center space-x-3 p-3 rounded-sm border transition-all cursor-pointer",
+                                    userPermissions.includes(page.id) ? "bg-primary/5 border-primary/20 shadow-sm" : "bg-background border-border/50 hover:border-primary/10"
+                                  )}
+                                  onClick={() => togglePermission(page.id, 'user')}
                                 >
-                                  {page.label}
-                                </Label>
-                              </div>
-                            ))}
+                                  <Checkbox 
+                                    id={`user-${page.id}`} 
+                                    checked={userPermissions.includes(page.id)} 
+                                    onCheckedChange={() => togglePermission(page.id, 'user')}
+                                    className="rounded-full h-5 w-5"
+                                  />
+                                  <Label 
+                                    htmlFor={`user-${page.id}`} 
+                                    className="flex-1 cursor-pointer font-bold text-xs uppercase tracking-tight"
+                                  >
+                                    {page.label}
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
