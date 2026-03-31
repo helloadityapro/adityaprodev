@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -127,7 +126,7 @@ export default function GlobalManagePOsPage() {
     }));
   };
 
-  const SortIcon = ({ column }: { column: SortKey }) => {
+  const SortIcon = ({ column }: { column: POSortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
     return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };

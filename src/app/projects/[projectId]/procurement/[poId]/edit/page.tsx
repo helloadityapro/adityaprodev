@@ -127,12 +127,6 @@ export default function EditPOPage({ params }: { params: Promise<{ projectId: st
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
 
-  React.useEffect(() => {
-    if (!isProfileLoading && user && !isProcurement) {
-      router.replace('/ptw/list');
-    }
-  }, [user, isProfileLoading, isProcurement, router]);
-
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
 
@@ -223,7 +217,7 @@ export default function EditPOPage({ params }: { params: Promise<{ projectId: st
     for (const item of values.items) {
       const original = approvedBomItems?.find(i => i.id === item.bomItemId);
       const authorized = original?.approvedQuantity || original?.plannedQuantity || 0;
-      const consumed = consumedByOthers[item.bomItemId] || 0;
+      const consumed = consumedQuantities[item.bomItemId] || 0;
       const remaining = authorized - consumed;
       newOrderCounts[item.bomItemId] = (newOrderCounts[item.bomItemId] || 0) + item.quantity;
       if (newOrderCounts[item.bomItemId] > remaining) {
@@ -258,8 +252,6 @@ export default function EditPOPage({ params }: { params: Promise<{ projectId: st
   };
 
   if (isProfileLoading || poLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
-
-  if (!isProcurement) return null;
 
   if (isSuccess) {
     return (

@@ -59,12 +59,6 @@ export default function SupplierSummaryPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
 
-  React.useEffect(() => {
-    if (!isProfileLoading && user && !isProcurement) {
-      router.replace('/ptw/list');
-    }
-  }, [user, isProfileLoading, isProcurement, router]);
-
   const suppliersQuery = useMemoFirebase(() => query(collection(firestore, 'suppliers'), orderBy('name', 'asc')), [firestore]);
   const { data: suppliers, isLoading: isSuppliersLoading } = useCollection<Supplier>(suppliersQuery);
 
@@ -100,10 +94,6 @@ export default function SupplierSummaryPage() {
 
   if (isProfileLoading || isSuppliersLoading || isPOsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
-  }
-
-  if (!isProcurement) {
-    return null;
   }
 
   return (

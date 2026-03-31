@@ -117,12 +117,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
 
-  React.useEffect(() => {
-    if (!isProfileLoading && user && !isProcurement) {
-      router.replace('/ptw/list');
-    }
-  }, [user, isProfileLoading, isProcurement, router]);
-
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
 
@@ -259,8 +253,6 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
 
   if (isProfileLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
 
-  if (!isProcurement) return null;
-
   if (isSuccess) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -298,7 +290,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
                   <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Order Date</FormLabel><FormControl><div className="relative"><Input type="date" {...field} className="h-11 rounded-sm pr-10" /><Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" /></div></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="supplierId" render={({ field }) => (
-                  <FormItem className="flex flex-col"><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Select Supplier</FormLabel><Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>{field.value ? allSuppliers?.find(s => s.id === field.value)?.name : "Choose Supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search suppliers..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} /></div><ScrollArea className="h-[200px]"><div className="p-1">{filteredSuppliers.map((s) => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { field.onChange(s.id); form.setValue('supplierName', s.name); setIsSupplierPopoverOpen(false); setSupplierSearch(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", s.id === field.value ? "opacity-100" : "opacity-0")} /><div className="flex flex-col items-start"><span className="font-bold">{s.name}</span><span className="text-[8px] font-mono text-muted-foreground">{s.gstin}</span></div></Button>))}</div></ScrollArea></PopoverContent></Popover><FormMessage /></FormItem>
+                  <FormItem className="flex flex-col"><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Select Supplier</FormLabel><Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>{field.value ? allSuppliers?.find(s => s.id === field.value)?.name : "Choose Supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search vendors..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} /></div><ScrollArea className="h-[200px]"><div className="p-1">{filteredSuppliers.map((s) => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { field.onChange(s.id); form.setValue('supplierName', s.name); setIsSupplierPopoverOpen(false); setSupplierSearch(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", s.id === field.value ? "opacity-100" : "opacity-0")} /><div className="flex flex-col items-start"><span className="font-bold">{s.name}</span><span className="text-[8px] font-mono text-muted-foreground">{s.gstin}</span></div></Button>))}</div></ScrollArea></PopoverContent></Popover><FormMessage /></FormItem>
                 )} />
               </div>
             </CardContent>

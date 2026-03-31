@@ -58,12 +58,6 @@ export default function ContractorSummaryPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
 
-  React.useEffect(() => {
-    if (!isProfileLoading && user && !isProcurement) {
-      router.replace('/ptw/list');
-    }
-  }, [user, isProfileLoading, isProcurement, router]);
-
   const contractorsQuery = useMemoFirebase(() => query(collection(firestore, 'contractors'), orderBy('name', 'asc')), [firestore]);
   const { data: contractors, isLoading: isContractorsLoading } = useCollection<Contractor>(contractorsQuery);
 
@@ -99,10 +93,6 @@ export default function ContractorSummaryPage() {
 
   if (isProfileLoading || isContractorsLoading || isWOsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
-  }
-
-  if (!isProcurement) {
-    return null;
   }
 
   return (
