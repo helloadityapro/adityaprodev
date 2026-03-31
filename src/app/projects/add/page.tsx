@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -15,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
 import { Trash2, Search, MapPin, Plus, FileDown, FileUp, Download, Check, ListFilter, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -478,7 +477,7 @@ export default function AddNewProjectPage() {
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-destructive" />
               Confirm Bulk Deletion
-            </AlertCircle>
+            </AlertDialogTitle>
             <AlertDialogDescription>
               You are about to permanently remove <strong>{selectedIds.length} project sites</strong> from the organization registry. 
               This action will remove them from all dropdowns across the platform and cannot be undone.
