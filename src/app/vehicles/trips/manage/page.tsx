@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, where, or, serverTimestamp, and, getDocs } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, or, serverTimestamp, and, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -42,7 +42,8 @@ import {
   UserCircle2,
   UserCog,
   ArrowLeftRight,
-  Maximize2
+  Maximize2,
+  Pencil
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -506,7 +507,7 @@ export default function ManageAllTripsPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right px-6">
-                            <div className="flex justify-end gap-1">
+                            <div className="flex justify-end items-center gap-1">
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -516,6 +517,32 @@ export default function ManageAllTripsPage() {
                               >
                                 <MessageCircle className="h-4 w-4" />
                               </Button>
+
+                              {/* Allot Vehicle Button for Pending Requests */}
+                              {(isAdmin || isManager) && trip.status === 'Pending' && (
+                                <Button 
+                                  size="sm" 
+                                  className="h-8 rounded-sm font-black text-[10px] uppercase px-3 shadow-sm"
+                                  onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}
+                                >
+                                  Allot Vehicle
+                                </Button>
+                              )}
+
+                              {/* Edit Button for Pending Requests */}
+                              {(isAdmin || isManager || trip.userId === user?.uid) && trip.status === 'Pending' && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-slate-600 rounded-sm"
+                                  asChild
+                                >
+                                  <Link href={`/vehicles/request?edit=${trip.id}`}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Link>
+                                </Button>
+                              )}
+
                               {canStartTrip && (
                                 <Button size="sm" className="h-8 rounded-sm bg-blue-600 hover:bg-blue-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild>
                                   <Link href={`/vehicles/trips/${trip.id}/start`}>
@@ -599,7 +626,7 @@ export default function ManageAllTripsPage() {
                           {trip.requestDate ? format(trip.requestDate.toDate(), 'dd MMM, HH:mm') : '—'}
                         </TableCell>
                         <TableCell className="text-right px-6">
-                          <div className="flex justify-end gap-1">
+                          <div className="flex justify-end items-center gap-1">
                             <Button 
                               variant="ghost" 
                               size="icon" 
@@ -609,9 +636,25 @@ export default function ManageAllTripsPage() {
                             >
                               <MessageCircle className="h-4 w-4" />
                             </Button>
+                            
                             <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>
                               Allot Vehicle
                             </Button>
+
+                            {/* Edit Button for Pending Requests */}
+                            {(isAdmin || isManager || trip.userId === user?.uid) && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-slate-600 rounded-sm"
+                                asChild
+                              >
+                                <Link href={`/vehicles/request?edit=${trip.id}`}>
+                                  <Pencil className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            )}
+
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setCancelTarget(trip)}>
                               <CircleX className="h-4 w-4" />
                             </Button>
