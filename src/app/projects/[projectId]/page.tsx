@@ -369,7 +369,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       let valB: any = b[key] ?? '';
       
       if (typeof valA === 'string') valA = valA.toLowerCase();
-      if (typeof valB === 'string') valB = b.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
 
       if (valA < valB) return direction === 'asc' ? -1 : 1;
       if (valA > valB) return direction === 'asc' ? 1 : -1;
@@ -1836,7 +1836,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               <div><DialogTitle className="text-xl font-black uppercase tracking-tight">Payment Audit Log</DialogTitle><DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Ref: {viewingPayment?.referenceNumber}</DialogDescription></div>
             </div>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh]">
+          <ScrollArea className="max-h-[75vh]">
             {viewingPayment && (
               <div className="p-8 space-y-10">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
