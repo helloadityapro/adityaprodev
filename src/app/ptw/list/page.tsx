@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -208,12 +207,8 @@ export default function PtwListPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
-
-  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
-  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
   
-  const isSuper = isSuperAdmin(user?.email);
-  const isAdmin = isSuper || userProfile?.role === "Admin";
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
   const userRole = isAdmin ? "Admin" : (userProfile?.role || "Site Engineer");
 
   const permitsQuery = useMemoFirebase(() => {
@@ -293,6 +288,18 @@ export default function PtwListPage() {
       site.name.toLowerCase().includes(siteSearchQuery.toLowerCase())
     );
   }, [sites, siteSearchQuery]);
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
 
   const handleAction = async (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
     if (!user || !userProfile) return;
@@ -378,6 +385,10 @@ export default function PtwListPage() {
     setCurrentFileIndex(prevIdx);
     setViewFile(viewFiles[prevIdx]);
     setZoom(1);
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsPermit(null);
   };
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
@@ -508,7 +519,7 @@ export default function PtwListPage() {
               <div className="min-w-[800px]">
                 <Table>
                   <TableHeader><TableRow className="bg-muted/30">
-                    <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('serialNumber')}><div className="flex items-center">Serial & Site <SortIcon column="serialNumber" /></div></TableHead>
+                    <TableHead className="px-6 cursor-pointer hover:bg-muted/5" onClick={() => handleSort('serialNumber')}><div className="flex items-center">Serial & Site <SortIcon column="serialNumber" /></div></TableHead>
                     <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('ptwType')}><div className="flex items-center">Type <SortIcon column="ptwType" /></div></TableHead>
                     <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('status')}><div className="flex items-center">Status <SortIcon column="status" /></div></TableHead>
                     <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('requestDate')}><div className="flex items-center">Request Date <SortIcon column="requestDate" /></div></TableHead>
