@@ -160,7 +160,7 @@ export default function CheckOutPage() {
         <CheckCircle2 className="h-16 w-16 text-green-500 opacity-20" />
         <div className="flex flex-col items-center gap-2">
           <h2 className="text-2xl font-black uppercase">No Active Session</h2>
-          <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase rounded-sm border-none bg-amber-500 text-white shadow-sm">
+          <Badge variant="outline" className="h-8 sm:h-9 px-3 sm:px-4 text-[10px] sm:text-xs font-black uppercase rounded-sm border-none bg-amber-600 text-white shadow-md animate-in fade-in zoom-in-95 duration-500">
             Status: Checked-out
           </Badge>
         </div>
@@ -177,7 +177,7 @@ export default function CheckOutPage() {
         </h1>
         <div className="flex items-center gap-2">
           <p className="text-muted-foreground text-sm">Session started {formatDistanceToNow(currentEntry.checkInTime?.toDate() || new Date(), { addSuffix: true })}.</p>
-          <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase rounded-sm border-none bg-emerald-500 text-white shadow-sm">
+          <Badge variant="outline" className="h-8 sm:h-9 px-3 sm:px-4 text-[10px] sm:text-xs font-black uppercase rounded-sm border-none bg-emerald-600 text-white shadow-md animate-in fade-in zoom-in-95 duration-500">
             Status: Checked-in
           </Badge>
         </div>
