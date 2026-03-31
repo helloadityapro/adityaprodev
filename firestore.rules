@@ -173,8 +173,8 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin() || (settingId == 'counters' && isSignedIn());
       
-      // Allow reading of nested access roles for sidebar logic
-      match /access/roles/{roleId} {
+      // Fixed nesting for access roles subcollection
+      match /roles/{roleId} {
         allow read: if isSignedIn();
         allow write: if isAdmin();
       }
