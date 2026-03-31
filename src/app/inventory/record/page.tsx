@@ -38,6 +38,8 @@ const movementSchema = z.object({
   sourceOrDestinationType: z.enum(["Supplier", "Site"], { required_error: "Type is required" }),
   sourceOrDestination: z.string().min(1, "Source/Destination is required"),
   movementDate: z.string().min(1, "Date is required"),
+  invoiceNumber: z.string().optional(),
+  invoiceDate: z.string().optional(),
   items: z.array(itemSchema).min(1, "Add at least one item"),
 });
 
@@ -117,6 +119,8 @@ export default function RecordMovementPage() {
       sourceOrDestinationType: "Supplier",
       sourceOrDestination: "",
       movementDate: format(new Date(), 'yyyy-MM-dd'),
+      invoiceNumber: "",
+      invoiceDate: format(new Date(), 'yyyy-MM-dd'),
       items: [{ itemName: "", quantity: 0, unit: "Numbers" }]
     },
   });
@@ -313,6 +317,69 @@ export default function RecordMovementPage() {
                 </div>
               </div>
 
+              <Separator />
+
+              {/* Invoice Details Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Invoice Documentation</h3>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField control={form.control} name="invoiceNumber" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice / Challan Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. INV/2024/001" {...field} className="h-11 rounded-sm" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="invoiceDate" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} className="h-11 rounded-sm" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <FileUp className="h-4 w-4" /> Upload Invoices / Proof
+                  </Label>
+                  <Input 
+                    type="file" 
+                    multiple 
+                    accept="image/*,application/pdf" 
+                    className="h-auto py-2 border-dashed"
+                    onChange={e => {
+                      if (e.target.files) {
+                        setInvoiceFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+                      }
+                    }}
+                  />
+                  {invoiceFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {invoiceFiles.map((file, idx) => (
+                        <Badge key={idx} variant="secondary" className="gap-2 h-8 rounded-sm">
+                          <FileText className="h-3 w-3" />
+                          <span className="truncate max-w-[150px] text-[10px]">{file.name}</span>
+                          <X 
+                            className="h-3 w-3 cursor-pointer hover:text-destructive transition-colors" 
+                            onClick={() => setInvoiceFiles(prev => prev.filter((_, i) => i !== idx))}
+                          />
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="space-y-6">
                 <div className="flex items-center justify-between"><h3 className="text-lg font-black uppercase tracking-widest flex items-center gap-2"><ListPlus className="h-5 w-5 text-primary" /> Approved Materials List</h3><Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="rounded-sm border-primary text-primary"><Plus className="mr-2 h-4 w-4" /> Add Line Item</Button></div>
                 <div className="space-y-4">{fields.map((field, index) => (
@@ -324,7 +391,7 @@ export default function RecordMovementPage() {
                           <FormLabel>Authorized Item</FormLabel>
                           <Popover open={openItemPopoverIndex === index} onOpenChange={o => setOpenItemPopoverIndex(o ? index : null)}>
                             <PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-10 bg-background", !itemField.value && "text-muted-foreground")}><span className="truncate">{itemField.value || "Search approved BoM items..."}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
-                            <PopoverContent className="w-[400px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); }}><Check className={cn("mr-2 h-4 w-4 text-primary", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} />{lookup.name}</Button>)) : (<div className="p-8 text-center text-[10px] uppercase font-bold text-muted-foreground italic leading-relaxed">No approved items found for this site.</div>)}</div></ScrollArea></PopoverContent>
+                            <PopoverContent className="w-[400px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} />{lookup.name}</Button>)) : (<div className="p-8 text-center text-[10px] uppercase font-bold text-muted-foreground italic leading-relaxed">No approved items found for this site.</div>)}</div></ScrollArea></PopoverContent>
                           </Popover>
                           <FormMessage />
                         </FormItem>
