@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from "react";
@@ -182,7 +181,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   // Dynamic Access Gate (Inline Visibility Control)
   const isAuthorized = React.useMemo(() => {
-    if (isAuthPage || isSuperAdmin(user?.email)) return true;
+    if (isAuthPage || isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
     if (isUserLoading || isProfileLoading || !userProfile) return true; // Wait for data before restricting
 
     const pageKey = getPageKeyByPath(pathname);
@@ -483,7 +482,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   <Lock className="h-12 w-12 text-destructive opacity-60" />
                 </div>
                 <h2 className="text-2xl font-black uppercase tracking-tight">Access Restricted</h2>
-                <p className="text-muted-foreground max-w-sm mt-2 font-medium">
+                <p className="text-muted-foreground max-sm mt-2 font-medium">
                   Your organizational account does not have authorization to view this module. Please contact administration for access keys.
                 </p>
                 <Button variant="outline" onClick={() => router.push('/rewards')} className="mt-8 rounded-sm font-bold uppercase text-xs tracking-widest px-8">

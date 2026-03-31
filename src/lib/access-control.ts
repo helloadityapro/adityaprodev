@@ -103,11 +103,11 @@ export const APP_PAGES: AppPage[] = [
  * Checks if a path belongs to a specific page key.
  */
 export function getPageKeyByPath(path: string): PageKey | null {
-  // Exact match first
-  const match = APP_PAGES.find(p => path === p.path || path.startsWith(p.path + '/'));
+  // 1. Check exact matches or path prefixes from APP_PAGES first
+  const match = APP_PAGES.find(p => p.path !== '' && (path === p.path || path.startsWith(p.path + '/')));
   if (match) return match.id;
 
-  // Handle specific operations aliases
+  // 2. Explicit aliases for operational modules that have multiple entry points
   if (path.startsWith('/ptw')) return 'permits';
   if (path.startsWith('/dpr')) return 'dpr';
   if (path.startsWith('/tasks')) return 'tasks';
@@ -117,8 +117,11 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/work-orders')) return 'work-orders';
   if (path.startsWith('/payments')) return 'payments';
   if (path.startsWith('/site-visits')) return 'visits';
-  if (path.startsWith('/vehicles')) return 'trips';
   if (path.startsWith('/attendance')) return 'attendance';
+  
+  // 3. Vehicles specific (Handling both management and requests under 'trips' key)
+  if (path.startsWith('/vehicles/trips') || path.startsWith('/vehicles/request')) return 'trips';
+  if (path.startsWith('/vehicles/manage')) return 'admin-vehicles';
   
   return null;
 }
