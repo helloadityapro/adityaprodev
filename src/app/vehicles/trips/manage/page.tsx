@@ -95,6 +95,7 @@ import {
 } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type Assignment = {
   id: string;
@@ -142,6 +143,8 @@ type UserProfile = {
   role: string;
   assignedProjectIds?: string[];
   ownDataOnly?: boolean;
+  mobile?: string;
+  email: string;
 };
 
 type AccessConfig = {
