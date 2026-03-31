@@ -419,6 +419,7 @@ export default function ManageAllTripsPage() {
                     <TableRow>
                       <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
                       <TableHead className="min-w-[250px]">Itinerary</TableHead>
+                      <TableHead>Trip Date</TableHead>
                       <TableHead>Fleet Resource</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right px-6">Actions</TableHead>
@@ -464,6 +465,18 @@ export default function ManageAllTripsPage() {
                                     <ArrowRight className="h-2.5 w-2.5" /> {dest.location}
                                   </div>
                                 ))}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                                <Calendar className="h-3.5 w-3.5 text-primary" />
+                                {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yyyy') : '—'}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground uppercase">
+                                <Clock className="h-3 w-3" />
+                                {trip.reportingTime}
                               </div>
                             </div>
                           </TableCell>
@@ -535,7 +548,7 @@ export default function ManageAllTripsPage() {
                         </TableRow>
                       );
                     }) : (
-                      <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">No logs discovered.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No logs discovered.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -552,6 +565,7 @@ export default function ManageAllTripsPage() {
                   <TableRow>
                     <TableHead className="px-6">Requester</TableHead>
                     <TableHead>Itinerary Summary</TableHead>
+                    <TableHead>Trip Date</TableHead>
                     <TableHead>Request Date</TableHead>
                     <TableHead className="text-right px-6">Actions</TableHead>
                   </TableRow>
@@ -573,6 +587,12 @@ export default function ManageAllTripsPage() {
                                 </div>
                               ))}
                             </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-bold text-foreground">{trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yyyy') : '—'}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase">{trip.reportingTime}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">
@@ -600,7 +620,7 @@ export default function ManageAllTripsPage() {
                       </TableRow>
                     ))
                   ) : (
-                    <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic">Queue empty.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">Queue empty.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
