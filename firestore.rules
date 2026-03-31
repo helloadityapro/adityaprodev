@@ -172,6 +172,12 @@ service cloud.firestore {
     match /system_settings/{settingId} {
       allow read: if isSignedIn();
       allow write: if isAdmin() || (settingId == 'counters' && isSignedIn());
+      
+      // Allow reading of nested access roles for sidebar logic
+      match /access/roles/{roleId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+      }
     }
 
     match /site_documents/{docId} {
