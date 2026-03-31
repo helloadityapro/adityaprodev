@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -65,13 +64,22 @@ export default function UserAccessManagementPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
-  const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
+  const rolesQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'user_roles');
+  }, [firestore, user]);
   const { data: rolesList } = useCollection<{ name: string }>(rolesQuery);
 
-  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const roleConfigsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'system_settings', 'access', 'roles');
+  }, [firestore, user]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
-  const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const usersQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'users');
+  }, [firestore, user]);
   const { data: allUsers } = useCollection<UserProfile>(usersQuery);
 
   React.useEffect(() => {

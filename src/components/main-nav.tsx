@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -85,7 +84,10 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
 
-  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const roleConfigsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return collection(firestore, 'system_settings', 'access', 'roles');
+  }, [firestore, user]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const isSuper = isSuperAdmin(user?.email);
