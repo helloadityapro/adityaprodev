@@ -9,11 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Camera, MapPin, Loader2, CheckCircle2, Flag, SwitchCamera, ImagePlus, Trash2, AlertCircle } from 'lucide-react';
+import { Camera, MapPin, Loader2, CheckCircle2, Flag, SwitchCamera, ImagePlus, Trash2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import Link from 'next/link';
 
 export default function FinishTripPage({ params }: { params: Promise<{ assignmentId: string }> }) {
   const { assignmentId } = React.use(params);
@@ -24,7 +25,7 @@ export default function FinishTripPage({ params }: { params: Promise<{ assignmen
   const { toast } = useToast();
 
   const tripRef = useMemoFirebase(() => doc(firestore, 'vehicle_assignments', assignmentId), [firestore, assignmentId]);
-  const { data: trip, isLoading } = useDoc(tripRef);
+  const { data: trip, isLoading } = useDoc<any>(tripRef);
 
   const [reading, setReading] = React.useState<string>("");
   const [photo, setPhoto] = React.useState<string | null>(null);
@@ -34,6 +35,17 @@ export default function FinishTripPage({ params }: { params: Promise<{ assignmen
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
+
+  const canEndTrip = React.useMemo(() => {
+    if (!trip || !user) return false;
+    if (trip.status !== 'Ongoing') return false;
+    
+    // Rule: Driver handles Owned, Requester handles Rented
+    if (trip.vehicleOwnership === 'Rented') {
+      return trip.userId === user.uid;
+    }
+    return trip.driverId === user.uid;
+  }, [trip, user]);
 
   const startCamera = async (mode: "user" | "environment" = facingMode) => {
     try {
@@ -128,6 +140,23 @@ export default function FinishTripPage({ params }: { params: Promise<{ assignmen
   };
 
   if (isLoading) return <div className="p-8 max-w-2xl mx-auto"><Skeleton className="h-64 w-full" /></div>;
+
+  if (!canEndTrip && !isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 px-4 text-center space-y-6">
+        <Alert variant="destructive" className="max-w-md">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Access Restricted</AlertTitle>
+          <AlertDescription>
+            {trip?.vehicleOwnership === 'Rented' 
+              ? "Since this is a Rented vehicle, only the requester is authorized to conclude the trip." 
+              : "Only the designated system driver can record the final status for this vehicle."}
+          </AlertDescription>
+        </Alert>
+        <Button variant="outline" asChild><Link href="/vehicles/trips/manage"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Trips</Link></Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-2xl mx-auto pb-20 px-4">

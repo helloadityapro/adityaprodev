@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -80,8 +79,9 @@ type Assignment = {
   driverName?: string;
   vehicleId?: string;
   vehicleDetails?: string;
+  vehicleOwnership?: 'Owned' | 'Rented';
   purpose: string;
-  siteId?: string; // Captured from pickup or destinations
+  siteId?: string;
   pickupLocation: string;
   pickupType: 'Site' | 'Other';
   destinations: { type: string, location: string, purpose: string }[];
@@ -103,6 +103,7 @@ type Vehicle = {
   model: string;
   plateNumber: string;
   status: string;
+  ownership: 'Owned' | 'Rented';
 };
 
 type UserProfile = {
@@ -184,8 +185,6 @@ export default function ManageAllTripsPage() {
     if (isOwnDataOnly && !isSuper) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
       result = result.filter(trip => {
-        // If trip is associated with a site, check if requester has access to that site.
-        // For general trips, we usually allow them if the user created them or is involved.
         if (trip.siteId) return assignedIds.has(trip.siteId);
         return true; 
       });
@@ -232,6 +231,7 @@ export default function ManageAllTripsPage() {
         status: 'Approved',
         vehicleId,
         vehicleDetails: `${vehicle?.make} ${vehicle?.model} (${vehicle?.plateNumber})`,
+        vehicleOwnership: vehicle?.ownership || 'Owned',
         driverId,
         driverName: driver?.username || 'Assigned Driver',
         approvalDate: serverTimestamp(),
@@ -350,6 +350,16 @@ export default function ManageAllTripsPage() {
                       const isAssignedDriver = trip.driverId === user?.uid;
                       const isRequester = trip.userId === user?.uid;
                       const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
+                      
+                      const canStartTrip = (trip.status === 'Approved') && (
+                        (trip.vehicleOwnership === 'Rented' && isRequester) || 
+                        (trip.vehicleOwnership !== 'Rented' && isAssignedDriver)
+                      );
+
+                      const canEndTrip = (trip.status === 'Ongoing') && (
+                        (trip.vehicleOwnership === 'Rented' && isRequester) || 
+                        (trip.vehicleOwnership !== 'Rented' && isAssignedDriver)
+                      );
 
                       return (
                         <TableRow key={trip.id} className="hover:bg-muted/5 transition-colors">
@@ -381,7 +391,10 @@ export default function ManageAllTripsPage() {
                           <TableCell>
                             {trip.vehicleId ? (
                               <div className="flex flex-col">
-                                <span className="text-xs font-bold">{trip.vehicleDetails}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold">{trip.vehicleDetails}</span>
+                                  <Badge variant="secondary" className="h-3.5 px-1 text-[7px] font-black uppercase rounded-sm border-none bg-muted text-muted-foreground">{trip.vehicleOwnership || 'Owned'}</Badge>
+                                </div>
                                 <span className="text-[10px] text-muted-foreground font-black uppercase">{trip.driverName}</span>
                               </div>
                             ) : (
@@ -402,6 +415,20 @@ export default function ManageAllTripsPage() {
                           </TableCell>
                           <TableCell className="text-right px-6">
                             <div className="flex justify-end gap-1">
+                              {canStartTrip && (
+                                <Button size="sm" className="h-8 rounded-sm bg-blue-600 hover:bg-blue-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild>
+                                  <Link href={`/vehicles/trips/${trip.id}/start`}>
+                                    <PlayCircle className="h-3.5 w-3.5 mr-1" /> Start
+                                  </Link>
+                                </Button>
+                              )}
+                              {canEndTrip && (
+                                <Button size="sm" className="h-8 rounded-sm bg-red-600 hover:bg-red-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild>
+                                  <Link href={`/vehicles/trips/${trip.id}/finish`}>
+                                    <Flag className="h-3.5 w-3.5 mr-1" /> End
+                                  </Link>
+                                </Button>
+                              )}
                               {canCancel && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setCancelTarget(trip)}>
                                   <CircleX className="h-4 w-4" />
@@ -480,7 +507,6 @@ export default function ManageAllTripsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Reused approval and detail dialogs from current manage trip logic */}
       <Dialog open={!!approvalTarget} onOpenChange={(o) => !o && setApprovalState(null)}>
         <DialogContent className="max-w-xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
@@ -526,7 +552,7 @@ export default function ManageAllTripsPage() {
                     <SelectContent>
                       {vehicles?.filter(v => v.status === 'Available').map(v => (
                         <SelectItem key={v.id} value={v.id} className="text-xs font-bold">
-                          {v.make} {v.model} ({v.plateNumber})
+                          {v.make} {v.model} ({v.plateNumber}) — {v.ownership}
                         </SelectItem>
                       ))}
                     </SelectContent>
