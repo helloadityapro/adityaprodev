@@ -37,7 +37,8 @@ import {
   HardHat,
   TrendingUp,
   CircleX,
-  ListFilter
+  ListFilter,
+  MessageCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -84,6 +85,8 @@ type Assignment = {
   siteId?: string;
   pickupLocation: string;
   pickupType: 'Site' | 'Other';
+  tripDate: string;
+  reportingTime: string;
   destinations: { type: string, location: string, purpose: string }[];
   status: 'Pending' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected';
   requestDate: any;
@@ -215,6 +218,43 @@ export default function ManageAllTripsPage() {
       completed: filteredAssignments.filter(a => a.status === 'Completed').length,
     };
   }, [filteredAssignments]);
+
+  const handleWhatsAppShare = (trip: Assignment) => {
+    let header = "";
+    let body = "";
+    const tripUrl = `${window.location.origin}/vehicles/trips/manage?view=${trip.id}`;
+
+    switch (trip.status) {
+      case 'Pending':
+        header = "🚨 *Aditya Pro - New Vehicle Request*";
+        body = `*Requester:* ${trip.userName}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.dropLocation || trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
+        break;
+      case 'Approved':
+        header = "✅ *Aditya Pro - Vehicle Allotted*";
+        body = `*Requester:* ${trip.userName}\n*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Ownership:* ${trip.vehicleOwnership}\n*Trip Date:* ${trip.tripDate}\n*Ready for departure.*`;
+        break;
+      case 'Ongoing':
+        header = "🚦 *Aditya Pro - Trip Ongoing*";
+        body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} ➔ ${trip.destinations[0]?.location || 'Destination'}`;
+        break;
+      case 'Completed':
+        const distance = (trip.endReading || 0) - (trip.startReading || 0);
+        header = "🏁 *Aditya Pro - Trip Completed*";
+        body = `*Vehicle:* ${trip.vehicleDetails}\n*Personnel:* ${trip.userName}\n*Distance:* ${distance.toFixed(1)} KM\n*Finished At:* ${trip.endTime ? format(trip.endTime.toDate(), 'HH:mm') : 'N/A'}`;
+        break;
+      case 'Rejected':
+        header = "❌ *Aditya Pro - Trip Cancelled*";
+        body = `*Request Ref:* ${trip.id.slice(0, 8)}\n*Requester:* ${trip.userName}\n*Site:* ${trip.pickupLocation}\n*The trip request has been revoked.*`;
+        break;
+      default:
+        header = "ℹ️ *Aditya Pro - Trip Update*";
+        body = `*Status:* ${trip.status}\n*Site:* ${trip.pickupLocation}`;
+    }
+
+    const message = `${header}\n\n${body}\n\n*View Audit Log:* ${tripUrl}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
 
   const handleApprove = async () => {
     if (!approvalTarget?.vehicleId || !approvalTarget?.driverId) {
@@ -425,6 +465,15 @@ export default function ManageAllTripsPage() {
                           </TableCell>
                           <TableCell className="text-right px-6">
                             <div className="flex justify-end gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50"
+                                onClick={() => handleWhatsAppShare(trip)}
+                                title="Share on WhatsApp"
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                              </Button>
                               {canStartTrip && (
                                 <Button size="sm" className="h-8 rounded-sm bg-blue-600 hover:bg-blue-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild>
                                   <Link href={`/vehicles/trips/${trip.id}/start`}>
@@ -497,6 +546,15 @@ export default function ManageAllTripsPage() {
                         </TableCell>
                         <TableCell className="text-right px-6">
                           <div className="flex justify-end gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50"
+                              onClick={() => handleWhatsAppShare(trip)}
+                              title="Share on WhatsApp"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
                             <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>
                               Allot Vehicle
                             </Button>
