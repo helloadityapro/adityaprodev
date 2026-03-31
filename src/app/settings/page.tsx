@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -19,7 +20,8 @@ import {
   ShieldCheck,
   Truck,
   HardHat,
-  Quote
+  Quote,
+  Lock
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -57,6 +59,7 @@ export default function SettingsPage() {
   };
 
   const adminTools = [
+    { label: 'User Access', href: '/settings/access', icon: Lock, color: 'text-primary' },
     { label: 'Rewards Setup', href: '/settings/rewards', icon: Coins, color: 'text-amber-600' },
     { label: 'Quotes Hub', href: '/settings/quotes', icon: Quote, color: 'text-blue-600' },
     { label: 'User Directory', href: '/settings/users', icon: Users, color: 'text-purple-600' },

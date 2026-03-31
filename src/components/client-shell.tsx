@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -27,6 +28,7 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { getPageKeyByPath, type PageKey } from "@/lib/access-control";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
 
@@ -38,6 +40,11 @@ type Notification = {
   link: string;
   read: boolean;
   createdAt: any;
+};
+
+type AccessConfig = {
+  id: string;
+  allowedPageKeys: PageKey[];
 };
 
 /**
@@ -163,9 +170,33 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
+
+  // Dynamic Access Gate
+  React.useEffect(() => {
+    if (!user || isProfileLoading || !userProfile || isAuthPage) return;
+    
+    // Super Admins bypass all gates
+    if (isSuperAdmin(user.email)) return;
+
+    const pageKey = getPageKeyByPath(pathname);
+    if (!pageKey) return;
+
+    const allowedKeys = userProfile.customPermissions 
+      ? new Set(userProfile.customPermissions) 
+      : new Set(roleConfigs?.find(c => c.id === userProfile.role)?.allowedPageKeys || []);
+
+    // If page is defined in registry but not allowed for this user
+    if (allowedKeys.size > 0 && !allowedKeys.has(pageKey)) {
+      toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have authorization to view this module.' });
+      router.replace('/rewards');
+    }
+  }, [user, userProfile, isProfileLoading, pathname, isAuthPage, roleConfigs, router, toast]);
 
   React.useEffect(() => {
     if (!isUserLoading && !user && !isAuthPage) {
@@ -221,12 +252,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     const colRef = collection(firestore, 'permits_to_work');
     
     if (userRole === 'Admin') {
-      // Admins act on permits already approved by Managers
       return query(colRef, where('status', '==', 'ManagerApproved'));
     }
     
     if (userRole === 'Site Manager') {
-      // Managers act on permits pending initial review
       return query(
         colRef, 
         and(
@@ -260,7 +289,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const [displayedNotifIds, setDisplayedNotifIds] = React.useState<Set<string>>(new Set());
 
-  // Handle notification click routing
   React.useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       const listener = LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
@@ -275,12 +303,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     }
   }, [router]);
 
-  // Request native & web notification permissions - triggered after user is confirmed
   React.useEffect(() => {
     if (!user) return;
 
     const initNotifications = async () => {
-      // 1. Mobile Platform Setup
       if (Capacitor.isNativePlatform()) {
         try {
           const perm = await LocalNotifications.checkPermissions();
@@ -293,8 +319,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               id: 'aditya-pro-alerts',
               name: 'Aditya Pro Alerts',
               description: 'Critical alerts for permits, tasks, and site activities',
-              importance: 5, // High importance
-              visibility: 1, // Public
+              importance: 5,
+              visibility: 1,
               vibration: true,
             });
           }
@@ -302,7 +328,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           console.warn("Failed to initialize native notifications:", err);
         }
       } 
-      // 2. Web Browser Setup
       else if (typeof window !== 'undefined' && 'Notification' in window) {
         if (Notification.permission === 'default') {
           Notification.requestPermission();
@@ -312,7 +337,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     initNotifications();
   }, [user]);
 
-  // Hydrate displayed notification IDs from session storage
   React.useEffect(() => {
     try {
       const raw = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
@@ -327,7 +351,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Monitor notifications and dispatch system alerts
   React.useEffect(() => {
       if (notifications && user) {
           const newDisplayedIds = new Set(displayedNotifIds);
@@ -335,14 +358,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           
           notifications.forEach(notif => {
               if (!notif.read && !displayedNotifIds.has(notif.id)) {
-                  // A. Show in-app UI toast
                   toast({ 
                     title: notif.title, 
                     description: notif.description, 
                     variant: notif.title.includes('Approved') ? 'success' : notif.title.includes('Rejected') ? 'destructive' : 'default' 
                   });
 
-                  // B. Trigger system panel notification if on mobile
                   if (Capacitor.isNativePlatform()) {
                     LocalNotifications.schedule({
                       notifications: [
@@ -351,7 +372,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                           body: notif.description,
                           id: parseInt(notif.id.replace(/\D/g, '').slice(-8)) || Math.floor(Math.random() * 1000000),
                           channelId: 'aditya-pro-alerts',
-                          smallIcon: 'ic_stat_icon_config_sample', // Standard resource name
+                          smallIcon: 'ic_stat_icon_config_sample',
                           extra: {
                             link: notif.link
                           }
@@ -359,7 +380,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                       ]
                     }).catch(err => console.error("Scheduling error:", err));
                   } 
-                  // C. Trigger browser notification if on desktop
                   else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
                     new Notification(notif.title, { body: notif.description });
                   }

@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -49,7 +50,8 @@ import {
   Settings2,
   Tag,
   IndianRupee,
-  PieChart
+  PieChart,
+  Lock
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -63,16 +65,54 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase"
+import { doc, collection } from "firebase/firestore"
+import * as React from "react"
+import { isSuperAdmin } from "@/lib/auth-constants"
+import { type PageKey } from "@/lib/access-control"
+
+type AccessConfig = {
+  id: string;
+  allowedPageKeys: PageKey[];
+};
 
 export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRole: string, userDepartment: string, pendingPtwCount: number }) {
   const pathname = usePathname()
-  const isDriver = userRole === 'Driver';
-  const isAdmin = userRole === 'Admin';
-  const isManager = userRole === 'Site Manager';
-  const isAdminOrHR = isAdmin || userRole === 'Manager - Human Resources';
-  const isProcurement = isAdmin || userDepartment === 'Procurement and Supply-chain';
-  
+  const firestore = useFirestore()
+  const { user } = useUser()
   const { setOpenMobile, isMobile } = useSidebar();
+
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile } = useDoc<any>(userProfileRef);
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+
+  const allowedKeys = React.useMemo(() => {
+    // Super Admins see everything
+    if (isSuper) return null; 
+
+    // 1. Check for individual user override
+    if (userProfile?.customPermissions) {
+      return new Set<string>(userProfile.customPermissions);
+    }
+
+    // 2. Check for role default
+    const config = roleConfigs?.find(c => c.id === userRole);
+    if (config) {
+      return new Set<string>(config.allowedPageKeys);
+    }
+
+    // Fallback if no config exists yet (prototype defaults)
+    return null;
+  }, [userProfile, roleConfigs, userRole, isSuper]);
+
+  const canShow = (key: PageKey) => {
+    if (!allowedKeys) return true;
+    return allowedKeys.has(key);
+  };
 
   const handleMobileClose = () => {
     if (isMobile) {
@@ -86,41 +126,49 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Main Hub</SidebarGroupLabel>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/reports'} className="rounded-sm" onClick={handleMobileClose}>
-              <Link href="/reports">
-                <FileBarChart className="h-4 w-4 text-primary" />
-                <span className="font-bold">Dashboard</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {canShow('reports') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/reports'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/reports">
+                  <FileBarChart className="h-4 w-4 text-primary" />
+                  <span className="font-bold">Dashboard</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
 
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Documents" isActive={pathname.startsWith('/documents')} className="rounded-sm" onClick={handleMobileClose}>
-              <Link href="/documents">
-                <FolderOpen className="h-4 w-4" />
-                <span className="font-medium">Documents</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {canShow('documents') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Documents" isActive={pathname.startsWith('/documents')} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/documents">
+                  <FolderOpen className="h-4 w-4" />
+                  <span className="font-medium">Documents</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Learning Hub" isActive={pathname.startsWith('/lms')} className="rounded-sm" onClick={handleMobileClose}>
-              <Link href="/lms">
-                <BookOpen className="h-4 w-4" />
-                <span className="font-medium">Learning Hub</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {canShow('lms') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Learning Hub" isActive={pathname.startsWith('/lms')} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/lms">
+                  <BookOpen className="h-4 w-4" />
+                  <span className="font-medium">Learning Hub</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Rewards" isActive={pathname === '/rewards'} className="rounded-sm" onClick={handleMobileClose}>
-              <Link href="/rewards">
-                <Trophy className="h-4 w-4 text-amber-500" />
-                <span className="font-medium">Rewards</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {canShow('rewards') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Rewards" isActive={pathname === '/rewards'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/rewards">
+                  <Trophy className="h-4 w-4 text-amber-500" />
+                  <span className="font-medium">Rewards</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
         </SidebarMenu>
       </SidebarGroup>
 
@@ -128,8 +176,8 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Operations</SidebarGroupLabel>
         <SidebarMenu>
-          {/* Projects Sub-Section */}
-          {!isDriver && isProcurement && (
+          {/* Projects */}
+          {canShow('projects') && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/projects')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -165,8 +213,8 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
             </Collapsible>
           )}
 
-          {/* Inventory Sub-Section */}
-          {!isDriver && (
+          {/* Inventory */}
+          {canShow('inventory') && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/inventory')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -245,7 +293,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
           )}
 
           {/* PO Sub-Section */}
-          {!isDriver && isProcurement && (
+          {canShow('purchase-orders') && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/purchase-orders')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -288,7 +336,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
           )}
 
           {/* WO Sub-Section */}
-          {!isDriver && isProcurement && (
+          {canShow('work-orders') && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/work-orders')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -331,7 +379,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
           )}
 
           {/* Payments Sub-Section */}
-          {!isDriver && (
+          {canShow('payments') && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/payments')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -382,7 +430,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
           )}
 
           {/* DPR Sub-Section */}
-          {!isDriver && (
+          {canShow('dpr') && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/dpr')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -417,7 +465,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
           )}
 
           {/* Tasks Sub-Section */}
-          {!isDriver && (
+          {canShow('tasks') && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/tasks')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -452,7 +500,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
           )}
 
           {/* Permits Sub-Section */}
-          {!isDriver && (
+          {canShow('permits') && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/ptw')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -502,7 +550,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
           )}
 
           {/* Visits Sub-Section */}
-          {!isDriver && (
+          {canShow('visits') && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/site-visits')} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
@@ -545,18 +593,18 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
           )}
 
           {/* Trips Sub-Section (Logistics & Fleet) */}
-          <Collapsible asChild defaultOpen={pathname.startsWith('/vehicles')} className="group/collapsible">
-            <SidebarMenuItem>
-              <CollapsibleTrigger asChild>
-                <SidebarMenuButton tooltip="Trips" isActive={pathname.startsWith('/vehicles')} className="rounded-sm">
-                  <Car className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Trips</span>
-                  <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                </SidebarMenuButton>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarMenuSub>
-                  {!isDriver && (
+          {canShow('trips') && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/vehicles')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Trips" isActive={pathname.startsWith('/vehicles')} className="rounded-sm">
+                    <Car className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Trips</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname === '/vehicles/request'} onClick={handleMobileClose}>
                         <Link href="/vehicles/request">
@@ -565,60 +613,62 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
-                  )}
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/vehicles/trips/manage'} onClick={handleMobileClose}>
-                      <Link href="/vehicles/trips/manage">
-                        <MapPinned className="h-4 w-4" />
-                        <span>Manage Trips</span>
-                      </Link>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </SidebarMenuItem>
-          </Collapsible>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/vehicles/trips/manage'} onClick={handleMobileClose}>
+                        <Link href="/vehicles/trips/manage">
+                          <MapPinned className="h-4 w-4" />
+                          <span>Manage Trips</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
 
           {/* Attendance Sub-Section */}
-          <Collapsible asChild defaultOpen={pathname.startsWith('/attendance')} className="group/collapsible">
-            <SidebarMenuItem>
-              <CollapsibleTrigger asChild>
-                <SidebarMenuButton tooltip="Attendance" isActive={pathname.startsWith('/attendance')} className="rounded-sm">
-                  <CalendarCheck className="h-4 w-4 text-emerald-600" />
-                  <span className="font-medium">Attendance</span>
-                  <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                </SidebarMenuButton>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarMenuSub>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/attendance/check-in' || pathname === '/attendance/check-out'} onClick={handleMobileClose}>
-                      <Link href="/attendance">
-                        <Clock className="h-4 w-4" />
-                        <span>Check-in / Out</span>
-                      </Link>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/attendance/history'} onClick={handleMobileClose}>
-                      <Link href="/attendance/history">
-                        <History className="h-4 w-4" />
-                        <span>Attendance History</span>
-                      </Link>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </SidebarMenuItem>
-          </Collapsible>
+          {canShow('attendance') && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/attendance')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Attendance" isActive={pathname.startsWith('/attendance')} className="rounded-sm">
+                    <CalendarCheck className="h-4 w-4 text-emerald-600" />
+                    <span className="font-medium">Attendance</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/attendance/check-in' || pathname === '/attendance/check-out'} onClick={handleMobileClose}>
+                        <Link href="/attendance">
+                          <Clock className="h-4 w-4" />
+                          <span>Check-in / Out</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/attendance/history'} onClick={handleMobileClose}>
+                        <Link href="/attendance/history">
+                          <History className="h-4 w-4" />
+                          <span>Attendance History</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
         </SidebarMenu>
       </SidebarGroup>
       
       {/* ADMINISTRATION Section */}
-      {isAdminOrHR && (
-        <SidebarGroup className="mt-auto">
-          <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">ADMINISTRATION</SidebarGroupLabel>
-          <SidebarMenu>
+      <SidebarGroup className="mt-auto">
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">ADMINISTRATION</SidebarGroupLabel>
+        <SidebarMenu>
+          {canShow('admin-attendance-summary') && (
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Attendance Summary" isActive={pathname === '/admin/attendance-summary'} className="rounded-sm" onClick={handleMobileClose}>
                 <Link href="/admin/attendance-summary">
@@ -627,101 +677,129 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            {isAdmin && (
-              <>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Day Report" isActive={pathname === '/admin/day-report'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/admin/day-report">
-                      <CalendarDays className="h-4 w-4 text-amber-600" />
-                      <span className="font-bold text-amber-700">Day Report</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="LMS Admin" isActive={pathname.startsWith('/lms/admin')} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/lms/admin">
-                      <BookOpen className="h-4 w-4 text-primary" />
-                      <span className="font-bold">LMS Admin</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Admin Dashboard" isActive={pathname === '/admin/dashboard'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/admin/dashboard">
-                      <LayoutDashboard className="h-4 w-4" />
-                      <span className="font-medium">Dashboard</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Permit Management" isActive={pathname === '/settings/permits'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/permits">
-                      <FileCheck className="h-4 w-4 text-primary" />
-                      <span className="font-bold">Permit Management</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Manage Vehicles" isActive={pathname === '/vehicles/manage'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/vehicles/manage">
-                      <Car className="h-4 w-4 text-primary" />
-                      <span className="font-medium">Manage Vehicles</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Rewards Setup" isActive={pathname === '/settings/rewards'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/rewards">
-                      <Coins className="h-4 w-4 text-amber-600" />
-                      <span className="font-medium">Rewards Setup</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Suppliers" isActive={pathname.startsWith('/settings/suppliers')} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/suppliers">
-                      <Truck className="h-4 w-4" />
-                      <span className="font-medium">Suppliers</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Contractors" isActive={pathname.startsWith('/settings/contractors')} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/contractors">
-                      <HardHat className="h-4 w-4" />
-                      <span className="font-medium">Contractors</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Users" isActive={pathname.startsWith('/settings/users')} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/users">
-                      <Users className="h-4 w-4" />
-                      <span className="font-medium">Users</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Teams" isActive={pathname === '/settings/teams'} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/teams">
-                      <Workflow className="h-4 w-4" />
-                      <span className="font-medium">Teams</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Settings" isActive={pathname.startsWith('/settings/dropdown-management')} className="rounded-sm" onClick={handleMobileClose}>
-                    <Link href="/settings/dropdown-management">
-                      <SlidersHorizontal className="h-4 w-4" />
-                      <span className="font-medium">Settings</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </>
-            )}
-          </SidebarMenu>
-        </SidebarGroup>
-      )}
+          )}
+          {canShow('admin-day-report') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Day Report" isActive={pathname === '/admin/day-report'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/admin/day-report">
+                  <CalendarDays className="h-4 w-4 text-amber-600" />
+                  <span className="font-bold text-amber-700">Day Report</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-lms') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="LMS Admin" isActive={pathname.startsWith('/lms/admin')} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/lms/admin">
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  <span className="font-bold">LMS Admin</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-dashboard') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Admin Dashboard" isActive={pathname === '/admin/dashboard'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/admin/dashboard">
+                  <LayoutDashboard className="h-4 w-4" />
+                  <span className="font-medium">Dashboard</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-permits') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Permit Management" isActive={pathname === '/settings/permits'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/settings/permits">
+                  <FileCheck className="h-4 w-4 text-primary" />
+                  <span className="font-bold">Permit Management</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-vehicles') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Manage Vehicles" isActive={pathname === '/vehicles/manage'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/vehicles/manage">
+                  <Car className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Manage Vehicles</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-rewards') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Rewards Setup" isActive={pathname === '/settings/rewards'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/settings/rewards">
+                  <Coins className="h-4 w-4 text-amber-600" />
+                  <span className="font-medium">Rewards Setup</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-suppliers') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Suppliers" isActive={pathname.startsWith('/settings/suppliers')} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/settings/suppliers">
+                  <Truck className="h-4 w-4" />
+                  <span className="font-medium">Suppliers</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-contractors') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Contractors" isActive={pathname.startsWith('/settings/contractors')} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/settings/contractors">
+                  <HardHat className="h-4 w-4" />
+                  <span className="font-medium">Contractors</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-users') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Users" isActive={pathname.startsWith('/settings/users')} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/settings/users">
+                  <Users className="h-4 w-4" />
+                  <span className="font-medium">Users</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-teams') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Teams" isActive={pathname === '/settings/teams'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/settings/teams">
+                  <Workflow className="h-4 w-4" />
+                  <span className="font-medium">Teams</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-access') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="User Access" isActive={pathname === '/settings/access'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/settings/access">
+                  <Lock className="h-4 w-4 text-primary" />
+                  <span className="font-bold">User Access</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-settings') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Settings" isActive={pathname.startsWith('/settings/dropdown-management')} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/settings/dropdown-management">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="font-medium">Settings</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+        </SidebarMenu>
+      </SidebarGroup>
     </div>
   )
 }

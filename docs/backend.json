@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -21,9 +22,20 @@
         "assignedProjectIds": { "type": "array", "items": { "type": "string" } },
         "hiddenPermitIds": { "type": "array", "items": { "type": "string" } },
         "totalPoints": { "type": "number", "default": 0 },
-        "pointsMultiplier": { "type": "number", "default": 1 }
+        "pointsMultiplier": { "type": "number", "default": 1 },
+        "customPermissions": { "type": "array", "items": { "type": "string" }, "description": "Individual access overrides for sidebar pages" }
       },
       "required": ["id", "username", "email", "mobile", "role"]
+    },
+    "AccessRule": {
+      "title": "Access Rule",
+      "type": "object",
+      "description": "Role-based page access configuration.",
+      "properties": {
+        "id": { "type": "string", "description": "The role name" },
+        "allowedPageKeys": { "type": "array", "items": { "type": "string" } },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     },
     "Quote": {
       "title": "Motivational Quote",
@@ -209,6 +221,10 @@
     "/users/{userId}": {
       "schema": { "$ref": "#/backend/entities/User" },
       "description": "User profiles and performance data."
+    },
+    "/system_settings/access/roles/{roleId}": {
+      "schema": { "$ref": "#/backend/entities/AccessRule" },
+      "description": "Role-based access permissions."
     },
     "/quotes/{quoteId}": {
       "schema": { "$ref": "#/backend/entities/Quote" },
