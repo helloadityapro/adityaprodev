@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, orderBy } from "firebase/firestore";
+import { collection, query, orderBy, doc } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import * as XLSX from 'xlsx';
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 type InventoryItem = {
   id: string;
@@ -26,6 +27,11 @@ type InventoryItem = {
   lastUpdated: any;
 };
 
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
+};
+
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
   const date = ts.toDate ? ts.toDate() : new Date(ts);
@@ -34,7 +40,16 @@ const formatTimestamp = (ts: any) => {
 
 export default function GlobalInventoryPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
   const [searchTerm, setSearchTerm] = React.useState("");
+
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
 
   const inventoryQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_inventory'), orderBy('siteName', 'asc')), 
@@ -43,12 +58,24 @@ export default function GlobalInventoryPage() {
   const { data: inventory, isLoading } = useCollection<InventoryItem>(inventoryQuery);
 
   const filteredInventory = React.useMemo(() => {
-    if (!inventory) return [];
-    return inventory.filter(item => 
+    if (!inventory || !userProfile) return [];
+
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    let list = inventory;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      list = list.filter(item => assignedIds.has(item.siteId));
+    }
+
+    return list.filter(item => 
       item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.siteName.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [inventory, searchTerm]);
+  }, [inventory, searchTerm, userProfile, roleConfigs, isSuper]);
 
   const handleExport = () => {
     if (filteredInventory.length === 0) return;
@@ -68,7 +95,7 @@ export default function GlobalInventoryPage() {
     XLSX.writeFile(wb, `Global_Inventory_Status_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
-  if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
+  if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -77,7 +104,7 @@ export default function GlobalInventoryPage() {
           <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
             <PackageCheck className="h-8 w-8" /> Global Inventory
           </h1>
-          <p className="text-muted-foreground font-medium">Real-time component-level stock availability and utilisation across all project sites.</p>
+          <p className="text-muted-foreground font-medium">Real-time component-level stock availability and utilisation across project sites.</p>
         </div>
         <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
           <FileDown className="h-4 w-4 mr-2" />

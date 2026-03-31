@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -67,6 +68,11 @@ type Payment = {
   editHistory?: any[];
 };
 
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
+};
+
 type Site = { id: string; name: string };
 type SortKey = 'date' | 'reference' | 'payee' | 'amount' | 'type' | 'mode' | 'site' | 'company';
 
@@ -88,8 +94,13 @@ export default function ProjectWisePaymentsPage() {
   const [isProcessing, setIsProcessing] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<any>(userProfileRef);
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites } = useCollection<Site>(sitesQuery);
@@ -100,22 +111,21 @@ export default function ProjectWisePaymentsPage() {
 
   const { data: payments, isLoading } = useCollection<Payment>(paymentsQuery);
 
-  const handleSort = (key: SortKey) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
-  };
-
   const filteredPayments = React.useMemo(() => {
-    if (!payments) return [];
+    if (!payments || !userProfile) return [];
     
-    let result = payments.filter(p => {
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    let result = payments;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      result = result.filter(p => assignedIds.has(p.siteId));
+    }
+
+    result = result.filter(p => {
       const matchesSite = selectedSiteId === 'all' || p.siteId === selectedSiteId;
       const matchesType = typeFilter === 'all' || p.paymentAgainst === typeFilter;
       const matchesSearch = p.payeeName.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -145,7 +155,19 @@ export default function ProjectWisePaymentsPage() {
     });
 
     return result;
-  }, [payments, selectedSiteId, typeFilter, searchTerm, sortConfig]);
+  }, [payments, selectedSiteId, typeFilter, searchTerm, sortConfig, userProfile, roleConfigs, isSuper]);
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+  };
 
   const handleDelete = async () => {
     if (!deletingPayment) return;
@@ -221,7 +243,7 @@ export default function ProjectWisePaymentsPage() {
     }
   };
 
-  if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
+  if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -478,26 +500,5 @@ export default function ProjectWisePaymentsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
-  const colors = {
-    primary: "bg-primary/5 border-primary/10 text-primary",
-    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
-    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
-    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
-  };
-
-  return (
-    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-black">{value}</div>
-      </CardContent>
-    </Card>
   );
 }

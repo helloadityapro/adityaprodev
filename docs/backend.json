@@ -23,7 +23,8 @@
         "hiddenPermitIds": { "type": "array", "items": { "type": "string" } },
         "totalPoints": { "type": "number", "default": 0 },
         "pointsMultiplier": { "type": "number", "default": 1 },
-        "customPermissions": { "type": "array", "items": { "type": "string" }, "description": "Individual access overrides for sidebar pages" }
+        "customPermissions": { "type": "array", "items": { "type": "string" }, "description": "Individual access overrides for sidebar pages" },
+        "ownDataOnly": { "type": "boolean", "default": false, "description": "Strictly limit user to assigned projects only" }
       },
       "required": ["id", "username", "email", "mobile", "role"]
     },
@@ -34,6 +35,7 @@
       "properties": {
         "id": { "type": "string", "description": "The role name" },
         "allowedPageKeys": { "type": "array", "items": { "type": "string" } },
+        "ownDataOnly": { "type": "boolean", "default": false, "description": "Default data sovereignty for this role" },
         "updatedAt": { "type": "string", "format": "date-time" }
       }
     },

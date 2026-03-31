@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -35,9 +36,11 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import * as XLSX from 'xlsx';
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 type Movement = {
   id: string;
+  siteId: string;
   siteName: string;
   itemName: string;
   quantity: number;
@@ -49,10 +52,16 @@ type Movement = {
   createdAt: any;
 };
 
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
+};
+
 type SortKey = 'date' | 'site' | 'item' | 'quantity' | 'personnel' | 'flow';
 
 export default function MovementDataPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
   const [searchTerm, setSearchTerm] = React.useState("");
   const [siteFilter, setSiteFilter] = React.useState("all");
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ 
@@ -60,33 +69,35 @@ export default function MovementDataPage() {
     direction: 'desc' 
   });
 
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+
   const dataQuery = useMemoFirebase(() => 
     query(collection(firestore, 'material_movements'), orderBy('createdAt', 'desc'), limit(500)), 
     [firestore]
   );
   const { data: movements, isLoading } = useCollection<Movement>(dataQuery);
 
-  const uniqueSites = React.useMemo(() => {
-    if (!movements) return [];
-    return Array.from(new Set(movements.map(m => m.siteName))).sort();
-  }, [movements]);
-
-  const handleSort = (key: SortKey) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
-  };
-
   const filteredData = React.useMemo(() => {
-    if (!movements) return [];
+    if (!movements || !userProfile) return [];
     
-    let result = movements.filter(m => 
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    let result = movements;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      result = result.filter(m => assignedIds.has(m.siteId));
+    }
+
+    result = result.filter(m => 
       m.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -128,7 +139,23 @@ export default function MovementDataPage() {
     });
 
     return result;
-  }, [movements, searchTerm, siteFilter, sortConfig]);
+  }, [movements, searchTerm, siteFilter, sortConfig, userProfile, roleConfigs, isSuper]);
+
+  const uniqueSites = React.useMemo(() => {
+    return Array.from(new Set(filteredData.map(m => m.siteName))).sort();
+  }, [filteredData]);
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+  };
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -156,7 +183,7 @@ export default function MovementDataPage() {
     XLSX.writeFile(wb, `Material_Movements_Registry_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
-  if (isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
+  if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -165,7 +192,7 @@ export default function MovementDataPage() {
           <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
             <TableIcon className="h-8 w-8" /> Global Movement Data
           </h1>
-          <p className="text-muted-foreground font-medium">Chronological history of all material transactions recorded across organizational projects.</p>
+          <p className="text-muted-foreground font-medium">Chronological history of material transactions across authorized project sites.</p>
         </div>
         <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
           <FileDown className="h-4 w-4 mr-2" />

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -36,7 +37,8 @@ import {
   Check,
   HardHat,
   TrendingUp,
-  CircleX
+  CircleX,
+  ListFilter
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -79,6 +81,7 @@ type Assignment = {
   vehicleId?: string;
   vehicleDetails?: string;
   purpose: string;
+  siteId?: string; // Captured from pickup or destinations
   pickupLocation: string;
   pickupType: 'Site' | 'Other';
   destinations: { type: string, location: string, purpose: string }[];
@@ -106,6 +109,13 @@ type UserProfile = {
   id: string;
   username: string;
   role: string;
+  assignedProjectIds?: string[];
+  ownDataOnly?: boolean;
+};
+
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
 };
 
 export default function ManageAllTripsPage() {
@@ -125,22 +135,23 @@ export default function ManageAllTripsPage() {
   const [isCancelling, setIsCancelling] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
   
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
   const assignmentsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'vehicle_assignments');
     
-    // Only administrators can view all organizational trips globally.
     if (isAdmin) {
       return query(colRef, orderBy('requestDate', 'desc'));
     }
 
-    // Other users (Managers, Engineers, Drivers) see trips they are linked to.
-    // Managers see trips from their team because we capture siteManagerId during request.
     return query(
       colRef, 
       or(
@@ -161,41 +172,26 @@ export default function ManageAllTripsPage() {
 
   const driversList = React.useMemo(() => allUsers?.filter(u => u.role === 'Driver') || [], [allUsers]);
 
-  React.useEffect(() => {
-    const viewId = searchParams.get('view');
-    if (viewId && assignments && assignments.length > 0) {
-      const assignment = assignments.find(a => a.id === viewId);
-      if (assignment) {
-        setDetailsAssignment(assignment);
-      }
-    } else {
-      setDetailsAssignment(null);
-    }
-  }, [searchParams, assignments]);
-
-  const handleCloseDetails = () => {
-    setDetailsAssignment(null);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('view');
-    const queryStr = params.toString();
-    router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
-  };
-
-  const stats = React.useMemo(() => {
-    if (!assignments) return { total: 0, pending: 0, ongoing: 0, completed: 0 };
-    return {
-      total: assignments.length,
-      pending: assignments.filter(a => a.status === 'Pending').length,
-      ongoing: assignments.filter(a => a.status === 'Ongoing').length,
-      completed: assignments.filter(a => a.status === 'Completed').length,
-    };
-  }, [assignments]);
-
   const filteredAssignments = React.useMemo(() => {
-    if (!assignments) return [];
+    if (!assignments || !userProfile) return [];
     
-    // Perform filtering and in-memory sorting
-    return assignments.filter(trip => {
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    let result = assignments;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      result = result.filter(trip => {
+        // If trip is associated with a site, check if requester has access to that site.
+        // For general trips, we usually allow them if the user created them or is involved.
+        if (trip.siteId) return assignedIds.has(trip.siteId);
+        return true; 
+      });
+    }
+
+    return result.filter(trip => {
       const matchesSearch = trip.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trip.pickupLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (trip.vehicleDetails || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -206,12 +202,20 @@ export default function ManageAllTripsPage() {
       
       return matchesSearch && matchesStatus && isQueue;
     }).sort((a, b) => {
-      // Ensure results are always sorted by date descending regardless of the security query used.
       const dateA = a.requestDate?.toDate?.()?.getTime() || 0;
       const dateB = b.requestDate?.toDate?.()?.getTime() || 0;
       return dateB - dateA;
     });
-  }, [assignments, searchTerm, statusFilter, activeTab]);
+  }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper]);
+
+  const stats = React.useMemo(() => {
+    return {
+      total: filteredAssignments.length,
+      pending: filteredAssignments.filter(a => a.status === 'Pending').length,
+      ongoing: filteredAssignments.filter(a => a.status === 'Ongoing').length,
+      completed: filteredAssignments.filter(a => a.status === 'Completed').length,
+    };
+  }, [filteredAssignments]);
 
   const handleApprove = async () => {
     if (!approvalTarget?.vehicleId || !approvalTarget?.driverId) {
@@ -247,7 +251,6 @@ export default function ManageAllTripsPage() {
     setIsCancelling(true);
 
     try {
-      // 1. Mark trip as Rejected (Cancellation status)
       updateDocumentNonBlocking(doc(firestore, 'vehicle_assignments', cancelTarget.id), {
         status: 'Rejected',
         updatedAt: serverTimestamp(),
@@ -255,54 +258,22 @@ export default function ManageAllTripsPage() {
         cancelledById: user?.uid
       });
 
-      // 2. Release vehicle if it was already alloted
       if (cancelTarget.vehicleId) {
         updateDocumentNonBlocking(doc(firestore, 'vehicles', cancelTarget.vehicleId), {
           status: 'Available'
         });
       }
 
-      toast({ title: 'Trip Cancelled', description: 'The trip request has been revoked and fleet resources released.' });
+      toast({ title: 'Trip Cancelled', description: 'The trip request has been revoked.' });
       setCancelTarget(null);
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Cancellation Failed', description: e.message });
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
       setIsCancelling(false);
     }
   };
 
-  const handleReject = (assignment: Assignment) => {
-    // Reuse cancellation logic for rejection to ensure vehicle release
-    setCancelTarget(assignment);
-  };
-
-  const handleExport = () => {
-    if (!filteredAssignments.length) return;
-    const exportData = filteredAssignments.map(trip => ({
-      'Requester': trip.userName,
-      'Status': trip.status,
-      'Request Date': trip.requestDate ? format(trip.requestDate.toDate(), 'yyyy-MM-dd HH:mm') : 'N/A',
-      'Route': `${trip.pickupLocation} -> ${trip.destinations.map(d => d.location).join(' -> ')}`,
-      'Vehicle': trip.vehicleDetails || 'Unassigned',
-      'Driver': trip.driverName || 'Unassigned'
-    }));
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Trips Log");
-    XLSX.writeFile(wb, `Trips_Export_${format(new Date(), 'yyyyMMdd')}.xlsx`);
-  };
-
-  if (isUserLoading || isProfileLoading || isLoading) {
-    return (
-      <div className="space-y-8 p-4">
-        <Skeleton className="h-12 w-64" />
-        <div className="grid grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 w-full" />)}
-        </div>
-        <Skeleton className="h-96 w-full" />
-      </div>
-    );
-  }
+  if (isUserLoading || isProfileLoading || isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
@@ -312,18 +283,13 @@ export default function ManageAllTripsPage() {
             <MapPinned className="h-6 w-6 text-primary" />
             <h1>Manage Trips</h1>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Trip life-cycle monitoring, resource allotment and coordination hub.</p>
+          <p className="text-muted-foreground text-sm font-medium">Trip coordination hub for authorized project itineraries.</p>
         </div>
-        {(isAdmin || isManager) && (
-          <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
-            <FileDown className="h-4 w-4 mr-2" /> Export Log
-          </Button>
-        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <SummaryCard title="Total Logs" value={stats.total} icon={History} color="primary" />
-        <SummaryCard title="Awaiting Approval" value={stats.pending} icon={AlertCircle} color="amber" />
+        <SummaryCard title="Logs Found" value={stats.total} icon={History} color="primary" />
+        <SummaryCard title="Awaiting Allotment" value={stats.pending} icon={AlertCircle} color="amber" />
         <SummaryCard title="Active Journeys" value={stats.ongoing} icon={Timer} color="blue" />
         <SummaryCard title="Completed" value={stats.completed} icon={CheckCircle2} color="emerald" />
       </div>
@@ -352,14 +318,14 @@ export default function ManageAllTripsPage() {
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[150px] h-9 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20">
-                <SelectValue placeholder="Status Filter" />
+                <SelectValue placeholder="Filter" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all" className="text-xs font-bold">All Status</SelectItem>
-                <SelectItem value="Pending" className="text-xs font-bold">Pending</SelectItem>
-                <SelectItem value="Approved" className="text-xs font-bold">Approved</SelectItem>
-                <SelectItem value="Ongoing" className="text-xs font-bold">Ongoing</SelectItem>
-                <SelectItem value="Completed" className="text-xs font-bold">Completed</SelectItem>
+                <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
+                <SelectItem value="Pending" className="text-xs font-bold uppercase">Pending</SelectItem>
+                <SelectItem value="Approved" className="text-xs font-bold uppercase">Approved</SelectItem>
+                <SelectItem value="Ongoing" className="text-xs font-bold uppercase">Ongoing</SelectItem>
+                <SelectItem value="Completed" className="text-xs font-bold uppercase">Completed</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -383,8 +349,6 @@ export default function ManageAllTripsPage() {
                     {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => {
                       const isAssignedDriver = trip.driverId === user?.uid;
                       const isRequester = trip.userId === user?.uid;
-                      const canFinishTrip = isAssignedDriver || isAdmin || isRequester;
-                      const canStartTrip = isAssignedDriver;
                       const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
 
                       return (
@@ -395,7 +359,7 @@ export default function ManageAllTripsPage() {
                               {trip.coPassengers && trip.coPassengers.length > 0 && (
                                 <div className="flex items-center gap-1">
                                   <Users className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-[9px] font-bold text-muted-foreground uppercase">+{trip.coPassengers.length} passengers</span>
+                                  <span className="text-[9px] font-bold text-muted-foreground uppercase">+{trip.coPassengers.length} pax</span>
                                 </div>
                               )}
                             </div>
@@ -429,7 +393,7 @@ export default function ManageAllTripsPage() {
                               "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
                               trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
                               trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                              trip.status === 'Ongoing' ? "bg-primary text-white border-none animate-pulse" :
+                              trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
                               trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
                               "bg-red-50 text-red-700 border-red-200"
                             )}>
@@ -439,31 +403,8 @@ export default function ManageAllTripsPage() {
                           <TableCell className="text-right px-6">
                             <div className="flex justify-end gap-1">
                               {canCancel && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" 
-                                  onClick={(e) => { e.stopPropagation(); setCancelTarget(trip); }}
-                                  title="Cancel Trip"
-                                >
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setCancelTarget(trip)}>
                                   <CircleX className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {(canStartTrip && trip.status === 'Approved') && (
-                                <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" asChild>
-                                  <Link href={`/vehicles/trips/${trip.id}/start`}>Start Trip</Link>
-                                </Button>
-                              )}
-                              {(canFinishTrip && (trip.status === 'Ongoing' || (trip.status === 'Approved' && (isAdmin || isAssignedDriver)))) && (
-                                <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-slate-900 hover:bg-black" asChild>
-                                  <Link href={`/vehicles/trips/${trip.id}/finish`}>
-                                    <Flag className="h-3 w-3 mr-1.5" /> Finish Trip
-                                  </Link>
-                                </Button>
-                              )}
-                              {(isAdmin || isManager) && trip.status === 'Pending' && (
-                                <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "" })}>
-                                  Allot Vehicle
                                 </Button>
                               )}
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
@@ -472,9 +413,9 @@ export default function ManageAllTripsPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      )
+                      );
                     }) : (
-                      <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">No trips found matching criteria.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">No logs discovered.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -483,58 +424,63 @@ export default function ManageAllTripsPage() {
           </Card>
         </TabsContent>
 
-        {(isAdmin || isManager) && (
-          <TabsContent value="queue" className="animate-in fade-in-50 duration-300">
-            <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
-                      <TableHead className="px-6">Requester</TableHead>
-                      <TableHead>Route Summary</TableHead>
-                      <TableHead>Request Date</TableHead>
-                      <TableHead className="text-right px-6">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? (
-                      filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
-                        <TableRow key={trip.id} className="hover:bg-muted/5 transition-colors">
-                          <TableCell className="px-6 py-4 font-bold text-sm">{trip.userName}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2 text-xs font-medium">
-                              <span className="text-emerald-700">{trip.pickupLocation}</span>
-                              <ArrowRight className="h-3 w-3" />
-                              <span className="text-primary">{trip.destinations.length} stop(s)</span>
+        <TabsContent value="queue" className="animate-in fade-in-50 duration-300">
+          <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="px-6">Requester</TableHead>
+                    <TableHead>Itinerary Summary</TableHead>
+                    <TableHead>Request Date</TableHead>
+                    <TableHead className="text-right px-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? (
+                    filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
+                      <TableRow key={trip.id} className="hover:bg-muted/5 transition-colors">
+                        <TableCell className="px-6 py-4 font-bold text-sm">{trip.userName}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
+                              <MapPin className="h-3 w-3" /> {trip.pickupLocation}
                             </div>
-                          </TableCell>
-                          <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">
-                            {trip.requestDate ? format(trip.requestDate.toDate(), 'dd MMM, HH:mm') : '—'}
-                          </TableCell>
-                          <TableCell className="text-right px-6">
-                            <div className="flex justify-end gap-1">
-                              <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "" })}>
-                                Allot Vehicle
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => handleReject(trip)}>
-                                <CircleX className="h-4 w-4" />
-                              </Button>
+                            <div className="flex flex-col gap-1 ml-4 border-l border-primary/10 pl-2">
+                              {trip.destinations.map((dest, i) => (
+                                <div key={i} className="flex items-center gap-1.5 text-[10px] font-bold text-primary">
+                                  <ArrowRight className="h-2.5 w-2.5" /> {dest.location}
+                                </div>
+                              ))}
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic">No pending allotments.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">
+                          {trip.requestDate ? format(trip.requestDate.toDate(), 'dd MMM, HH:mm') : '—'}
+                        </TableCell>
+                        <TableCell className="text-right px-6">
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "" })}>
+                              Allot Vehicle
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setCancelTarget(trip)}>
+                              <CircleX className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic">Queue empty.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
-      {/* Allotment Modal */}
+      {/* Reused approval and detail dialogs from current manage trip logic */}
       <Dialog open={!!approvalTarget} onOpenChange={(o) => !o && setApprovalState(null)}>
         <DialogContent className="max-w-xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
@@ -617,189 +563,14 @@ export default function ManageAllTripsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Trip Details Modal */}
-      <Dialog open={!!detailsAssignment} onOpenChange={(o) => !o && handleCloseDetails()}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-2 rounded-sm"><Navigation className="h-5 w-5 text-primary" /></div>
-              <div>
-                <DialogTitle className="text-xl font-black uppercase tracking-tight">Trip Audit Log</DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">ID: {detailsAssignment?.id.slice(0, 12)}</DialogDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {detailsAssignment && (
-                <Badge variant="outline" className={cn(
-                  "text-[9px] font-black uppercase rounded-sm px-2 h-6",
-                  detailsAssignment.status === 'Completed' ? "bg-green-100 text-green-800" : 
-                  detailsAssignment.status === 'Ongoing' ? "bg-primary text-white" : "bg-blue-100 text-blue-800"
-                )}>
-                  {detailsAssignment.status}
-                </Badge>
-              )}
-            </div>
-          </DialogHeader>
-
-          <ScrollArea className="max-h-[75vh]">
-            {detailsAssignment && (
-              <div className="p-8 space-y-10">
-                {/* Header Info */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Requester</Label>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-bold">{detailsAssignment.userName}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Driver</Label>
-                    <div className="flex items-center gap-2">
-                      <HardHat className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-bold">{detailsAssignment.driverName || 'Not Assigned'}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Vehicle</Label>
-                    <div className="flex items-center gap-2">
-                      <CarFront className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-bold">{detailsAssignment.vehicleDetails || 'Not Assigned'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Itinerary */}
-                <div className="space-y-4">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                    <MapPinned className="h-4 w-4 text-primary" /> Route Itinerary & Purpose
-                  </Label>
-                  <div className="bg-muted/20 border rounded-sm p-6 space-y-6">
-                    <div className="relative pl-8 border-l-2 border-emerald-500 pb-2">
-                      <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-emerald-500 ring-4 ring-background flex items-center justify-center">
-                        <MapPin className="h-2 w-2 text-white" />
-                      </div>
-                      <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter leading-none mb-1">Departure Point ({detailsAssignment.pickupType})</p>
-                      <p className="text-base font-black">{detailsAssignment.pickupLocation}</p>
-                    </div>
-
-                    {detailsAssignment.destinations.map((d, i) => (
-                      <div key={i} className="relative pl-8 border-l-2 border-primary pb-2">
-                        <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-primary ring-4 ring-background flex items-center justify-center">
-                          <Navigation className="h-2 w-2 text-white" />
-                        </div>
-                        <p className="text-[9px] font-black uppercase text-primary tracking-tighter leading-none mb-1">Stop {i + 1} ({d.type})</p>
-                        <p className="text-base font-black">{d.location}</p>
-                        <p className="text-xs font-bold text-muted-foreground mt-1 italic">"{d.purpose}"</p>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="p-4 bg-primary/5 rounded-sm border border-primary/10">
-                    <Label className="text-[9px] font-black uppercase text-primary tracking-widest block mb-1">Primary Trip Purpose</Label>
-                    <p className="text-sm font-medium leading-relaxed">"{detailsAssignment.purpose}"</p>
-                  </div>
-                </div>
-
-                {/* Passengers */}
-                {detailsAssignment.coPassengers && detailsAssignment.coPassengers.length > 0 && (
-                  <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                      <Users className="h-4 w-4 text-primary" /> Co-Passengers Manifest
-                    </Label>
-                    <div className="flex flex-wrap gap-2">
-                      {detailsAssignment.coPassengers.map(p => (
-                        <Badge key={p.id} variant="secondary" className="h-8 rounded-sm font-bold px-3 py-0 flex items-center gap-2 bg-muted/50 border">
-                          <User className="h-3 w-3 opacity-40" /> {p.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <Separator />
-
-                {/* Audit Readings */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-700 flex items-center gap-2 px-1">
-                      <PlayCircle className="h-4 w-4" /> Start Audit
-                    </h4>
-                    <div className="p-4 border rounded-sm bg-emerald-50/30 border-emerald-100 flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] font-black uppercase text-emerald-600 tracking-tighter leading-none mb-1">Initial Reading</p>
-                        <p className="text-xl font-black font-mono">{detailsAssignment.startReading || '—'} <span className="text-[10px] font-bold text-muted-foreground">KM</span></p>
-                      </div>
-                      {detailsAssignment.startReadingPhoto && (
-                        <div className="h-12 w-20 rounded-sm overflow-hidden border shadow-sm cursor-pointer" onClick={() => window.open(detailsAssignment.startReadingPhoto, '_blank')}>
-                          <img src={detailsAssignment.startReadingPhoto} className="w-full h-full object-cover" alt="Start" />
-                        </div>
-                      )}
-                    </div>
-                    {detailsAssignment.startTime && (
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1.5 px-1">
-                        <Clock className="h-3 w-3" /> {format(detailsAssignment.startTime.toDate(), 'dd MMM yyyy, HH:mm')}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-700 flex items-center gap-2 px-1">
-                      <Flag className="h-4 w-4" /> Finish Audit
-                    </h4>
-                    <div className="p-4 border rounded-sm bg-slate-50 border-slate-200 flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] font-black uppercase text-slate-600 tracking-tighter leading-none mb-1">Final Reading</p>
-                        <p className="text-xl font-black font-mono">{detailsAssignment.endReading || '—'} <span className="text-[10px] font-bold text-muted-foreground">KM</span></p>
-                      </div>
-                      {detailsAssignment.endReadingPhoto && (
-                        <div className="h-12 w-20 rounded-sm overflow-hidden border shadow-sm cursor-pointer" onClick={() => window.open(detailsAssignment.endReadingPhoto, '_blank')}>
-                          <img src={detailsAssignment.endReadingPhoto} className="w-full h-full object-cover" alt="End" />
-                        </div>
-                      )}
-                    </div>
-                    {detailsAssignment.endTime && (
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1.5 px-1">
-                        <Clock className="h-3 w-3" /> {format(detailsAssignment.endTime.toDate(), 'dd MMM yyyy, HH:mm')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {detailsAssignment.startReading && detailsAssignment.endReading && (
-                  <div className="p-6 bg-primary/5 border-2 border-primary/10 rounded-sm flex items-center justify-between shadow-inner">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-black uppercase text-primary tracking-widest leading-none">Total Distance Covered</span>
-                      <span className="text-3xl font-black tabular-nums">{detailsAssignment.endReading - detailsAssignment.startReading} <span className="text-xs font-bold text-muted-foreground/60 uppercase ml-1">Kilometers</span></span>
-                    </div>
-                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                      <TrendingUp className="h-6 w-6 text-primary" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </ScrollArea>
-
-          <DialogFooter className="p-4 bg-muted/5 border-t">
-            <DialogClose asChild>
-              <Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Cancellation Confirmation */}
       <AlertDialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
-              <CircleX className="h-5 w-5" /> Revoke Trip Request
+              <CircleX className="h-5 w-5" /> Confirm Cancellation
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed">
-              Are you sure you want to cancel this trip request? If a vehicle has already been alloted, it will be automatically released back into the available pool.
+              Revoke this trip request? If a vehicle was alloted, it will be returned to the available pool.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3">

@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -50,6 +51,7 @@ type TimelineEntry = {
 
 type Requirement = {
   id: string;
+  siteId: string;
   siteName: string;
   itemName: string;
   quantity: number;
@@ -66,6 +68,11 @@ type Requirement = {
   editedBy?: string;
   editedAt?: any;
   timeline?: TimelineEntry[];
+};
+
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
 };
 
 const LOGISTICS_STATUSES = ["Ordered", "Dispatched", "In-transit", "Delivered"] as const;
@@ -105,9 +112,13 @@ export default function RequirementListPage() {
   const [isSaving, setIsSaving] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
   const requirementsQuery = useMemoFirebase(() => {
@@ -124,9 +135,20 @@ export default function RequirementListPage() {
   const { data: requirements, isLoading: reqsLoading } = useCollection<Requirement>(requirementsQuery);
 
   const sortedAndFilteredReqs = React.useMemo(() => {
-    if (!requirements) return [];
+    if (!requirements || !userProfile) return [];
     
-    let result = requirements.filter(req => {
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    let result = requirements;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      result = result.filter(req => assignedIds.has(req.siteId));
+    }
+
+    result = result.filter(req => {
       const matchesSearch = req.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (req.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (req.itemName || '').toLowerCase().includes(searchTerm.toLowerCase());
@@ -143,10 +165,9 @@ export default function RequirementListPage() {
         const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
     });
-  }, [requirements, searchTerm, startDate, endDate]);
+  }, [requirements, searchTerm, startDate, endDate, userProfile, roleConfigs, isSuper]);
 
   const stats = React.useMemo(() => {
-    if (!sortedAndFilteredReqs) return { total: 0, high: 0, pending: 0, delivered: 0 };
     return {
       total: sortedAndFilteredReqs.length,
       high: sortedAndFilteredReqs.filter(r => r.urgency === 'High').length,
@@ -189,7 +210,6 @@ export default function RequirementListPage() {
         timeline: arrayUnion(timelineEntry)
     });
 
-    // Notify original requester
     if (req.userId !== user.uid) {
         addDocumentNonBlocking(collection(firestore, 'notifications'), {
             userId: req.userId,
@@ -211,13 +231,15 @@ export default function RequirementListPage() {
     Low: "bg-blue-100 text-blue-800 border-blue-200",
   };
 
+  if (isProfileLoading || reqsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-1 no-print">
         <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <ClipboardList className="h-8 w-8" /> Requirement Data
         </h1>
-        <p className="text-muted-foreground">Monitor and track site material requests.</p>
+        <p className="text-muted-foreground">Monitor and track site material requests from authorized projects.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
@@ -296,7 +318,6 @@ export default function RequirementListPage() {
         </div>
       </div>
 
-      {/* Mobile-Responsive Card List */}
       <div className="md:hidden space-y-4">
         {sortedAndFilteredReqs.length > 0 ? sortedAndFilteredReqs.map((req) => (
           <Card key={req.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setHistoryReq(req)}>
@@ -310,7 +331,6 @@ export default function RequirementListPage() {
                   {req.urgency}
                 </Badge>
               </div>
-
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
                   <Building2 className="h-3 w-3 text-primary/60" />
@@ -321,38 +341,22 @@ export default function RequirementListPage() {
                   <StatusBadge status={req.status} />
                 </div>
               </div>
-
               <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <User className="h-3 w-3 text-primary" />
                   <span className="text-[10px] font-bold text-muted-foreground">{req.userName}</span>
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={(e) => { e.stopPropagation(); setHistoryReq(req); }}>
+                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setHistoryReq(req)}>
                     <History className="h-4 w-4" />
                   </Button>
-                  {(isAdmin || isManager) && req.status === 'Pending' && (
-                    <>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => { e.stopPropagation(); setActionState({ req, targetStatus: isManager ? 'ManagerApproved' : 'Approved' }); }}>
-                        <CircleCheck className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={(e) => { e.stopPropagation(); setActionState({ req, targetStatus: 'Rejected' }); }}>
-                        <CircleX className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
-        )) : (
-          <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-            No requirements found.
-          </div>
-        )}
+        )) : <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No requirements found.</div>}
       </div>
 
-      {/* Desktop Table View */}
       <div className="hidden md:block">
         <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden" id="printable-report-area">
           <CardContent className="p-0 overflow-x-auto">
@@ -404,18 +408,11 @@ export default function RequirementListPage() {
                             <StatusBadge status={req.status} />
                             {canLogisticsAct && (
                               <div className="no-print">
-                                <Select 
-                                    defaultValue={req.status} 
-                                    onValueChange={(val) => setActionState({ req, targetStatus: val })}
-                                >
-                                    <SelectTrigger className="w-[120px] h-7 text-[10px] font-bold rounded-sm border-primary/20">
-                                        <SelectValue />
-                                    </SelectTrigger>
+                                <Select defaultValue={req.status} onValueChange={(val) => setActionState({ req, targetStatus: val })}>
+                                    <SelectTrigger className="w-[120px] h-7 text-[10px] font-bold rounded-sm border-primary/20"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Approved">Approved</SelectItem>
-                                        {LOGISTICS_STATUSES.map(opt => (
-                                            <SelectItem key={opt} value={opt} className="text-[10px] font-medium">{opt}</SelectItem>
-                                        ))}
+                                        {LOGISTICS_STATUSES.map(opt => (<SelectItem key={opt} value={opt} className="text-[10px] font-medium">{opt}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                               </div>
@@ -424,23 +421,15 @@ export default function RequirementListPage() {
                       </TableCell>
                       <TableCell className="text-right px-6 no-print">
                           <div className="flex justify-end items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setHistoryReq(req)} title="View Timeline">
-                                  <History className="h-4 w-4" />
-                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setHistoryReq(req)} title="View Timeline"><History className="h-4 w-4" /></Button>
                               {(canManagerAct || canAdminAct) && (
                                 <>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve">
-                                      <CircleCheck className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => setActionState({ req, targetStatus: 'Rejected' })} title="Reject">
-                                      <CircleX className="h-4 w-4" />
-                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve"><CircleCheck className="h-4 w-4" /></Button>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => setActionState({ req, targetStatus: 'Rejected' })} title="Reject"><CircleX className="h-4 w-4" /></Button>
                                 </>
                               )}
                               {isOwner && req.status === 'Pending' && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingReq(req)}>
-                                      <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingReq(req)}><Trash2 className="h-4 w-4" /></Button>
                               )}
                           </div>
                       </TableCell>
@@ -453,25 +442,14 @@ export default function RequirementListPage() {
         </Card>
       </div>
 
-      {/* Action Dialog */}
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent className="rounded-sm">
-          <DialogHeader>
-            <DialogTitle>Update Status</DialogTitle>
-            <DialogDescription>Setting status to <strong>{actionState?.targetStatus}</strong>.</DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-2">
-            <Label>Remarks</Label>
-            <Textarea id="action-remarks" placeholder="Provide reason..." className="min-h-[100px] rounded-sm" />
-          </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-            <Button onClick={() => handleAction((document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "")}>Confirm</Button>
-          </DialogFooter>
+          <DialogHeader><DialogTitle>Update Status</DialogTitle><DialogDescription>Setting status to <strong>{actionState?.targetStatus}</strong>.</DialogDescription></DialogHeader>
+          <div className="py-4 space-y-2"><Label>Remarks</Label><Textarea id="action-remarks" placeholder="Provide reason..." className="min-h-[100px] rounded-sm" /></div>
+          <DialogFooter><DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose><Button onClick={() => handleAction((document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "")}>Confirm</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* History Dialog */}
       <Dialog open={!!historyReq} onOpenChange={(o) => !o && setHistoryReq(null)}>
         <DialogContent className="rounded-sm max-w-lg">
           <DialogHeader><DialogTitle>Requirement Lifecycle</DialogTitle></DialogHeader>
@@ -492,14 +470,10 @@ export default function RequirementListPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deletingReq} onOpenChange={(o) => !o && setDeletingReq(null)}>
         <AlertDialogContent className="rounded-sm">
             <AlertDialogHeader><AlertDialogTitle>Delete Request?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
-            </AlertDialogFooter>
+            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

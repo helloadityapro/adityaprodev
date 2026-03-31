@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -42,6 +43,7 @@ import { useRouter } from "next/navigation";
 
 type Task = {
   id: string;
+  siteId?: string;
   siteName: string;
   title: string;
   description: string;
@@ -59,6 +61,11 @@ type Task = {
 
 type RewardSettings = {
   taskCompletion?: number;
+};
+
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
 };
 
 const STATUS_OPTIONS = ["To-do", "In Progress", "Completed", "Cancelled"] as const;
@@ -106,9 +113,13 @@ export default function TaskListPage() {
   const [deletingTask, setDeletingTask] = React.useState<Task | null>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
 
   const tasksQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
@@ -123,9 +134,20 @@ export default function TaskListPage() {
   const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
 
   const filteredTasks = React.useMemo(() => {
-    if (!tasks) return [];
+    if (!tasks || !userProfile) return [];
     
-    let list = tasks.filter(task => {
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    let list = tasks;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      list = list.filter(task => assignedIds.has(task.siteId || ""));
+    }
+
+    list = list.filter(task => {
       const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         task.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         task.assignedToName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -144,17 +166,16 @@ export default function TaskListPage() {
         const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
     });
-  }, [tasks, searchTerm, statusFilter, activeTab, user]);
+  }, [tasks, searchTerm, statusFilter, activeTab, user, userProfile, roleConfigs, isSuper]);
 
   const stats = React.useMemo(() => {
-    if (!tasks) return { todo: 0, inProgress: 0, completed: 0 };
-    const myTasks = tasks.filter(t => t.assignedToId === user?.uid);
+    const myTasks = filteredTasks.filter(t => t.assignedToId === user?.uid);
     return {
       todo: myTasks.filter(t => t.status === 'To-do').length,
       inProgress: myTasks.filter(t => t.status === 'In Progress').length,
       completed: myTasks.filter(t => t.status === 'Completed').length,
     };
-  }, [tasks, user]);
+  }, [filteredTasks, user]);
 
   const handleUpdateStatus = async (remarks: string) => {
     if (!actionTask || !pendingStatus) return;
@@ -162,7 +183,6 @@ export default function TaskListPage() {
     
     const nextStatus = pendingStatus;
 
-    // Guard against double completion logic
     if (actionTask.status === 'Completed' && nextStatus === 'Completed') {
         setActionTask(null);
         setIsUpdating(false);
@@ -229,6 +249,8 @@ export default function TaskListPage() {
     setStatusFilter("all");
   };
 
+  if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -236,7 +258,7 @@ export default function TaskListPage() {
           <h1 className="flex items-center gap-2">
             <ListTodo className="h-8 w-8" /> Tasks Audit
           </h1>
-          <p className="text-muted-foreground text-sm font-medium">Monitor and update site activity assignments.</p>
+          <p className="text-muted-foreground text-sm font-medium">Monitor and update authorized site activity assignments.</p>
         </div>
         <Button onClick={() => router.push('/tasks/create')} className="rounded-sm font-bold shadow-md">
           Assign New Task
@@ -357,7 +379,7 @@ export default function TaskListPage() {
             </Card>
           )) : (
             <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-              No tasks found.
+              No tasks found matching criteria.
             </div>
           )}
         </div>

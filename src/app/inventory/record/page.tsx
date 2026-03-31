@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -65,6 +66,12 @@ type UserProfile = {
   role: string;
   siteManagerId?: string;
   assignedProjectIds?: string[];
+  ownDataOnly?: boolean;
+};
+
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
 };
 
 export default function RecordMovementPage() {
@@ -77,8 +84,11 @@ export default function RecordMovementPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
-  const isManager = userProfile?.role === 'Site Manager';
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -97,7 +107,7 @@ export default function RecordMovementPage() {
 
   // BoM lookup for approved items only
   const [approvedBomItems, setApprovedBomItems] = React.useState<BoMItem[]>([]);
-  const currentSiteName = React.useRef("");
+  const currentSiteNameRef = React.useRef("");
 
   const form = useForm<z.infer<typeof movementSchema>>({
     resolver: zodResolver(movementSchema),
@@ -119,8 +129,8 @@ export default function RecordMovementPage() {
 
   // Fetch approved BoM for current site
   React.useEffect(() => {
-    if (watchSiteName && watchSiteName !== currentSiteName.current) {
-      currentSiteName.current = watchSiteName;
+    if (watchSiteName && watchSiteName !== currentSiteNameRef.current) {
+      currentSiteNameRef.current = watchSiteName;
       const fetchApprovedBom = async () => {
         const q = query(collection(firestore, 'project_boms'), where('siteName', '==', watchSiteName), where('status', '==', 'Approved'));
         const snap = await getDocs(q);
@@ -212,10 +222,20 @@ export default function RecordMovementPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-    if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
-    return allSites.filter(s => assignedIds.has(s.id));
-  }, [allSites, userProfile, isAdmin]);
+
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    if (isSuper) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+
+    if (isOwnDataOnly || !isAdmin) {
+      const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
+      return allSites.filter(s => assignedIds.has(s.id));
+    }
+
+    return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+  }, [allSites, userProfile, isAdmin, isSuper, roleConfigs]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
   const filteredSuppliers = allSuppliers?.filter(s => s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())) || [];
@@ -276,8 +296,7 @@ export default function RecordMovementPage() {
                 )} />
 
                 <FormField control={form.control} name="movementType" render={({ field }) => (
-                  <FormItem><FormLabel>Movement Direction</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Inward">Inward (Add to Stock)</SelectItem><SelectItem value="Outward">Outward (Remove from Stock)</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                )} />
+                  <FormItem><FormLabel>Movement Direction</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Inward">Inward (Add to Stock)</SelectItem><SelectItem value="Outward">Outward (Remove from Stock)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
 
                 <div className="space-y-4">
                   <FormField control={form.control} name="sourceOrDestinationType" render={({ field }) => (

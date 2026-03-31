@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -36,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 
 type DPR = {
   id: string;
+  siteId: string;
   siteName: string;
   reportDate: string;
   description: string;
@@ -45,6 +47,11 @@ type DPR = {
   createdAt: any;
   editedBy?: string;
   editedAt?: any;
+};
+
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
 };
 
 export default function DPRListPage() {
@@ -59,9 +66,13 @@ export default function DPRListPage() {
   const [isSaving, setIsSaving] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc(userProfileRef);
+  const { data: userProfile } = useDoc<any>(userProfileRef);
 
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
   const dprsQuery = useMemoFirebase(() => {
@@ -83,9 +94,20 @@ export default function DPRListPage() {
   const { data: dprs, isLoading: dprsLoading } = useCollection<DPR>(dprsQuery);
 
   const sortedAndFilteredDprs = React.useMemo(() => {
-    if (!dprs) return [];
+    if (!dprs || !userProfile) return [];
     
-    let result = dprs.filter(dpr => {
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    let result = dprs;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      result = result.filter(dpr => assignedIds.has(dpr.siteId));
+    }
+
+    result = result.filter(dpr => {
       const matchesSearch = dpr.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (dpr.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         dpr.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -106,7 +128,7 @@ export default function DPRListPage() {
         const dateB = new Date(b.reportDate || (b.createdAt?.toDate?.() || 0)).getTime();
         return dateB - dateA;
     });
-  }, [dprs, searchTerm, startDate, endDate]);
+  }, [dprs, searchTerm, startDate, endDate, userProfile, roleConfigs, isSuper]);
 
   const handleDelete = async () => {
     if (!deletingDpr || !firestore) return;

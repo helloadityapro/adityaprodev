@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -31,6 +32,12 @@ type Site = {
   dcCapacity: any;
 };
 
+type AccessConfig = {
+  id: string;
+  allowedPageKeys: string[];
+  ownDataOnly?: boolean;
+};
+
 const formatCapacity = (val: any) => {
   const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
   return isNaN(num) ? "0.000" : num.toFixed(3);
@@ -45,7 +52,11 @@ export default function ProjectsListPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
 
   React.useEffect(() => {
@@ -58,10 +69,22 @@ export default function ProjectsListPage() {
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
   const accessibleSites = React.useMemo(() => {
-    if (!allSites || !isProcurement) return [];
-    // Only authorized personnel (Admin/Procurement) can access the project list.
+    if (!allSites || !isProcurement || !userProfile) return [];
+    
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    // Super Admins bypass data sovereignty
+    if (isSuper) return allSites;
+
+    if (isOwnDataOnly) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      return allSites.filter(s => assignedIds.has(s.id));
+    }
+    
     return allSites;
-  }, [allSites, isProcurement]);
+  }, [allSites, isProcurement, userProfile, roleConfigs, isSuper]);
 
   const filteredSites = React.useMemo(() => {
     return accessibleSites.filter(s => 

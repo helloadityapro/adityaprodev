@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -59,6 +60,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
 type POItem = {
+  bomItemId: string;
   itemName: string;
   quantity: number;
   rate: number;
@@ -82,6 +84,11 @@ type PurchaseOrder = {
   history?: any[];
 };
 
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
+};
+
 type POSortKey = 'poNumber' | 'site' | 'supplier' | 'status' | 'date' | 'total';
 
 export default function GlobalManagePOsPage() {
@@ -98,8 +105,12 @@ export default function GlobalManagePOsPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
-  
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
   const isManager = userProfile?.role === 'Site Manager';
 
@@ -129,9 +140,20 @@ export default function GlobalManagePOsPage() {
   };
 
   const filteredPOs = React.useMemo(() => {
-    if (!allPOs) return [];
+    if (!allPOs || !userProfile) return [];
     
-    let result = allPOs.filter(po => {
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    let result = allPOs;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      result = result.filter(po => assignedIds.has(po.siteId));
+    }
+
+    result = result.filter(po => {
       const matchesSearch = 
         po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -160,7 +182,7 @@ export default function GlobalManagePOsPage() {
     });
 
     return result;
-  }, [allPOs, searchTerm, statusFilter, sortConfig]);
+  }, [allPOs, searchTerm, statusFilter, sortConfig, userProfile, roleConfigs, isSuper]);
 
   const toggleRow = (id: string) => {
     const newSet = new Set(expandedRows);

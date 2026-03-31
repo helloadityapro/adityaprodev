@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -81,6 +82,11 @@ type WorkOrder = {
   history?: any[];
 };
 
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
+};
+
 type WOSortKey = 'woNumber' | 'site' | 'contractor' | 'status' | 'date' | 'total';
 
 export default function GlobalManageWOsPage() {
@@ -97,8 +103,12 @@ export default function GlobalManageWOsPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
-  
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
   const isManager = userProfile?.role === 'Site Manager';
 
@@ -128,9 +138,20 @@ export default function GlobalManageWOsPage() {
   };
 
   const filteredWOs = React.useMemo(() => {
-    if (!allWOs) return [];
+    if (!allWOs || !userProfile) return [];
     
-    let result = allWOs.filter(wo => {
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    let result = allWOs;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      result = result.filter(wo => assignedIds.has(wo.siteId));
+    }
+
+    result = result.filter(wo => {
       const matchesSearch = 
         wo.woNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         wo.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -159,7 +180,7 @@ export default function GlobalManageWOsPage() {
     });
 
     return result;
-  }, [allWOs, searchTerm, statusFilter, sortConfig]);
+  }, [allWOs, searchTerm, statusFilter, sortConfig, userProfile, roleConfigs, isSuper]);
 
   const toggleRow = (id: string) => {
     const newSet = new Set(expandedRows);
@@ -379,26 +400,5 @@ export default function GlobalManageWOsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
-  const colors = {
-    primary: "bg-primary/5 border-primary/10 text-primary",
-    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
-    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
-    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
-  };
-
-  return (
-    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4" />
-      </CardHeader>
-      <CardContent className="p-4 pt-0">
-        <div className="text-2xl font-black">{value}</div>
-      </CardContent>
-    </Card>
   );
 }

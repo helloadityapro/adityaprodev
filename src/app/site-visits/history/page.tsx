@@ -40,6 +40,7 @@ import Link from "next/link";
 
 type SiteVisit = {
   id: string;
+  siteId: string;
   siteName: string;
   managerName: string;
   managerId: string;
@@ -49,6 +50,11 @@ type SiteVisit = {
   endTime?: any;
   purpose?: string;
   status: 'ongoing' | 'completed';
+};
+
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
 };
 
 type SortKey = 'startTime' | 'siteName' | 'managerName' | 'duration' | 'status';
@@ -84,8 +90,13 @@ export default function SiteVisitsHistoryPage() {
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'startTime', direction: 'desc' });
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
   const historyQuery = useMemoFirebase(() => {
@@ -102,31 +113,26 @@ export default function SiteVisitsHistoryPage() {
         );
     }
     
-    return query(
-      colRef,
-      where('managerId', '==', user.uid),
-      limit(100)
-    );
+    return query(colRef, where('managerId', '==', user.uid), limit(100));
   }, [firestore, user, isAdmin, isManager, isProfileLoading]);
 
   const { data: visits, isLoading } = useCollection<SiteVisit>(historyQuery);
 
-  const handleSort = (key: SortKey) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
-  };
-
   const filteredVisits = React.useMemo(() => {
-    if (!visits) return [];
+    if (!visits || !userProfile) return [];
     
-    const result = visits.filter(v => {
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    let result = visits;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      result = result.filter(v => assignedIds.has(v.siteId));
+    }
+
+    result = result.filter(v => {
       const matchesSearch = v.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (v.purpose || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (v.managerName || '').toLowerCase().includes(searchTerm.toLowerCase());
@@ -162,7 +168,19 @@ export default function SiteVisitsHistoryPage() {
       if (valA > valB) return direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [visits, searchTerm, statusFilter, sortConfig]);
+  }, [visits, searchTerm, statusFilter, sortConfig, userProfile, roleConfigs, isSuper]);
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -180,7 +198,7 @@ export default function SiteVisitsHistoryPage() {
           <h1 className="flex items-center gap-2">
             <History className="h-8 w-8 text-primary" /> {headerTitle}
           </h1>
-          <p className="text-muted-foreground">Historical records of site presence and audit reports.</p>
+          <p className="text-muted-foreground">Historical records of site presence from authorized project locations.</p>
         </div>
       </div>
 
@@ -214,7 +232,6 @@ export default function SiteVisitsHistoryPage() {
         </div>
       </div>
 
-      {/* Mobile-Responsive Card List */}
       <div className="md:hidden space-y-4">
         {filteredVisits.length > 0 ? filteredVisits.map((visit) => (
           <Card key={visit.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden">
@@ -231,7 +248,6 @@ export default function SiteVisitsHistoryPage() {
                   {visit.status}
                 </Badge>
               </div>
-
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">
@@ -242,23 +258,7 @@ export default function SiteVisitsHistoryPage() {
                     {calculateDurationStr(visit.startTime, visit.endTime)}
                   </div>
                 </div>
-                
-                {(isAdmin || isManager) && (
-                  <div className="flex flex-col gap-1 mt-1">
-                    <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                      <User className="h-3.5 w-3.5 text-primary" />
-                      {visit.managerName}
-                    </div>
-                    {visit.department && (
-                      <Badge className="w-fit text-[8px] h-4 font-black uppercase rounded-sm border-none bg-slate-900 text-white px-1.5 flex items-center gap-1">
-                        <Building2 className="h-2.5 w-2.5" />
-                        {visit.department}
-                      </Badge>
-                    )}
-                  </div>
-                )}
               </div>
-
               <div className="pt-2 border-t border-primary/5 flex justify-end">
                 <Button variant="ghost" size="sm" asChild className="rounded-sm text-primary h-8 px-3">
                   <Link href={`/site-visits/${visit.id}`}>
@@ -270,14 +270,9 @@ export default function SiteVisitsHistoryPage() {
               </div>
             </CardContent>
           </Card>
-        )) : (
-          <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-            No visit records found matching current filters.
-          </div>
-        )}
+        )) : <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No visit records found.</div>}
       </div>
 
-      {/* Desktop Table View */}
       <div className="hidden md:block">
         <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
           <CardContent className="p-0">
@@ -285,97 +280,34 @@ export default function SiteVisitsHistoryPage() {
               <Table>
                 <TableHeader className="bg-muted/30">
                   <TableRow>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => handleSort('startTime')}
-                    >
-                      <div className="flex items-center">Start Date & Time <SortIcon column="startTime" /></div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => handleSort('siteName')}
-                    >
-                      <div className="flex items-center">Project Site <SortIcon column="siteName" /></div>
-                    </TableHead>
-                    {(isAdmin || isManager) && (
-                      <TableHead 
-                        className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => handleSort('managerName')}
-                      >
-                        <div className="flex items-center">Personnel <SortIcon column="managerName" /></div>
-                      </TableHead>
-                    )}
+                    <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('startTime')}><div className="flex items-center">Start Date & Time <SortIcon column="startTime" /></div></TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('siteName')}><div className="flex items-center">Project Site <SortIcon column="siteName" /></div></TableHead>
+                    {(isAdmin || isManager) && (<TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('managerName')}><div className="flex items-center">Personnel <SortIcon column="managerName" /></div></TableHead>)}
                     <TableHead>Purpose</TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => handleSort('duration')}
-                    >
-                      <div className="flex items-center">Duration <SortIcon column="duration" /></div>
-                    </TableHead>
-                    <TableHead 
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => handleSort('status')}
-                    >
-                      <div className="flex items-center">Status <SortIcon column="status" /></div>
-                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('duration')}><div className="flex items-center">Duration <SortIcon column="duration" /></div></TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('status')}><div className="flex items-center">Status <SortIcon column="status" /></div></TableHead>
                     <TableHead className="text-right px-6">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredVisits.length > 0 ? filteredVisits.map((visit) => (
                     <TableRow key={visit.id} className="hover:bg-muted/5 transition-colors group">
-                      <TableCell className="font-mono text-xs font-bold text-muted-foreground">
-                        {formatTimestamp(visit.startTime)}
-                      </TableCell>
+                      <TableCell className="font-mono text-xs font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
                       <TableCell className="font-black text-sm">{visit.siteName}</TableCell>
                       {(isAdmin || isManager) && (
                         <TableCell>
                           <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2 text-xs font-bold">
-                              <User className="h-3 w-3 text-primary" />
-                              {visit.managerName}
-                            </div>
-                            {visit.department && (
-                              <Badge className="w-fit text-[8px] h-4 font-black uppercase rounded-sm border-none bg-slate-900 text-white flex items-center gap-1 px-1.5">
-                                <Building2 className="h-3 w-3" /> {visit.department}
-                              </Badge>
-                            )}
+                            <div className="flex items-center gap-2 text-xs font-bold"><User className="h-3 w-3 text-primary" />{visit.managerName}</div>
+                            {visit.department && (<Badge className="w-fit text-[8px] h-4 font-black uppercase rounded-sm border-none bg-slate-900 text-white flex items-center gap-1 px-1.5"><Building2 className="h-3 w-3" /> {visit.department}</Badge>)}
                           </div>
                         </TableCell>
                       )}
-                      <TableCell>
-                        <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">
-                          {visit.purpose || '—'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
-                          <Timer className="h-3 w-3" />
-                          {calculateDurationStr(visit.startTime, visit.endTime)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>
-                          {visit.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right px-6">
-                        <Button variant="ghost" size="sm" asChild className="rounded-sm text-primary hover:text-primary hover:bg-primary/5">
-                          <Link href={`/site-visits/${visit.id}`}>
-                            <FileText className="h-4 w-4 mr-1.5" />
-                            View Report
-                            <ArrowRight className="ml-1.5 h-3 w-3 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                          </Link>
-                        </Button>
-                      </TableCell>
+                      <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">{visit.purpose || '—'}</Badge></TableCell>
+                      <TableCell><div className="flex items-center gap-1.5 text-xs font-bold text-primary"><Timer className="h-3 w-3" />{calculateDurationStr(visit.startTime, visit.endTime)}</div></TableCell>
+                      <TableCell><Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{visit.status}</Badge></TableCell>
+                      <TableCell className="text-right px-6"><Button variant="ghost" size="sm" asChild className="rounded-sm text-primary"><Link href={`/site-visits/${visit.id}`}><FileText className="h-4 w-4 mr-1.5" />View Report</Link></Button></TableCell>
                     </TableRow>
-                  )) : (
-                    <TableRow>
-                      <TableCell colSpan={isAdmin || isManager ? 7 : 6} className="h-32 text-center text-muted-foreground italic">
-                        No visit records found.
-                      </TableCell>
-                    </TableRow>
-                  )}
+                  )) : <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No visit records found.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
