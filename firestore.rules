@@ -17,8 +17,7 @@ service cloud.firestore {
       if (customPerms.contains(key)) { return true; }
       
       let role = userData.get('role', 'none');
-      // If role contains slashes, the path below will point to the nested document.
-      // We must ensure the match rules allow reading these nested documents.
+      // Recursive match {roleId=**} used below handles nested role paths
       let rolePath = /databases/$(database)/documents/system_settings/access/roles/$(role);
       return exists(rolePath) && get(rolePath).data.get('allowedPageKeys', []).contains(key);
     }
@@ -29,6 +28,15 @@ service cloud.firestore {
       let userData = getUserData();
       let hasAdminRole = userData.get('role', '') == 'Admin';
       return isSignedIn() && (isSuperAdmin || hasAdminRole);
+    }
+
+    function isProcurementStaff() {
+      let userData = getUserData();
+      let role = userData.get('role', '');
+      let dept = userData.get('department', '');
+      return role == 'Assistant Manager - Purchase & Supply Chain' || 
+             dept == 'Purchase & Supply Chain' ||
+             dept == 'Procurement and Supply-chain';
     }
 
     match /users/{userId} {
@@ -64,17 +72,17 @@ service cloud.firestore {
 
     match /project_boms/{bomId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('projects');
+      allow write: if isAdmin() || hasPermission('projects') || isProcurementStaff();
     }
 
     match /project_pos/{poId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('purchase-orders');
+      allow write: if isAdmin() || hasPermission('purchase-orders') || isProcurementStaff();
     }
 
     match /project_wos/{woId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('work-orders');
+      allow write: if isAdmin() || hasPermission('work-orders') || isProcurementStaff();
     }
 
     match /project_inventory/{invId} {
@@ -84,7 +92,7 @@ service cloud.firestore {
 
     match /master_inventory/{itemId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('inventory');
+      allow write: if isAdmin() || hasPermission('inventory') || isProcurementStaff();
     }
 
     match /inventory_categories/{categoryId} {
@@ -173,12 +181,12 @@ service cloud.firestore {
 
     match /suppliers/{supplierId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isAdmin() || isProcurementStaff();
     }
 
     match /contractors/{contractorId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isAdmin() || isProcurementStaff();
     }
 
     match /system_settings/{settingId} {
@@ -186,8 +194,6 @@ service cloud.firestore {
       allow write: if isAdmin() || (settingId == 'counters' && isSignedIn());
     }
 
-    // Explicit path for access roles to ensure list/get operations work correctly
-    // Added recursive match {roleId=**} to handle role names containing slashes
     match /system_settings/access/roles/{roleId=**} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
@@ -227,7 +233,7 @@ service cloud.firestore {
 
     match /payments/{paymentId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('payments');
+      allow write: if isAdmin() || hasPermission('payments') || isProcurementStaff();
     }
   }
 }
