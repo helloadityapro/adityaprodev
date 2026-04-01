@@ -17,7 +17,8 @@ service cloud.firestore {
       if (customPerms.contains(key)) { return true; }
       
       let role = userData.get('role', 'none');
-      // Recursive match {roleId=**} used below handles nested role paths
+      // Recursive match {roleId=**} used below in the roles collection handles nested role paths
+      // Note: path literals in rules handle slashes as segment separators.
       let rolePath = /databases/$(database)/documents/system_settings/access/roles/$(role);
       return exists(rolePath) && get(rolePath).data.get('allowedPageKeys', []).contains(key);
     }
@@ -32,11 +33,16 @@ service cloud.firestore {
 
     function isProcurementStaff() {
       let userData = getUserData();
-      let role = userData.get('role', '');
-      let dept = userData.get('department', '');
-      return role == 'Assistant Manager - Purchase & Supply Chain' || 
-             dept == 'Purchase & Supply Chain' ||
-             dept == 'Procurement and Supply-chain';
+      let role = userData.get('role', '').lower();
+      let dept = userData.get('department', '').lower();
+      // Explicit exact matches and flexible keyword-based matches for reliability
+      return role == 'assistant manager - purchase & supply chain' || 
+             dept == 'purchase & supply chain' ||
+             dept == 'procurement and supply-chain' ||
+             role.contains('purchase') ||
+             role.contains('procurement') ||
+             dept.contains('purchase') ||
+             dept.contains('procurement');
     }
 
     match /users/{userId} {
@@ -45,7 +51,7 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         request.auth.uid == userId || 
         isAdmin() || 
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints']))
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints', 'hiddenPermitIds']))
       );
       allow delete: if isAdmin();
     }
