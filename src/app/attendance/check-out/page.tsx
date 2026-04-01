@@ -170,25 +170,25 @@ export default function CheckOutPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-2xl mx-auto py-8 px-4">
+    <div className="space-y-3 max-w-2xl mx-auto py-2 px-4">
       <div className="flex flex-col gap-1">
-        <h1 className="flex items-center gap-2">
-          <CalendarCheck className="h-8 w-8 text-primary" /> Workday In Progress
+        <h1 className="flex items-center gap-2 text-xl">
+          <CalendarCheck className="h-6 w-6 text-primary" /> Session Active
         </h1>
         <div className="flex items-center gap-2">
-          <p className="text-muted-foreground text-sm">Session started {formatDistanceToNow(currentEntry.checkInTime?.toDate() || new Date(), { addSuffix: true })}.</p>
-          <Badge variant="outline" className="h-8 sm:h-9 px-3 sm:px-4 text-[10px] sm:text-xs font-black uppercase rounded-sm border-none bg-emerald-600 text-white shadow-md animate-in fade-in zoom-in-95 duration-500">
+          <p className="text-muted-foreground text-[10px]">Started {formatDistanceToNow(currentEntry.checkInTime?.toDate() || new Date(), { addSuffix: true })}.</p>
+          <Badge variant="outline" className="h-6 px-2 text-[9px] font-black uppercase rounded-sm border-none bg-emerald-600 text-white shadow-md animate-in fade-in zoom-in-95 duration-500">
             Status: Checked-in
           </Badge>
         </div>
       </div>
 
       <Card className="shadow-lg border-emerald-500/20 overflow-hidden rounded-sm">
-        <CardHeader className="bg-emerald-500/5 border-b py-6">
-          <CardTitle className="text-xl">Check-out Verification</CardTitle>
-          <CardDescription>Final profile capture and GPS sync.</CardDescription>
+        <CardHeader className="bg-emerald-500/5 border-b py-2">
+          <CardTitle className="text-sm font-black uppercase tracking-widest">Check-out Verification</CardTitle>
+          <CardDescription className="text-[8px] font-bold text-muted-foreground uppercase">Final profile capture and GPS sync.</CardDescription>
         </CardHeader>
-        <CardContent className="pt-8 pb-8 space-y-6">
+        <CardContent className="pt-4 pb-4 space-y-4">
           <div className="flex flex-col items-center gap-4">
             <div className={cn("relative w-full h-80 bg-black rounded-sm overflow-hidden shadow-2xl border-4 border-emerald-500/20", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
@@ -231,22 +231,22 @@ export default function CheckOutPage() {
           </div>
 
           {hasCameraPermission === false && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="py-2">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Camera Required</AlertTitle>
-              <AlertDescription>Hardware access is mandatory for site audit. Please enable camera permissions in settings to continue.</AlertDescription>
+              <AlertTitle className="text-xs">Camera Required</AlertTitle>
+              <AlertDescription className="text-[10px]">Hardware access is mandatory for site audit. Please enable camera permissions in settings to continue.</AlertDescription>
             </Alert>
           )}
 
           <Button 
-            className="w-full h-16 text-xl font-black rounded-sm shadow-xl bg-red-600 hover:bg-red-700 text-white transition-colors" 
+            className="w-full h-14 text-lg font-black rounded-sm shadow-xl bg-red-600 hover:bg-red-700 text-white transition-colors" 
             onClick={handleCheckOut}
             disabled={isProcessing || !selfie}
           >
             {isProcessing ? (
-              <><Loader2 className="mr-2 h-6 w-6 animate-spin" /> Finalizing...</>
+              <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Finalizing...</>
             ) : (
-              <><LogOut className="mr-3 h-6 w-6" /> END WORKDAY</>
+              <><LogOut className="mr-3 h-5 w-5" /> END WORKDAY</>
             )}
           </Button>
         </CardContent>

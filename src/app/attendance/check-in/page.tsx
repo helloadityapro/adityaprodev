@@ -154,16 +154,15 @@ export default function CheckInPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto pb-10">
+    <div className="space-y-3 max-w-2xl mx-auto pb-4">
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2">
-            <CalendarCheck className="h-6 w-6 text-primary" /> Check-in
+          <h1 className="flex items-center gap-2 text-xl">
+            <CalendarCheck className="h-5 w-5 text-primary" /> Check-in
           </h1>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-muted-foreground text-xs font-medium">Verify your site presence.</p>
             <Badge variant="outline" className={cn(
-              "h-8 sm:h-9 px-3 sm:px-4 text-[10px] sm:text-xs font-black uppercase rounded-sm border-none shadow-md animate-in fade-in zoom-in-95 duration-500",
+              "h-7 px-3 text-[10px] font-black uppercase rounded-sm border-none shadow-md",
               isCheckedIn ? "bg-emerald-600 text-white" : "bg-amber-600 text-white"
             )}>
               {isCheckedIn ? 'Status: Session Active' : 'Status: Checked-out'}
@@ -176,11 +175,11 @@ export default function CheckInPage() {
       </div>
 
       <Card className="shadow-lg border-primary/10 rounded-sm overflow-hidden">
-        <CardHeader className="bg-primary/5 py-4 border-b">
-          <CardTitle className="text-sm font-black uppercase tracking-widest">Verification Profile</CardTitle>
-          <CardDescription className="text-[10px] font-bold text-amber-700 uppercase">Live front profile & GPS sync</CardDescription>
+        <CardHeader className="bg-primary/5 py-2 border-b">
+          <CardTitle className="text-[10px] font-black uppercase tracking-widest">Verification Profile</CardTitle>
+          <CardDescription className="text-[8px] font-bold text-amber-700 uppercase">Live front profile & GPS sync</CardDescription>
         </CardHeader>
-        <CardContent className="pt-6 space-y-6">
+        <CardContent className="pt-4 space-y-4">
           <div className="flex flex-col items-center gap-4">
             <div className={cn("relative w-full h-80 bg-black rounded-sm overflow-hidden shadow-2xl border-4 border-primary/10", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
@@ -219,15 +218,15 @@ export default function CheckInPage() {
           </div>
 
           {hasCameraPermission === false && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="py-2">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Camera Required</AlertTitle>
-              <AlertDescription>Hardware access is mandatory for workday verification. Please enable camera permissions in your device settings.</AlertDescription>
+              <AlertTitle className="text-xs">Camera Required</AlertTitle>
+              <AlertDescription className="text-[10px]">Hardware access is mandatory for workday verification. Please enable camera permissions in your device settings.</AlertDescription>
             </Alert>
           )}
 
           <Button 
-            className="w-full h-14 text-lg font-black rounded-sm shadow-xl" 
+            className="w-full h-12 text-base font-black rounded-sm shadow-xl" 
             onClick={handleCheckIn}
             disabled={isProcessing || !selfie}
           >
