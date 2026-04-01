@@ -17,7 +17,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, query, where, getDocs, limit, doc, orderBy } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
 import {
@@ -41,6 +41,17 @@ type SearchResult = {
   userData?: any;
 };
 
+type Site = {
+  id: string;
+  name: string;
+  projectCompany: string;
+};
+
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
+};
+
 export function GlobalSearch() {
   const router = useRouter();
   const firestore = useFirestore();
@@ -52,7 +63,16 @@ export function GlobalSearch() {
   const [selectedUserForView, setSelectedUserForView] = React.useState<any>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc(userProfileRef);
+  const { data: userProfile } = useDoc<any>(userProfileRef);
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  // Pre-fetch all sites for instant searching and guaranteed visibility
+  // We use a high limit to ensure "all sites" are indeed captured in the index
+  const sitesQuery = useMemoFirebase(() => query(collection(firestore, 'sites'), limit(1000)), [firestore]);
+  const { data: allSites } = useCollection<Site>(sitesQuery);
+
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   // Keyboard shortcut listener
@@ -67,7 +87,7 @@ export function GlobalSearch() {
     return () => document.removeEventListener('keydown', down);
   }, []);
 
-  // Debounced search trigger to reduce database load and latency
+  // Debounced search trigger
   React.useEffect(() => {
     if (!isOpen) {
       setSearchQuery('');
@@ -81,23 +101,51 @@ export function GlobalSearch() {
       } else {
         setResults([]);
       }
-    }, 300);
+    }, 250);
 
     return () => clearTimeout(timer);
   }, [searchQuery, isOpen]);
 
   /**
-   * Parallelizes searches across different collections and updates state progressively.
+   * Perform search across local index (Sites) and remote collections (Permits, Tasks, etc.)
    */
   const performSearch = async (term: string) => {
     setIsSearching(true);
-    setResults([]); // Reset results for new search
+    
+    // 1. Instant local search for Sites (Guarantees visibility of all authorized sites)
+    const siteResults: SearchResult[] = [];
+    if (allSites && userProfile) {
+      const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+        ? userProfile.ownDataOnly 
+        : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
 
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+
+      allSites.forEach(s => {
+        // Apply Data Sovereignty Access Control
+        const isAuthorized = isAdmin || !isOwnDataOnly || assignedIds.has(s.id);
+        if (!isAuthorized) return;
+
+        if (s.name.toLowerCase().includes(term) || s.projectCompany.toLowerCase().includes(term)) {
+          siteResults.push({
+            id: s.id,
+            type: 'Site',
+            title: s.name,
+            subtitle: `${s.projectCompany} • Site ID: ${s.id.slice(0, 8)}`,
+            link: `/projects/${s.id}`
+          });
+        }
+      });
+    }
+
+    setResults(siteResults);
+
+    // 2. Fetch results from more dynamic/growing collections
     const searchCollection = async (
       collName: string, 
       type: SearchResult['type'], 
       fields: string[], 
-      limitCount: number = 50
+      limitCount: number = 100
     ) => {
       try {
         const q = query(collection(firestore, collName), limit(limitCount));
@@ -106,6 +154,20 @@ export function GlobalSearch() {
         const matches: SearchResult[] = [];
         snap.docs.forEach(d => {
           const data = d.data();
+          
+          // Apply Access Control for non-admins if data sovereignty is active
+          if (!isAdmin && userProfile) {
+            const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+              ? userProfile.ownDataOnly 
+              : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+            if (isOwnDataOnly) {
+              const siteId = data.siteId;
+              const assignedIds = new Set(userProfile.assignedProjectIds || []);
+              if (siteId && !assignedIds.has(siteId)) return;
+            }
+          }
+
           const isMatch = fields.some(field => {
             const val = data[field];
             return typeof val === 'string' && val.toLowerCase().includes(term);
@@ -118,11 +180,6 @@ export function GlobalSearch() {
             let userData = null;
 
             switch (type) {
-              case 'Site':
-                title = data.name;
-                subtitle = `${data.projectCompany} • ID: ${d.id.slice(0, 8)}`;
-                link = `/projects/${d.id}`;
-                break;
               case 'Permit':
                 title = data.serialNumber || `Permit ${d.id.slice(0, 8)}`;
                 subtitle = `${data.siteName} • ${data.ptwType} • ${data.status}`;
@@ -130,7 +187,7 @@ export function GlobalSearch() {
                 break;
               case 'Task':
                 title = data.title;
-                subtitle = `Site: ${data.siteName} • Assignee: ${data.assignedToName} • Status: ${data.status}`;
+                subtitle = `Site: ${data.siteName} • Status: ${data.status}`;
                 link = `/tasks/list`;
                 break;
               case 'DPR':
@@ -167,14 +224,13 @@ export function GlobalSearch() {
       }
     };
 
-    // Dispatch all searches in parallel
+    // Parallel search for speed
     Promise.allSettled([
-      searchCollection('sites', 'Site', ['name', 'projectCompany'], 100),
-      searchCollection('permits_to_work', 'Permit', ['serialNumber', 'siteName', 'ptwType'], 100),
+      searchCollection('permits_to_work', 'Permit', ['serialNumber', 'siteName', 'ptwType'], 150),
       searchCollection('tasks', 'Task', ['title', 'siteName', 'assignedToName'], 100),
       searchCollection('dprs', 'DPR', ['siteName', 'description', 'userName'], 50),
       searchCollection('material_movements', 'Movement', ['itemName', 'siteName', 'sourceOrDestination'], 50),
-      searchCollection('users', 'User', ['username', 'email'], 150)
+      isAdmin ? searchCollection('users', 'User', ['username', 'email'], 200) : Promise.resolve()
     ]).finally(() => {
       setIsSearching(false);
     });
