@@ -11,17 +11,22 @@ service cloud.firestore {
       return exists(path) ? get(path).data : {};
     }
 
+    function hasPermission(key) {
+      let userData = getUserData();
+      let customPerms = userData.get('customPermissions', []);
+      if (customPerms.contains(key)) { return true; }
+      
+      let role = userData.get('role', 'none');
+      let rolePath = /databases/$(database)/documents/system_settings/access/roles/$(role);
+      return exists(rolePath) && get(rolePath).data.get('allowedPageKeys', []).contains(key);
+    }
+
     function isAdmin() {
       let userEmail = request.auth.token.get('email', '').lower();
       let isSuperAdmin = userEmail == 'khalil@adityagreenenergy.com';
-      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      let hasAdminRole = exists(userDocPath) && get(userDocPath).data.get('role', '') == 'Admin';
+      let userData = getUserData();
+      let hasAdminRole = userData.get('role', '') == 'Admin';
       return isSignedIn() && (isSuperAdmin || hasAdminRole);
-    }
-
-    function isProcurement() {
-      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return isSignedIn() && exists(userDocPath) && get(userDocPath).data.get('department', '') == 'Procurement and Supply-chain';
     }
 
     match /users/{userId} {
@@ -57,17 +62,17 @@ service cloud.firestore {
 
     match /project_boms/{bomId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
+      allow write: if isAdmin() || hasPermission('projects');
     }
 
     match /project_pos/{poId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isProcurement() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
+      allow write: if isAdmin() || hasPermission('purchase-orders');
     }
 
     match /project_wos/{woId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isProcurement() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
+      allow write: if isAdmin() || hasPermission('work-orders');
     }
 
     match /project_inventory/{invId} {
@@ -77,7 +82,7 @@ service cloud.firestore {
 
     match /master_inventory/{itemId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
+      allow write: if isAdmin() || hasPermission('inventory');
     }
 
     match /inventory_categories/{categoryId} {
@@ -219,7 +224,7 @@ service cloud.firestore {
 
     match /payments/{paymentId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
+      allow write: if isAdmin() || hasPermission('payments');
     }
   }
 }
