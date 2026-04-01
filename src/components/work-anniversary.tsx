@@ -32,6 +32,12 @@ export function WorkAnniversary() {
 
   const { data: profile, isLoading } = useDoc<any>(userProfileRef);
 
+  // Extract only the first name for a more personal greeting
+  const firstName = React.useMemo(() => {
+    if (!profile?.username) return '';
+    return profile.username.trim().split(' ')[0];
+  }, [profile?.username]);
+
   const anniversaryInfo = React.useMemo(() => {
     if (!profile?.doj) return { isAnniversary: false, years: 0 };
     const today = new Date();
@@ -134,7 +140,7 @@ export function WorkAnniversary() {
             Congratulations!
           </DialogTitle>
           <DialogDescription className="text-xl sm:text-2xl font-black text-primary mt-1 text-center uppercase tracking-tight">
-            Work Anniversary
+            {firstName}
           </DialogDescription>
         </DialogHeader>
 
