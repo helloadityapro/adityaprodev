@@ -18,8 +18,8 @@ import { motion } from 'framer-motion';
 
 /**
  * Component that displays a celebratory birthday popup if it's the user's birthday.
- * Uses local storage to ensure it only appears once on the actual day.
- * Sequences with the AttendanceGate via a custom event.
+ * Uses local storage to ensure it only appears once automatically on the actual day.
+ * Supports manual re-trigger via a global event.
  */
 export function BirthdayCelebration() {
   const { user } = useUser();
@@ -39,33 +39,7 @@ export function BirthdayCelebration() {
     return profile.username.trim().split(' ')[0];
   }, [profile?.username]);
 
-  React.useEffect(() => {
-    if (isLoading || !profile?.dob || !user) return;
-
-    const checkBirthday = () => {
-      const today = new Date();
-      const birthDate = new Date(profile.dob);
-      
-      // Compare month and day
-      const isBirthday = 
-        today.getMonth() === birthDate.getMonth() && 
-        today.getDate() === birthDate.getDate();
-
-      if (isBirthday) {
-        const storageKey = `birthday_shown_${user.uid}_${today.getFullYear()}`;
-        const hasBeenShown = localStorage.getItem(storageKey);
-
-        if (!hasBeenShown) {
-          setIsOpen(true);
-          triggerConfetti();
-        }
-      }
-    };
-
-    checkBirthday();
-  }, [profile, isLoading, user]);
-
-  const triggerConfetti = () => {
+  const triggerConfetti = React.useCallback(() => {
     const duration = 5 * 1000;
     const animationEnd = Date.now() + duration;
     const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
@@ -92,7 +66,41 @@ export function BirthdayCelebration() {
         origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
       });
     }, 250);
-  };
+  }, []);
+
+  React.useEffect(() => {
+    if (isLoading || !profile?.dob || !user) return;
+
+    const checkBirthday = () => {
+      const today = new Date();
+      const birthDate = new Date(profile.dob);
+      
+      // Compare month and day
+      const isBirthday = 
+        today.getMonth() === birthDate.getMonth() && 
+        today.getDate() === birthDate.getDate();
+
+      if (isBirthday) {
+        const storageKey = `birthday_shown_${user.uid}_${today.getFullYear()}`;
+        const hasBeenShown = localStorage.getItem(storageKey);
+
+        if (!hasBeenShown) {
+          setIsOpen(true);
+          triggerConfetti();
+        }
+      }
+    };
+
+    checkBirthday();
+
+    const handleManualTrigger = () => {
+      setIsOpen(true);
+      triggerConfetti();
+    };
+
+    window.addEventListener('trigger-birthday-celebration', handleManualTrigger);
+    return () => window.removeEventListener('trigger-birthday-celebration', handleManualTrigger);
+  }, [profile, isLoading, user, triggerConfetti]);
 
   const handleClose = () => {
     if (user && profile?.dob) {

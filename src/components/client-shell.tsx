@@ -180,6 +180,17 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
 
+  const isBirthday = React.useMemo(() => {
+    if (!userProfile?.dob) return false;
+    const today = new Date();
+    const birthDate = new Date(userProfile.dob);
+    return today.getMonth() === birthDate.getMonth() && today.getDate() === birthDate.getDate();
+  }, [userProfile?.dob]);
+
+  const handleBirthdayClick = () => {
+    window.dispatchEvent(new Event('trigger-birthday-celebration'));
+  };
+
   // Dynamic Access Gate (Inline Visibility Control)
   const isAuthorized = React.useMemo(() => {
     if (isAuthPage || isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
@@ -233,7 +244,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           if (!updateData.username) {
             updateData.username = user.displayName || user.email?.split('@')[0] || 'Admin';
           }
-          updateData.mobile = user.phoneNumber || 'N/A';
+          data.mobile = user.phoneNumber || 'N/A';
           updateData.assignedProjectIds = [];
           updateData.totalPoints = 0;
           updateData.pointsMultiplier = 1;
@@ -462,6 +473,15 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               <GlobalSearch />
             </div>
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              {isBirthday && (
+                <Button 
+                  variant="ghost" 
+                  onClick={handleBirthdayClick}
+                  className="h-8 px-2 sm:px-3 text-xs font-black uppercase text-amber-600 hover:bg-amber-50 rounded-sm animate-in fade-in zoom-in duration-500"
+                >
+                  <span className="mr-1">🎉</span> Happy Birthday!
+                </Button>
+              )}
               <div className="hidden md:flex">
                 <QuickActions />
               </div>
