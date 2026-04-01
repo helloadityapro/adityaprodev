@@ -236,7 +236,8 @@ export default function CreatePOPage() {
         details: `Initial order generated for ₹${totalAmount.toLocaleString('en-IN')}`
       };
 
-      await addDocumentNonBlocking(collection(firestore, 'project_pos'), {
+      // Removing await to leverage optimistic updates and background sync as per guidelines
+      addDocumentNonBlocking(collection(firestore, 'project_pos'), {
         siteId: values.siteId,
         siteName: values.siteName,
         poNumber: values.poNumber,
@@ -256,6 +257,7 @@ export default function CreatePOPage() {
       setIsSuccess(true);
       toast({ title: 'PO Created', description: `Purchase Order ${values.poNumber} has been recorded.` });
     } catch (e: any) {
+      // Errors are also handled by the non-blocking catch block and global emitter
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
       setIsSubmitting(false);

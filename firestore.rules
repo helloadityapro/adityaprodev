@@ -17,8 +17,10 @@ service cloud.firestore {
       if (customPerms.contains(key)) { return true; }
       
       let role = userData.get('role', 'none');
-      // Recursive match {roleId=**} used below in the roles collection handles nested role paths
-      // Note: path literals in rules handle slashes as segment separators.
+      if (role == 'none') { return false; }
+      
+      // Note: role names with slashes will be interpreted as path segments
+      // which matches the document structure created by the SDK.
       let rolePath = /databases/$(database)/documents/system_settings/access/roles/$(role);
       return exists(rolePath) && get(rolePath).data.get('allowedPageKeys', []).contains(key);
     }
@@ -33,16 +35,11 @@ service cloud.firestore {
 
     function isProcurementStaff() {
       let userData = getUserData();
-      let role = userData.get('role', '').lower();
-      let dept = userData.get('department', '').lower();
-      // Explicit exact matches and flexible keyword-based matches for reliability
-      return role == 'assistant manager - purchase & supply chain' || 
-             dept == 'purchase & supply chain' ||
-             dept == 'procurement and supply-chain' ||
-             role.contains('purchase') ||
-             role.contains('procurement') ||
-             dept.contains('purchase') ||
-             dept.contains('procurement');
+      let role = userData.get('role', 'none').lower();
+      let dept = userData.get('department', 'none').lower();
+      // Robust keyword checking to handle role name variations like "Assistant Manager - Purchase & Supply Chain"
+      return role.contains('purchase') || role.contains('procurement') || role.contains('supply') ||
+             dept.contains('purchase') || dept.contains('procurement') || dept.contains('supply');
     }
 
     match /users/{userId} {
