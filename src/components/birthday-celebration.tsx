@@ -19,6 +19,7 @@ import { motion } from 'framer-motion';
 /**
  * Component that displays a celebratory birthday popup if it's the user's birthday.
  * Uses local storage to ensure it only appears once on the actual day.
+ * Sequences with the AttendanceGate via a custom event.
  */
 export function BirthdayCelebration() {
   const { user } = useUser();
@@ -31,6 +32,12 @@ export function BirthdayCelebration() {
   }, [firestore, user]);
 
   const { data: profile, isLoading } = useDoc<any>(userProfileRef);
+
+  // Extract only the first name for a more personal greeting
+  const firstName = React.useMemo(() => {
+    if (!profile?.username) return '';
+    return profile.username.trim().split(' ')[0];
+  }, [profile?.username]);
 
   React.useEffect(() => {
     if (isLoading || !profile?.dob || !user) return;
@@ -101,7 +108,7 @@ export function BirthdayCelebration() {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if(!open) handleClose(); }}>
       <DialogContent className="sm:max-w-md rounded-sm border-primary/10 shadow-2xl overflow-hidden bg-background">
-        <DialogHeader className="pt-8 pb-4 flex flex-col items-center text-center sm:text-center">
+        <DialogHeader className="pt-8 pb-4 flex flex-col items-center text-center">
           <motion.div 
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -118,19 +125,20 @@ export function BirthdayCelebration() {
             </motion.div>
           </motion.div>
           
-          <DialogTitle className="text-5xl text-foreground font-script normal-case py-2 text-center w-full">
+          <DialogTitle className="text-6xl text-foreground font-script normal-case py-2 text-center w-full">
             Happy Birthday!
           </DialogTitle>
-          <DialogDescription className="text-lg font-bold text-primary mt-2 text-center">
-            {profile?.username}
+          <DialogDescription className="text-2xl font-black text-primary mt-2 text-center uppercase tracking-tight">
+            {firstName}
           </DialogDescription>
         </DialogHeader>
 
         <div className="px-6 py-4 text-center space-y-6">
-          <div className="space-y-2">
-            <p className="text-sm font-medium leading-relaxed text-muted-foreground italic">
-              "Warmest wishes on your special day! Your hard work and dedication continue to light up our projects."
-            </p>
+          <div className="space-y-1">
+            <p className="text-sm font-bold leading-relaxed text-muted-foreground italic">You bring the energy.</p>
+            <p className="text-sm font-bold leading-relaxed text-muted-foreground italic">Today, we celebrate YOU.</p>
+            <p className="text-sm font-bold leading-relaxed text-muted-foreground italic">A special day for a special you.</p>
+            <p className="text-sm font-bold leading-relaxed text-muted-foreground italic">Wishing you happiness today and success all year long.</p>
           </div>
 
           <div className="py-4 border-y border-border/50">
