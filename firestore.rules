@@ -17,6 +17,8 @@ service cloud.firestore {
       if (customPerms.contains(key)) { return true; }
       
       let role = userData.get('role', 'none');
+      // If role contains slashes, the path below will point to the nested document.
+      // We must ensure the match rules allow reading these nested documents.
       let rolePath = /databases/$(database)/documents/system_settings/access/roles/$(role);
       return exists(rolePath) && get(rolePath).data.get('allowedPageKeys', []).contains(key);
     }
@@ -185,7 +187,8 @@ service cloud.firestore {
     }
 
     // Explicit path for access roles to ensure list/get operations work correctly
-    match /system_settings/access/roles/{roleId} {
+    // Added recursive match {roleId=**} to handle role names containing slashes
+    match /system_settings/access/roles/{roleId=**} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
