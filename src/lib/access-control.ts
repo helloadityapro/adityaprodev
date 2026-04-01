@@ -125,3 +125,16 @@ export function getPageKeyByPath(path: string): PageKey | null {
   
   return null;
 }
+
+/**
+ * Normalizes a role string into a stable identifier for use as a Firestore document ID.
+ * This prevents slashes and special characters from breaking path resolutions in security rules.
+ */
+export function slugifyRole(role: string): string {
+  return role
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, '') // Remove non-word characters (except spaces and hyphens)
+    .replace(/[\s_]+/g, '-')  // Replace spaces and underscores with hyphens
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+}

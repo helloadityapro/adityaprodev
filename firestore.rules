@@ -13,16 +13,29 @@ service cloud.firestore {
 
     function hasPermission(key) {
       let userData = getUserData();
+      
+      // 1. Check individual overrides first
       let customPerms = userData.get('customPermissions', []);
       if (customPerms.contains(key)) { return true; }
       
-      let role = userData.get('role', 'none');
-      if (role == 'none') { return false; }
+      // 2. Check role-based defaults using normalized roleId
+      let roleId = userData.get('roleId', 'none');
+      if (roleId != 'none') {
+        let rolePath = /databases/$(database)/documents/system_settings/access/roles/$(roleId);
+        if (exists(rolePath) && get(rolePath).data.get('allowedPageKeys', []).contains(key)) {
+          return true;
+        }
+      }
       
-      // Note: role names with slashes will be interpreted as path segments
-      // which matches the document structure created by the SDK.
-      let rolePath = /databases/$(database)/documents/system_settings/access/roles/$(role);
-      return exists(rolePath) && get(rolePath).data.get('allowedPageKeys', []).contains(key);
+      // 3. Fallback for existing users without roleId (raw role string)
+      // Note: Slashes in role names might fail here, which is why roleId is preferred.
+      let role = userData.get('role', 'none');
+      if (role != 'none') {
+        let rawRolePath = /databases/$(database)/documents/system_settings/access/roles/$(role);
+        return exists(rawRolePath) && get(rawRolePath).data.get('allowedPageKeys', []).contains(key);
+      }
+
+      return false;
     }
 
     function isAdmin() {

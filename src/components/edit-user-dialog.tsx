@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore, updateDocumentNonBlocking, useCollection, useMemoFirebase } from '@/firebase';
 import { doc, collection } from 'firebase/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { slugifyRole } from '@/lib/access-control';
 
 const editUserSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
@@ -106,6 +107,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
       const userRef = doc(firestore, 'users', user.id);
       updateDocumentNonBlocking(userRef, {
         ...values,
+        roleId: slugifyRole(values.role),
         panNumber: values.panNumber.toUpperCase()
       });
 

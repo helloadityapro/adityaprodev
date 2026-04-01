@@ -16,6 +16,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth"
 import { doc, serverTimestamp, collection } from "firebase/firestore"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2, CheckCircle2 } from "lucide-react"
+import { slugifyRole } from "@/lib/access-control"
 
 const registerSchema = z.object({
   username: z.string().min(1, { message: "Username is required." }),
@@ -94,6 +95,7 @@ export default function RegisterPage() {
         email: values.email,
         mobile: values.mobile,
         role: values.role,
+        roleId: slugifyRole(values.role),
         department: values.department,
         dob: values.dob,
         doj: values.doj,

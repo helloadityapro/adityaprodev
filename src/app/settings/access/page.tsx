@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { APP_PAGES, type PageKey } from '@/lib/access-control';
+import { APP_PAGES, type PageKey, slugifyRole } from '@/lib/access-control';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -89,7 +89,8 @@ export default function UserAccessManagementPage() {
   // Load permissions for selected role
   React.useEffect(() => {
     if (selectedRole && roleConfigs) {
-      const config = roleConfigs.find(c => c.id === selectedRole);
+      const roleId = slugifyRole(selectedRole);
+      const config = roleConfigs.find(c => c.id === roleId);
       setRolePermissions(config?.allowedPageKeys || []);
       setRoleOwnDataOnly(config?.ownDataOnly || false);
     }
@@ -104,7 +105,8 @@ export default function UserAccessManagementPage() {
         setUserPermissions(foundUser.customPermissions);
         setUserOwnDataOnly(foundUser.ownDataOnly || false);
       } else {
-        const roleConfig = roleConfigs?.find(c => c.id === foundUser?.role);
+        const roleId = slugifyRole(foundUser?.role || "");
+        const roleConfig = roleConfigs?.find(c => c.id === roleId);
         setUserPermissions(roleConfig?.allowedPageKeys || []);
         setUserOwnDataOnly(roleConfig?.ownDataOnly || false);
       }
@@ -126,7 +128,8 @@ export default function UserAccessManagementPage() {
     if (!selectedRole) return;
     setIsSaving(true);
     try {
-      const ref = doc(firestore, 'system_settings', 'access', 'roles', selectedRole);
+      const roleId = slugifyRole(selectedRole);
+      const ref = doc(firestore, 'system_settings', 'access', 'roles', roleId);
       await setDocumentNonBlocking(ref, {
         allowedPageKeys: rolePermissions,
         ownDataOnly: roleOwnDataOnly,
@@ -170,7 +173,8 @@ export default function UserAccessManagementPage() {
       
       // Reset local state to role defaults
       const foundUser = allUsers?.find(u => u.id === selectedUserId);
-      const roleConfig = roleConfigs?.find(c => c.id === foundUser?.role);
+      const roleId = slugifyRole(foundUser?.role || "");
+      const roleConfig = roleConfigs?.find(c => c.id === roleId);
       setUserPermissions(roleConfig?.allowedPageKeys || []);
       setUserOwnDataOnly(roleConfig?.ownDataOnly || false);
       

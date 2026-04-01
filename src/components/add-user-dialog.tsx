@@ -30,6 +30,7 @@ import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { firebaseConfig } from '@/firebase/config';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { slugifyRole } from '@/lib/access-control';
 
 const addUserSchema = z.object({
   username: z.string().min(1, 'Username is required.'),
@@ -92,6 +93,7 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
         email: values.email,
         mobile: values.mobile,
         role: values.role,
+        roleId: slugifyRole(values.role),
         department: values.department,
         dob: values.dob,
         doj: values.doj,
@@ -314,7 +316,7 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
             </form>
           </Form>
         </ScrollArea>
-        <DialogFooter className="p-6 border-t gap-2 flex-col sm:flex-row">
+        <DialogFooter className="p-6 border-t gap-2 flex flex-col sm:flex-row">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting} className="rounded-sm font-bold uppercase text-[10px]">
             Cancel
           </Button>
