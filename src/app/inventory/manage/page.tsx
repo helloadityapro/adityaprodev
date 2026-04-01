@@ -1,10 +1,12 @@
-
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc } from 'firebase/firestore';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, doc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -21,7 +23,11 @@ import {
   ArrowUp,
   ArrowDown,
   Tag,
-  Eye
+  Eye,
+  Pencil,
+  Loader2,
+  Save,
+  X
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -37,6 +43,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"];
+
+const subItemSchema = z.object({
+  name: z.string().min(1, 'Part name is required.'),
+  quantityPerSet: z.coerce.number().min(0.01, 'Qty required.'),
+  unit: z.string().min(1, 'Unit required.'),
+});
+
+const itemSchema = z.object({
+  name: z.string().min(1, 'Item Name is required.'),
+  category: z.string().min(1, 'Category is required.'),
+  unit: z.string().min(1, 'Unit is required.'),
+  make: z.string().min(1, 'Make/Brand is required.'),
+  description: z.string().optional(),
+  subItems: z.array(subItemSchema).optional(),
+});
 
 type MasterItem = {
   id: string;
@@ -61,6 +102,8 @@ export default function ManageMasterInventoryPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [categoryFilter, setCategoryFilter] = React.useState("all");
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+  const [editingItem, setEditingItem] = React.useState<MasterItem | null>(null);
+  const [isUpdating, setIsUpdating] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -72,6 +115,54 @@ export default function ManageMasterInventoryPage() {
 
   const categoriesQuery = useMemoFirebase(() => collection(firestore, 'inventory_categories'), [firestore]);
   const { data: categories } = useCollection<{ name: string }>(categoriesQuery);
+
+  const form = useForm<z.infer<typeof itemSchema>>({
+    resolver: zodResolver(itemSchema),
+    defaultValues: { 
+      name: '', 
+      category: '', 
+      unit: 'Numbers', 
+      make: 'Standard',
+      description: '',
+      subItems: [] 
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "subItems"
+  });
+
+  React.useEffect(() => {
+    if (editingItem) {
+      form.reset({
+        name: editingItem.name,
+        category: editingItem.category,
+        unit: editingItem.unit,
+        make: editingItem.make,
+        description: editingItem.description || '',
+        subItems: editingItem.subItems || []
+      });
+    }
+  }, [editingItem, form]);
+
+  const onEditSubmit = async (values: z.infer<typeof itemSchema>) => {
+    if (!editingItem) return;
+    setIsUpdating(true);
+    try {
+      const itemRef = doc(firestore, 'master_inventory', editingItem.id);
+      updateDocumentNonBlocking(itemRef, {
+        ...values,
+        updatedAt: serverTimestamp(),
+      });
+      toast({ title: 'Item Updated', description: `${values.name} has been modified successfully.` });
+      setEditingItem(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -208,7 +299,7 @@ export default function ManageMasterInventoryPage() {
                   <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('unit')}>
                     <div className="flex items-center justify-center">Base Unit <SortIcon column="unit" /></div>
                   </TableHead>
-                  {isAdmin && <TableHead className="text-right px-6">Action</TableHead>}
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -239,22 +330,32 @@ export default function ManageMasterInventoryPage() {
                           {item.unit}
                         </Badge>
                       </TableCell>
-                      {isAdmin && (
-                        <TableCell className="text-right px-6">
-                          <div className="flex justify-end items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => {
-                              deleteDocumentNonBlocking(doc(firestore, 'master_inventory', item.id));
-                              toast({ title: 'Item Removed' });
-                            }}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end items-center gap-1">
+                          {isAdmin && (
+                            <>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10"
+                                onClick={() => setEditingItem(item)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => {
+                                deleteDocumentNonBlocking(doc(firestore, 'master_inventory', item.id));
+                                toast({ title: 'Item Removed' });
+                              }}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                     {expandedRows.has(item.id) && item.subItems && (
                       <TableRow className="bg-primary/[0.02]">
-                        <TableCell colSpan={isAdmin ? 5 : 4} className="p-0 border-b">
+                        <TableCell colSpan={5} className="p-0 border-b">
                           <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200">
                             <div className="flex items-center gap-2 mb-2">
                               <Layers className="h-3.5 w-3.5 text-primary" />
@@ -278,7 +379,7 @@ export default function ManageMasterInventoryPage() {
                   </React.Fragment>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 5 : 4} className="h-48 text-center text-muted-foreground italic flex flex-col items-center justify-center gap-2">
+                    <TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic flex flex-col items-center justify-center gap-2">
                       <Boxes className="h-10 w-10 opacity-20" />
                       <p className="text-sm font-bold uppercase tracking-widest">No items matching current filters</p>
                     </TableCell>
@@ -289,6 +390,165 @@ export default function ManageMasterInventoryPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingItem} onOpenChange={(o) => !o && setEditingItem(null)}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 rounded-sm overflow-hidden border-none shadow-2xl">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Edit Material Registry</DialogTitle>
+            <DialogDescription className="text-xs font-medium">Modify properties for {editingItem?.name}.</DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="flex-1">
+            <div className="p-6">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField control={form.control} name="name" render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Item Name</FormLabel>
+                        <FormControl><Input placeholder="e.g. Solar Module 540Wp" {...field} className="h-11 rounded-sm" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="category" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Category</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-11 rounded-sm">
+                              <SelectValue placeholder="Select Category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories?.map(c => <SelectItem key={c.name} value={c.name} className="text-xs font-bold">{c.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="unit" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Base Unit</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-11 rounded-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {UNITS.map(u => <SelectItem key={u} value={u} className="text-xs font-bold">{u}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="make" render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Make / Brand</FormLabel>
+                        <FormControl><Input placeholder="e.g. Adani / Mahindra" {...field} className="h-11 rounded-sm" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+
+                    <FormField control={form.control} name="description" render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Technical Specification</FormLabel>
+                        <FormControl><Input placeholder="Details..." {...field} className="h-11 rounded-sm" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+
+                  {form.watch('unit') === 'Sets' && (
+                    <div className="space-y-4 p-4 bg-muted/10 border rounded-sm">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Component Breakdown</Label>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => append({ name: '', quantityPerSet: 1, unit: 'Numbers' })}
+                          className="h-7 text-[9px] font-black uppercase border border-primary/20 hover:bg-primary/10"
+                        >
+                          <Plus className="h-3 w-3 mr-1" /> Add Part
+                        </Button>
+                      </div>
+                      <div className="space-y-3">
+                        {fields.map((field, idx) => (
+                          <div key={field.id} className="grid grid-cols-12 gap-2 items-end bg-background p-2 rounded-sm relative group border shadow-sm">
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="absolute -top-2 -right-2 h-5 w-5 bg-destructive text-white rounded-full z-10" 
+                              onClick={() => remove(idx)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                            <div className="col-span-6">
+                              <FormField control={form.control} name={`subItems.${idx}.name`} render={({ field }) => (
+                                <Input placeholder="Part name" {...field} className="h-8 text-xs rounded-sm" />
+                              )} />
+                            </div>
+                            <div className="col-span-3">
+                              <FormField control={form.control} name={`subItems.${idx}.quantityPerSet`} render={({ field }) => (
+                                <Input type="number" step="0.01" {...field} className="h-8 text-xs rounded-sm px-1 text-center" />
+                              )} />
+                            </div>
+                            <div className="col-span-3">
+                              <FormField control={form.control} name={`subItems.${idx}.unit`} render={({ field }) => (
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <SelectTrigger className="h-8 text-[10px] rounded-sm"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {UNITS.map(u => <SelectItem key={u} value={u} className="text-[10px]">{u}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              )} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </form>
+              </Form>
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0">
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
+            <Button onClick={form.handleSubmit(onEditSubmit)} disabled={isUpdating} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
+  const colors = {
+    primary: "bg-primary/5 border-primary/10 text-primary",
+    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
+    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
+  };
+
+  return (
+    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-4 w-4" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-black">{value}</div>
+      </CardContent>
+    </Card>
   );
 }
