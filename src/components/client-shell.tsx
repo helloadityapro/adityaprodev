@@ -180,6 +180,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
+  const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
+  const userDepartment = userProfile?.department || "";
 
   const isBirthday = React.useMemo(() => {
     if (!userProfile?.dob) return false;
@@ -223,7 +225,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (allowedKeys.size === 0) return true; 
     
     return allowedKeys.has(pageKey);
-  }, [user, userProfile, isUserLoading, isProfileLoading, pathname, isAuthPage, roleConfigs]);
+  }, [user, userProfile, isUserLoading, isProfileLoading, pathname, isAuthPage, roleConfigs, userRole]);
 
   React.useEffect(() => {
     if (!isUserLoading && !user && !isAuthPage) {
@@ -260,7 +262,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           if (!updateData.username) {
             updateData.username = user.displayName || user.email?.split('@')[0] || 'Admin';
           }
-          data.mobile = user.phoneNumber || 'N/A';
+          updateData.mobile = user.phoneNumber || 'N/A';
           updateData.assignedProjectIds = [];
           updateData.totalPoints = 0;
           updateData.pointsMultiplier = 1;
@@ -271,9 +273,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     }
   }, [user, userProfile, isProfileLoading, firestore]);
 
-  const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
-  const userDepartment = userProfile?.department || "";
-  
   const ptwQueryForBadge = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'permits_to_work');
