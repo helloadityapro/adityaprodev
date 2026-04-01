@@ -19,6 +19,11 @@ service cloud.firestore {
       return isSignedIn() && (isSuperAdmin || hasAdminRole);
     }
 
+    function isProcurement() {
+      let userDocPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return isSignedIn() && exists(userDocPath) && get(userDocPath).data.get('department', '') == 'Procurement and Supply-chain';
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
@@ -57,12 +62,12 @@ service cloud.firestore {
 
     match /project_pos/{poId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
+      allow write: if isAdmin() || isProcurement() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
     }
 
     match /project_wos/{woId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
+      allow write: if isAdmin() || isProcurement() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
     }
 
     match /project_inventory/{invId} {
