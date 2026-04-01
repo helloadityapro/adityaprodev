@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap');
+
 @layer base {
   :root {
     /* Professional Blue (#2d73ff) Theme */
@@ -63,7 +65,7 @@
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 220 100% 59%;
     --sidebar-primary-foreground: 222.2 47.4% 11.2%;
-    --sidebar-accent: 217.2 32.6% 12.5%;
+    --sidebar-accent: 217.2 32.6 12.5%;
     --sidebar-accent-foreground: 220 100% 69.8%;
     --sidebar-border: 217.2 32.6% 17.5%;
     --sidebar-ring: 220 100% 59%;
@@ -84,6 +86,10 @@
 }
 
 @layer utilities {
+  .font-script {
+    font-family: 'Great Vibes', cursive;
+  }
+
   /* Mobile-optimized scrollbars */
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;

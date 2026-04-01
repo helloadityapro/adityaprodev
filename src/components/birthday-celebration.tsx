@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Cake, PartyPopper, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 /**
  * Component that displays a celebratory birthday popup if it's the user's birthday.
@@ -90,9 +90,7 @@ export function BirthdayCelebration() {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-md rounded-sm border-primary/20 shadow-2xl overflow-hidden bg-gradient-to-b from-primary/[0.02] to-background">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 via-primary to-emerald-400" />
-        
+      <DialogContent className="sm:max-w-md rounded-sm border-primary/10 shadow-2xl overflow-hidden bg-background">
         <DialogHeader className="pt-8 pb-4 text-center">
           <motion.div 
             initial={{ scale: 0.5, opacity: 0 }}
@@ -110,7 +108,7 @@ export function BirthdayCelebration() {
             </motion.div>
           </motion.div>
           
-          <DialogTitle className="text-3xl font-black uppercase tracking-tight text-foreground">
+          <DialogTitle className="text-5xl text-foreground font-script normal-case py-2">
             Happy Birthday!
           </DialogTitle>
           <DialogDescription className="text-lg font-bold text-primary mt-2">
@@ -125,7 +123,7 @@ export function BirthdayCelebration() {
             </p>
           </div>
 
-          <div className="py-4 border-y border-primary/5">
+          <div className="py-4 border-y border-border/50">
             <p className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-[0.3em] mb-1">Wishes from</p>
             <p className="text-xs font-black text-primary uppercase tracking-widest">Team Aditya</p>
             <p className="text-[10px] font-bold text-muted-foreground mt-0.5">Aditya Green Energy Private Limited</p>
