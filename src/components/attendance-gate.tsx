@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { collection, query, where, doc, limit, Timestamp } from 'firebase/firestore';
-import { format, isAfter, setHours, setMinutes, parseISO, addDays, startOfDay, endOfDay } from 'date-fns';
+import { format, isAfter, setHours, setMinutes, parseISO, endOfDay } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useRouter, usePathname } from 'next/navigation';
@@ -15,6 +15,7 @@ import { Clock, LogIn } from 'lucide-react';
  * 1. Forced check-in redirect if no session exists for today.
  * 2. Check-out reminders after 7:00 PM.
  * 3. Daily 12 AM system reset for stale sessions (Marked as System CheckOut).
+ * 4. Sequencing with Birthday Celebration popup.
  */
 export function AttendanceGate() {
   const { user } = useUser();
@@ -25,6 +26,13 @@ export function AttendanceGate() {
   const [showCheckIn, setShowCheckIn] = React.useState(false);
   const [showCheckOut, setShowCheckOut] = React.useState(false);
   const [currentDate, setCurrentDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
+  const [isWaitingForBirthday, setIsWaitingForBirthday] = React.useState(false);
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+  const { data: profile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   // Periodic check for date rollover (every 1 minute)
   React.useEffect(() => {
@@ -36,6 +44,32 @@ export function AttendanceGate() {
     }, 60000);
     return () => clearInterval(interval);
   }, [currentDate]);
+
+  // Handle birthday sequencing
+  React.useEffect(() => {
+    if (isProfileLoading || !profile?.dob || !user) return;
+
+    const today = new Date();
+    const birthDate = new Date(profile.dob);
+    const isBirthday = today.getMonth() === birthDate.getMonth() && today.getDate() === birthDate.getDate();
+    const storageKey = `birthday_shown_${user.uid}_${today.getFullYear()}`;
+    const hasBeenShown = localStorage.getItem(storageKey);
+
+    if (isBirthday && !hasBeenShown) {
+      setIsWaitingForBirthday(true);
+    } else {
+      setIsWaitingForBirthday(false);
+    }
+  }, [profile, isProfileLoading, user, currentDate]);
+
+  // Listen for birthday popup completion
+  React.useEffect(() => {
+    const handleBirthdayFinished = () => {
+      setIsWaitingForBirthday(false);
+    };
+    window.addEventListener('birthday-celebration-finished', handleBirthdayFinished);
+    return () => window.removeEventListener('birthday-celebration-finished', handleBirthdayFinished);
+  }, []);
 
   // Today's date reference
   const todayStr = currentDate;
@@ -68,7 +102,7 @@ export function AttendanceGate() {
   const { data: todayFinished, isLoading: isFinishedLoading } = useCollection(todayFinishedQuery);
 
   React.useEffect(() => {
-    if (isActiveLoading || isFinishedLoading || !user) return;
+    if (isActiveLoading || isFinishedLoading || !user || isWaitingForBirthday) return;
 
     // Do not show prompts if already on attendance pages
     if (pathname.startsWith('/attendance')) return;
@@ -115,7 +149,7 @@ export function AttendanceGate() {
     if (activeSession && activeSession.date === todayStr && isAfterSeven) {
       setShowCheckOut(true);
     }
-  }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, user, todayStr, pathname, firestore]);
+  }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, user, todayStr, pathname, firestore, isWaitingForBirthday]);
 
   return (
     <>

@@ -51,7 +51,6 @@ export function BirthdayCelebration() {
         if (!hasBeenShown) {
           setIsOpen(true);
           triggerConfetti();
-          localStorage.setItem(storageKey, 'true');
         }
       }
     };
@@ -88,8 +87,19 @@ export function BirthdayCelebration() {
     }, 250);
   };
 
+  const handleClose = () => {
+    if (user && profile?.dob) {
+      const today = new Date();
+      const storageKey = `birthday_shown_${user.uid}_${today.getFullYear()}`;
+      localStorage.setItem(storageKey, 'true');
+    }
+    setIsOpen(false);
+    // Dispatch event to notify AttendanceGate that it can now show its popup
+    window.dispatchEvent(new Event('birthday-celebration-finished'));
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if(!open) handleClose(); }}>
       <DialogContent className="sm:max-w-md rounded-sm border-primary/10 shadow-2xl overflow-hidden bg-background">
         <DialogHeader className="pt-8 pb-4 text-center">
           <motion.div 
@@ -132,7 +142,7 @@ export function BirthdayCelebration() {
 
         <DialogFooter className="p-6 pt-2">
           <Button 
-            onClick={() => setIsOpen(false)} 
+            onClick={handleClose} 
             className="w-full h-12 font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20"
           >
             <PartyPopper className="mr-2 h-4 w-4" />
