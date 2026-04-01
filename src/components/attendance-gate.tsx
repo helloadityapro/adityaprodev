@@ -15,7 +15,7 @@ import { Clock, LogIn } from 'lucide-react';
  * 1. Forced check-in redirect if no session exists for today.
  * 2. Check-out reminders after 7:00 PM.
  * 3. Daily 12 AM system reset for stale sessions (Marked as System CheckOut).
- * 4. Sequencing with Birthday Celebration popup.
+ * 4. Sequencing with Birthday and Anniversary Celebration popups.
  */
 export function AttendanceGate() {
   const { user } = useUser();
@@ -26,7 +26,7 @@ export function AttendanceGate() {
   const [showCheckIn, setShowCheckIn] = React.useState(false);
   const [showCheckOut, setShowCheckOut] = React.useState(false);
   const [currentDate, setCurrentDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
-  const [isWaitingForBirthday, setIsWaitingForBirthday] = React.useState(false);
+  const [isWaitingForCelebration, setIsWaitingForCelebration] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -45,31 +45,69 @@ export function AttendanceGate() {
     return () => clearInterval(interval);
   }, [currentDate]);
 
-  // Handle birthday sequencing
+  // Handle celebration sequencing (Birthday and Anniversary)
   React.useEffect(() => {
-    if (isProfileLoading || !profile?.dob || !user) return;
+    if (isProfileLoading || !user) return;
 
     const today = new Date();
-    const birthDate = new Date(profile.dob);
-    const isBirthday = today.getMonth() === birthDate.getMonth() && today.getDate() === birthDate.getDate();
-    const storageKey = `birthday_shown_${user.uid}_${today.getFullYear()}`;
-    const hasBeenShown = localStorage.getItem(storageKey);
-
-    if (isBirthday && !hasBeenShown) {
-      setIsWaitingForBirthday(true);
-    } else {
-      setIsWaitingForBirthday(false);
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    // Check Birthday
+    let birthdayWaiting = false;
+    if (profile?.dob) {
+      const birthDate = new Date(profile.dob);
+      const isBirthday = today.getMonth() === birthDate.getMonth() && today.getDate() === birthDate.getDate();
+      const bStorageKey = `birthday_shown_${user.uid}_${today.getFullYear()}`;
+      if (isBirthday && !localStorage.getItem(bStorageKey)) birthdayWaiting = true;
     }
+
+    // Check Anniversary
+    let anniversaryWaiting = false;
+    if (profile?.doj) {
+      const joinDate = new Date(profile.doj);
+      const isAnniversary = today.getMonth() === joinDate.getMonth() && today.getDate() === joinDate.getDate();
+      const years = today.getFullYear() - joinDate.getFullYear();
+      const aStorageKey = `anniversary_shown_${user.uid}_${today.getFullYear()}`;
+      if (isAnniversary && years > 0 && !localStorage.getItem(aStorageKey)) anniversaryWaiting = true;
+    }
+
+    setIsWaitingForCelebration(birthdayWaiting || anniversaryWaiting);
   }, [profile, isProfileLoading, user, currentDate]);
 
-  // Listen for birthday popup completion
+  // Listen for celebration popup completions
   React.useEffect(() => {
-    const handleBirthdayFinished = () => {
-      setIsWaitingForBirthday(false);
+    const handleFinished = () => {
+      // Re-evaluate waiting state on any celebration finish
+      const today = new Date();
+      let birthdayWaiting = false;
+      let anniversaryWaiting = false;
+
+      if (user && profile) {
+        if (profile.dob) {
+          const birthDate = new Date(profile.dob);
+          const isBirthday = today.getMonth() === birthDate.getMonth() && today.getDate() === birthDate.getDate();
+          const bStorageKey = `birthday_shown_${user.uid}_${today.getFullYear()}`;
+          if (isBirthday && !localStorage.getItem(bStorageKey)) birthdayWaiting = true;
+        }
+        if (profile.doj) {
+          const joinDate = new Date(profile.doj);
+          const isAnniversary = today.getMonth() === joinDate.getMonth() && today.getDate() === joinDate.getDate();
+          const years = today.getFullYear() - joinDate.getFullYear();
+          const aStorageKey = `anniversary_shown_${user.uid}_${today.getFullYear()}`;
+          if (isAnniversary && years > 0 && !localStorage.getItem(aStorageKey)) anniversaryWaiting = true;
+        }
+      }
+
+      setIsWaitingForCelebration(birthdayWaiting || anniversaryWaiting);
     };
-    window.addEventListener('birthday-celebration-finished', handleBirthdayFinished);
-    return () => window.removeEventListener('birthday-celebration-finished', handleBirthdayFinished);
-  }, []);
+
+    window.addEventListener('birthday-celebration-finished', handleFinished);
+    window.addEventListener('anniversary-celebration-finished', handleFinished);
+    return () => {
+      window.removeEventListener('birthday-celebration-finished', handleFinished);
+      window.removeEventListener('anniversary-celebration-finished', handleFinished);
+    };
+  }, [user, profile]);
 
   // Today's date reference
   const todayStr = currentDate;
@@ -102,7 +140,7 @@ export function AttendanceGate() {
   const { data: todayFinished, isLoading: isFinishedLoading } = useCollection(todayFinishedQuery);
 
   React.useEffect(() => {
-    if (isActiveLoading || isFinishedLoading || !user || isWaitingForBirthday) return;
+    if (isActiveLoading || isFinishedLoading || !user || isWaitingForCelebration) return;
 
     // Do not show prompts if already on attendance pages
     if (pathname.startsWith('/attendance')) return;
@@ -116,7 +154,6 @@ export function AttendanceGate() {
     const hasCompletedToday = todayFinished && todayFinished.length > 0;
 
     // 1. CYCLE RESET (Stale Session Cleanup)
-    // If we find an "ongoing" session where the date is NOT today, it means it's a leftover.
     if (activeSession && activeSession.date !== todayStr) {
       const ref = doc(firestore, 'attendance', activeSession.id);
       
@@ -139,21 +176,18 @@ export function AttendanceGate() {
     }
 
     // 2. CHECK-IN GATE
-    // Prompt if not checked in at all today AND it's before 7 PM
     if (!activeSession && !hasCompletedToday && !isAfterSeven) {
       setShowCheckIn(true);
     }
 
     // 3. CHECK-OUT PROMPT
-    // Prompt if session is ongoing AND it's after 7 PM
     if (activeSession && activeSession.date === todayStr && isAfterSeven) {
       setShowCheckOut(true);
     }
-  }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, user, todayStr, pathname, firestore, isWaitingForBirthday]);
+  }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, user, todayStr, pathname, firestore, isWaitingForCelebration]);
 
   return (
     <>
-      {/* Check-in Gateway */}
       <Dialog open={showCheckIn} onOpenChange={setShowCheckIn}>
         <DialogContent className="sm:max-w-md rounded-sm border-primary/20 shadow-2xl">
           <DialogHeader className="pt-4">
@@ -173,7 +207,6 @@ export function AttendanceGate() {
         </DialogContent>
       </Dialog>
 
-      {/* End-of-Day Gateway */}
       <Dialog open={showCheckOut} onOpenChange={setShowCheckOut}>
         <DialogContent className="sm:max-w-md rounded-sm border-amber-200 shadow-2xl bg-amber-50/50">
           <DialogHeader className="pt-4">

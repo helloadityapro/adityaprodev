@@ -20,10 +20,11 @@ import { UserNotifications } from "@/components/user-notifications";
 import { GlobalSearch } from "@/components/global-search";
 import { AttendanceGate } from "@/components/attendance-gate";
 import { BirthdayCelebration } from "@/components/birthday-celebration";
+import { WorkAnniversary } from "@/components/work-anniversary";
 import { BottomNav } from "@/components/bottom-nav";
 import { QuickActions } from "@/components/quick-actions";
 import { CredentialsPromptDialog } from "@/components/credentials-prompt-dialog";
-import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock, PartyPopper } from "lucide-react";
+import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock, PartyPopper, Award } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from '@capacitor/core';
@@ -187,8 +188,23 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     return today.getMonth() === birthDate.getMonth() && today.getDate() === birthDate.getDate();
   }, [userProfile?.dob]);
 
+  const anniversaryYear = React.useMemo(() => {
+    if (!userProfile?.doj) return 0;
+    const today = new Date();
+    const joinDate = new Date(userProfile.doj);
+    if (today.getMonth() === joinDate.getMonth() && today.getDate() === joinDate.getDate()) {
+      const years = today.getFullYear() - joinDate.getFullYear();
+      return years > 0 ? years : 0;
+    }
+    return 0;
+  }, [userProfile?.doj]);
+
   const handleBirthdayClick = () => {
     window.dispatchEvent(new Event('trigger-birthday-celebration'));
+  };
+
+  const handleAnniversaryClick = () => {
+    window.dispatchEvent(new Event('trigger-anniversary-celebration'));
   };
 
   // Dynamic Access Gate (Inline Visibility Control)
@@ -469,10 +485,35 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <header className="flex flex-col shrink-0 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-30 sticky top-0 pt-safe">
           <div className="flex h-14 items-center gap-2 px-3 lg:px-6">
             <SidebarTrigger className="h-9 w-9" />
-            <div className="flex-1 min-w-0">
+            
+            <div className="flex-1 min-w-0 flex items-center gap-4">
               <GlobalSearch />
+              {/* Anniversary Message */}
+              {anniversaryYear > 0 && (
+                <button 
+                  onClick={handleAnniversaryClick}
+                  className="hidden lg:flex items-center gap-2 text-[10px] font-black uppercase tracking-tight text-primary bg-primary/5 px-3 py-1.5 rounded-sm border border-primary/10 hover:bg-primary/10 transition-colors animate-in fade-in slide-in-from-left-2 duration-500"
+                >
+                  <Award className="h-3.5 w-3.5" />
+                  <span>🎉 Congratulations! Completed {anniversaryYear} {anniversaryYear === 1 ? 'year' : 'years'} at Aditya</span>
+                </button>
+              )}
             </div>
+
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              {/* Anniversary Icon for Mobile/Tablet */}
+              {anniversaryYear > 0 && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={handleAnniversaryClick}
+                  className="lg:hidden h-9 w-9 rounded-full text-primary hover:bg-primary/5 animate-in fade-in zoom-in duration-500"
+                  title={`Happy Anniversary! (${anniversaryYear} years)`}
+                >
+                  <Award className="h-5 w-5 animate-bounce" />
+                </Button>
+              )}
+
               {isBirthday && (
                 <Button 
                   variant="ghost" 
@@ -499,6 +540,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col gap-4 p-4 lg:gap-6 lg:p-6 min-h-full pb-36 md:pb-6 relative">
             <AttendanceGate />
             <BirthdayCelebration />
+            <WorkAnniversary />
             <CredentialsPromptDialog />
             {isAuthorized ? children : (
               <div className="flex flex-col items-center justify-center py-32 text-center animate-in fade-in zoom-in-95 duration-500">
