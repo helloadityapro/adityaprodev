@@ -107,51 +107,51 @@ export function BirthdayCelebration() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if(!open) handleClose(); }}>
-      <DialogContent className="sm:max-w-md rounded-sm border-primary/10 shadow-2xl overflow-hidden bg-background">
-        <DialogHeader className="pt-8 pb-4 flex flex-col items-center text-center">
+      <DialogContent className="sm:max-w-md rounded-sm border-primary/10 shadow-2xl overflow-hidden bg-background p-0">
+        <DialogHeader className="pt-6 pb-2 flex flex-col items-center text-center px-6">
           <motion.div 
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: "spring", damping: 12 }}
-            className="mx-auto bg-amber-500/10 p-5 rounded-full w-fit mb-6 relative"
+            className="mx-auto bg-amber-500/10 p-3 rounded-full w-fit mb-3 relative"
           >
-            <Cake className="h-12 w-12 text-amber-600" />
+            <Cake className="h-10 w-10 text-amber-600" />
             <motion.div 
               animate={{ rotate: [0, 15, -15, 0] }}
               transition={{ repeat: Infinity, duration: 2 }}
               className="absolute -top-1 -right-1"
             >
-              <Sparkles className="h-6 w-6 text-primary fill-primary" />
+              <Sparkles className="h-5 w-5 text-primary fill-primary" />
             </motion.div>
           </motion.div>
           
-          <DialogTitle className="text-6xl text-foreground font-script normal-case py-2 text-center w-full">
+          <DialogTitle className="text-4xl sm:text-5xl text-foreground font-script normal-case py-1 text-center w-full">
             Happy Birthday!
           </DialogTitle>
-          <DialogDescription className="text-2xl font-black text-primary mt-2 text-center uppercase tracking-tight">
+          <DialogDescription className="text-xl sm:text-2xl font-black text-primary mt-1 text-center uppercase tracking-tight">
             {firstName}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="px-6 py-4 text-center space-y-6">
-          <div className="space-y-1">
-            <p className="text-sm font-bold leading-relaxed text-muted-foreground italic">You bring the energy.</p>
-            <p className="text-sm font-bold leading-relaxed text-muted-foreground italic">Today, we celebrate YOU.</p>
-            <p className="text-sm font-bold leading-relaxed text-muted-foreground italic">A special day for a special you.</p>
-            <p className="text-sm font-bold leading-relaxed text-muted-foreground italic">Wishing you happiness today and success all year long.</p>
+        <div className="px-6 py-2 text-center space-y-4">
+          <div className="space-y-0.5">
+            <p className="text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground italic">You bring the energy.</p>
+            <p className="text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground italic">Today, we celebrate YOU.</p>
+            <p className="text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground italic">A special day for a special you.</p>
+            <p className="text-xs sm:text-sm font-bold leading-relaxed text-muted-foreground italic">Wishing you happiness today and success all year long.</p>
           </div>
 
-          <div className="py-4 border-y border-border/50">
-            <p className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-[0.3em] mb-1">Wishes from</p>
-            <p className="text-xs font-black text-primary uppercase tracking-widest">Team Aditya</p>
-            <p className="text-[10px] font-bold text-muted-foreground mt-0.5">Aditya Green Energy Private Limited</p>
+          <div className="py-2 border-y border-border/50">
+            <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-[0.3em] mb-0.5">Wishes from</p>
+            <p className="text-[11px] font-black text-primary uppercase tracking-widest">Team Aditya</p>
+            <p className="text-[9px] font-bold text-muted-foreground">Aditya Green Energy Private Limited</p>
           </div>
         </div>
 
-        <DialogFooter className="p-6 pt-2">
+        <DialogFooter className="p-4 pt-2 px-6 pb-6">
           <Button 
             onClick={handleClose} 
-            className="w-full h-12 font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20"
+            className="w-full h-11 font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20"
           >
             <PartyPopper className="mr-2 h-4 w-4" />
             Thank You
