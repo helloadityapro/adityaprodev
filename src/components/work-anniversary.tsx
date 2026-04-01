@@ -167,7 +167,7 @@ export function WorkAnniversary() {
             className="w-full h-11 font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20"
           >
             <PartyPopper className="mr-2 h-4 w-4" />
-            Keep Shining
+            Thank You
           </Button>
         </DialogFooter>
       </DialogContent>
