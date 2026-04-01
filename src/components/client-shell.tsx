@@ -23,7 +23,7 @@ import { BirthdayCelebration } from "@/components/birthday-celebration";
 import { BottomNav } from "@/components/bottom-nav";
 import { QuickActions } from "@/components/quick-actions";
 import { CredentialsPromptDialog } from "@/components/credentials-prompt-dialog";
-import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock } from "lucide-react";
+import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock, PartyPopper } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from '@capacitor/core';
@@ -201,7 +201,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
     const allowedKeys = userProfile.customPermissions 
       ? new Set(userProfile.customPermissions) 
-      : new Set(roleConfigs?.find(c => c.id === userProfile.role)?.allowedPageKeys || []);
+      : new Set(roleConfigs?.find(c => c.id === userRole)?.allowedPageKeys || []);
 
     // If no policy is defined yet, default to open for prototype usability
     if (allowedKeys.size === 0) return true; 
@@ -476,10 +476,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               {isBirthday && (
                 <Button 
                   variant="ghost" 
+                  size="icon"
                   onClick={handleBirthdayClick}
-                  className="h-8 px-2 sm:px-3 text-xs font-black uppercase text-amber-600 hover:bg-amber-50 rounded-sm animate-in fade-in zoom-in duration-500"
+                  className="h-9 w-9 rounded-full text-amber-600 hover:bg-amber-50 animate-in fade-in zoom-in duration-500"
+                  title="Celebrate Birthday!"
                 >
-                  <span className="mr-1">🎉</span> Happy Birthday!
+                  <PartyPopper className="h-5 w-5 animate-bounce" />
                 </Button>
               )}
               <div className="hidden md:flex">
