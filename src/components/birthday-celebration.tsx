@@ -101,7 +101,7 @@ export function BirthdayCelebration() {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if(!open) handleClose(); }}>
       <DialogContent className="sm:max-w-md rounded-sm border-primary/10 shadow-2xl overflow-hidden bg-background">
-        <DialogHeader className="pt-8 pb-4 text-center">
+        <DialogHeader className="pt-8 pb-4 flex flex-col items-center text-center sm:text-center">
           <motion.div 
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -118,10 +118,10 @@ export function BirthdayCelebration() {
             </motion.div>
           </motion.div>
           
-          <DialogTitle className="text-5xl text-foreground font-script normal-case py-2">
+          <DialogTitle className="text-5xl text-foreground font-script normal-case py-2 text-center w-full">
             Happy Birthday!
           </DialogTitle>
-          <DialogDescription className="text-lg font-bold text-primary mt-2">
+          <DialogDescription className="text-lg font-bold text-primary mt-2 text-center">
             {profile?.username}
           </DialogDescription>
         </DialogHeader>
