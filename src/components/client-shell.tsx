@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -24,11 +25,12 @@ import { WorkAnniversary } from "@/components/work-anniversary";
 import { BottomNav } from "@/components/bottom-nav";
 import { QuickActions } from "@/components/quick-actions";
 import { CredentialsPromptDialog } from "@/components/credentials-prompt-dialog";
-import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock, PartyPopper, Award } from "lucide-react";
+import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { App } from '@capacitor/app';
 import { getPageKeyByPath, type PageKey } from "@/lib/access-control";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
@@ -47,26 +49,6 @@ type AccessConfig = {
   id: string;
   allowedPageKeys: PageKey[];
 };
-
-/**
- * Global top-loading progress indicator.
- * Shown during page transitions to provide visual feedback.
- */
-function TopLoadingBar({ isVisible }: { isVisible: boolean }) {
-  return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial={{ scaleX: 0, opacity: 0 }}
-          animate={{ scaleX: 1, opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="fixed top-0 left-0 right-0 z-[100] h-1 bg-primary origin-left"
-        />
-      )}
-    </AnimatePresence>
-  );
-}
 
 function FullPageLoader() {
   const [quote, setQuote] = React.useState("");
@@ -131,16 +113,25 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
-  const [isNavigating, setIsNavigating] = React.useState(false);
 
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
 
-  // Handle route change state for top loader
+  // Handle mobile hardware back button
   React.useEffect(() => {
-    setIsNavigating(true);
-    const timer = setTimeout(() => setIsNavigating(false), 400);
-    return () => clearTimeout(timer);
-  }, [pathname]);
+    if (Capacitor.isNativePlatform()) {
+      const backListener = App.addListener('backButton', (data) => {
+        // Exit only if at root or primary landing pages
+        if (pathname === '/' || pathname === '/rewards' || pathname === '/login') {
+          App.exitApp();
+        } else {
+          router.back();
+        }
+      });
+      return () => {
+        backListener.then(l => l.remove());
+      };
+    }
+  }, [pathname, router]);
 
   React.useEffect(() => {
     const syncThemeState = () => {
@@ -212,16 +203,15 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   // Dynamic Access Gate (Inline Visibility Control)
   const isAuthorized = React.useMemo(() => {
     if (isAuthPage || isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
-    if (isUserLoading || isProfileLoading || !userProfile) return true; // Wait for data before restricting
+    if (isUserLoading || isProfileLoading || !userProfile) return true;
 
     const pageKey = getPageKeyByPath(pathname);
-    if (!pageKey) return true; // Path not in controlled registry (e.g. /profile)
+    if (!pageKey) return true;
 
     const allowedKeys = userProfile.customPermissions 
       ? new Set(userProfile.customPermissions) 
       : new Set(roleConfigs?.find(c => c.id === userRole)?.allowedPageKeys || []);
 
-    // If no policy is defined yet, default to open for prototype usability
     if (allowedKeys.size === 0) return true; 
     
     return allowedKeys.has(pageKey);
@@ -469,7 +459,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider className="h-screen overflow-hidden">
-      <TopLoadingBar isVisible={isNavigating} />
       <Sidebar>
         <SidebarHeader className="px-6 py-4 border-b">
           <div className="flex items-baseline gap-0.5">
@@ -487,7 +476,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             
             <div className="flex-1 min-w-0 flex items-center gap-4">
               <GlobalSearch />
-              {/* Anniversary Message */}
               {anniversaryYear > 0 && (
                 <button 
                   onClick={handleAnniversaryClick}
@@ -500,7 +488,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              {/* Anniversary Icon for Mobile/Tablet */}
               {anniversaryYear > 0 && (
                 <Button 
                   variant="ghost" 
