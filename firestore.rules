@@ -30,7 +30,7 @@ service cloud.firestore {
       // 3. Fallback for existing users without roleId (raw role string)
       // Note: Slashes in role names might fail here, which is why roleId is preferred.
       let role = userData.get('role', 'none');
-      if (role != 'none') {
+      if (role != 'none' && !role.contains('/')) {
         let rawRolePath = /databases/$(database)/documents/system_settings/access/roles/$(role);
         return exists(rawRolePath) && get(rawRolePath).data.get('allowedPageKeys', []).contains(key);
       }
@@ -50,9 +50,9 @@ service cloud.firestore {
       let userData = getUserData();
       let role = userData.get('role', 'none').lower();
       let dept = userData.get('department', 'none').lower();
-      // Robust keyword checking to handle role name variations like "Assistant Manager - Purchase & Supply Chain"
-      return role.contains('purchase') || role.contains('procurement') || role.contains('supply') ||
-             dept.contains('purchase') || dept.contains('procurement') || dept.contains('supply');
+      // Robust keyword checking using matches for CEL resilience
+      return role.matches('.*purchase.*') || role.matches('.*procurement.*') || role.matches('.*supply.*') ||
+             dept.matches('.*purchase.*') || dept.matches('.*procurement.*') || dept.matches('.*supply.*');
     }
 
     match /users/{userId} {
@@ -93,12 +93,12 @@ service cloud.firestore {
 
     match /project_pos/{poId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('purchase-orders') || hasPermission('project-tab-po') || isProcurementStaff();
+      allow write: if isAdmin() || hasPermission('purchase-orders') || hasPermission('projects') || isProcurementStaff();
     }
 
     match /project_wos/{woId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('work-orders') || hasPermission('project-tab-wo') || isProcurementStaff();
+      allow write: if isAdmin() || hasPermission('work-orders') || hasPermission('projects') || isProcurementStaff();
     }
 
     match /project_inventory/{invId} {
