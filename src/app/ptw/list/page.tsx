@@ -155,7 +155,7 @@ function WhatsAppUpdateEngineer({ permit }: { permit: Permit }) {
     };
 
     if (!engineerProfile?.mobile) return null;
-    return <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={(e) => { e.stopPropagation(); triggerWhatsApp(); }}><MessageCircle className="h-4 w-4" /></Button>;
+    return <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={(e) => { e.stopPropagation(); triggerWhatsApp(); }} title="Notify via WhatsApp"><MessageCircle className="h-4 w-4" /></Button>;
 }
 
 const formatTimestamp = (ts: any) => {
@@ -460,7 +460,7 @@ export default function PtwListPage() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" role="combobox" className="w-full md:w-[180px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
                     {siteFilter === 'all' ? "All Sites" : siteFilter}
-                    <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[240px] p-0" align="start">
@@ -510,7 +510,19 @@ export default function PtwListPage() {
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><ShieldCheck className="h-3.5 w-3.5 text-primary/60" /><span>{permit.ptwType}</span></div>
                 <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-tight"><Calendar className="h-3.5 w-3.5" />{formatTimestamp(permit.requestDate)}</div>
               </div>
-              <div className="pt-2 border-t border-primary/5 flex justify-end"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm"><Eye className="h-4 w-4" /></Button></div>
+              <div className="pt-2 border-t border-primary/5 flex justify-end items-center gap-2">
+                <WhatsAppUpdateEngineer permit={permit} />
+                {permit.status === 'Rejected' && (
+                  <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-amber-600 rounded-sm" title="Resubmit">
+                    <Link href={`/ptw/raise?correct=${permit.id}`} onClick={(e) => e.stopPropagation()}>
+                      <RefreshCw className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={(e) => { e.stopPropagation(); setDetailsPermit(permit); }}>
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )) : <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No records found.</div>}
@@ -536,7 +548,21 @@ export default function PtwListPage() {
                         <TableCell className="text-xs font-semibold">{permit.ptwType}</TableCell>
                         <TableCell><StatusBadge permit={permit} /></TableCell>
                         <TableCell className="text-[10px] font-bold text-muted-foreground">{formatTimestamp(permit.requestDate)}</TableCell>
-                        <TableCell className="text-right px-6"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setDetailsPermit(permit)}><Eye className="h-4 w-4" /></Button></TableCell>
+                        <TableCell className="text-right px-6">
+                          <div className="flex justify-end items-center gap-1">
+                            <WhatsAppUpdateEngineer permit={permit} />
+                            {permit.status === 'Rejected' && (
+                              <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-amber-600 rounded-sm" title="Resubmit with Corrections">
+                                <Link href={`/ptw/raise?correct=${permit.id}`} onClick={(e) => e.stopPropagation()}>
+                                  <RefreshCw className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={(e) => { e.stopPropagation(); setDetailsPermit(permit); }} title="View Details">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
