@@ -226,7 +226,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
         timestamp: new Date(),
         details: `Initial order generated for ₹${totalAmount.toLocaleString('en-IN')}`
       };
-      await addDocumentNonBlocking(collection(firestore, 'project_pos'), {
+      addDocumentNonBlocking(collection(firestore, 'project_pos'), {
         siteId: projectId,
         siteName: site.name,
         poNumber: values.poNumber,
@@ -327,7 +327,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
               })}
             </div>
           </div>
-          <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl animate-in slide-in-from-bottom-2"><div className="flex items-center gap-4"><div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5"><CheckCircle2 className="h-8 w-8" /></div><div className="flex flex-col"><span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Final PO Value (Incl. Taxes)</span><span className="text-4xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div><div className="flex gap-3 w-full sm:w-auto"><Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">Cancel</Button><Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95">{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}</Button></div></div>
+          <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl animate-in slide-in-from-bottom-2"><div className="flex items-center gap-4"><div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5"><CheckCircle2 className="h-8 w-8" /></div><div className="flex flex-col"><span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Final PO Value (Incl. Taxes)</span><span className="text-4xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div><div className="flex gap-3 w-full sm:w-auto"><Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">Cancel</Button><Button type="submit" disabled={isSubmitting || totalAmount <= 0} className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95">{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}</Button></div></div>
         </form>
       </Form>
     </div>

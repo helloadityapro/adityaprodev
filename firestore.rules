@@ -50,9 +50,10 @@ service cloud.firestore {
       let userData = getUserData();
       let role = userData.get('role', 'none').lower();
       let dept = userData.get('department', 'none').lower();
-      // Robust keyword checking using matches for CEL resilience
-      return role.matches('.*purchase.*') || role.matches('.*procurement.*') || role.matches('.*supply.*') ||
-             dept.matches('.*purchase.*') || dept.matches('.*procurement.*') || dept.matches('.*supply.*');
+      
+      // Robust keyword checking using contains for CEL resilience
+      return role.contains('purchase') || role.contains('procurement') || role.contains('supply') ||
+             dept.contains('purchase') || dept.contains('procurement') || dept.contains('supply');
     }
 
     match /users/{userId} {
