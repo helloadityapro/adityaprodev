@@ -11,49 +11,12 @@ service cloud.firestore {
       return exists(path) ? get(path).data : {};
     }
 
-    function hasPermission(key) {
-      let userData = getUserData();
-      
-      // 1. Check individual overrides first
-      let customPerms = userData.get('customPermissions', []);
-      if (customPerms.contains(key)) { return true; }
-      
-      // 2. Check role-based defaults using normalized roleId
-      let roleId = userData.get('roleId', 'none');
-      if (roleId != 'none') {
-        let rolePath = /databases/$(database)/documents/system_settings/access/roles/$(roleId);
-        if (exists(rolePath) && get(rolePath).data.get('allowedPageKeys', []).contains(key)) {
-          return true;
-        }
-      }
-      
-      // 3. Fallback for existing users without roleId (raw role string)
-      // Note: Slashes in role names might fail here, which is why roleId is preferred.
-      let role = userData.get('role', 'none');
-      if (role != 'none' && !role.contains('/')) {
-        let rawRolePath = /databases/$(database)/documents/system_settings/access/roles/$(role);
-        return exists(rawRolePath) && get(rawRolePath).data.get('allowedPageKeys', []).contains(key);
-      }
-
-      return false;
-    }
-
     function isAdmin() {
       let userEmail = request.auth.token.get('email', '').lower();
       let isSuperAdmin = userEmail == 'khalil@adityagreenenergy.com';
       let userData = getUserData();
       let hasAdminRole = userData.get('role', '') == 'Admin';
       return isSignedIn() && (isSuperAdmin || hasAdminRole);
-    }
-
-    function isProcurementStaff() {
-      let userData = getUserData();
-      let role = userData.get('role', 'none').lower();
-      let dept = userData.get('department', 'none').lower();
-      
-      // Robust keyword checking using contains for CEL resilience
-      return role.contains('purchase') || role.contains('procurement') || role.contains('supply') ||
-             dept.contains('purchase') || dept.contains('procurement') || dept.contains('supply');
     }
 
     match /users/{userId} {
@@ -88,33 +51,27 @@ service cloud.firestore {
     }
 
     match /project_boms/{bomId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('projects') || hasPermission('project-tab-bom') || isProcurementStaff();
+      allow read, write: if isSignedIn();
     }
 
     match /project_pos/{poId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('purchase-orders') || hasPermission('projects') || isProcurementStaff();
+      allow read, write: if isSignedIn();
     }
 
     match /project_wos/{woId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('work-orders') || hasPermission('projects') || isProcurementStaff();
+      allow read, write: if isSignedIn();
     }
 
     match /project_inventory/{invId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     match /master_inventory/{itemId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('inventory') || isProcurementStaff();
+      allow read, write: if isSignedIn();
     }
 
     match /inventory_categories/{categoryId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
 
     match /vehicle_assignments/{assignmentId} {
@@ -197,13 +154,11 @@ service cloud.firestore {
     }
 
     match /suppliers/{supplierId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || isProcurementStaff();
+      allow read, write: if isSignedIn();
     }
 
     match /contractors/{contractorId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || isProcurementStaff();
+      allow read, write: if isSignedIn();
     }
 
     match /system_settings/{settingId} {
@@ -249,8 +204,7 @@ service cloud.firestore {
     }
 
     match /payments/{paymentId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('payments') || isProcurementStaff();
+      allow read, write: if isSignedIn();
     }
   }
 }
