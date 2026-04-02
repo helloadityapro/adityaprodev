@@ -170,7 +170,7 @@ export default function GlobalCreateWOPage() {
         details: `Work Order issued for ₹${totalAmount.toLocaleString('en-IN')} (Pending Admin Approval)`
       };
 
-      await addDocumentNonBlocking(collection(firestore, 'project_wos'), {
+      addDocumentNonBlocking(collection(firestore, 'project_wos'), {
         siteId: values.siteId,
         siteName: values.siteName,
         woNumber: values.woNumber,

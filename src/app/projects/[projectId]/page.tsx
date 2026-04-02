@@ -356,14 +356,34 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     if (!user || isProfileLoading || !userProfile) return [];
     if (isSuperAdmin(user.email)) return ALL_TABS;
 
+    const userRole = userProfile.role || "none";
     const allowedKeys = userProfile.customPermissions 
       ? new Set(userProfile.customPermissions) 
-      : new Set(roleConfigs?.find(c => c.id === userProfile.role)?.allowedPageKeys || []);
+      : new Set(roleConfigs?.find(c => c.id === userRole)?.allowedPageKeys || []);
 
-    // If no specific tab config exists, fallback to legacy behavior (show all if user can see projects)
+    // If no specific tab config exists, default to all if user has basic access
     if (allowedKeys.size === 0) return ALL_TABS;
 
-    return ALL_TABS.filter(tab => allowedKeys.has(tab.key as PageKey));
+    return ALL_TABS.filter(tab => {
+      // Primary check: Direct tab authorization
+      if (allowedKeys.has(tab.key as PageKey)) return true;
+      
+      // Secondary check: Inclusive module authorization
+      // This ensures if you have the main module access, the corresponding project tab is also visible
+      if (tab.id === 'po' && allowedKeys.has('purchase-orders')) return true;
+      if (tab.id === 'wo' && allowedKeys.has('work-orders')) return true;
+      if (tab.id === 'bom' && allowedKeys.has('projects')) return true;
+      if (tab.id === 'inventory' && allowedKeys.has('inventory')) return true;
+      if (tab.id === 'utilisation' && allowedKeys.has('inventory')) return true;
+      if (tab.id === 'movements' && allowedKeys.has('inventory')) return true;
+      if (tab.id === 'ptw' && allowedKeys.has('permits')) return true;
+      if (tab.id === 'dpr' && allowedKeys.has('dpr')) return true;
+      if (tab.id === 'tasks' && allowedKeys.has('tasks')) return true;
+      if (tab.id === 'visits' && allowedKeys.has('visits')) return true;
+      if (tab.id === 'payments' && allowedKeys.has('payments')) return true;
+
+      return false;
+    });
   }, [user, userProfile, isProfileLoading, roleConfigs, ALL_TABS]);
 
   // Handle active tab authorization redirect
@@ -808,10 +828,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
     }
-  };
-
-  const handleCloseDetails = () => {
-    setDetailsAssignment(null);
   };
 
   if (projectLoading || isProfileLoading) return (
@@ -1572,7 +1588,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardHeader className="bg-muted/5 border-b py-4">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><ArrowLeftRight className="h-4 w-4 text-primary" /> Material Movement Logs</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <ArrowLeftRight className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest">Material Movement Logs</CardTitle>
+                  </div>
                   <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase" asChild><Link href="/inventory/record"><Plus className="h-3 w-3 mr-1.5" /> Record Movement</Link></Button>
                 </div>
               </CardHeader>

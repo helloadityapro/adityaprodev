@@ -88,17 +88,17 @@ service cloud.firestore {
 
     match /project_boms/{bomId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('projects') || isProcurementStaff();
+      allow write: if isAdmin() || hasPermission('projects') || hasPermission('project-tab-bom') || isProcurementStaff();
     }
 
     match /project_pos/{poId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('purchase-orders') || isProcurementStaff();
+      allow write: if isAdmin() || hasPermission('purchase-orders') || hasPermission('project-tab-po') || isProcurementStaff();
     }
 
     match /project_wos/{woId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || hasPermission('work-orders') || isProcurementStaff();
+      allow write: if isAdmin() || hasPermission('work-orders') || hasPermission('project-tab-wo') || isProcurementStaff();
     }
 
     match /project_inventory/{invId} {

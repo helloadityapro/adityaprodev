@@ -94,6 +94,7 @@ type PurchaseOrder = {
 
 export default function CreatePOPage() {
   const firestore = useFirestore();
+  const firebaseApp = useFirebaseApp();
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
@@ -111,6 +112,9 @@ export default function CreatePOPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -236,7 +240,6 @@ export default function CreatePOPage() {
         details: `Initial order generated for ₹${totalAmount.toLocaleString('en-IN')}`
       };
 
-      // Removing await to leverage optimistic updates and background sync as per guidelines
       addDocumentNonBlocking(collection(firestore, 'project_pos'), {
         siteId: values.siteId,
         siteName: values.siteName,
@@ -257,7 +260,6 @@ export default function CreatePOPage() {
       setIsSuccess(true);
       toast({ title: 'PO Created', description: `Purchase Order ${values.poNumber} has been recorded.` });
     } catch (e: any) {
-      // Errors are also handled by the non-blocking catch block and global emitter
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
       setIsSubmitting(false);
@@ -413,7 +415,7 @@ export default function CreatePOPage() {
               })}
             </div>
           </div>
-          <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl animate-in slide-in-from-bottom-2"><div className="flex items-center gap-4"><div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5"><CheckCircle2 className="h-8 w-8" /></div><div className="flex flex-col"><span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Final PO Value (Incl. Taxes)</span><span className="text-4xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div><div className="flex gap-3 w-full sm:w-auto"><Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">Cancel</Button><Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95">{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}</Button></div></div>
+          <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl animate-in slide-in-from-bottom-2"><div className="flex items-center gap-4"><div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5"><CheckCircle2 className="h-8 w-8" /></div><div className="flex flex-col"><span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Final PO Value (Incl. Taxes)</span><span className="text-4xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div><div className="flex gap-3 w-full sm:w-auto"><Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">Cancel</Button><Button type="submit" disabled={isSubmitting || totalAmount <= 0} className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95">{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}</Button></div></div>
         </form>
       </Form>
     </div>
