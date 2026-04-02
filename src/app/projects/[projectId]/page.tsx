@@ -1282,7 +1282,20 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                             <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-1.5 h-5", po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" : po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{po.status || 'Pending'}</Badge></TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                            <TableCell className="text-right px-6"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}><Eye className="h-4 w-4" /></Button>{isAdmin && po.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setPoActionState({ po, type: 'Accepted' })} title="Accept PO"><CircleCheck className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setPoActionState({ po, type: 'Rejected' })} title="Reject PO"><CircleX className="h-4 w-4" /></Button></>)}{(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/procurement/${po.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}><Trash2 className="h-4 w-4" /></Button></>)}</div></TableCell>
+                            <TableCell className="text-right px-6"><div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}><Eye className="h-4 w-4" /></Button>
+                              {isAdmin && po.status === 'Pending' && (
+                                <div className="flex gap-1 ml-2">
+                                  <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3 text-[10px] uppercase" onClick={() => setPoActionState({ po, type: 'Accepted' })}>
+                                    Accept
+                                  </Button>
+                                  <Button size="sm" variant="destructive" className="h-8 rounded-sm font-bold px-3 text-[10px] uppercase" onClick={() => setPoActionState({ po, type: 'Rejected' })}>
+                                    Reject
+                                  </Button>
+                                </div>
+                              )}
+                              {(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/procurement/${po.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}><Trash2 className="h-4 w-4" /></Button></>)}
+                            </div></TableCell>
                           </TableRow>
                           {expandedPORows.has(po.id) && po.items && (<TableRow className="bg-muted/30"><TableCell colSpan={6} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Breakdown for {po.poNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{po.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.itemName}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Subtotal</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
                         </React.Fragment>
@@ -1324,7 +1337,20 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
                             <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-1.5 h-5", wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" : wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{wo.status || 'Pending'}</Badge></TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                            <TableCell className="text-right px-6"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}><Eye className="h-4 w-4" /></Button>{isAdmin && wo.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Accepted' })} title="Accept WO"><CircleCheck className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Rejected' })} title="Reject WO"><CircleX className="h-4 w-4" /></Button></>)}{(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}><Trash2 className="h-4 w-4" /></Button></>)}</div></TableCell>
+                            <TableCell className="text-right px-6"><div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}><Eye className="h-4 w-4" /></Button>
+                              {isAdmin && wo.status === 'Pending' && (
+                                <div className="flex gap-1 ml-2">
+                                  <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3 text-[10px] uppercase" onClick={() => setWoActionState({ wo, type: 'Accepted' })}>
+                                    Accept
+                                  </Button>
+                                  <Button size="sm" variant="destructive" className="h-8 rounded-sm font-bold px-3 text-[10px] uppercase" onClick={() => setWoActionState({ wo, type: 'Rejected' })}>
+                                    Reject
+                                  </Button>
+                                </div>
+                              )}
+                              {(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}><Trash2 className="h-4 w-4" /></Button></>)}
+                            </div></TableCell>
                           </TableRow>
                           {expandedWORows.has(wo.id) && wo.items && wo.items.length > 0 && (<TableRow className="bg-muted/30"><TableCell colSpan={6} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown for {wo.woNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{wo.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.description}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Amount</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
                         </React.Fragment>
@@ -1548,62 +1574,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         );
                       }) : (
                         <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">No site stock recorded.</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="utilisation" className="mt-6 animate-in fade-in-50 duration-300 transition-all space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
-              <div className="relative w-full md:w-80">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search material or personnel..." 
-                  className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
-                  value={searchTerm} 
-                  onChange={e => setSearchTerm(e.target.value)} 
-                />
-              </div>
-              <Button asChild className="rounded-sm font-bold shadow-md h-9">
-                <Link href={`/inventory/utilisation/record`}><Plus className="h-4 w-4 mr-2" /> Log Consumption</Link>
-              </Button>
-            </div>
-            <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-muted/30">
-                      <TableRow>
-                        <TableHead className="px-6">Date</TableHead>
-                        <TableHead>Material Item</TableHead>
-                        <TableHead className="text-center">Quantity Used</TableHead>
-                        <TableHead className="min-w-[200px]">Remarks / Work Done</TableHead>
-                        <TableHead className="text-right px-6">Personnel</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUtilisations.length > 0 ? filteredUtilisations.map(u => (
-                        <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
-                          <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground">{u.utilisationDate}</TableCell>
-                          <TableCell className="text-sm font-bold text-foreground">{u.itemName}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="secondary" className="font-mono font-bold bg-amber-50 text-amber-700 border-amber-200">
-                              {u.quantity} {u.unit}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-xs italic text-muted-foreground">"{u.remarks}"</TableCell>
-                          <TableCell className="text-right px-6">
-                            <div className="flex items-center justify-end gap-2 text-[10px] font-bold text-muted-foreground uppercase">
-                              <User className="h-3 w-3 text-primary" />
-                              {u.userName}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )) : (
-                        <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">No records found.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
