@@ -16,7 +16,7 @@ import {
 } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -236,7 +236,7 @@ export default function CreatePOPage({ params }: { params: Promise<{ projectId: 
         items: values.items,
         itemsCount: values.items.length,
         totalAmount,
-        status: 'Open',
+        status: 'Pending',
         createdAt: serverTimestamp(),
         createdByName: userProfile.username || user.email,
         history: [historyEntry]

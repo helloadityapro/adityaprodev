@@ -269,7 +269,7 @@ const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "D
 
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
   return format(date, 'dd/MM/yyyy HH:mm');
 };
 
@@ -301,7 +301,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [bomItemSearchQuery, setBomItemSearchQuery] = React.useState("");
   
   const [bomActionState, setBomActionState] = React.useState<{ item: BoMItem, type: 'Approved' | 'Rejected' } | null>(null);
-  const [woActionState, setWoActionState] = React.useState<{ wo: WorkOrder, type: 'Approved' | 'Rejected' } | null>(null);
+  const [poActionState, setPoActionState] = React.useState<{ po: PurchaseOrder, type: 'Accepted' | 'Rejected' } | null>(null);
+  const [woActionState, setWoActionState] = React.useState<{ wo: WorkOrder, type: 'Accepted' | 'Rejected' } | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
   const [expandedBomRows, setExpandedBomRows] = React.useState<Set<string>>(new Set());
   const [expandedInvRows, setExpandedInvRows] = React.useState<Set<string>>(new Set());
@@ -369,7 +370,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       if (allowedKeys.has(tab.key as PageKey)) return true;
       
       // Secondary check: Inclusive module authorization
-      // This ensures if you have the main module access, the corresponding project tab is also visible
       if (tab.id === 'po' && allowedKeys.has('purchase-orders')) return true;
       if (tab.id === 'wo' && allowedKeys.has('work-orders')) return true;
       if (tab.id === 'bom' && allowedKeys.has('projects')) return true;
@@ -715,11 +715,38 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     setBomActionState(null);
   };
 
+  const handleProcessPO = (remarks: string) => {
+    if (!poActionState || !userProfile) return;
+    setIsActionProcessing(true);
+    const logEntry = {
+      action: poActionState.type === 'Accepted' ? 'Accepted' : 'Rejected',
+      userName: userProfile.username || user?.email || 'Admin',
+      userId: user?.uid || '',
+      timestamp: new Date(),
+      details: remarks ? `Remarks: ${remarks}` : 'Processed without specific remarks.'
+    };
+    const poRef = doc(firestore, 'project_pos', poActionState.po.id);
+    updateDocumentNonBlocking(poRef, {
+      status: poActionState.type,
+      adminRemarks: remarks,
+      processedByName: userProfile.username || user?.email || 'Admin',
+      processedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      history: arrayUnion(logEntry)
+    });
+    toast({ 
+      title: poActionState.type === 'Accepted' ? 'PO Accepted' : 'PO Rejected', 
+      description: `Purchase Order ${poActionState.po.poNumber} has been updated.` 
+    });
+    setIsActionProcessing(false);
+    setPoActionState(null);
+  };
+
   const handleProcessWO = (remarks: string) => {
     if (!woActionState || !userProfile) return;
     setIsActionProcessing(true);
     const logEntry = {
-      action: woActionState.type === 'Approved' ? 'Authorized' : 'Rejected',
+      action: woActionState.type === 'Accepted' ? 'Accepted' : 'Rejected',
       userName: userProfile.username || user?.email || 'Admin',
       userId: user?.uid || '',
       timestamp: new Date(),
@@ -728,13 +755,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     const woRef = doc(firestore, 'project_wos', woActionState.wo.id);
     updateDocumentNonBlocking(woRef, {
       status: woActionState.type,
+      adminRemarks: remarks,
       updatedAt: serverTimestamp(),
       updatedBy: user?.uid || '',
       updatedByName: userProfile.username || user?.email || 'Admin',
       history: arrayUnion(logEntry)
     });
     toast({ 
-      title: woActionState.type === 'Approved' ? 'WO Authorized' : 'WO Rejected', 
+      title: woActionState.type === 'Accepted' ? 'WO Accepted' : 'WO Rejected', 
       description: `Work Order ${woActionState.wo.woNumber} has been updated.` 
     });
     setIsActionProcessing(false);
@@ -1252,9 +1280,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => togglePORow(po.id)}>{expandedPORows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span></div></TableCell>
                             <TableCell className="text-sm font-semibold text-foreground">{po.supplierName}</TableCell>
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
-                            <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm px-1.5 h-5">{po.status}</Badge></TableCell>
+                            <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-1.5 h-5", po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" : po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{po.status || 'Pending'}</Badge></TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                            <TableCell className="text-right px-6"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}><Eye className="h-4 w-4" /></Button>{(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/procurement/${po.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}><Trash2 className="h-4 w-4" /></Button></>)}</div></TableCell>
+                            <TableCell className="text-right px-6"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}><Eye className="h-4 w-4" /></Button>{isAdmin && po.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setPoActionState({ po, type: 'Accepted' })} title="Accept PO"><CircleCheck className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setPoActionState({ po, type: 'Rejected' })} title="Reject PO"><CircleX className="h-4 w-4" /></Button></>)}{(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/procurement/${po.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}><Trash2 className="h-4 w-4" /></Button></>)}</div></TableCell>
                           </TableRow>
                           {expandedPORows.has(po.id) && po.items && (<TableRow className="bg-muted/30"><TableCell colSpan={6} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Breakdown for {po.poNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{po.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.itemName}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Subtotal</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
                         </React.Fragment>
@@ -1294,9 +1322,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => toggleWORow(wo.id)}>{expandedWORows.has(wo.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{wo.woNumber}</span></div></TableCell>
                             <TableCell className="text-sm font-semibold text-foreground">{wo.contractorName}</TableCell>
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
-                            <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-1.5 h-5", wo.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" : wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{wo.status || 'Pending'}</Badge></TableCell>
+                            <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-1.5 h-5", wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" : wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{wo.status || 'Pending'}</Badge></TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                            <TableCell className="text-right px-6"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}><Eye className="h-4 w-4" /></Button>{isAdmin && wo.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Approved' })} title="Approve WO"><CircleCheck className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Rejected' })} title="Reject WO"><CircleX className="h-4 w-4" /></Button></>)}{(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}><Trash2 className="h-4 w-4" /></Button></>)}</div></TableCell>
+                            <TableCell className="text-right px-6"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}><Eye className="h-4 w-4" /></Button>{isAdmin && wo.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Accepted' })} title="Accept WO"><CircleCheck className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Rejected' })} title="Reject WO"><CircleX className="h-4 w-4" /></Button></>)}{(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}><Trash2 className="h-4 w-4" /></Button></>)}</div></TableCell>
                           </TableRow>
                           {expandedWORows.has(wo.id) && wo.items && wo.items.length > 0 && (<TableRow className="bg-muted/30"><TableCell colSpan={6} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown for {wo.woNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{wo.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.description}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Amount</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
                         </React.Fragment>
@@ -1786,6 +1814,62 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               }}
             >
               {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${bomActionState?.type}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!poActionState} onOpenChange={(o) => !o && setPoActionState(null)}>
+        <DialogContent className="rounded-sm max-md">
+          <DialogHeader>
+            <DialogTitle>Authorize Purchase Order</DialogTitle>
+            <DialogDescription>Decide approval for {poActionState?.po.poNumber}.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Decision Remarks</Label>
+              <Textarea id="po-action-remarks" placeholder="Provide reason for decision..." className="min-h-[100px] rounded-sm" />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button 
+              className={cn("min-w-[120px]", poActionState?.type === 'Accepted' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+              disabled={isActionProcessing}
+              onClick={() => {
+                const remarks = (document.getElementById('po-action-remarks') as HTMLTextAreaElement)?.value || "";
+                handleProcessPO(remarks);
+              }}
+            >
+              {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${poActionState?.type}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!woActionState} onOpenChange={(o) => !o && setWoActionState(null)}>
+        <DialogContent className="rounded-sm max-md">
+          <DialogHeader>
+            <DialogTitle>Authorize Work Order</DialogTitle>
+            <DialogDescription>Decide approval for {woActionState?.wo.woNumber}.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Decision Remarks</Label>
+              <Textarea id="wo-action-remarks" placeholder="Provide reason for decision..." className="min-h-[100px] rounded-sm" />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button 
+              className={cn("min-w-[120px]", woActionState?.type === 'Accepted' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+              disabled={isActionProcessing}
+              onClick={() => {
+                const remarks = (document.getElementById('wo-action-remarks') as HTMLTextAreaElement)?.value || "";
+                handleProcessWO(remarks);
+              }}
+            >
+              {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${woActionState?.type}`}
             </Button>
           </DialogFooter>
         </DialogContent>

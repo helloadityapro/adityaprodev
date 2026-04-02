@@ -1,8 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, where, limit } from 'firebase/firestore';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, doc, where, limit, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +27,10 @@ import {
   Layers,
   FileDown,
   Plus,
-  Pencil
+  Pencil,
+  CircleCheck,
+  CircleX,
+  Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -57,6 +60,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 type WOItem = {
   description: string;
@@ -99,6 +105,8 @@ export default function GlobalManageWOsPage() {
   const [sortConfig, setSortConfig] = React.useState<{ key: WOSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [expandedRows, setExpandedRows] = React.useState<Set<string>>(new Set());
   const [woToDelete, setWoToDelete] = React.useState<WorkOrder | null>(null);
+  const [woActionState, setWoActionState] = React.useState<{ wo: WorkOrder, type: 'Accepted' | 'Rejected' } | null>(null);
+  const [isActionProcessing, setIsActionProcessing] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -181,6 +189,33 @@ export default function GlobalManageWOsPage() {
     setExpandedRows(newSet);
   };
 
+  const handleProcessWO = (remarks: string) => {
+    if (!woActionState || !userProfile) return;
+    setIsActionProcessing(true);
+    const logEntry = {
+      action: woActionState.type === 'Accepted' ? 'Accepted' : 'Rejected',
+      userName: userProfile.username || user?.email || 'Admin',
+      userId: user?.uid || '',
+      timestamp: new Date(),
+      details: remarks ? `Remarks: ${remarks}` : 'Processed without specific remarks.'
+    };
+    const woRef = doc(firestore, 'project_wos', woActionState.wo.id);
+    updateDocumentNonBlocking(woRef, {
+      status: woActionState.type,
+      adminRemarks: remarks,
+      updatedAt: serverTimestamp(),
+      updatedBy: user?.uid || '',
+      updatedByName: userProfile.username || user?.email || 'Admin',
+      history: arrayUnion(logEntry)
+    });
+    toast({ 
+      title: woActionState.type === 'Accepted' ? 'WO Accepted' : 'WO Rejected', 
+      description: `Work Order ${woActionState.wo.woNumber} has been updated.` 
+    });
+    setIsActionProcessing(false);
+    setWoActionState(null);
+  };
+
   const handleDeleteWO = async () => {
     if (!woToDelete) return;
     try {
@@ -248,10 +283,10 @@ export default function GlobalManageWOsPage() {
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all" className="text-xs font-bold">All Status</SelectItem>
-              <SelectItem value="Pending" className="text-xs font-bold">Pending</SelectItem>
-              <SelectItem value="Approved" className="text-xs font-bold text-green-600">Approved</SelectItem>
-              <SelectItem value="Rejected" className="text-xs font-bold text-red-600">Rejected</SelectItem>
+              <SelectItem value="all" className="text-xs font-bold uppercase">All Records</SelectItem>
+              <SelectItem value="Pending" className="text-xs font-bold uppercase text-amber-600">Pending</SelectItem>
+              <SelectItem value="Accepted" className="text-xs font-bold uppercase text-green-600">Accepted</SelectItem>
+              <SelectItem value="Rejected" className="text-xs font-bold uppercase text-red-600">Rejected</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }} className="h-10 w-10 text-muted-foreground rounded-sm">
@@ -305,9 +340,10 @@ export default function GlobalManageWOsPage() {
                       <TableCell>
                         <Badge variant="outline" className={cn(
                           "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                          wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                          wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
                           wo.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                          wo.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                          "bg-red-50 text-red-700 border-red-200"
+                          "bg-muted text-muted-foreground"
                         )}>
                           {wo.status || 'Pending'}
                         </Badge>
@@ -317,6 +353,12 @@ export default function GlobalManageWOsPage() {
                       </TableCell>
                       <TableCell className="text-right px-6">
                         <div className="flex justify-end gap-1">
+                          {isAdmin && wo.status === 'Pending' && (
+                            <>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Accepted' })} title="Accept WO"><CircleCheck className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setWoActionState({ wo, type: 'Rejected' })} title="Reject WO"><CircleX className="h-4 w-4" /></Button>
+                            </>
+                          )}
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => router.push(`/projects/${wo.siteId}?tab=wo`)}>
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -376,6 +418,34 @@ export default function GlobalManageWOsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!woActionState} onOpenChange={(o) => !o && setWoActionState(null)}>
+        <DialogContent className="rounded-sm max-md">
+          <DialogHeader>
+            <DialogTitle>Authorize Work Order</DialogTitle>
+            <DialogDescription>Set decision for {woActionState?.wo.woNumber}.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Decision Remarks</Label>
+              <Textarea id="wo-action-remarks" placeholder="Provide feedback for the contractor engagement..." className="min-h-[100px] rounded-sm" />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button 
+              className={cn("min-w-[120px]", woActionState?.type === 'Accepted' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+              disabled={isActionProcessing}
+              onClick={() => {
+                const remarks = (document.getElementById('wo-action-remarks') as HTMLTextAreaElement)?.value || "";
+                handleProcessWO(remarks);
+              }}
+            >
+              {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${woActionState?.type}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!woToDelete} onOpenChange={(o) => !o && setWoToDelete(null)}>
         <AlertDialogContent className="rounded-sm">

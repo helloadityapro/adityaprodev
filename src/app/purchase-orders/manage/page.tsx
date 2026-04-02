@@ -1,8 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, where, limit } from 'firebase/firestore';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, doc, where, limit, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -27,7 +27,10 @@ import {
   Layers,
   FileDown,
   Plus,
-  Pencil
+  Pencil,
+  CircleCheck,
+  CircleX,
+  Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -57,6 +60,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 type POItem = {
   bomItemId: string;
@@ -101,6 +107,8 @@ export default function GlobalManagePOsPage() {
   const [sortConfig, setSortConfig] = React.useState<{ key: POSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [expandedRows, setExpandedRows] = React.useState<Set<string>>(new Set());
   const [poToDelete, setPoToDelete] = React.useState<PurchaseOrder | null>(null);
+  const [poActionState, setPoActionState] = React.useState<{ po: PurchaseOrder, type: 'Accepted' | 'Rejected' } | null>(null);
+  const [isActionProcessing, setIsActionProcessing] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -194,6 +202,33 @@ export default function GlobalManagePOsPage() {
     }
   };
 
+  const handleProcessPO = (remarks: string) => {
+    if (!poActionState || !userProfile) return;
+    setIsActionProcessing(true);
+    const logEntry = {
+      action: poActionState.type === 'Accepted' ? 'Accepted' : 'Rejected',
+      userName: userProfile.username || user?.email || 'Admin',
+      userId: user?.uid || '',
+      timestamp: new Date(),
+      details: remarks ? `Remarks: ${remarks}` : 'Processed without specific remarks.'
+    };
+    const poRef = doc(firestore, 'project_pos', poActionState.po.id);
+    updateDocumentNonBlocking(poRef, {
+      status: poActionState.type,
+      adminRemarks: remarks,
+      processedByName: userProfile.username || user?.email || 'Admin',
+      processedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      history: arrayUnion(logEntry)
+    });
+    toast({ 
+      title: poActionState.type === 'Accepted' ? 'PO Accepted' : 'PO Rejected', 
+      description: `Purchase Order ${poActionState.po.poNumber} has been updated.` 
+    });
+    setIsActionProcessing(false);
+    setPoActionState(null);
+  };
+
   const handleExport = () => {
     if (filteredPOs.length === 0) return;
     const exportData = filteredPOs.map(po => ({
@@ -250,10 +285,11 @@ export default function GlobalManagePOsPage() {
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all" className="text-xs font-bold">All Status</SelectItem>
-              <SelectItem value="Open" className="text-xs font-bold">Open</SelectItem>
-              <SelectItem value="Approved" className="text-xs font-bold text-green-600">Approved</SelectItem>
-              <SelectItem value="Cancelled" className="text-xs font-bold text-red-600">Cancelled</SelectItem>
+              <SelectItem value="all" className="text-xs font-bold uppercase">All Records</SelectItem>
+              <SelectItem value="Pending" className="text-xs font-bold uppercase text-amber-600">Pending</SelectItem>
+              <SelectItem value="Accepted" className="text-xs font-bold uppercase text-green-600">Accepted</SelectItem>
+              <SelectItem value="Rejected" className="text-xs font-bold uppercase text-red-600">Rejected</SelectItem>
+              <SelectItem value="Cancelled" className="text-xs font-bold uppercase">Cancelled</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }} className="h-10 w-10 text-muted-foreground rounded-sm">
@@ -307,11 +343,12 @@ export default function GlobalManagePOsPage() {
                       <TableCell>
                         <Badge variant="outline" className={cn(
                           "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                          po.status === 'Open' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                          po.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                          "bg-red-50 text-red-700 border-red-200"
+                          po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                          po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                          po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                          "bg-muted text-muted-foreground"
                         )}>
-                          {po.status}
+                          {po.status || 'Pending'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right font-black text-sm font-mono text-foreground">
@@ -319,6 +356,12 @@ export default function GlobalManagePOsPage() {
                       </TableCell>
                       <TableCell className="text-right px-6">
                         <div className="flex justify-end gap-1">
+                          {isAdmin && po.status === 'Pending' && (
+                            <>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setPoActionState({ po, type: 'Accepted' })} title="Accept PO"><CircleCheck className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setPoActionState({ po, type: 'Rejected' })} title="Reject PO"><CircleX className="h-4 w-4" /></Button>
+                            </>
+                          )}
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
                             <Link href={`/projects/${po.siteId}?tab=po`}><Eye className="h-4 w-4" /></Link>
                           </Button>
@@ -378,6 +421,34 @@ export default function GlobalManagePOsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!poActionState} onOpenChange={(o) => !o && setPoActionState(null)}>
+        <DialogContent className="rounded-sm max-md">
+          <DialogHeader>
+            <DialogTitle>Authorize Purchase Order</DialogTitle>
+            <DialogDescription>Set decision for {poActionState?.po.poNumber}.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Decision Remarks</Label>
+              <Textarea id="po-action-remarks" placeholder="Provide feedback for the requester..." className="min-h-[100px] rounded-sm" />
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button 
+              className={cn("min-w-[120px]", poActionState?.type === 'Accepted' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+              disabled={isActionProcessing}
+              onClick={() => {
+                const remarks = (document.getElementById('po-action-remarks') as HTMLTextAreaElement)?.value || "";
+                handleProcessPO(remarks);
+              }}
+            >
+              {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${poActionState?.type}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!poToDelete} onOpenChange={(o) => !o && setPoToDelete(null)}>
         <AlertDialogContent className="rounded-sm">

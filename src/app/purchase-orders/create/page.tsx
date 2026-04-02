@@ -250,7 +250,7 @@ export default function CreatePOPage() {
         items: values.items,
         itemsCount: values.items.length,
         totalAmount,
-        status: 'Open',
+        status: 'Pending',
         createdAt: serverTimestamp(),
         createdByName: userProfile.username || user.email,
         history: [historyEntry]
