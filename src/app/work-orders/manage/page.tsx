@@ -355,11 +355,11 @@ export default function GlobalManageWOsPage() {
                         <div className="flex justify-end gap-1">
                           {isAdmin && wo.status === 'Pending' && (
                             <div className="flex gap-1 mr-2">
-                              <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3 text-[10px] uppercase" onClick={() => setWoActionState({ wo, type: 'Accepted' })}>
-                                Accept
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setWoActionState({ wo, type: 'Accepted' })} title="Accept WO">
+                                <CircleCheck className="h-4 w-4" />
                               </Button>
-                              <Button size="sm" variant="destructive" className="h-8 rounded-sm font-bold px-3 text-[10px] uppercase" onClick={() => setWoActionState({ wo, type: 'Rejected' })}>
-                                Reject
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setWoActionState({ wo, type: 'Rejected' })} title="Reject WO">
+                                <CircleX className="h-4 w-4" />
                               </Button>
                             </div>
                           )}

@@ -1286,11 +1286,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}><Eye className="h-4 w-4" /></Button>
                               {isAdmin && po.status === 'Pending' && (
                                 <div className="flex gap-1 ml-2">
-                                  <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3 text-[10px] uppercase" onClick={() => setPoActionState({ po, type: 'Accepted' })}>
-                                    Accept
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setPoActionState({ po, type: 'Accepted' })} title="Accept PO">
+                                    <CircleCheck className="h-4 w-4" />
                                   </Button>
-                                  <Button size="sm" variant="destructive" className="h-8 rounded-sm font-bold px-3 text-[10px] uppercase" onClick={() => setPoActionState({ po, type: 'Rejected' })}>
-                                    Reject
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setPoActionState({ po, type: 'Rejected' })} title="Reject PO">
+                                    <CircleX className="h-4 w-4" />
                                   </Button>
                                 </div>
                               )}
@@ -1341,11 +1341,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}><Eye className="h-4 w-4" /></Button>
                               {isAdmin && wo.status === 'Pending' && (
                                 <div className="flex gap-1 ml-2">
-                                  <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3 text-[10px] uppercase" onClick={() => setWoActionState({ wo, type: 'Accepted' })}>
-                                    Accept
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setWoActionState({ wo, type: 'Accepted' })} title="Accept WO">
+                                    <CircleCheck className="h-4 w-4" />
                                   </Button>
-                                  <Button size="sm" variant="destructive" className="h-8 rounded-sm font-bold px-3 text-[10px] uppercase" onClick={() => setWoActionState({ wo, type: 'Rejected' })}>
-                                    Reject
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setWoActionState({ wo, type: 'Rejected' })} title="Reject WO">
+                                    <CircleX className="h-4 w-4" />
                                   </Button>
                                 </div>
                               )}
@@ -1857,8 +1857,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </div>
               <div className="grid gap-2"><Label>Specification</Label><Textarea name="specification" defaultValue={editingBomItem.specification} /></div>
               <DialogFooter className="pt-4">
-                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                <Button type="submit" disabled={isUpdatingBom}>{isUpdatingBom ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : 'Update'}</Button>
+                <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
+                <Button type="submit" className="rounded-sm font-bold" disabled={isUpdatingBom}>{isUpdatingBom ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : 'Update'}</Button>
               </DialogFooter>
             </form>
           )}
@@ -1975,14 +1975,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       <AlertDialog open={!!poToDelete} onOpenChange={(o) => !o && setPoToDelete(null)}>
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader><AlertDialogTitle>Delete PO?</AlertDialogTitle><AlertDialogDescription>This will remove purchase order <strong>{poToDelete?.poNumber}</strong> from site records.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeletePO} className="bg-destructive text-destructive-foreground">Confirm Delete</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeletePO} className="bg-destructive text-destructive-foreground">Confirm Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog open={!!woToDelete} onOpenChange={(o) => !o && setWoToDelete(null)}>
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader><AlertDialogTitle>Delete WO?</AlertDialogTitle><AlertDialogDescription>This will remove work order <strong>{woToDelete?.woNumber}</strong> from site records.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteWO} className="bg-destructive text-destructive-foreground">Confirm Delete</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteWO} className="bg-destructive text-destructive-foreground">Confirm Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

@@ -358,11 +358,11 @@ export default function GlobalManagePOsPage() {
                         <div className="flex justify-end items-center gap-1">
                           {isAdmin && po.status === 'Pending' && (
                             <div className="flex gap-1 mr-2">
-                              <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3 text-[10px] uppercase" onClick={() => setPoActionState({ po, type: 'Accepted' })}>
-                                Accept
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setPoActionState({ po, type: 'Accepted' })} title="Accept PO">
+                                <CircleCheck className="h-4 w-4" />
                               </Button>
-                              <Button size="sm" variant="destructive" className="h-8 rounded-sm font-bold px-3 text-[10px] uppercase" onClick={() => setPoActionState({ po, type: 'Rejected' })}>
-                                Reject
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setPoActionState({ po, type: 'Rejected' })} title="Reject PO">
+                                <CircleX className="h-4 w-4" />
                               </Button>
                             </div>
                           )}
