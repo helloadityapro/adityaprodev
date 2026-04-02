@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -173,6 +174,8 @@ type POHistoryEntry = {
 type PurchaseOrder = {
   id: string;
   poNumber: string;
+  siteId: string;
+  siteName: string;
   supplierName: string;
   orderDate: string;
   status: string;
@@ -183,6 +186,8 @@ type PurchaseOrder = {
   createdByName?: string;
   updatedAt?: any;
   updatedByName?: string;
+  processedAt?: any;
+  processedByName?: string;
   history?: POHistoryEntry[];
 };
 
@@ -207,6 +212,8 @@ type WorkOrder = {
   createdByName?: string;
   updatedAt?: any;
   updatedByName?: string;
+  processedAt?: any;
+  processedByName?: string;
   history?: POHistoryEntry[];
 };
 
@@ -607,7 +614,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   }, [workOrders, woSearch, woSortConfig]);
 
   const handlePOSort = (key: POSortKey) => {
-    setPoSortConfig(prev => ({
+    setSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
@@ -756,6 +763,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     updateDocumentNonBlocking(woRef, {
       status: woActionState.type,
       adminRemarks: remarks,
+      processedByName: userProfile.username || user?.email || 'Admin',
+      processedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       updatedBy: user?.uid || '',
       updatedByName: userProfile.username || user?.email || 'Admin',
@@ -1281,7 +1290,26 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => togglePORow(po.id)}>{expandedPORows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span></div></TableCell>
                             <TableCell className="text-sm font-semibold text-foreground">{po.supplierName}</TableCell>
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
-                            <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-1.5 h-5", po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" : po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{po.status || 'Pending'}</Badge></TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <Badge variant="outline" className={cn(
+                                  "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
+                                  po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                                  po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                                  "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                )}>{po.status || 'Pending'}</Badge>
+                                {po.processedByName && (po.status === 'Accepted' || po.status === 'Rejected') && (
+                                  <span className="text-[8px] font-bold text-muted-foreground uppercase leading-tight">
+                                    {po.status === 'Accepted' ? 'Approved' : 'Rejected'} by {po.processedByName}
+                                  </span>
+                                )}
+                                {po.updatedAt && po.updatedByName && (
+                                  <span className="text-[8px] font-medium text-muted-foreground/60 leading-tight">
+                                    Last Edited: {formatTimestamp(po.updatedAt)} by {po.updatedByName}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1.5">
@@ -1343,7 +1371,26 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => toggleWORow(wo.id)}>{expandedWORows.has(wo.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{wo.woNumber}</span></div></TableCell>
                             <TableCell className="text-sm font-semibold text-foreground">{wo.contractorName}</TableCell>
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
-                            <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-1.5 h-5", wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" : wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{wo.status || 'Pending'}</Badge></TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <Badge variant="outline" className={cn(
+                                  "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
+                                  wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                                  wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                                  "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                )}>{wo.status || 'Pending'}</Badge>
+                                {wo.processedByName && (wo.status === 'Accepted' || wo.status === 'Rejected') && (
+                                  <span className="text-[8px] font-bold text-muted-foreground uppercase leading-tight">
+                                    {wo.status === 'Accepted' ? 'Approved' : 'Rejected'} by {wo.processedByName}
+                                  </span>
+                                )}
+                                {wo.updatedAt && wo.updatedByName && (
+                                  <span className="text-[8px] font-medium text-muted-foreground/60 leading-tight">
+                                    Last Edited: {formatTimestamp(wo.updatedAt)} by {wo.updatedByName}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1.5">
@@ -1663,7 +1710,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <TableCell className="text-sm font-semibold">{permit.ptwType}</TableCell>
                           <TableCell className="text-xs font-medium">{permit.siteEngineerName || '—'}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm h-5 px-1.5", permit.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" : permit.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{permit.status}</Badge>
+                            <Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm h-5 px-1.5", permit.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" : permit.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : permit.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" : "bg-blue-50 text-blue-700 border-blue-200")}>{permit.status}</Badge>
                           </TableCell>
                           <TableCell className="text-right px-6"><Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm"><Link href={`/ptw/list?view=${permit.id}`}><Eye className="h-4 w-4" /></Link></Button></TableCell>
                         </TableRow>
