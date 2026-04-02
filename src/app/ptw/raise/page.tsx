@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react"
@@ -401,7 +400,7 @@ export default function RaisePtwPage() {
                 <CheckCircle2 className="h-12 w-12 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold uppercase tracking-tight">ACCOUNT CREATED</CardTitle>
+            <CardTitle className="text-2xl font-bold uppercase tracking-tight">Submitted</CardTitle>
             <CardDescription className="text-base">
               Permit <span className="font-mono font-bold text-primary">{submittedPermit.serialNumber}</span> has been raised and is pending review.
             </CardDescription>
@@ -486,7 +485,7 @@ export default function RaisePtwPage() {
                           {filteredAccessibleSites.length > 0 ? filteredAccessibleSites.map((site) => (
                             <Button 
                               key={site.id} 
-                              type="button"
+                              type="button" 
                               variant="ghost" 
                               className="w-full justify-start font-normal text-left" 
                               onClick={() => { field.onChange(site.name); setSelectedSite(site); setIsSitePopoverOpen(false); }}
