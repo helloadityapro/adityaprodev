@@ -1270,6 +1270,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('date')}><div className="flex items-center">Date <POSortIcon column="date" /></div></TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('status')}><div className="flex items-center">Status <POSortIcon column="status" /></div></TableHead>
                         <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}><div className="flex items-center justify-end">Total Value <POSortIcon column="total" /></div></TableHead>
+                        <TableHead>Recorded By</TableHead>
                         <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1282,6 +1283,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                             <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-1.5 h-5", po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" : po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{po.status || 'Pending'}</Badge></TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight truncate max-w-[100px]">{po.createdByName || '—'}</span>
+                              </div>
+                            </TableCell>
                             <TableCell className="text-right px-6"><div className="flex justify-end gap-1">
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}><Eye className="h-4 w-4" /></Button>
                               {isAdmin && po.status === 'Pending' && (
@@ -1297,10 +1304,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               {(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/procurement/${po.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}><Trash2 className="h-4 w-4" /></Button></>)}
                             </div></TableCell>
                           </TableRow>
-                          {expandedPORows.has(po.id) && po.items && (<TableRow className="bg-muted/30"><TableCell colSpan={6} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Breakdown for {po.poNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{po.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.itemName}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Subtotal</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
+                          {expandedPORows.has(po.id) && po.items && (<TableRow className="bg-muted/30"><TableCell colSpan={7} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Breakdown for {po.poNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{po.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.itemName}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Subtotal</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
                         </React.Fragment>
                       )) : (
-                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No POs found.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic text-xs">No POs found.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1325,6 +1332,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('date')}><div className="flex items-center">Date <WOSortIcon column="date" /></div></TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('status')}><div className="flex items-center">Status <WOSortIcon column="status" /></div></TableHead>
                         <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('total')}><div className="flex items-center justify-end">Contract Value <WOSortIcon column="total" /></div></TableHead>
+                        <TableHead>Recorded By</TableHead>
                         <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1337,6 +1345,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
                             <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-1.5 h-5", wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" : wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{wo.status || 'Pending'}</Badge></TableCell>
                             <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                <User className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight truncate max-w-[100px]">{wo.createdByName || '—'}</span>
+                              </div>
+                            </TableCell>
                             <TableCell className="text-right px-6"><div className="flex justify-end gap-1">
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}><Eye className="h-4 w-4" /></Button>
                               {isAdmin && wo.status === 'Pending' && (
@@ -1352,10 +1366,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               {(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}><Trash2 className="h-4 w-4" /></Button></>)}
                             </div></TableCell>
                           </TableRow>
-                          {expandedWORows.has(wo.id) && wo.items && wo.items.length > 0 && (<TableRow className="bg-muted/30"><TableCell colSpan={6} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown for {wo.woNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{wo.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.description}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Amount</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
+                          {expandedWORows.has(wo.id) && wo.items && wo.items.length > 0 && (<TableRow className="bg-muted/30"><TableCell colSpan={7} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown for {wo.woNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{wo.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.description}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Amount</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
                         </React.Fragment>
                       )) : (
-                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No work orders found.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic text-xs">No work orders found.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
