@@ -25,6 +25,9 @@
 
     <!-- Notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
+    <!-- Power management for reliable push delivery -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Hardware features -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />

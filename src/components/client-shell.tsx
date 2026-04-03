@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from "react";
@@ -41,6 +40,7 @@ type Notification = {
   description: string;
   link: string;
   read: boolean;
+  push: boolean;
   createdAt: any;
 };
 
@@ -169,33 +169,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
-  const userDepartment = userProfile?.department || "";
-
-  const anniversaryYear = React.useMemo(() => {
-    if (!userProfile?.doj) return 0;
-    const today = new Date();
-    const joinDate = new Date(userProfile.doj);
-    if (today.getMonth() === joinDate.getMonth() && today.getDate() === joinDate.getDate()) {
-      const years = today.getFullYear() - joinDate.getFullYear();
-      return years > 0 ? years : 0;
-    }
-    return 0;
-  }, [userProfile?.doj]);
-
-  const isBirthday = React.useMemo(() => {
-    if (!userProfile?.dob) return false;
-    const today = new Date();
-    const birthDate = new Date(userProfile.dob);
-    return today.getMonth() === birthDate.getMonth() && today.getDate() === birthDate.getDate();
-  }, [userProfile?.dob]);
-
-  const handleBirthdayClick = () => {
-    window.dispatchEvent(new Event('trigger-birthday-celebration'));
-  };
-
-  const handleAnniversaryClick = () => {
-    window.dispatchEvent(new Event('trigger-anniversary-celebration'));
-  };
 
   const isAuthorized = React.useMemo(() => {
     if (isAuthPage || isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
@@ -321,8 +294,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           let wasUpdated = false;
           
           notifications.forEach(notif => {
-              if (!notif.read && !displayedNotifIds.has(notif.id)) {
-                  // Standard in-app visual feedback
+              // CRITICAL: We only fire toasts for in-app notifications (push: false)
+              // to prevent duplication with the native push notification listener.
+              if (!notif.read && !notif.push && !displayedNotifIds.has(notif.id)) {
                   toast({ 
                     title: notif.title, 
                     description: notif.description, 
@@ -331,6 +305,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
                   newDisplayedIds.add(notif.id);
                   wasUpdated = true;
+              } else if (!notif.read && notif.push) {
+                  // Mark as displayed to keep the session tracking consistent
+                  // but do not fire a toast (let PushNotificationManager handle it)
+                  if (!displayedNotifIds.has(notif.id)) {
+                    newDisplayedIds.add(notif.id);
+                    wasUpdated = true;
+                  }
               }
           });
           
@@ -355,7 +336,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <div className="bg-destructive/10 p-6 rounded-full mb-6">
           <UserX className="h-16 w-16 text-destructive opacity-80" />
         </div>
-        <h1 className="mb-2">Profile Not Found</h1>
+        <h1>Profile Not Found</h1>
         <p className="mb-8 max-w-md text-muted-foreground text-lg leading-relaxed">
           Your account is authenticated, but your professional profile could not be found in the database.
         </p>
@@ -395,7 +376,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <MainNav userRole={userRole} userDepartment={userDepartment} pendingPtwCount={pendingPtwCount} />
+          <MainNav userRole={userRole} userDepartment={userProfile?.department || ""} pendingPtwCount={pendingPtwCount} />
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="flex flex-col h-full overflow-hidden relative">
@@ -405,41 +386,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             
             <div className="flex-1 min-w-0 flex items-center gap-4">
               <GlobalSearch />
-              {anniversaryYear > 0 && (
-                <button 
-                  onClick={handleAnniversaryClick}
-                  className="hidden lg:flex items-center gap-2 text-[10px] font-black uppercase tracking-tight text-primary bg-primary/5 px-3 py-1.5 rounded-sm border border-primary/10 hover:bg-primary/10 transition-colors animate-in fade-in slide-in-from-left-2 duration-500"
-                >
-                  <Award className="h-3.5 w-3.5" />
-                  <span>🎉 Congratulations! Completed {anniversaryYear} {anniversaryYear === 1 ? 'year' : 'years'} at Aditya</span>
-                </button>
-              )}
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              {anniversaryYear > 0 && (
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={handleAnniversaryClick}
-                  className="lg:hidden h-9 w-9 rounded-full text-primary hover:bg-primary/5 animate-in fade-in zoom-in duration-500"
-                  title={`Happy Anniversary! (${anniversaryYear} years)`}
-                >
-                  <Award className="h-5 w-5 animate-bounce" />
-                </Button>
-              )}
-
-              {isBirthday && (
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={handleBirthdayClick}
-                  className="h-9 w-9 rounded-full text-amber-600 hover:bg-amber-50 animate-in fade-in zoom-in duration-500"
-                  title="Celebrate Birthday!"
-                >
-                  <PartyPopper className="h-5 w-5 animate-bounce" />
-                </Button>
-              )}
               <div className="hidden md:flex">
                 <QuickActions />
               </div>

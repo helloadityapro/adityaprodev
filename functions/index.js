@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview Firebase Cloud Function to dispatch true Push Notifications via FCM.
  * This script monitors the 'notifications' collection and sends messages
@@ -7,7 +6,7 @@
 
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { initializeApp } = require("firebase-admin/app");
 
 initializeApp();
@@ -51,6 +50,13 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
         link: data.link || "/",
         notificationId: event.params.notificationId
       },
+      android: {
+        notification: {
+          channelId: 'default',
+          priority: 'high',
+          sound: 'default'
+        }
+      },
       // Target multiple tokens (multicast)
       tokens: tokens,
     };
@@ -72,9 +78,9 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
       });
 
       if (failedTokens.length > 0) {
-        console.log(`Cleaning up ${failedTokens.length} expired tokens for user ${userId}.`);
+        console.log(`Cleaning up ${failedTokens.length} expired tokens for user ${userId} atomically.`);
         await db.collection("users").doc(userId).update({
-          fcmTokens: userData.fcmTokens.filter(t => !failedTokens.includes(t))
+          fcmTokens: FieldValue.arrayRemove(...failedTokens)
         });
       }
     }

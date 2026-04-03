@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -33,10 +32,20 @@ export function PushNotificationManager() {
         }
       }
 
-      // 2. Register with FCM
+      // 2. Create standard notification channel for Android 8+
+      await PushNotifications.createChannel({
+        id: 'default',
+        name: 'Aditya Pro Alerts',
+        description: 'Standard notifications for PtW, Trips and Tasks',
+        importance: 5,
+        visibility: 1,
+        vibration: true,
+      });
+
+      // 3. Register with FCM
       await PushNotifications.register();
 
-      // 3. Listen for token and store in Firestore
+      // 4. Listen for token and store in Firestore
       const regListener = await PushNotifications.addListener('registration', (token: Token) => {
         const userRef = doc(firestore, 'users', user.uid);
         updateDocumentNonBlocking(userRef, {
@@ -44,12 +53,13 @@ export function PushNotificationManager() {
         });
       });
 
-      // 4. Handle errors
+      // 5. Handle errors
       const errListener = await PushNotifications.addListener('registrationError', (error: any) => {
         console.error('Push Registration Error: ', JSON.stringify(error));
       });
 
-      // 5. Handle foreground notifications
+      // 6. Handle foreground notifications
+      // Triggered when app is open. We show a toast here.
       const receivedListener = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
         toast({
           title: notification.title,
@@ -62,7 +72,7 @@ export function PushNotificationManager() {
         });
       });
 
-      // 6. Handle notification clicks (from background/closed state)
+      // 7. Handle notification clicks (from background/closed state)
       const actionListener = await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
         const link = notification.notification.data?.link;
         if (link) {
