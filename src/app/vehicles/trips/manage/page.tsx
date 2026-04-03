@@ -103,6 +103,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { sendNotification } from '@/lib/notifications';
+import { getPageKeyByPath, type PageKey, slugifyRole } from "@/lib/access-control";
 
 type Assignment = {
   id: string;
@@ -377,7 +378,19 @@ function EditTripDialog({
                               {pickupType === 'Site' ? (
                                 <Popover open={isPickupPopoverOpen} onOpenChange={setIsPickupPopoverOpen}>
                                   <PopoverTrigger asChild>
-                                    <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal rounded-sm h-11 text-left", !field.value && "text-muted-foreground")}>{field.value || "Select pickup..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
+                                    <FormControl>
+                                      <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        className={cn(
+                                          "w-full justify-between font-normal rounded-sm h-11 text-left",
+                                          !field.value && "text-muted-foreground"
+                                        )}
+                                      >
+                                        <span className="truncate">{field.value || "Select pickup..."}</span>
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </FormControl>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                                     <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-10 border-none" value={pickupSearchQuery} onChange={e => setPickupSearchQuery(e.target.value)} /></div>
@@ -736,6 +749,7 @@ export default function ManageAllTripsPage() {
   const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
   const isHR = userProfile?.role === 'Manager - Human Resources';
+  const userRole = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
   const assignmentsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
@@ -823,7 +837,7 @@ export default function ManageAllTripsPage() {
       const dateB = b.requestDate?.toDate?.()?.getTime() || 0;
       return dateB - dateA;
     });
-  }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper]);
+  }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper, userRole]);
 
   const stats = React.useMemo(() => {
     return {
@@ -1388,7 +1402,7 @@ export default function ManageAllTripsPage() {
                         <div className="flex flex-col gap-1.5">
                           <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Itinerary</span>
                           <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700">
-                            <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation} \u{2794} {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
+                            <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation} ➔ {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
                           </div>
                         </div>
                       </div>
@@ -1465,7 +1479,7 @@ export default function ManageAllTripsPage() {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
+                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
                               )}
                             </TableCell>
                             <TableCell>
@@ -1479,7 +1493,7 @@ export default function ManageAllTripsPage() {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
+                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right px-6">
@@ -1573,7 +1587,7 @@ export default function ManageAllTripsPage() {
                     <SelectContent>
                       {availableVehiclesForAllotment.map(v => (
                         <SelectItem key={v.id} value={v.id} className="text-xs font-bold">
-                          {v.make} {v.model} ({v.plateNumber}) \u{2014} {v.ownership}
+                          {v.make} {v.model} ({v.plateNumber}) — {v.ownership}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1590,7 +1604,7 @@ export default function ManageAllTripsPage() {
                         value={approvalTarget?.rentedDriverDetails || ""}
                         onChange={(e) => setApprovalState(prev => prev ? { ...prev, rentedDriverDetails: e.target.value } : null)}
                       />
-                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver \u{2014} No system selection required.</p>
+                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver — No system selection required.</p>
                     </>
                   ) : (
                     <>
@@ -1714,7 +1728,7 @@ export default function ManageAllTripsPage() {
                         <div className="h-10 w-10 rounded-sm bg-muted flex items-center justify-center text-muted-foreground shrink-0"><UserCog className="h-6 w-6" /></div>
                         <div className="flex flex-col min-w-0">
                           <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Assigned Driver</span>
-                          <span className="text-sm font-black truncate">{detailsAssignment.driverName || '\u2014'}</span>
+                          <span className="text-sm font-black truncate">{detailsAssignment.driverName || '—'}</span>
                         </div>
                       </div>
                     </div>
@@ -1902,7 +1916,7 @@ function handleWhatsAppShare(trip: Assignment) {
       break;
     case 'Ongoing':
       header = "\u{1F6A6} *Aditya Pro - Trip Ongoing*";
-      body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} \u{2794} ${trip.destinations[0]?.location || 'Destination'}`;
+      body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} ➔ ${trip.destinations[0]?.location || 'Destination'}`;
       break;
     case 'Completed':
       const distance = (trip.endReading || 0) - (trip.startReading || 0);
