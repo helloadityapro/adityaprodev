@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, orderBy, where, or, serverTimestamp, and, getDocs, writeBatch } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -805,7 +805,7 @@ export default function ManageAllTripsPage() {
     }
   };
 
-  if (isUserLoading || isProfileLoading || isAssignmentsLoading || isVehiclesLoading || isUsersLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
+  if (isUserLoading || isProfileLoading || isAssignmentsLoading || isVehiclesLoading || isUsersLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-500px w-full" /></div>;
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
@@ -1275,7 +1275,7 @@ export default function ManageAllTripsPage() {
                                 <div className="flex items-center gap-2">
                                   <UserCircle2 className="h-4 w-4 text-primary" />
                                   <div className="flex flex-col">
-                                    <span className="text-xs font-bold">{activeTrip.userName}</span>
+                                    <span className="text-xs font-bold">{activeTrip.username}</span>
                                     <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {activeTrip.driverName}</span>
                                   </div>
                                 </div>
