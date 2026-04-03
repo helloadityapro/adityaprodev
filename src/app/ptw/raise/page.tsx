@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react"
@@ -66,7 +65,7 @@ const formatCapacity = (val: any) => {
   return isNaN(num) ? "0.000" : num.toFixed(3);
 };
 
-const FILE_INPUT_STYLES = "cursor-pointer h-auto py-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 transition-all";
+const FILE_INPUT_STYLES = "cursor-pointer h-auto py-2 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 transition-all w-full";
 
 export default function RaisePtwPage() {
   const firestore = useFirestore()
@@ -94,10 +93,10 @@ export default function RaisePtwPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
-  const isAdmin = React.useMemo(() => isSuperAdmin(user?.email) || userProfile?.role === 'Admin', [user, userProfile]);
-  const isManager = userProfile?.role === 'Site Manager';
+  const userRole = userProfile?.role || "";
+  const isAdmin = isSuperAdmin(user?.email) || userRole === 'Admin';
+  const isManager = userRole === 'Site Manager';
 
-  // Fetch team members for managers to aggregate sites
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
     return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
@@ -110,7 +109,6 @@ export default function RaisePtwPage() {
       return Array.from(new Map(allSites.map(site => [site.name, site])).values());
     }
     
-    // Aggregated site visibility for Managers
     const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
     if (isManager && teamMembers) {
       teamMembers.forEach(member => {
@@ -169,7 +167,7 @@ export default function RaisePtwPage() {
     }
   }, [isCorrectionMode, permitToCorrect, form, accessibleSites]);
 
-  const canRaisePermit = userProfile?.role === 'Site Manager' || userProfile?.role === 'Admin' || !!userProfile?.siteManagerId;
+  const canRaisePermit = userRole === 'Site Manager' || isAdmin || !!userProfile?.siteManagerId;
 
   const getCurrentLocation = (): Promise<{ latitude: number; longitude: number } | null> => {
     return new Promise((resolve) => {
@@ -299,7 +297,6 @@ export default function RaisePtwPage() {
       const newAttachments = [];
       const allFilesToUpload: File[] = [...files, ...referenceDocs];
 
-      // Sequential uploads for reliability and accurate progress bars
       for (const file of allFilesToUpload) {
         let fileToUpload: Blob = file;
         if (file.type.startsWith('image/')) {
@@ -311,15 +308,14 @@ export default function RaisePtwPage() {
         newAttachments.push(attachment);
       }
       
-      // Strict flow: Site Engineer (Pending) -> Site Manager (ManagerApproved) -> Admin (Approved)
-      const targetStatus = (userProfile.role === 'Site Engineer' || isCorrectionMode) ? "Pending" : "ManagerApproved";
+      const targetStatus = (userRole === 'Site Engineer' || isCorrectionMode) ? "Pending" : "ManagerApproved";
 
       const timelineEntry = {
         status: targetStatus,
         timestamp: new Date(),
         userId: user.uid,
         userName: userProfile.username || user.email || 'User',
-        userRole: userProfile.role,
+        userRole: userRole,
         remarks: values.commentsAndRemarks || (isCorrectionMode ? "Permit resubmitted with corrections." : values.descriptionOfWork),
         action: isCorrectionMode ? "Resubmitted" : "Created",
         submissionIndex: currentSubmissionIndex
@@ -400,7 +396,7 @@ export default function RaisePtwPage() {
 
   if (isSubmitted && submittedPermit) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[60vh] px-4">
         <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
@@ -421,11 +417,11 @@ export default function RaisePtwPage() {
               <MessageCircle className="mr-2 h-5 w-5" />
               Notify Manager on WhatsApp
             </Button>
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-11" onClick={() => router.push('/ptw/list')}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Button variant="outline" className="h-11 w-full" onClick={() => router.push('/ptw/list')}>
                 View Dashboard
               </Button>
-              <Button variant="secondary" className="h-11" onClick={() => {
+              <Button variant="secondary" className="h-11 w-full" onClick={() => {
                 setIsSubmitted(false);
                 setSubmittedPermit(null);
                 form.reset();
@@ -444,8 +440,8 @@ export default function RaisePtwPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {!canRaisePermit && userProfile?.role === 'Site Engineer' && (
+    <div className="space-y-6 pb-10">
+      {!canRaisePermit && userRole === 'Site Engineer' && (
         <Alert variant="destructive">
           <TriangleAlert className="h-4 w-4" />
           <AlertTitle>Action Required</AlertTitle>
@@ -455,15 +451,15 @@ export default function RaisePtwPage() {
 
       <div className="flex flex-col gap-1">
         <h1>{isCorrectionMode ? "Resubmit PtW Request" : "Request a Permit to Work"}</h1>
-        <p className="text-muted-foreground">Detailed site documentation is required for approval.</p>
+        <p className="text-muted-foreground text-sm sm:text-base">Detailed site documentation is required for approval.</p>
       </div>
 
-      <Card className="max-w-4xl">
-        <CardHeader>
+      <Card className="max-w-4xl w-full mx-auto">
+        <CardHeader className="px-4 sm:px-6">
           <CardTitle>Permit Details</CardTitle>
           <CardDescription>All fields are mandatory for safety compliance.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -558,16 +554,16 @@ export default function RaisePtwPage() {
 
               {selectedSite && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg border text-sm">
-                  <div><p className="text-muted-foreground mb-1 uppercase text-[10px] font-bold">Company</p><p className="font-semibold">{selectedSite.projectCompany}</p></div>
-                  <div><p className="text-muted-foreground mb-1 uppercase text-[10px] font-bold">AC Capacity (MW)</p><p className="font-semibold">{formatCapacity(selectedSite.acCapacity)}</p></div>
-                  <div><p className="text-muted-foreground mb-1 uppercase text-[10px] font-bold">DC Capacity (MWp)</p><p className="font-semibold">{formatCapacity(selectedSite.dcCapacity)}</p></div>
+                  <div className="space-y-1"><p className="text-muted-foreground uppercase text-[10px] font-bold">Company</p><p className="font-semibold break-all">{selectedSite.projectCompany}</p></div>
+                  <div className="space-y-1"><p className="text-muted-foreground uppercase text-[10px] font-bold">AC Capacity (MW)</p><p className="font-semibold">{formatCapacity(selectedSite.acCapacity)}</p></div>
+                  <div className="space-y-1"><p className="text-muted-foreground uppercase text-[10px] font-bold">DC Capacity (MWp)</p><p className="font-semibold">{formatCapacity(selectedSite.dcCapacity)}</p></div>
                 </div>
               )}
 
               <FormField control={form.control} name="descriptionOfWork" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Description of Work</FormLabel>
-                  <FormControl><Textarea placeholder="Explain exactly what tasks will be performed..." rows={5} {...field} disabled={isProcessing || isSubmitted} /></FormControl>
+                  <FormControl><Textarea placeholder="Explain exactly what tasks will be performed..." rows={5} {...field} disabled={isProcessing || isSubmitted} className="min-h-[120px] resize-none sm:resize-y" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -582,12 +578,12 @@ export default function RaisePtwPage() {
                     disabled={isProcessing || isSubmitted} 
                     className={FILE_INPUT_STYLES} 
                   />
-                  <div className="grid gap-3 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     {referenceDocs.map((file, idx) => (
                       <div key={idx} className="space-y-1.5">
-                        <Badge variant="secondary" className="w-full justify-between pl-3 pr-1 py-1.5 h-auto rounded-sm gap-2 flex items-center font-bold text-xs bg-muted/50 border animate-in fade-in zoom-in-95">
-                          <div className="flex items-center gap-2 truncate">
-                            <FileText className="h-3.5 w-3.5 text-primary opacity-60" />
+                        <Badge variant="secondary" className="w-full justify-between pl-3 pr-1 py-1.5 h-auto rounded-sm gap-2 flex items-center font-bold text-xs bg-muted/50 border animate-in fade-in zoom-in-95 overflow-hidden">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="h-3.5 w-3.5 text-primary opacity-60 shrink-0" />
                             <span className="truncate">{file.name}</span>
                           </div>
                           {!isProcessing && (
@@ -595,7 +591,7 @@ export default function RaisePtwPage() {
                               type="button" 
                               variant="ghost" 
                               size="icon" 
-                              className="h-6 w-6 hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
+                              className="h-6 w-6 hover:bg-destructive/10 text-muted-foreground hover:text-destructive shrink-0" 
                               onClick={() => removeFile(idx, 'refs')}
                             >
                               <X className="h-3.5 w-3.5" />
@@ -625,12 +621,12 @@ export default function RaisePtwPage() {
                     disabled={isProcessing || isSubmitted} 
                     className={FILE_INPUT_STYLES} 
                   />
-                  <div className="grid gap-3 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     {files.map((file, idx) => (
                       <div key={idx} className="space-y-1.5">
-                        <Badge variant="secondary" className="w-full justify-between pl-3 pr-1 py-1.5 h-auto rounded-sm gap-2 flex items-center font-bold text-xs bg-muted/50 border animate-in fade-in zoom-in-95">
-                          <div className="flex items-center gap-2 truncate">
-                            {file.type.startsWith('image/') ? <FileImage className="h-3.5 w-3.5 text-primary opacity-60" /> : <FileText className="h-3.5 w-3.5 text-primary opacity-60" />}
+                        <Badge variant="secondary" className="w-full justify-between pl-3 pr-1 py-1.5 h-auto rounded-sm gap-2 flex items-center font-bold text-xs bg-muted/50 border animate-in fade-in zoom-in-95 overflow-hidden">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {file.type.startsWith('image/') ? <FileImage className="h-3.5 w-3.5 text-primary opacity-60 shrink-0" /> : <FileText className="h-3.5 w-3.5 text-primary opacity-60 shrink-0" />}
                             <span className="truncate">{file.name}</span>
                           </div>
                           {!isProcessing && (
@@ -638,7 +634,7 @@ export default function RaisePtwPage() {
                               type="button" 
                               variant="ghost" 
                               size="icon" 
-                              className="h-6 w-6 hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
+                              className="h-6 w-6 hover:bg-destructive/10 text-muted-foreground hover:text-destructive shrink-0" 
                               onClick={() => removeFile(idx, 'files')}
                             >
                               <X className="h-3.5 w-3.5" />
@@ -661,11 +657,11 @@ export default function RaisePtwPage() {
               </div>
 
               <FormField control={form.control} name="undertaking" render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-5 bg-primary/5 border-primary/20 shadow-sm">
-                  <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isProcessing || isSubmitted} /></FormControl>
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-lg border p-4 sm:p-5 bg-primary/5 border-primary/20 shadow-sm">
+                  <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isProcessing || isSubmitted} className="mt-1" /></FormControl>
                   <div className="space-y-1">
                     <FormLabel className="text-sm font-bold text-primary uppercase">Safety Undertaking</FormLabel>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
+                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                       I, <strong className="text-primary font-bold">{userProfile?.username || 'user'}</strong>, hereby undertake that the work will be carried out safely as per company SOPs and PPE will be used at all times.
                     </p>
                     <FormMessage />
@@ -673,9 +669,9 @@ export default function RaisePtwPage() {
                 </FormItem>
               )} />
 
-              <div className="flex items-center justify-between pt-4 border-t">
-                <Button type="button" variant="ghost" onClick={() => router.push('/ptw/list')} disabled={isProcessing || isSubmitted}>Cancel</Button>
-                <Button type="submit" size="lg" disabled={isProcessing || isSubmitted || (!canRaisePermit && userProfile?.role === 'Site Engineer')} className="min-w-[200px]">
+              <div className="flex flex-col-reverse sm:flex-row items-center justify-between pt-6 border-t gap-4">
+                <Button type="button" variant="ghost" onClick={() => router.push('/ptw/list')} disabled={isProcessing || isSubmitted} className="w-full sm:w-auto h-11 sm:h-10">Cancel</Button>
+                <Button type="submit" size="lg" disabled={isProcessing || isSubmitted || (!canRaisePermit && userRole === 'Site Engineer')} className="w-full sm:w-auto min-w-0 sm:min-w-[200px] h-12 sm:h-14 font-bold text-base">
                   {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing Uploads...</> : isSubmitted ? "Submitted" : "Submit for Approval"}
                 </Button>
               </div>
