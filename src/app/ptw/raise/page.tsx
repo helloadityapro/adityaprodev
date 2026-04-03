@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react"
@@ -10,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { TriangleAlert, Loader2, Search, ChevronsUpDown, Check, FileUp, MessageCircle, CheckCircle2, X, FileText, FileImage } from "lucide-react"
+import { TriangleAlert, Loader2, Search, ChevronsUpDown, Check, FileUp, MessageCircle, CheckCircle2, X, FileText, FileImage, ShieldCheck } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, setDocumentNonBlocking, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase"
 import { collection, serverTimestamp, doc, arrayUnion, getDoc, query, where, getDocs, Timestamp, runTransaction } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -27,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -126,6 +128,7 @@ export default function RaisePtwPage() {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [submittedPermit, setSubmittedPermit] = React.useState<{id: string, serialNumber: string, siteName: string, managerMobile?: string} | null>(null);
+  const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
@@ -228,6 +231,7 @@ export default function RaisePtwPage() {
     }
 
     setIsProcessing(true);
+    setUploadProgress({});
     const location = await getCurrentLocation();
     if (!location) {
       setIsProcessing(false);
@@ -270,8 +274,12 @@ export default function RaisePtwPage() {
           const storage = getStorage(firebaseApp);
           const storageRef = ref(storage, storagePath);
           const uploadTask = uploadBytesResumable(storageRef, file);
+          
           uploadTask.on('state_changed', 
-            null, 
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(prev => ({ ...prev, [fileName]: progress }));
+            }, 
             (error) => {
               console.error("Storage Error:", error);
               reject(error);
@@ -291,7 +299,7 @@ export default function RaisePtwPage() {
       const newAttachments = [];
       const allFilesToUpload: File[] = [...files, ...referenceDocs];
 
-      // Sequential uploads for reliability
+      // Sequential uploads for reliability and accurate progress bars
       for (const file of allFilesToUpload) {
         let fileToUpload: Blob = file;
         if (file.type.startsWith('image/')) {
@@ -424,6 +432,7 @@ export default function RaisePtwPage() {
                 setSelectedSite(null);
                 setFiles([]);
                 setReferenceDocs([]);
+                setUploadProgress({});
               }}>
                 Raise Another
               </Button>
@@ -573,25 +582,38 @@ export default function RaisePtwPage() {
                     disabled={isProcessing || isSubmitted} 
                     className={FILE_INPUT_STYLES} 
                   />
-                  {referenceDocs.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {referenceDocs.map((file, idx) => (
-                        <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1 h-8 rounded-sm gap-2 flex items-center font-bold text-xs bg-muted/50 border animate-in fade-in zoom-in-95">
-                          <FileText className="h-3 w-3 text-primary opacity-60" />
-                          <span className="truncate max-w-[120px]">{file.name}</span>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-5 w-5 hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
-                            onClick={() => removeFile(idx, 'refs')}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
+                  <div className="grid gap-3 pt-1">
+                    {referenceDocs.map((file, idx) => (
+                      <div key={idx} className="space-y-1.5">
+                        <Badge variant="secondary" className="w-full justify-between pl-3 pr-1 py-1.5 h-auto rounded-sm gap-2 flex items-center font-bold text-xs bg-muted/50 border animate-in fade-in zoom-in-95">
+                          <div className="flex items-center gap-2 truncate">
+                            <FileText className="h-3.5 w-3.5 text-primary opacity-60" />
+                            <span className="truncate">{file.name}</span>
+                          </div>
+                          {!isProcessing && (
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6 hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
+                              onClick={() => removeFile(idx, 'refs')}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </Badge>
-                      ))}
-                    </div>
-                  )}
+                        {uploadProgress[file.name] !== undefined && (
+                          <div className="space-y-1 px-1">
+                            <div className="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
+                              <span>Uploading...</span>
+                              <span>{Math.round(uploadProgress[file.name])}%</span>
+                            </div>
+                            <Progress value={uploadProgress[file.name]} className="h-1 rounded-full" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 
                 <div className="space-y-3">
@@ -603,25 +625,38 @@ export default function RaisePtwPage() {
                     disabled={isProcessing || isSubmitted} 
                     className={FILE_INPUT_STYLES} 
                   />
-                  {files.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {files.map((file, idx) => (
-                        <Badge key={idx} variant="secondary" className="pl-3 pr-1 py-1 h-8 rounded-sm gap-2 flex items-center font-bold text-xs bg-muted/50 border animate-in fade-in zoom-in-95">
-                          {file.type.startsWith('image/') ? <FileImage className="h-3 w-3 text-primary opacity-60" /> : <FileText className="h-3 w-3 text-primary opacity-60" />}
-                          <span className="truncate max-w-[120px]">{file.name}</span>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-5 w-5 hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
-                            onClick={() => removeFile(idx, 'files')}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
+                  <div className="grid gap-3 pt-1">
+                    {files.map((file, idx) => (
+                      <div key={idx} className="space-y-1.5">
+                        <Badge variant="secondary" className="w-full justify-between pl-3 pr-1 py-1.5 h-auto rounded-sm gap-2 flex items-center font-bold text-xs bg-muted/50 border animate-in fade-in zoom-in-95">
+                          <div className="flex items-center gap-2 truncate">
+                            {file.type.startsWith('image/') ? <FileImage className="h-3.5 w-3.5 text-primary opacity-60" /> : <FileText className="h-3.5 w-3.5 text-primary opacity-60" />}
+                            <span className="truncate">{file.name}</span>
+                          </div>
+                          {!isProcessing && (
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6 hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
+                              onClick={() => removeFile(idx, 'files')}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </Badge>
-                      ))}
-                    </div>
-                  )}
+                        {uploadProgress[file.name] !== undefined && (
+                          <div className="space-y-1 px-1">
+                            <div className="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
+                              <span>Uploading...</span>
+                              <span>{Math.round(uploadProgress[file.name])}%</span>
+                            </div>
+                            <Progress value={uploadProgress[file.name]} className="h-1 rounded-full" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -641,7 +676,7 @@ export default function RaisePtwPage() {
               <div className="flex items-center justify-between pt-4 border-t">
                 <Button type="button" variant="ghost" onClick={() => router.push('/ptw/list')} disabled={isProcessing || isSubmitted}>Cancel</Button>
                 <Button type="submit" size="lg" disabled={isProcessing || isSubmitted || (!canRaisePermit && userProfile?.role === 'Site Engineer')} className="min-w-[200px]">
-                  {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : isSubmitted ? "Submitted" : "Submit for Approval"}
+                  {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing Uploads...</> : isSubmitted ? "Submitted" : "Submit for Approval"}
                 </Button>
               </div>
             </form>

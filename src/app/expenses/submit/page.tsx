@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -34,7 +35,8 @@ import {
   X,
   Building2,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  FileText
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -42,6 +44,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from '@/lib/utils';
+import { Progress } from "@/components/ui/progress";
 
 const expenseItemSchema = z.object({
   category: z.string().min(1, 'Category is required.'),
@@ -87,6 +90,7 @@ export default function SubmitExpensePage() {
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState<Record<number, number>>({});
 
   const form = useForm<z.infer<typeof expenseSchema>>({
     resolver: zodResolver(expenseSchema),
@@ -103,7 +107,8 @@ export default function SubmitExpensePage() {
     name: "items"
   });
 
-  const totalAmount = form.watch('items').reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const watchedItems = form.watch('items');
+  const totalAmount = watchedItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
   const uploadProof = async (file: File, userId: string, index: number): Promise<string | null> => {
     if (!file) return null;
@@ -113,17 +118,29 @@ export default function SubmitExpensePage() {
     const storageRef = ref(storage, storagePath);
     
     const uploadTask = uploadBytesResumable(storageRef, file);
+    
     return new Promise((resolve, reject) => {
-      uploadTask.on('state_changed', null, reject, async () => {
-        const url = await getDownloadURL(uploadTask.snapshot.ref);
-        resolve(url);
-      });
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(prev => ({ ...prev, [index]: progress }));
+        }, 
+        (error) => {
+          console.error("Proof upload failed:", error);
+          reject(error);
+        }, 
+        async () => {
+          const url = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(url);
+        }
+      );
     });
   };
 
   const onSubmit = async (values: z.infer<typeof expenseSchema>) => {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
+    setUploadProgress({});
 
     try {
       const processedItems = await Promise.all(values.items.map(async (item, idx) => {
@@ -150,9 +167,10 @@ export default function SubmitExpensePage() {
       setIsSuccess(true);
       toast({ title: 'Expense Submitted', description: 'Your request is pending administrative review.' });
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
+      toast({ variant: 'destructive', title: 'Submission Error', description: e.message });
     } finally {
       setIsSubmitting(false);
+      setUploadProgress({});
     }
   };
 
@@ -174,10 +192,10 @@ export default function SubmitExpensePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push('/expenses/manage')}>
+            <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push('/expenses/list')}>
               View My Expenses
             </Button>
-            <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); }}>
+            <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); setUploadProgress({}); }}>
               Submit New
             </Button>
           </CardContent>
@@ -339,7 +357,7 @@ export default function SubmitExpensePage() {
                         </Button>
                       )}
 
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                         <div className="md:col-span-3">
                           <FormField
                             control={form.control}
@@ -414,7 +432,7 @@ export default function SubmitExpensePage() {
                               const preview = value instanceof File ? URL.createObjectURL(value) : null;
                               return (
                                 <FormItem>
-                                  <div className="flex flex-col items-center gap-2">
+                                  <div className="flex flex-col gap-2">
                                     <input 
                                       type="file" 
                                       accept="image/*" 
@@ -424,14 +442,25 @@ export default function SubmitExpensePage() {
                                       {...rest}
                                     />
                                     {preview ? (
-                                      <div className="relative group h-10 w-full rounded-sm overflow-hidden border">
-                                        <img src={preview} className="h-full w-full object-cover" alt="Preview" />
-                                        <div 
-                                          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity"
-                                          onClick={() => onChange(null)}
-                                        >
-                                          <X className="h-4 w-4 text-white" />
+                                      <div className="relative">
+                                        <div className="relative group h-10 w-full rounded-sm overflow-hidden border bg-background flex items-center justify-center">
+                                          <img src={preview} className="h-full w-full object-cover" alt="Preview" />
+                                          <div 
+                                            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity"
+                                            onClick={() => onChange(null)}
+                                          >
+                                            <X className="h-4 w-4 text-white" />
+                                          </div>
                                         </div>
+                                        {uploadProgress[index] !== undefined && (
+                                          <div className="absolute -bottom-4 left-0 right-0 space-y-0.5">
+                                            <div className="flex justify-between items-center text-[7px] font-black uppercase text-primary">
+                                              <span>Uploading</span>
+                                              <span>{Math.round(uploadProgress[index])}%</span>
+                                            </div>
+                                            <Progress value={uploadProgress[index]} className="h-1 rounded-none" />
+                                          </div>
+                                        )}
                                       </div>
                                     ) : (
                                       <Button asChild variant="outline" size="icon" className="w-full h-10 border-dashed rounded-sm text-primary hover:bg-primary/5 cursor-pointer">
@@ -468,7 +497,7 @@ export default function SubmitExpensePage() {
                   disabled={isSubmitting || totalAmount <= 0} 
                   className="w-full sm:w-auto h-12 px-10 font-black text-lg rounded-sm shadow-xl"
                 >
-                  {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> SUBMITTING...</> : <><Send className="mr-2 h-4 w-4" /> SUBMIT FOR AUDIT</>}
+                  {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> DISPATCHING UPLOADS...</> : <><Send className="mr-2 h-4 w-4" /> SUBMIT FOR AUDIT</>}
                 </Button>
               </div>
             </form>

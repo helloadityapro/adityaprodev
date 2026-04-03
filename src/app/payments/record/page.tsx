@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -37,7 +38,9 @@ import {
   HardHat,
   ShoppingBag,
   Send,
-  IndianRupee
+  IndianRupee,
+  FileText,
+  X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -45,6 +48,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { Progress } from "@/components/ui/progress";
 
 const paymentSchema = z.object({
   siteId: z.string().min(1, 'Please select a project.'),
@@ -81,6 +85,7 @@ export default function RecordPaymentPage() {
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [proofFile, setProofFile] = React.useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = React.useState<number | null>(null);
   
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearch, setSiteSearch] = React.useState("");
@@ -93,7 +98,7 @@ export default function RecordPaymentPage() {
   const [orders, setOrders] = React.useState<any[]>([]);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<any>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites } = useCollection<Site>(sitesQuery);
@@ -178,14 +183,25 @@ export default function RecordPaymentPage() {
     }
 
     setIsSubmitting(true);
+    setUploadProgress(0);
     try {
       let proofUrl = "";
       if (proofFile) {
         const storage = getStorage(firebaseApp);
         const path = `payments/${user?.uid}/${Date.now()}_${proofFile.name}`;
         const sRef = ref(storage, path);
-        await uploadBytesResumable(sRef, proofFile);
-        proofUrl = await getDownloadURL(sRef);
+        const uploadTask = uploadBytesResumable(sRef, proofFile);
+        
+        proofUrl = await new Promise((resolve, reject) => {
+          uploadTask.on('state_changed', 
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(progress);
+            },
+            reject,
+            () => getDownloadURL(uploadTask.snapshot.ref).then(resolve)
+          );
+        });
       }
 
       const recorderName = userProfile.username || user.displayName || user.email || 'System User';
@@ -218,6 +234,7 @@ export default function RecordPaymentPage() {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(null);
     }
   };
 
@@ -464,7 +481,45 @@ export default function RecordPaymentPage() {
                 <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-2">
                   <FileUp className="h-4 w-4" /> Payment Document / Proof
                 </Label>
-                <Input type="file" accept="image/*,application/pdf" onChange={e => setProofFile(e.target.files?.[0] || null)} className="h-auto py-2 border-dashed" />
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Input 
+                      type="file" 
+                      accept="image/*,application/pdf" 
+                      onChange={e => setProofFile(e.target.files?.[0] || null)} 
+                      className="h-auto py-2 border-dashed rounded-sm" 
+                      disabled={isSubmitting}
+                    />
+                    {proofFile && !isSubmitting && (
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute right-2 top-2 h-7 w-7 text-destructive"
+                        onClick={() => setProofFile(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {proofFile && (
+                    <div className="p-3 bg-muted/20 border rounded-sm space-y-2 animate-in fade-in zoom-in-95">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-primary" />
+                          <span className="text-xs font-bold truncate max-w-[200px]">{proofFile.name}</span>
+                        </div>
+                        {uploadProgress !== null && (
+                          <span className="text-[10px] font-black text-primary">{Math.round(uploadProgress)}%</span>
+                        )}
+                      </div>
+                      {uploadProgress !== null && (
+                        <Progress value={uploadProgress} className="h-1.5" />
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
             <CardFooter className="bg-muted/10 border-t p-6 flex justify-end">

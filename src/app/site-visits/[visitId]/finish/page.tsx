@@ -1,10 +1,11 @@
+
 "use client";
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
 import { doc, serverTimestamp } from "firebase/firestore";
-import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,7 @@ import { format } from "date-fns";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
+import { Progress } from "@/components/ui/progress";
 
 const PURPOSES = ["Kick-off visit", "Regular visit", "Site team meetup", "Vendor meetup"];
 
@@ -78,6 +80,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
   const [customerNames, setCustomerNames] = React.useState("");
   const [tasks, setTasks] = React.useState<TaskItem[]>([{ text: "", photoUrl: null }]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
 
   React.useEffect(() => {
     if (visit?.tasks) {
@@ -203,18 +206,44 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
     setTasks(newTasks);
   };
 
+  const dataURLtoBlob = (dataurl: string) => {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)![1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  }
+
   const processTaskPhotosSequential = async () => {
     const storage = getStorage(firebaseApp);
-    const metadata = { contentType: 'image/jpeg' };
     const uploadedTasks = [];
     
     for (let i = 0; i < tasks.length; i++) {
       const task = tasks[i];
       if (task.localPhoto) {
+        const blob = dataURLtoBlob(task.localPhoto);
+        const fileName = `task_${i}_photo`;
         const taskPhotoRef = ref(storage, `site_visits/${user!.uid}/task_${i}_${Date.now()}.jpg`);
-        await uploadString(taskPhotoRef, task.localPhoto, 'data_url', metadata);
-        const url = await getDownloadURL(taskPhotoRef);
-        uploadedTasks.push({ text: task.text, photoUrl: url });
+        const uploadTask = uploadBytesResumable(taskPhotoRef, blob);
+        
+        await new Promise((resolve, reject) => {
+          uploadTask.on('state_changed', 
+            (snapshot) => {
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              setUploadProgress(prev => ({ ...prev, [fileName]: progress }));
+            },
+            reject,
+            async () => {
+              const url = await getDownloadURL(uploadTask.snapshot.ref);
+              uploadedTasks.push({ text: task.text, photoUrl: url });
+              resolve(url);
+            }
+          );
+        });
       } else {
         uploadedTasks.push({ text: task.text, photoUrl: task.photoUrl });
       }
@@ -225,6 +254,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
   const handleSaveProgress = async () => {
     if (!user || !visit) return;
     setIsSubmitting(true);
+    setUploadProgress({});
     try {
       const finalTasks = await processTaskPhotosSequential();
       await updateDocumentNonBlocking(visitRef, {
@@ -258,15 +288,29 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
     }
 
     setIsSubmitting(true);
+    setUploadProgress({});
     const endLocation = await getCurrentLocation();
 
     try {
       const storage = getStorage(firebaseApp);
-      const metadata = { contentType: 'image/jpeg' };
       
+      const selfieBlob = dataURLtoBlob(selfie);
       const selfieRef = ref(storage, `site_visits/${user.uid}/selfie_${Date.now()}.jpg`);
-      await uploadString(selfieRef, selfie, 'data_url', metadata);
-      const selfieUrl = await getDownloadURL(selfieRef);
+      const selfieUploadTask = uploadBytesResumable(selfieRef, selfieBlob);
+      
+      const selfieUrl: string = await new Promise((resolve, reject) => {
+        selfieUploadTask.on('state_changed', 
+          (snapshot) => {
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setUploadProgress(prev => ({ ...prev, 'Verification Selfie': progress }));
+          },
+          reject,
+          async () => {
+            const url = await getDownloadURL(selfieUploadTask.snapshot.ref);
+            resolve(url);
+          }
+        );
+      });
 
       const finalTasks = await processTaskPhotosSequential();
 
@@ -351,15 +395,24 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                 
                 <div className="flex items-center gap-4">
                   {(task.localPhoto || task.photoUrl) ? (
-                    <div className="relative h-20 w-32 rounded-sm overflow-hidden border shadow-sm group">
-                      <img src={task.localPhoto || task.photoUrl!} className="h-full w-full object-cover" alt="Task proof" />
-                      <Button 
-                        variant="destructive" size="icon" 
-                        className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity" 
-                        onClick={() => removeTaskPhoto(idx)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
+                    <div className="relative">
+                      <div className="relative h-20 w-32 rounded-sm overflow-hidden border shadow-sm group">
+                        <img src={task.localPhoto || task.photoUrl!} className="h-full w-full object-cover" alt="Task proof" />
+                        {!isSubmitting && (
+                          <Button 
+                            variant="destructive" size="icon" 
+                            className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity" 
+                            onClick={() => removeTaskPhoto(idx)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                      {uploadProgress[`task_${idx}_photo`] !== undefined && (
+                        <div className="mt-1 w-32">
+                          <Progress value={uploadProgress[`task_${idx}_photo`]} className="h-1 rounded-none" />
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="relative w-full sm:w-auto">
@@ -444,7 +497,22 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                     {selfie && !isCameraActive && (
                       <div className="relative group w-full max-w-sm">
                         <img src={selfie} className="w-full aspect-video object-cover rounded-sm border-2 border-primary shadow-lg" alt="Verification" />
-                        <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full h-8 w-8" onClick={() => setSelfie(null)}><Trash2 className="h-4 w-4" /></Button>
+                        <div className="mt-2 space-y-1.5">
+                          {uploadProgress['Verification Selfie'] !== undefined && (
+                            <div className="flex flex-col gap-1">
+                              <div className="flex justify-between text-[10px] font-bold uppercase tracking-tight text-primary">
+                                <span>Uploading selfie...</span>
+                                <span>{Math.round(uploadProgress['Verification Selfie'])}%</span>
+                              </div>
+                              <Progress value={uploadProgress['Verification Selfie']} className="h-1.5" />
+                            </div>
+                          )}
+                          {!isSubmitting && (
+                            <Button variant="destructive" size="sm" className="w-full h-8 rounded-sm text-[10px] font-bold uppercase" onClick={() => setSelfie(null)}>
+                              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Retake Photo
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -500,7 +568,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                     onClick={onSubmitFinalReport}
                     disabled={isSubmitting || !selfie || !purpose || details.trim().length < 10}
                   >
-                    {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> CONCLUDE & PUBLISH REPORT</>}
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> CONCLUDE & PUBLISH REPORT</>}
                   </Button>
                 </CardFooter>
               </Card>
