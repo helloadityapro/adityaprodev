@@ -49,7 +49,8 @@ import {
   PlusCircle,
   UserPlus,
   ChevronsUpDown,
-  Save
+  Save,
+  ShieldCheck
 } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -369,9 +370,9 @@ function EditTripDialog({
                               {pickupType === 'Site' ? (
                                 <Popover open={isPickupPopoverOpen} onOpenChange={setIsPickupPopoverOpen}>
                                   <PopoverTrigger asChild>
-                                    <FormControl><Button variant="outline" className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select pickup..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
+                                    <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal rounded-sm h-11 text-left", !field.value && "text-muted-foreground")}>{field.value || "Select pickup..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                                     <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none" value={pickupSearchQuery} onChange={e => setPickupSearchQuery(e.target.value)} /></div>
                                     <ScrollArea className="h-[150px]">{filteredPickupSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsPickupPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea>
                                   </PopoverContent>
@@ -796,7 +797,7 @@ export default function ManageAllTripsPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Search personnel or location..." 
-                className="pl-8 h-9 text-xs rounded-sm border-primary/20"
+                className="pl-8 h-9 text-xs rounded-sm border-primary/20" 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
