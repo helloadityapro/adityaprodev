@@ -462,7 +462,7 @@ function EditTripDialog({
                                   <PopoverTrigger asChild>
                                     <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal rounded-sm h-11 text-left", !field.value && "text-muted-foreground")}>{field.value || "Select destination..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><ScrollArea className="h-[150px]">{filteredDropSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(site.name); setIsDropPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
+                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><ScrollArea className="h-[150px]">{filteredDropSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsDropPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
                                 </Popover>
                               ) : (
                                 <FormControl><Input placeholder="Enter destination address..." {...field} className="h-11 rounded-sm" /></FormControl>
@@ -533,15 +533,20 @@ function ScheduledTripsDialog({
   onOpenChange: (o: boolean) => void 
 }) {
   const [selectedDate, setSelectedDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
   
   const filtered = React.useMemo(() => {
-    return assignments.filter(a => a.tripDate === selectedDate && a.status !== 'Rejected');
-  }, [assignments, selectedDate]);
+    return assignments.filter(a => {
+      const dateMatch = a.tripDate === selectedDate;
+      const statusMatch = statusFilter === 'all' ? a.status !== 'Rejected' : a.status === statusFilter;
+      return dateMatch && statusMatch;
+    });
+  }, [assignments, selectedDate, statusFilter]);
 
   const handleShareOnWhatsApp = () => {
     if (filtered.length === 0) return;
     
-    let message = `*Scheduled Trips for ${format(new Date(selectedDate), 'dd MMM yyyy')}*\n\n`;
+    let message = `*Scheduled Trips for ${format(new Date(selectedDate), 'dd MMM yyyy')} (${statusFilter === 'all' ? 'All Active' : statusFilter})*\n\n`;
     
     filtered.forEach((trip, index) => {
       const passengerList = trip.coPassengers && trip.coPassengers.length > 0 
@@ -565,7 +570,7 @@ function ScheduledTripsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 rounded-sm overflow-hidden shadow-2xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 rounded-sm overflow-hidden shadow-2xl bg-background">
         <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
@@ -574,17 +579,27 @@ function ScheduledTripsDialog({
               </DialogTitle>
               <DialogDescription className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Audit upcoming logistics deployments</DialogDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9 w-32 rounded-sm font-bold text-[10px] uppercase bg-background border-primary/20">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[10px] font-bold uppercase">All Active</SelectItem>
+                  <SelectItem value="Approved" className="text-[10px] font-bold uppercase">Approved</SelectItem>
+                  <SelectItem value="Completed" className="text-[10px] font-bold uppercase">Completed</SelectItem>
+                </SelectContent>
+              </Select>
               <Input 
                 type="date" 
                 value={selectedDate} 
                 onChange={e => setSelectedDate(e.target.value)} 
-                className="h-9 w-40 rounded-sm font-bold text-xs" 
+                className="h-9 w-40 rounded-sm font-bold text-xs bg-background border-primary/20" 
               />
               <Button 
                 onClick={handleShareOnWhatsApp} 
                 disabled={filtered.length === 0}
-                className="h-9 bg-green-600 hover:bg-green-700 text-white font-black uppercase text-[10px] px-4"
+                className="h-9 bg-green-600 hover:bg-green-700 text-white font-black uppercase text-[10px] px-4 shadow-md"
               >
                 <Share2 className="h-3.5 w-3.5 mr-1.5" /> Share WA
               </Button>
@@ -594,9 +609,12 @@ function ScheduledTripsDialog({
 
         <ScrollArea className="flex-1 bg-muted/10">
           <div className="p-6 space-y-6">
-            <h3 className="text-sm font-black uppercase tracking-widest text-primary border-b-2 border-primary/10 pb-2">
-              Trips for {format(new Date(selectedDate), 'eeee, dd MMM yyyy')}
-            </h3>
+            <div className="flex items-center justify-between border-b-2 border-primary/10 pb-2">
+              <h3 className="text-sm font-black uppercase tracking-widest text-primary">
+                Trips for {format(new Date(selectedDate), 'eeee, dd MMM yyyy')}
+              </h3>
+              <Badge variant="secondary" className="rounded-full font-black text-[9px] uppercase">{filtered.length} Results</Badge>
+            </div>
             
             {filtered.length > 0 ? (
               <div className="grid gap-6">
@@ -614,8 +632,10 @@ function ScheduledTripsDialog({
                       </div>
                       <Badge variant="outline" className={cn(
                         "text-[8px] font-black uppercase h-5 rounded-sm",
-                        trip.status === 'Approved' ? "bg-blue-50 text-blue-700" : 
-                        trip.status === 'Ongoing' ? "bg-primary text-white" : "bg-yellow-50"
+                        trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" : 
+                        trip.status === 'Ongoing' ? "bg-primary text-white border-none" : 
+                        trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+                        "bg-yellow-50 text-yellow-700 border-yellow-200"
                       )}>
                         {trip.status}
                       </Badge>
@@ -674,7 +694,7 @@ function ScheduledTripsDialog({
             ) : (
               <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
                 <Calendar className="h-16 w-16 mb-4" />
-                <p className="font-black uppercase tracking-widest text-sm">No trips scheduled for this date</p>
+                <p className="font-black uppercase tracking-widest text-sm">No {statusFilter === 'all' ? 'active' : statusFilter.toLowerCase()} trips scheduled for this date</p>
               </div>
             )}
           </div>
@@ -776,7 +796,7 @@ export default function ManageAllTripsPage() {
     
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+      : roleConfigs?.find(c => c.id === userRole)?.ownDataOnly ?? false;
 
     let result = assignments;
 
@@ -813,43 +833,6 @@ export default function ManageAllTripsPage() {
       completed: filteredAssignments.filter(a => a.status === 'Completed').length,
     };
   }, [filteredAssignments]);
-
-  const handleWhatsAppShare = (trip: Assignment) => {
-    let header = "";
-    let body = "";
-    const tripUrl = `${window.location.origin}/vehicles/trips/manage?view=${trip.id}`;
-
-    switch (trip.status) {
-      case 'Pending':
-        header = "\u{1F6A8} *Aditya Pro - New Vehicle Request*";
-        body = `*Requester:* ${trip.userName}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
-        break;
-      case 'Approved':
-        header = "\u{2705} *Aditya Pro - Vehicle Allotted*";
-        body = `*Requester:* ${trip.userName}\n*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Ownership:* ${trip.vehicleOwnership}\n*Trip Date:* ${trip.tripDate}\n*Ready for departure.*`;
-        break;
-      case 'Ongoing':
-        header = "\u{1F6A6} *Aditya Pro - Trip Ongoing*";
-        body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} \u{2794} ${trip.destinations[0]?.location || 'Destination'}`;
-        break;
-      case 'Completed':
-        const distance = (trip.endReading || 0) - (trip.startReading || 0);
-        header = "\u{1F3C1} *Aditya Pro - Trip Completed*";
-        body = `*Vehicle:* ${trip.vehicleDetails}\n*Personnel:* ${trip.userName}\n*Distance:* ${distance.toFixed(1)} KM\n*Finished At:* ${trip.endTime ? format(trip.endTime.toDate(), 'HH:mm') : 'N/A'}`;
-        break;
-      case 'Rejected':
-        header = "\u{274C} *Aditya Pro - Trip Cancelled*";
-        body = `*Request Ref:* ${trip.id.slice(0, 8)}\n*Requester:* ${trip.userName}\n*Site:* ${trip.pickupLocation}\n*The trip request has been revoked.*`;
-        break;
-      default:
-        header = "\u{2139}\u{FE0F} *Aditya Pro - Trip Update*";
-        body = `*Status:* ${trip.status}\n*Site:* ${trip.pickupLocation}`;
-    }
-
-    const message = `${header}\n\n${body}\n\n*View Audit Log:* ${tripUrl}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
-  };
 
   const handleApprove = async () => {
     if (!approvalTarget?.vehicleId || !approvalTarget?.driverId) {
