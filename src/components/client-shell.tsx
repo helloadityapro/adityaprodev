@@ -29,7 +29,6 @@ import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock } from 
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from '@capacitor/core';
-import { LocalNotifications } from '@capacitor/local-notifications';
 import { App } from '@capacitor/app';
 import { getPageKeyByPath, type PageKey } from "@/lib/access-control";
 
@@ -116,11 +115,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
 
-  // Handle mobile hardware back button
   React.useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       const backListener = App.addListener('backButton', (data) => {
-        // Exit only if at root or primary landing pages
         if (pathname === '/' || pathname === '/rewards' || pathname === '/login') {
           App.exitApp();
         } else {
@@ -174,13 +171,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
   const userDepartment = userProfile?.department || "";
 
-  const isBirthday = React.useMemo(() => {
-    if (!userProfile?.dob) return false;
-    const today = new Date();
-    const birthDate = new Date(userProfile.dob);
-    return today.getMonth() === birthDate.getMonth() && today.getDate() === birthDate.getDate();
-  }, [userProfile?.dob]);
-
   const anniversaryYear = React.useMemo(() => {
     if (!userProfile?.doj) return 0;
     const today = new Date();
@@ -192,6 +182,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     return 0;
   }, [userProfile?.doj]);
 
+  const isBirthday = React.useMemo(() => {
+    if (!userProfile?.dob) return false;
+    const today = new Date();
+    const birthDate = new Date(userProfile.dob);
+    return today.getMonth() === birthDate.getMonth() && today.getDate() === birthDate.getDate();
+  }, [userProfile?.dob]);
+
   const handleBirthdayClick = () => {
     window.dispatchEvent(new Event('trigger-birthday-celebration'));
   };
@@ -200,7 +197,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     window.dispatchEvent(new Event('trigger-anniversary-celebration'));
   };
 
-  // Dynamic Access Gate (Inline Visibility Control)
   const isAuthorized = React.useMemo(() => {
     if (isAuthPage || isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
     if (isUserLoading || isProfileLoading || !userProfile) return true;
@@ -306,54 +302,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const [displayedNotifIds, setDisplayedNotifIds] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      const listener = LocalNotifications.addListener('localNotificationActionPerformed', (action) => {
-        const link = action.notification.extra?.link;
-        if (link) {
-          router.push(link);
-        }
-      });
-      return () => {
-        listener.remove();
-      };
-    }
-  }, [router]);
-
-  React.useEffect(() => {
-    if (!user) return;
-
-    const initNotifications = async () => {
-      if (Capacitor.isNativePlatform()) {
-        try {
-          const perm = await LocalNotifications.checkPermissions();
-          if (perm.display !== 'granted') {
-            await LocalNotifications.requestPermissions();
-          }
-          
-          if (Capacitor.getPlatform() === 'android') {
-            await LocalNotifications.createChannel({
-              id: 'aditya-pro-alerts',
-              name: 'Aditya Pro Alerts',
-              description: 'Critical alerts for permits, tasks, and site activities',
-              importance: 5,
-              visibility: 1,
-              vibration: true,
-            });
-          }
-        } catch (err) {
-          console.warn("Failed to initialize native notifications:", err);
-        }
-      } 
-      else if (typeof window !== 'undefined' && 'Notification' in window) {
-        if (Notification.permission === 'default') {
-          Notification.requestPermission();
-        }
-      }
-    };
-    initNotifications();
-  }, [user]);
-
-  React.useEffect(() => {
     try {
       const raw = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
       if (raw && raw.trim().length > 0) {
@@ -374,31 +322,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           
           notifications.forEach(notif => {
               if (!notif.read && !displayedNotifIds.has(notif.id)) {
+                  // Standard in-app visual feedback
                   toast({ 
                     title: notif.title, 
                     description: notif.description, 
                     variant: notif.title.includes('Approved') ? 'success' : notif.title.includes('Rejected') ? 'destructive' : 'default' 
                   });
-
-                  if (Capacitor.isNativePlatform()) {
-                    LocalNotifications.schedule({
-                      notifications: [
-                        {
-                          title: notif.title,
-                          body: notif.description,
-                          id: parseInt(notif.id.replace(/\D/g, '').slice(-8)) || Math.floor(Math.random() * 1000000),
-                          channelId: 'aditya-pro-alerts',
-                          smallIcon: 'ic_stat_icon_config_sample',
-                          extra: {
-                            link: notif.link
-                          }
-                        }
-                      ]
-                    }).catch(err => console.error("Scheduling error:", err));
-                  } 
-                  else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-                    new Notification(notif.title, { body: notif.description });
-                  }
 
                   newDisplayedIds.add(notif.id);
                   wasUpdated = true;

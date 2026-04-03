@@ -21,12 +21,28 @@
         "siteManagerId": { "type": "string" },
         "assignedProjectIds": { "type": "array", "items": { "type": "string" } },
         "hiddenPermitIds": { "type": "array", "items": { "type": "string" } },
+        "fcmTokens": { "type": "array", "items": { "type": "string" }, "description": "FCM registration tokens for push notifications" },
         "totalPoints": { "type": "number", "default": 0 },
         "pointsMultiplier": { "type": "number", "default": 1 },
         "customPermissions": { "type": "array", "items": { "type": "string" }, "description": "Individual access overrides for sidebar pages" },
         "ownDataOnly": { "type": "boolean", "default": false, "description": "Strictly limit user to assigned projects only" }
       },
       "required": ["id", "username", "email", "mobile", "role"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "link": { "type": "string" },
+        "read": { "type": "boolean", "default": false },
+        "push": { "type": "boolean", "default": false, "description": "Whether to send as a system push notification" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "description"]
     },
     "AccessRule": {
       "title": "Access Rule",
@@ -60,7 +76,7 @@
         "plateNumber": { "type": "string" },
         "ownership": { "type": "string", "enum": ["Owned", "Rented"] },
         "currentReading": { "type": "number" },
-        "status": { "type": "string", "enum": ["Available", "Assigned", "Maintenance"] },
+        "status": { "type": "string", "enum": ["Available", "Allotted", "Ongoing"] },
         "createdAt": { "type": "string", "format": "date-time" }
       }
     },
@@ -271,6 +287,10 @@
     "/inventory_categories/{categoryId}": {
       "schema": { "$ref": "#/backend/entities/InventoryCategory" },
       "description": "Categories for inventory items."
+    },
+    "/notifications/{notifId}": {
+      "schema": { "$ref": "#/backend/entities/Notification" },
+      "description": "System alerts and push notification logs."
     }
   }
 }

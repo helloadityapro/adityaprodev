@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -29,6 +30,7 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
+import { sendNotification } from "@/lib/notifications";
 
 const MIN_REDEEM_VALUE_RS = 500;
 
@@ -170,7 +172,7 @@ function EarningHistoryDialog({ targetUser, open, onOpenChange, settings }: { ta
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[85vh] h-[85vh] flex flex-col p-0 rounded-sm overflow-hidden border-none shadow-2xl">
+      <DialogContent className="max-w-xl max-h-[85vh] h-[85vh] flex flex-col p-0 rounded-sm overflow-hidden border-none shadow-2xl bg-background">
         <DialogHeader className="p-4 px-6 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <History className="h-4 w-4 text-primary shrink-0" />
@@ -313,6 +315,27 @@ export default function RewardsPage() {
 
     setIsRedeeming(true);
     try {
+      await sendNotification(firestore, {
+        userId: user!.uid,
+        title: "Redemption Request Pending",
+        description: `Your request to redeem ${pts} points (₹${(pts * pointValue).toFixed(2)}) has been logged.`,
+        link: "/rewards",
+        push: false // In-app only for self
+      });
+
+      // Special notification for Admins
+      const adminEmails = ['khalil@adityagreenenergy.com'];
+      const usersSnap = await getDocs(query(collection(firestore, 'users'), where('role', '==', 'Admin')));
+      usersSnap.forEach(adminDoc => {
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "New Redemption Request",
+          description: `${userProfile?.username} requested a payout of ₹${(pts * pointValue).toFixed(2)}.`,
+          link: "/settings/rewards",
+          push: true
+        });
+      });
+
       await addDocumentNonBlocking(collection(firestore, 'redemption_requests'), {
         userId: user!.uid,
         userName: userProfile!.username,
@@ -458,7 +481,6 @@ export default function RewardsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {/* Mobile Card List View */}
           <div className="md:hidden divide-y divide-border/50">
             {filteredLeaders.length > 0 ? filteredLeaders.map((leader, index) => {
               const actualRank = leaders?.findIndex(l => l.id === leader.id) ?? index;
@@ -502,7 +524,6 @@ export default function RewardsPage() {
             )}
           </div>
 
-          {/* Desktop Table View */}
           <div className="hidden md:block">
             <ScrollArea className="w-full">
               <div className="min-w-full">
@@ -565,7 +586,6 @@ export default function RewardsPage() {
         </CardContent>
       </Card>
 
-      {/* Manual Redemption Modal */}
       <Dialog open={isRedeemDialogOpen} onOpenChange={setIsRedeemDialogOpen}>
         <DialogContent className="max-w-md w-[95vw] rounded-sm p-6 overflow-hidden border-none shadow-2xl">
           <DialogHeader className="text-left space-y-2">

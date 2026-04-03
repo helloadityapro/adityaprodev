@@ -1,8 +1,9 @@
+
 "use client";
 
 import * as React from "react";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp, increment, getDoc, limit } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
+import { collection, doc, query, where, serverTimestamp, increment, getDoc, limit } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,6 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
+import { sendNotification } from "@/lib/notifications";
 
 type Task = {
   id: string;
@@ -122,8 +124,6 @@ export default function TaskListPage() {
 
   const tasksQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
-    // Fetching all tasks and filtering in memory is more robust for prototypes 
-    // to avoid silent query failures or complex index requirements.
     return query(collection(firestore, 'tasks'), limit(1000));
   }, [firestore, user, userProfile]);
 
@@ -137,14 +137,12 @@ export default function TaskListPage() {
     
     let list = tasks;
 
-    // 1. Mandatory Visibility Filter: Non-admins only see tasks assigned to/by them
     if (!isAdmin) {
       list = list.filter(task => 
         task.assignedToId === user?.uid || task.assignedById === user?.uid
       );
     }
 
-    // 2. Data Sovereignty Filter: "Own Data Only"
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
       : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
@@ -152,12 +150,11 @@ export default function TaskListPage() {
     if (isOwnDataOnly && !isSuper) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
       list = list.filter(task => {
-        if (!task.siteId) return true; // Let legacy tasks through
+        if (!task.siteId) return true;
         return assignedIds.has(task.siteId);
       });
     }
 
-    // 3. User Filters
     list = list.filter(task => {
       const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         task.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -220,25 +217,23 @@ export default function TaskListPage() {
                 totalPoints: increment(pointsToAdd)
             });
             
-            addDocumentNonBlocking(collection(firestore, 'notifications'), {
+            sendNotification(firestore, {
                 userId: actionTask.assignedToId,
                 title: "Points Earned!",
                 description: `You earned ${pointsToAdd.toFixed(2)} points for completing task: "${actionTask.title}".`,
                 link: `/rewards`,
-                read: false,
-                createdAt: serverTimestamp(),
+                push: true
             });
         }
     }
 
     if (actionTask.assignedById !== user?.uid) {
-        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+        sendNotification(firestore, {
             userId: actionTask.assignedById,
             title: `Task Update: ${nextStatus}`,
             description: `${userProfile?.username || 'Team member'} marked task "${actionTask.title}" as ${nextStatus}.`,
             link: "/tasks/list",
-            read: false,
-            createdAt: serverTimestamp(),
+            push: true
         });
     }
 

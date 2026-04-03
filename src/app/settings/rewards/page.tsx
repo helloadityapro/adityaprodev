@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -27,6 +28,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { sendNotification } from "@/lib/notifications";
 
 type UserProfile = {
   id: string;
@@ -173,7 +175,6 @@ export default function AdminRewardsSettingsPage() {
       const userPointsMap: Record<string, number> = {};
       allUsers.forEach(u => userPointsMap[u.id] = 0);
 
-      // 1. Process Approved Permits
       const permitsSnap = await getDocs(query(collection(firestore, 'permits_to_work'), where('status', '==', 'Approved')));
       permitsSnap.docs.forEach(d => {
         const p = d.data();
@@ -189,7 +190,6 @@ export default function AdminRewardsSettingsPage() {
         }
       });
 
-      // 2. Process DPRs
       const dprsSnap = await getDocs(collection(firestore, 'dprs'));
       dprsSnap.docs.forEach(d => {
         const r = d.data();
@@ -202,7 +202,6 @@ export default function AdminRewardsSettingsPage() {
         }
       });
 
-      // 3. Process Movements
       const movsSnap = await getDocs(collection(firestore, 'material_movements'));
       movsSnap.docs.forEach(d => {
         const m = d.data();
@@ -282,13 +281,12 @@ export default function AdminRewardsSettingsPage() {
           updateDocumentNonBlocking(userRef, { totalPoints: increment(req.amount) });
         }
 
-        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+        sendNotification(firestore, {
           userId: req.userId,
           title: "Account Balance Adjusted",
           description: req.type === 'clear' ? "Your points balance has been reset to zero by administration." : `Your points balance was manually adjusted by ${Math.abs(req.amount).toFixed(2)} points.`,
           link: "/rewards",
-          read: false,
-          createdAt: serverTimestamp(),
+          push: true
         });
       }
 
@@ -312,25 +310,22 @@ export default function AdminRewardsSettingsPage() {
       
       if (action === 'approved') {
         const userRef = doc(firestore, 'users', req.userId);
-        // Deduct points from user
         updateDocumentNonBlocking(userRef, { totalPoints: increment(-req.points) });
 
-        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+        sendNotification(firestore, {
           userId: req.userId,
           title: "Redemption Approved",
           description: `Your request to redeem ${req.points} points (₹${req.amountInRs.toFixed(2)}) has been approved and processed.`,
           link: "/rewards",
-          read: false,
-          createdAt: serverTimestamp(),
+          push: true
         });
       } else {
-        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+        sendNotification(firestore, {
           userId: req.userId,
           title: "Redemption Rejected",
           description: `Your request to redeem ${req.points} points has been rejected. No points were deducted.`,
           link: "/rewards",
-          read: false,
-          createdAt: serverTimestamp(),
+          push: true
         });
       }
 
@@ -637,7 +632,7 @@ export default function AdminRewardsSettingsPage() {
               </div>
               <div className="relative w-full md:w-64">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Search personnel..." className="h-10 pl-9 text-sm rounded-sm" value={userSearch} onChange={e => setUserSearch(e.target.value)} />
+                  <Input placeholder="Search personnel..." className="h-10 pl-9 text-sm rounded-sm" value={userSearch} onChange={e => userSearch(e.target.value)} />
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -723,7 +718,7 @@ export default function AdminRewardsSettingsPage() {
             </div>
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button variant="ghost" className="rounded-sm">Cancel</Button></DialogClose>
+            <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>

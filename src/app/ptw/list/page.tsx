@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -44,10 +45,11 @@ import {
   Fuel,
   FilterX,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, arrayUnion, getDoc, increment, or, and } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,6 +64,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { sendNotification } from "@/lib/notifications";
 
 type Attachment = { 
   url: string; 
@@ -228,7 +231,6 @@ export default function PtwListPage() {
   const { data: permits, isLoading } = useCollection<Permit>(permitsQuery);
   const { data: rewardSettings } = useDoc<RewardSettings>(useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]));
 
-  // Fetch users and sites for filters (Admins only)
   const usersQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), where('role', '==', 'Site Engineer')) : null, [firestore, isAdmin]);
   const { data: engineers } = useCollection<{ username: string, id: string }>(usersQuery);
 
@@ -354,13 +356,12 @@ export default function PtwListPage() {
         }
     }
 
-    addDocumentNonBlocking(collection(firestore, 'notifications'), {
+    sendNotification(firestore, {
       userId: permit.siteEngineerId,
       title: "Permit Update",
       description: `Permit ${permit.serialNumber} is now ${targetStatus}.`,
       link: `/ptw/list?view=${permit.id}`,
-      read: false,
-      createdAt: serverTimestamp(),
+      push: true
     });
 
     toast({ title: "Updated", description: `Permit status set to ${targetStatus}.` });

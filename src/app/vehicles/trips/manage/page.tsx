@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -99,6 +100,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { sendNotification } from '@/lib/notifications';
 
 type Assignment = {
   id: string;
@@ -505,7 +507,7 @@ function EditTripDialog({
             </Form>
           </div>
         </ScrollArea>
-        <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0">
+        <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex-col sm:flex-row">
           <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
           <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
             {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Applying...</> : <><Save className="h-4 w-4 mr-2" /> Apply Updates</>}
@@ -578,11 +580,9 @@ export default function ManageAllTripsPage() {
 
   const availableVehiclesForAllotment = React.useMemo(() => {
     if (!vehicles) return [];
-    // Rely strictly on vehicle status for immediate reactivity
     return vehicles.filter(v => v.status === 'Available');
   }, [vehicles]);
 
-  // Deep Link Handling
   React.useEffect(() => {
     const viewId = searchParams.get('view');
     if (viewId && assignments && assignments.length > 0) {
@@ -713,6 +713,26 @@ export default function ManageAllTripsPage() {
       });
 
       updateDocumentNonBlocking(doc(firestore, 'vehicles', vehicleId), { status: 'Allotted' });
+
+      // Send Platform and Push Notification to Requester
+      sendNotification(firestore, {
+        userId: assignment.userId,
+        title: "Vehicle Allotted",
+        description: `Your trip request for ${assignment.tripDate} has been authorized. Vehicle: ${vehicle?.plateNumber}.`,
+        link: `/vehicles/trips/manage?view=${assignment.id}`,
+        push: true
+      });
+
+      // Send Platform and Push Notification to Driver (if system driver)
+      if (finalDriverId !== 'RENTED') {
+        sendNotification(firestore, {
+          userId: finalDriverId,
+          title: "New Trip Assigned",
+          description: `You have been assigned a trip for ${assignment.userName} on ${assignment.tripDate}.`,
+          link: `/vehicles/trips/manage?view=${assignment.id}`,
+          push: true
+        });
+      }
 
       toast({ title: 'Trip Authorized', description: 'Resources alloted successfully.' });
       setApprovalState(null);
@@ -1270,7 +1290,7 @@ export default function ManageAllTripsPage() {
                                 <div className="flex items-center gap-2">
                                   <UserCircle2 className="h-4 w-4 text-primary" />
                                   <div className="flex flex-col">
-                                    <span className="text-xs font-bold">{activeTrip.userName}</span>
+                                    <span className="text-xs font-bold">{activeTrip.username}</span>
                                     <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {activeTrip.driverName}</span>
                                   </div>
                                 </div>
@@ -1457,13 +1477,11 @@ export default function ManageAllTripsPage() {
           <ScrollArea className="flex-1">
             {detailsAssignment && (
               <div className="p-4 sm:p-8 space-y-10 sm:space-y-12 text-left">
-                {/* Section 1: Route */}
                 <section className="space-y-6">
                   <div className="flex items-center gap-2 border-b pb-2">
                     <Navigation className="h-4 w-4 text-primary" />
                     <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-foreground">Trip Itinerary</h3>
                   </div>
-                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-6 relative border-l-2 border-primary/10 ml-3 pl-6">
                       <div className="relative">
@@ -1472,7 +1490,6 @@ export default function ManageAllTripsPage() {
                         <p className="text-sm font-black">{detailsAssignment.pickupLocation}</p>
                         <Badge variant="secondary" className="mt-1 text-[8px] h-4 rounded-sm px-1.5 font-bold uppercase">{detailsAssignment.pickupType}</Badge>
                       </div>
-
                       {detailsAssignment.destinations.map((dest, idx) => (
                         <div key={idx} className="relative">
                           <div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
@@ -1484,7 +1501,6 @@ export default function ManageAllTripsPage() {
                         </div>
                       ))}
                     </div>
-
                     <div className="space-y-4">
                       <div className="p-4 bg-muted/20 border rounded-sm space-y-3">
                         <div className="flex justify-between items-center text-[9px] sm:text-[10px] font-black uppercase text-muted-foreground">
@@ -1504,14 +1520,11 @@ export default function ManageAllTripsPage() {
                     </div>
                   </div>
                 </section>
-
-                {/* Section 2: Fleet & Personnel */}
                 <section className="space-y-6">
                   <div className="flex items-center gap-2 border-b pb-2">
                     <HardHat className="h-4 w-4 text-primary" />
                     <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-foreground">Fleet & Personnel</h3>
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-4">
                       <div className="flex items-center gap-3">
@@ -1529,7 +1542,6 @@ export default function ManageAllTripsPage() {
                         </div>
                       </div>
                     </div>
-
                     <div className="space-y-4">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-sm bg-primary/5 border border-primary/10 flex items-center justify-center text-primary font-black text-xs shrink-0">V</div>
@@ -1551,15 +1563,12 @@ export default function ManageAllTripsPage() {
                     </div>
                   </div>
                 </section>
-
-                {/* Section 3: Audit (If Ongoing or Completed) */}
                 {(detailsAssignment.status === 'Ongoing' || detailsAssignment.status === 'Completed') && (
                   <section className="space-y-6 pb-10">
                     <div className="flex items-center gap-2 border-b pb-2">
                       <ShieldCheck className="h-4 w-4 text-primary" />
                       <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-foreground">Digital Audit Proof</h3>
                     </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div className="space-y-4">
                         <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
@@ -1580,7 +1589,6 @@ export default function ManageAllTripsPage() {
                           )}
                         </div>
                       </div>
-
                       {detailsAssignment.status === 'Completed' && (
                         <div className="space-y-4">
                           <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">

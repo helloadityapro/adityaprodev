@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
+import { sendNotification } from "@/lib/notifications";
 
 const taskSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -163,14 +165,13 @@ export default function CreateTaskPage() {
         totalPoints: increment(rate * multiplier)
       });
 
-      // Notify Assignee via platform notifications
-      addDocumentNonBlocking(collection(firestore, 'notifications'), {
+      // Send Platform and Push Notification
+      sendNotification(firestore, {
         userId: values.assignedToId,
         title: "New Task Assigned",
         description: `${userProfile.username} assigned you a new task: "${values.title}" for site ${values.siteName}.`,
         link: "/tasks/list",
-        read: false,
-        createdAt: serverTimestamp(),
+        push: true
       });
       
       setSubmittedTask({
