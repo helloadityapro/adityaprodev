@@ -53,7 +53,9 @@ import {
   ChevronsUpDown,
   Save,
   ShieldCheck,
-  RotateCcw
+  RotateCcw,
+  ListChecks,
+  Share2
 } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -400,7 +402,7 @@ function EditTripDialog({
                         </div>
                         {stopFields.map((field, idx) => (
                           <div key={field.id} className="p-4 border rounded-sm bg-muted/5 space-y-3 relative group">
-                            <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6 text-destructive" onClick={() => removeStop(idx)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                            <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6 text-destructive rounded-sm" onClick={() => removeStop(idx)}><Trash2 className="h-3.5 w-3.5" /></Button>
                             <FormField
                               control={form.control}
                               name={`intermediateStops.${idx}.type`}
@@ -518,6 +520,173 @@ function EditTripDialog({
   );
 }
 
+/**
+ * Dialog to view and share scheduled trips for a specific date.
+ */
+function ScheduledTripsDialog({ 
+  assignments, 
+  open, 
+  onOpenChange 
+}: { 
+  assignments: Assignment[], 
+  open: boolean, 
+  onOpenChange: (o: boolean) => void 
+}) {
+  const [selectedDate, setSelectedDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
+  
+  const filtered = React.useMemo(() => {
+    return assignments.filter(a => a.tripDate === selectedDate && a.status !== 'Rejected');
+  }, [assignments, selectedDate]);
+
+  const handleShareOnWhatsApp = () => {
+    if (filtered.length === 0) return;
+    
+    let message = `*Scheduled Trips for ${format(new Date(selectedDate), 'dd MMM yyyy')}*\n\n`;
+    
+    filtered.forEach((trip, index) => {
+      const passengerList = trip.coPassengers && trip.coPassengers.length > 0 
+        ? ` (with ${trip.coPassengers.map(p => p.name).join(', ')})` 
+        : '';
+      const stops = trip.intermediateStops && trip.intermediateStops.length > 0
+        ? `\n🛑 *Stops:* ${trip.intermediateStops.map(s => s.location).join(', ')}`
+        : '';
+
+      message += `*${index + 1}. @${trip.userName}${passengerList}*\n`;
+      message += `📍 *Pickup:* ${trip.pickupLocation}\n`;
+      message += `🕒 *Reporting:* ${formatTo12Hr(trip.reportingTime)}${stops}\n`;
+      message += `🏁 *Drop:* ${trip.dropLocation}\n`;
+      message += `🚗 *Vehicle:* ${trip.vehicleDetails || 'Pending Allotment'}\n`;
+      message += `👤 *Driver:* ${trip.driverName || 'Pending Designation'}\n`;
+      message += `------------------\n\n`;
+    });
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 rounded-sm overflow-hidden shadow-2xl">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                <ListChecks className="h-5 w-5 text-primary" /> Scheduled Trips Overview
+              </DialogTitle>
+              <DialogDescription className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Audit upcoming logistics deployments</DialogDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input 
+                type="date" 
+                value={selectedDate} 
+                onChange={e => setSelectedDate(e.target.value)} 
+                className="h-9 w-40 rounded-sm font-bold text-xs" 
+              />
+              <Button 
+                onClick={handleShareOnWhatsApp} 
+                disabled={filtered.length === 0}
+                className="h-9 bg-green-600 hover:bg-green-700 text-white font-black uppercase text-[10px] px-4"
+              >
+                <Share2 className="h-3.5 w-3.5 mr-1.5" /> Share WA
+              </Button>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 bg-muted/10">
+          <div className="p-6 space-y-6">
+            <h3 className="text-sm font-black uppercase tracking-widest text-primary border-b-2 border-primary/10 pb-2">
+              Trips for {format(new Date(selectedDate), 'eeee, dd MMM yyyy')}
+            </h3>
+            
+            {filtered.length > 0 ? (
+              <div className="grid gap-6">
+                {filtered.map((trip, idx) => (
+                  <Card key={trip.id} className="rounded-sm border-primary/10 shadow-sm overflow-hidden group">
+                    <CardHeader className="bg-background py-3 border-b flex flex-row items-center justify-between space-y-0">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center font-black text-xs text-primary border border-primary/20">
+                          {idx + 1}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm text-foreground">@{trip.userName}</span>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">{formatTo12Hr(trip.reportingTime)}</span>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={cn(
+                        "text-[8px] font-black uppercase h-5 rounded-sm",
+                        trip.status === 'Approved' ? "bg-blue-50 text-blue-700" : 
+                        trip.status === 'Ongoing' ? "bg-primary text-white" : "bg-yellow-50"
+                      )}>
+                        {trip.status}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent className="p-4 bg-background/50">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div className="relative pl-6 border-l-2 border-emerald-500 pb-2">
+                            <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
+                            <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Pickup</p>
+                            <p className="text-xs font-bold">{trip.pickupLocation}</p>
+                          </div>
+                          {trip.intermediateStops?.map((stop, sIdx) => (
+                            <div key={sIdx} className="relative pl-6 border-l-2 border-primary/30 pb-2">
+                              <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-muted-foreground/30 ring-4 ring-background" />
+                              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Stop #{sIdx + 1}</p>
+                              <p className="text-xs font-bold">{stop.location}</p>
+                            </div>
+                          ))}
+                          <div className="relative pl-6 border-l-2 border-primary">
+                            <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
+                            <p className="text-[9px] font-black uppercase text-primary tracking-tighter">Final Drop</p>
+                            <p className="text-xs font-bold">{trip.dropLocation}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="p-3 bg-muted/20 rounded-sm border border-primary/5">
+                            <Label className="text-[9px] font-black uppercase text-muted-foreground block mb-2">Fleet Allotment</Label>
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <CarFront className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-[11px] font-black uppercase">{trip.vehicleDetails || 'Pending'}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <UserCog className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-[11px] font-black uppercase">{trip.driverName || 'Pending'}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {trip.coPassengers && trip.coPassengers.length > 0 && (
+                            <div className="space-y-1.5">
+                              <Label className="text-[9px] font-black uppercase text-muted-foreground flex items-center gap-1.5"><Users className="h-3 w-3" /> Co-passengers</Label>
+                              <div className="flex flex-wrap gap-1.5">
+                                {trip.coPassengers.map(p => (
+                                  <Badge key={p.id} variant="secondary" className="text-[8px] h-4 rounded-sm font-bold bg-muted/50 border-none">{p.name}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
+                <Calendar className="h-16 w-16 mb-4" />
+                <p className="font-black uppercase tracking-widest text-sm">No trips scheduled for this date</p>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+        <DialogFooter className="p-4 border-t bg-muted/10">
+          <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close</Button></DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ManageAllTripsPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -535,6 +704,7 @@ export default function ManageAllTripsPage() {
   const [cancelTarget, setCancelTarget] = React.useState<Assignment | null>(null);
   const [releaseTarget, setReleaseTarget] = React.useState<Vehicle | null>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [isScheduledTripsOpen, setIsScheduledTripsOpen] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -824,12 +994,29 @@ export default function ManageAllTripsPage() {
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <MapPinned className="h-6 w-6 text-primary" />
-          <h1>Manage Trips</h1>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <MapPinned className="h-6 w-6 text-primary" />
+            <h1>Manage Trips</h1>
+          </div>
+          <p className="text-muted-foreground text-sm font-medium">Trip coordination hub for authorized project itineraries.</p>
         </div>
-        <p className="text-muted-foreground text-sm font-medium">Trip coordination hub for authorized project itineraries.</p>
+        
+        <div className="flex items-center gap-2">
+          {(isAdmin || isManager || isHR) && (
+            <Button 
+              variant="outline" 
+              onClick={() => setIsScheduledTripsOpen(true)}
+              className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary hover:bg-primary/5"
+            >
+              <ListChecks className="h-4 w-4 mr-2" /> Scheduled Trips
+            </Button>
+          )}
+          <Button asChild className="h-10 rounded-sm font-bold shadow-md px-6">
+            <Link href="/vehicles/request"><Plus className="h-4 w-4 mr-2" /> Request Vehicle</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -1290,7 +1477,7 @@ export default function ManageAllTripsPage() {
                                 <div className="flex items-center gap-2">
                                   <UserCircle2 className="h-4 w-4 text-primary" />
                                   <div className="flex flex-col">
-                                    <span className="text-xs font-bold">{activeTrip.username}</span>
+                                    <span className="text-xs font-bold">{activeTrip.userName}</span>
                                     <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {activeTrip.driverName}</span>
                                   </div>
                                 </div>
@@ -1343,6 +1530,12 @@ export default function ManageAllTripsPage() {
         sites={sites || []}
         allUsers={allUsers || []}
         onSave={handleSaveEdit}
+      />
+
+      <ScheduledTripsDialog 
+        assignments={assignments || []} 
+        open={isScheduledTripsOpen} 
+        onOpenChange={setIsScheduledTripsOpen} 
       />
 
       <Dialog open={!!approvalTarget} onOpenChange={(o) => !o && setApprovalState(null)}>
