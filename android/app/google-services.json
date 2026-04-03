@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "420197541118",
+    "project_id": "studio-2612988795-1d8b2",
+    "storage_bucket": "studio-2612988795-1d8b2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:420197541118:android:38b102e3d2f65c76a171af",
+        "android_client_info": {
+          "package_name": "in.adityapro.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "420197541118-deunnkulv66ovuaelvmqlh1hh3rqict4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCL2Pvq8HSGql9-RqDAKb3P6HB3HzUGil4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "420197541118-deunnkulv66ovuaelvmqlh1hh3rqict4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
