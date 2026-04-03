@@ -117,8 +117,8 @@ export default function FinishTripPage({ params }: { params: Promise<{ assignmen
 
       const endValue = parseFloat(reading);
 
-      // 1. Update assignment status
-      await updateDocumentNonBlocking(tripRef, {
+      // 1. Update assignment status (Non-blocking)
+      updateDocumentNonBlocking(tripRef, {
         status: 'Completed',
         endTime: serverTimestamp(),
         endReading: endValue,
@@ -126,11 +126,12 @@ export default function FinishTripPage({ params }: { params: Promise<{ assignmen
         updatedAt: serverTimestamp()
       });
 
-      // 2. Update vehicle availability & reading
+      // 2. Update vehicle availability & reading (Non-blocking)
       if (trip.vehicleId) {
         updateDocumentNonBlocking(doc(firestore, 'vehicles', trip.vehicleId), {
           status: 'Available',
-          currentReading: endValue
+          currentReading: endValue,
+          updatedAt: serverTimestamp()
         });
       }
 

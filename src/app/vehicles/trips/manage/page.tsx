@@ -413,7 +413,7 @@ function EditTripDialog({
                                 <FormItem>
                                   {form.watch(`intermediateStops.${idx}.type`) === 'Site' ? (
                                     <Popover open={openStopPopoverIndex === idx} onOpenChange={o => setOpenStopPopoverIndex(o ? idx : null)}>
-                                      <PopoverTrigger asChild><FormControl><Button variant="outline" className="w-full justify-between h-9 rounded-sm bg-background">{locField.value || "Choose Site..."}<ChevronsUpDown className="ml-2 h-3.5 w-3.5 opacity-50" /></Button></FormControl></PopoverTrigger>
+                                      <PopoverTrigger asChild><FormControl><Button variant="outline" className="w-full justify-between h-9 rounded-sm bg-background">{locField.value || "Choose Site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
                                       <PopoverContent className="w-[300px] p-0"><ScrollArea className="h-[150px]">{filteredStopSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { locField.onChange(s.name); setOpenStopPopoverIndex(null); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
                                     </Popover>
                                   ) : (
@@ -559,13 +559,13 @@ export default function ManageAllTripsPage() {
     );
   }, [firestore, isAdmin, user, isProfileLoading]);
 
-  const { data: assignments, isLoading } = useCollection<Assignment>(assignmentsQuery);
+  const { data: assignments, isLoading: isAssignmentsLoading } = useCollection<Assignment>(assignmentsQuery);
 
   const vehiclesQuery = useMemoFirebase(() => collection(firestore, 'vehicles'), [firestore]);
-  const { data: vehicles } = useCollection<Vehicle>(vehiclesQuery);
+  const { data: vehicles, isLoading: isVehiclesLoading } = useCollection<Vehicle>(vehiclesQuery);
 
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-  const { data: allUsers } = useCollection<UserProfile>(usersQuery);
+  const { data: allUsers, isLoading: isUsersLoading } = useCollection<UserProfile>(usersQuery);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites } = useCollection<Site>(sitesQuery);
@@ -759,18 +759,16 @@ export default function ManageAllTripsPage() {
     }
   };
 
-  if (isUserLoading || isProfileLoading || isLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
+  if (isUserLoading || isProfileLoading || isAssignmentsLoading || isVehiclesLoading || isUsersLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <MapPinned className="h-6 w-6 text-primary" />
-            <h1>Manage Trips</h1>
-          </div>
-          <p className="text-muted-foreground text-sm font-medium">Trip coordination hub for authorized project itineraries.</p>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <MapPinned className="h-6 w-6 text-primary" />
+          <h1>Manage Trips</h1>
         </div>
+        <p className="text-muted-foreground text-sm font-medium">Trip coordination hub for authorized project itineraries.</p>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

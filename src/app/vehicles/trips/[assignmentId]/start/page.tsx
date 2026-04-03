@@ -116,7 +116,8 @@ export default function StartTripPage({ params }: { params: Promise<{ assignment
         photoUrl = await getDownloadURL(photoRef);
       }
 
-      await updateDocumentNonBlocking(tripRef, {
+      // Non-blocking update for trip start
+      updateDocumentNonBlocking(tripRef, {
         status: 'Ongoing',
         startTime: serverTimestamp(),
         startReading: parseFloat(reading),
