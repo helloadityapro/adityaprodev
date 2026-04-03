@@ -47,7 +47,8 @@ service cloud.firestore {
 
     match /vehicles/{vehicleId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'currentReading', 'updatedAt']));
     }
 
     match /project_boms/{bomId} {
