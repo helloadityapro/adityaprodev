@@ -573,6 +573,17 @@ export default function ManageAllTripsPage() {
 
   const driversList = React.useMemo(() => allUsers?.filter(u => u.role === 'Driver') || [], [allUsers]);
 
+  const availableVehicles = React.useMemo(() => {
+    if (!vehicles || !assignments) return [];
+    const busyVehicleIds = new Set(
+      assignments
+        .filter(a => a.status === 'Approved' || a.status === 'Ongoing')
+        .map(a => a.vehicleId)
+        .filter(Boolean)
+    );
+    return vehicles.filter(v => v.status === 'Available' && !busyVehicleIds.has(v.id));
+  }, [vehicles, assignments]);
+
   // Deep Link Handling
   React.useEffect(() => {
     const viewId = searchParams.get('view');
@@ -756,7 +767,6 @@ export default function ManageAllTripsPage() {
       setCancelTarget(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
-    } finally {
       setIsCancelling(false);
     }
   };
@@ -821,7 +831,6 @@ export default function ManageAllTripsPage() {
         </div>
 
         <TabsContent value="registry" className="animate-in fade-in-50 duration-300">
-          {/* Mobile Card List View for Trip History */}
           <div className="md:hidden space-y-4">
             {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => {
               const isAssignedDriver = trip.driverId === user?.uid;
@@ -1024,7 +1033,6 @@ export default function ManageAllTripsPage() {
         </TabsContent>
 
         <TabsContent value="queue" className="animate-in fade-in-50 duration-300">
-          {/* Mobile Card List View for Allotment Queue */}
           <div className="md:hidden space-y-4">
             {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? (
               filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
@@ -1129,6 +1137,7 @@ export default function ManageAllTripsPage() {
           <div className="md:hidden space-y-4">
             {vehicles?.map(v => {
               const activeTrip = assignments?.find(a => a.vehicleId === v.id && (a.status === 'Approved' || a.status === 'Ongoing'));
+              const effectiveStatus = activeTrip ? (activeTrip.status === 'Approved' ? 'Allotted' : 'Ongoing') : 'Available';
               return (
                 <Card key={v.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden">
                   <CardHeader className="p-4 bg-muted/5 border-b flex flex-row items-center justify-between space-y-0">
@@ -1138,10 +1147,10 @@ export default function ManageAllTripsPage() {
                     </div>
                     <Badge variant="outline" className={cn(
                       "text-[8px] font-black uppercase h-5 px-1.5",
-                      v.status === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                      v.status === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                      effectiveStatus === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                      effectiveStatus === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
                       "bg-amber-50 text-amber-700 border-amber-200"
-                    )}>{v.status}</Badge>
+                    )}>{effectiveStatus}</Badge>
                   </CardHeader>
                   <CardContent className="p-4 space-y-3">
                     <div className="flex flex-col">
@@ -1192,6 +1201,7 @@ export default function ManageAllTripsPage() {
                     <TableBody>
                       {vehicles?.sort((a, b) => a.plateNumber.localeCompare(b.plateNumber)).map(v => {
                         const activeTrip = assignments?.find(a => a.vehicleId === v.id && (a.status === 'Approved' || a.status === 'Ongoing'));
+                        const effectiveStatus = activeTrip ? (activeTrip.status === 'Approved' ? 'Allotted' : 'Ongoing') : 'Available';
                         return (
                           <TableRow key={v.id} className="hover:bg-muted/5">
                             <TableCell className="px-6 py-4">
@@ -1206,11 +1216,11 @@ export default function ManageAllTripsPage() {
                             <TableCell>
                               <Badge variant="outline" className={cn(
                                 "text-[9px] font-black uppercase rounded-sm px-2 h-5",
-                                v.status === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                                v.status === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                effectiveStatus === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                effectiveStatus === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
                                 "bg-amber-50 text-amber-700 border-amber-200"
                               )}>
-                                {v.status}
+                                {effectiveStatus}
                               </Badge>
                             </TableCell>
                             <TableCell>
@@ -1311,7 +1321,7 @@ export default function ManageAllTripsPage() {
                       <SelectValue placeholder="Allot Vehicle..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {vehicles?.filter(v => v.status === 'Available').map(v => (
+                      {availableVehicles.map(v => (
                         <SelectItem key={v.id} value={v.id} className="text-xs font-bold">
                           {v.make} {v.model} ({v.plateNumber}) — {v.ownership}
                         </SelectItem>
