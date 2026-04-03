@@ -22,7 +22,9 @@ import {
   CheckCircle2,
   Loader2,
   Save,
-  X
+  X,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
@@ -59,7 +61,7 @@ const editVehicleSchema = z.object({
   plateNumber: z.string().min(4, 'Registration number is required.'),
   ownership: z.enum(['Owned', 'Rented']),
   currentReading: z.coerce.number().min(0, 'Odometer reading cannot be negative.'),
-  status: z.enum(['Available', 'Assigned', 'Maintenance']),
+  status: z.enum(['Available', 'Allotted', 'Ongoing']),
 });
 
 type Vehicle = {
@@ -68,7 +70,7 @@ type Vehicle = {
   model: string;
   plateNumber: string;
   ownership: 'Owned' | 'Rented';
-  status: 'Available' | 'Assigned' | 'Maintenance';
+  status: 'Available' | 'Allotted' | 'Ongoing';
   currentReading: number;
   createdAt?: any;
 };
@@ -196,8 +198,8 @@ export default function ManageVehiclesPage() {
     return {
       total: vehicles?.length || 0,
       available: vehicles?.filter(v => v.status === 'Available').length || 0,
-      assigned: vehicles?.filter(v => v.status === 'Assigned').length || 0,
-      maintenance: vehicles?.filter(v => v.status === 'Maintenance').length || 0,
+      allotted: vehicles?.filter(v => v.status === 'Allotted').length || 0,
+      ongoing: vehicles?.filter(v => v.status === 'Ongoing').length || 0,
     };
   }, [vehicles]);
 
@@ -230,11 +232,11 @@ export default function ManageVehiclesPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <SummaryCard title="Total Fleet" value={stats.total} icon={Truck} color="primary" />
         <SummaryCard title="Available" value={stats.available} icon={CheckCircle2} color="emerald" />
-        <SummaryCard title="On Trip" value={stats.assigned} icon={Navigation} color="blue" />
-        <SummaryCard title="Maintenance" value={stats.maintenance} icon={Wrench} color="amber" />
+        <SummaryCard title="Allotted" value={stats.allotted} icon={Clock} color="amber" />
+        <SummaryCard title="Ongoing" value={stats.ongoing} icon={Navigation} color="blue" />
       </div>
 
       <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
@@ -297,7 +299,7 @@ export default function ManageVehiclesPage() {
                     <Badge variant="outline" className={cn(
                       "text-[9px] font-black uppercase rounded-sm px-2 h-5",
                       v.status === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                      v.status === 'Assigned' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                      v.status === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
                       "bg-amber-50 text-amber-700 border-amber-200"
                     )}>
                       {v.status}
@@ -410,8 +412,8 @@ export default function ManageVehiclesPage() {
                           <FormControl><SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="Available" className="text-xs font-bold text-emerald-600">Available</SelectItem>
-                            <SelectItem value="Assigned" className="text-xs font-bold text-blue-600">Assigned</SelectItem>
-                            <SelectItem value="Maintenance" className="text-xs font-bold text-amber-600">Maintenance</SelectItem>
+                            <SelectItem value="Allotted" className="text-xs font-bold text-amber-600">Allotted</SelectItem>
+                            <SelectItem value="Ongoing" className="text-xs font-bold text-blue-600">Ongoing</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -446,12 +448,12 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
 
   return (
     <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
+        <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-3.5 sm:h-4 sm:w-4" />
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-black">{value}</div>
+      <CardContent className="p-3 sm:p-4 pt-0">
+        <div className="text-xl sm:text-2xl font-black">{value}</div>
       </CardContent>
     </Card>
   );

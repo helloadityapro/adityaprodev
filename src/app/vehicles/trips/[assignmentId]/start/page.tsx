@@ -116,7 +116,7 @@ export default function StartTripPage({ params }: { params: Promise<{ assignment
         photoUrl = await getDownloadURL(photoRef);
       }
 
-      // Non-blocking update for trip start
+      // 1. Update trip status
       updateDocumentNonBlocking(tripRef, {
         status: 'Ongoing',
         startTime: serverTimestamp(),
@@ -124,6 +124,14 @@ export default function StartTripPage({ params }: { params: Promise<{ assignment
         startReadingPhoto: photoUrl || null,
         updatedAt: serverTimestamp()
       });
+
+      // 2. Update vehicle status to "Ongoing"
+      if (trip.vehicleId) {
+        updateDocumentNonBlocking(doc(firestore, 'vehicles', trip.vehicleId), {
+          status: 'Ongoing',
+          updatedAt: serverTimestamp()
+        });
+      }
 
       toast({ title: 'Trip Started', description: 'Safe driving. Your start time and reading are logged.' });
       router.push('/vehicles/trips/manage');

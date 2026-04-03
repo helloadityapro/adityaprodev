@@ -134,7 +134,7 @@ type Vehicle = {
   make: string;
   model: string;
   plateNumber: string;
-  status: string;
+  status: 'Available' | 'Allotted' | 'Ongoing';
   ownership: 'Owned' | 'Rented';
 };
 
@@ -703,7 +703,8 @@ export default function ManageAllTripsPage() {
         approvalDate: serverTimestamp(),
       });
 
-      updateDocumentNonBlocking(doc(firestore, 'vehicles', vehicleId), { status: 'Assigned' });
+      // Standardize status to "Allotted" per user request
+      updateDocumentNonBlocking(doc(firestore, 'vehicles', vehicleId), { status: 'Allotted' });
 
       toast({ title: 'Trip Authorized', description: 'Resources alloted successfully.' });
       setApprovalState(null);
@@ -944,7 +945,7 @@ export default function ManageAllTripsPage() {
                                 </div>
                                 <div className="flex flex-col gap-1 ml-4 border-l border-primary/10 pl-2">
                                   {trip.destinations.map((dest, i) => (
-                                    <div key={i} className="flex items-center gap-1.5 text-[10px] font-bold text-primary">
+                                    <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
                                       <ArrowRight className="h-2.5 w-2.5" /> {dest.location}
                                     </div>
                                   ))}
@@ -1138,7 +1139,7 @@ export default function ManageAllTripsPage() {
                     <Badge variant="outline" className={cn(
                       "text-[8px] font-black uppercase h-5 px-1.5",
                       v.status === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                      v.status === 'Assigned' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                      v.status === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
                       "bg-amber-50 text-amber-700 border-amber-200"
                     )}>{v.status}</Badge>
                   </CardHeader>
@@ -1177,72 +1178,74 @@ export default function ManageAllTripsPage() {
           <div className="hidden md:block">
             <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
-                      <TableHead className="px-6">Vehicle Identity</TableHead>
-                      <TableHead>Ownership</TableHead>
-                      <TableHead>Fleet Status</TableHead>
-                      <TableHead className="min-w-[200px]">Current Personnel</TableHead>
-                      <TableHead className="min-w-[250px]">Current Itinerary</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {vehicles?.sort((a, b) => a.plateNumber.localeCompare(b.plateNumber)).map(v => {
-                      const activeTrip = assignments?.find(a => a.vehicleId === v.id && (a.status === 'Approved' || a.status === 'Ongoing'));
-                      return (
-                        <TableRow key={v.id} className="hover:bg-muted/5">
-                          <TableCell className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-bold">{v.make} {v.model}</span>
-                              <span className="font-mono text-[10px] font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="rounded-sm text-[9px] font-black uppercase px-1.5 h-5">{v.ownership}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={cn(
-                              "text-[9px] font-black uppercase rounded-sm px-2 h-5",
-                              v.status === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                              v.status === 'Assigned' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                              "bg-amber-50 text-amber-700 border-amber-200"
-                            )}>
-                              {activeTrip?.status === 'Ongoing' ? 'Ongoing Trip' : (activeTrip ? 'Allotted' : v.status)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {activeTrip ? (
-                              <div className="flex items-center gap-2">
-                                <UserCircle2 className="h-4 w-4 text-primary" />
-                                <div className="flex flex-col">
-                                  <span className="text-xs font-bold">{activeTrip.userName}</span>
-                                  <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {activeTrip.driverName}</span>
-                                </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6">Vehicle Identity</TableHead>
+                        <TableHead>Ownership</TableHead>
+                        <TableHead>Fleet Status</TableHead>
+                        <TableHead className="min-w-[200px]">Current Personnel</TableHead>
+                        <TableHead className="min-w-[250px]">Current Itinerary</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {vehicles?.sort((a, b) => a.plateNumber.localeCompare(b.plateNumber)).map(v => {
+                        const activeTrip = assignments?.find(a => a.vehicleId === v.id && (a.status === 'Approved' || a.status === 'Ongoing'));
+                        return (
+                          <TableRow key={v.id} className="hover:bg-muted/5">
+                            <TableCell className="px-6 py-4">
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold">{v.make} {v.model}</span>
+                                <span className="font-mono text-[10px] font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
                               </div>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {activeTrip ? (
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-700">
-                                  <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="rounded-sm text-[9px] font-black uppercase px-1.5 h-5">{v.ownership}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={cn(
+                                "text-[9px] font-black uppercase rounded-sm px-2 h-5",
+                                v.status === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                                v.status === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                                "bg-amber-50 text-amber-700 border-amber-200"
+                              )}>
+                                {v.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {activeTrip ? (
+                                <div className="flex items-center gap-2">
+                                  <UserCircle2 className="h-4 w-4 text-primary" />
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-bold">{activeTrip.userName}</span>
+                                    <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {activeTrip.driverName}</span>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-primary ml-4">
-                                  <ArrowRight className="h-2.5 w-2.5" /> {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {activeTrip ? (
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-700">
+                                    <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-primary ml-4">
+                                    <ArrowRight className="h-2.5 w-2.5" /> {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
+                                  </div>
                                 </div>
-                              </div>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -1602,7 +1605,7 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
     <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
         <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+        <Icon className="h-3.5 sm:h-4 sm:w-4" />
       </CardHeader>
       <CardContent className="p-3 sm:p-4 pt-0">
         <div className="text-xl sm:text-2xl font-black">{value}</div>
