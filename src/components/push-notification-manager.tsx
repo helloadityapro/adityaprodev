@@ -7,6 +7,7 @@ import { useUser, useFirestore, updateDocumentNonBlocking } from '@/firebase';
 import { doc, arrayUnion } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 
 /**
  * Global manager for Firebase Cloud Messaging (FCM) push notifications.
@@ -59,16 +60,20 @@ export function PushNotificationManager() {
       });
 
       // 6. Handle foreground notifications
-      // Triggered when app is open. We show a toast here.
       const receivedListener = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
         toast({
           title: notification.title,
           description: notification.body,
-          onClick: () => {
-            if (notification.data?.link) {
-              router.push(notification.data.link);
-            }
-          }
+          action: notification.data?.link ? (
+            <Button 
+              variant="default"
+              size="sm" 
+              className="h-8 rounded-sm font-bold text-[10px] uppercase px-3"
+              onClick={() => router.push(notification.data.link)}
+            >
+              View
+            </Button>
+          ) : undefined
         });
       });
 

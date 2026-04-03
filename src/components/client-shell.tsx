@@ -2,7 +2,7 @@
 
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useUser, useDoc, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection, useFirestore } from "@/firebase";
+import { useUser, useDoc, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection, useFirestore, updateDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, or, and, getDocs } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import { MainNav } from "@/components/main-nav";
@@ -300,7 +300,19 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   toast({ 
                     title: notif.title, 
                     description: notif.description, 
-                    variant: notif.title.includes('Approved') ? 'success' : notif.title.includes('Rejected') ? 'destructive' : 'default' 
+                    variant: notif.title.includes('Approved') ? 'success' : notif.title.includes('Rejected') ? 'destructive' : 'default',
+                    action: notif.link ? (
+                      <Button 
+                        size="sm" 
+                        className="h-8 rounded-sm font-bold text-[10px] uppercase px-3 shadow-md"
+                        onClick={() => {
+                          updateDocumentNonBlocking(doc(firestore, 'notifications', notif.id), { read: true });
+                          router.push(notif.link);
+                        }}
+                      >
+                        View
+                      </Button>
+                    ) : undefined
                   });
 
                   newDisplayedIds.add(notif.id);
@@ -320,7 +332,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               sessionStorage.setItem(DISPLAYED_NOTIFS_KEY, JSON.stringify(Array.from(newDisplayedIds)));
           }
       }
-  }, [notifications, user, toast, displayedNotifIds]);
+  }, [notifications, user, toast, displayedNotifIds, firestore, router]);
 
   if (isAuthPage) return <>{children}</>;
 

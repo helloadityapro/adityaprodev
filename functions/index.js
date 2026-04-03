@@ -51,10 +51,19 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
         notificationId: event.params.notificationId
       },
       android: {
+        priority: 'high', // CRITICAL: Ensure instant delivery on Android
         notification: {
           channelId: 'default',
-          priority: 'high',
+          priority: 'high', // Priority within the system drawer
           sound: 'default'
+        }
+      },
+      apns: {
+        payload: {
+          aps: {
+            contentAvailable: true,
+            sound: 'default'
+          }
         }
       },
       // Target multiple tokens (multicast)
@@ -64,12 +73,13 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
     // 3. Send via FCM
     const response = await messaging.sendEachForMulticast(messagePayload);
     
-    // 4. Cleanup invalid tokens if any (e.g. user uninstalled app)
+    // 4. Cleanup invalid tokens atomically if any (e.g. user uninstalled app)
     if (response.failureCount > 0) {
       const failedTokens = [];
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const errorCode = resp.error.code;
+          // Clean up tokens that are definitely invalid/expired
           if (errorCode === 'messaging/invalid-registration-token' ||
               errorCode === 'messaging/registration-token-not-registered') {
             failedTokens.push(tokens[idx]);
