@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 export default function StartTripPage({ params }: { params: Promise<{ assignmentId: string }> }) {
   const { assignmentId } = React.use(params);
@@ -103,20 +104,23 @@ export default function StartTripPage({ params }: { params: Promise<{ assignment
   };
 
   const handleStartTrip = async () => {
-    if (!user || !trip || !photo || !reading) return;
+    if (!user || !trip || !reading) return;
     setIsProcessing(true);
 
     try {
-      const storage = getStorage(firebaseApp);
-      const photoRef = ref(storage, `trips/${assignmentId}/start_${Date.now()}.jpg`);
-      await uploadString(photoRef, photo, 'data_url', { contentType: 'image/jpeg' });
-      const photoUrl = await getDownloadURL(photoRef);
+      let photoUrl = "";
+      if (photo) {
+        const storage = getStorage(firebaseApp);
+        const photoRef = ref(storage, `trips/${assignmentId}/start_${Date.now()}.jpg`);
+        await uploadString(photoRef, photo, 'data_url', { contentType: 'image/jpeg' });
+        photoUrl = await getDownloadURL(photoRef);
+      }
 
       await updateDocumentNonBlocking(tripRef, {
         status: 'Ongoing',
         startTime: serverTimestamp(),
         startReading: parseFloat(reading),
-        startReadingPhoto: photoUrl,
+        startReadingPhoto: photoUrl || null,
         updatedAt: serverTimestamp()
       });
 
@@ -159,7 +163,7 @@ export default function StartTripPage({ params }: { params: Promise<{ assignment
       <Card className="rounded-sm shadow-md border-primary/10">
         <CardHeader className="bg-primary/5 border-b">
           <CardTitle className="text-xl">Vehicle Audit: {trip?.vehicleDetails}</CardTitle>
-          <CardDescription>Capture odometer reading and photo.</CardDescription>
+          <CardDescription>Capture odometer reading and photo (Photo is optional).</CardDescription>
         </CardHeader>
         <CardContent className="pt-8 space-y-6">
           <div className="space-y-2">
@@ -214,10 +218,10 @@ export default function StartTripPage({ params }: { params: Promise<{ assignment
             )}
 
             {hasCameraPermission === false && (
-              <Alert variant="destructive">
+              <Alert variant="secondary" className="border-dashed">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Camera Required</AlertTitle>
-                <AlertDescription>Hardware access is mandatory for odometer verification. Please enable camera permissions in your settings.</AlertDescription>
+                <AlertTitle>Camera Disabled</AlertTitle>
+                <AlertDescription>Hardware access is disabled. You can still proceed by manually entering the odometer reading.</AlertDescription>
               </Alert>
             )}
           </div>
@@ -225,7 +229,7 @@ export default function StartTripPage({ params }: { params: Promise<{ assignment
           <Button 
             className="w-full h-16 text-xl font-black rounded-sm shadow-xl transition-all active:scale-[0.98]" 
             onClick={handleStartTrip}
-            disabled={isProcessing || !photo || !reading}
+            disabled={isProcessing || !reading}
           >
             {isProcessing ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : 'CONFIRM & DEPART'}
           </Button>
