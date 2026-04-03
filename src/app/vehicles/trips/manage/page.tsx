@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, orderBy, where, or, serverTimestamp, and, getDocs } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, or, serverTimestamp, and, getDocs, writeBatch } from 'firebase/firestore';
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -50,7 +51,8 @@ import {
   UserPlus,
   ChevronsUpDown,
   Save,
-  ShieldCheck
+  ShieldCheck,
+  RotateCcw
 } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -136,6 +138,7 @@ type Vehicle = {
   plateNumber: string;
   status: 'Available' | 'Allotted' | 'Ongoing';
   ownership: 'Owned' | 'Rented';
+  currentReading: number;
 };
 
 type UserProfile = {
@@ -475,7 +478,7 @@ function EditTripDialog({
                     <Popover open={isPassengerPopoverOpen} onOpenChange={setIsPassengerPopoverOpen}>
                       <PopoverTrigger asChild><Button variant="outline" size="sm" className="h-7 text-[10px] font-bold"><UserPlus className="h-3 w-3 mr-1" /> Add</Button></PopoverTrigger>
                       <PopoverContent className="w-[300px] p-0" align="end">
-                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 opacity-50" /><Input placeholder="Search personnel..." className="h-10 border-none" value={passengerSearchQuery} onChange={e => setPassengerSearchQuery(e.target.value)} /></div>
+                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search personnel..." className="h-10 border-none" value={passengerSearchQuery} onChange={e => setPassengerSearchQuery(e.target.value)} /></div>
                         <ScrollArea className="h-[200px]">{filteredPotentialPassengers.map(u => (<Button key={u.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { if(!coPassengers.some(p => p.id === u.id)) { form.setValue('coPassengers', [...coPassengers, { id: u.id, name: u.username }]); } setIsPassengerPopoverOpen(false); }}>{u.username}</Button>))}</ScrollArea>
                       </PopoverContent>
                     </Popover>
@@ -505,8 +508,7 @@ function EditTripDialog({
         <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0">
           <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
           <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
-            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            Apply Updates
+            {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Applying...</> : <><Save className="h-4 w-4 mr-2" /> Apply Updates</>}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -529,7 +531,8 @@ export default function ManageAllTripsPage() {
   const [detailsAssignment, setDetailsAssignment] = React.useState<Assignment | null>(null);
   const [editingAssignment, setEditingAssignment] = React.useState<Assignment | null>(null);
   const [cancelTarget, setCancelTarget] = React.useState<Assignment | null>(null);
-  const [isCancelling, setIsCancelling] = React.useState(false);
+  const [releaseTarget, setReleaseTarget] = React.useState<Vehicle | null>(null);
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -714,7 +717,6 @@ export default function ManageAllTripsPage() {
         approvalDate: serverTimestamp(),
       });
 
-      // Standardize status to "Allotted" per user request
       updateDocumentNonBlocking(doc(firestore, 'vehicles', vehicleId), { status: 'Allotted' });
 
       toast({ title: 'Trip Authorized', description: 'Resources alloted successfully.' });
@@ -747,7 +749,7 @@ export default function ManageAllTripsPage() {
 
   const handleConfirmCancel = async () => {
     if (!cancelTarget) return;
-    setIsCancelling(true);
+    setIsProcessing(true);
 
     try {
       updateDocumentNonBlocking(doc(firestore, 'vehicle_assignments', cancelTarget.id), {
@@ -767,7 +769,39 @@ export default function ManageAllTripsPage() {
       setCancelTarget(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
-      setIsCancelling(false);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleMarkAvailable = async () => {
+    if (!releaseTarget || !assignments) return;
+    setIsProcessing(true);
+
+    try {
+      const activeAssignments = assignments.filter(a => a.vehicleId === releaseTarget.id && (a.status === 'Approved' || a.status === 'Ongoing'));
+      
+      const batch = writeBatch(firestore);
+      activeAssignments.forEach(a => {
+        batch.update(doc(firestore, 'vehicle_assignments', a.id), {
+          status: 'Rejected',
+          updatedAt: serverTimestamp(),
+          adminRemarks: 'Force-released by system administration.'
+        });
+      });
+
+      batch.update(doc(firestore, 'vehicles', releaseTarget.id), {
+        status: 'Available',
+        updatedAt: serverTimestamp()
+      });
+
+      await batch.commit();
+      toast({ title: 'Vehicle Released', description: `${releaseTarget.plateNumber} is now available for new allotments.` });
+      setReleaseTarget(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -1179,6 +1213,18 @@ export default function ManageAllTripsPage() {
                       </div>
                     )}
                   </CardContent>
+                  {effectiveStatus !== 'Available' && (
+                    <CardFooter className="bg-muted/5 border-t p-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full h-8 text-[10px] font-black uppercase text-amber-700 hover:text-amber-800"
+                        onClick={() => setReleaseTarget(v)}
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1.5" /> Mark as Available
+                      </Button>
+                    </CardFooter>
+                  )}
                 </Card>
               );
             })}
@@ -1196,6 +1242,7 @@ export default function ManageAllTripsPage() {
                         <TableHead>Fleet Status</TableHead>
                         <TableHead className="min-w-[200px]">Current Personnel</TableHead>
                         <TableHead className="min-w-[250px]">Current Itinerary</TableHead>
+                        <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1248,6 +1295,18 @@ export default function ManageAllTripsPage() {
                                 </div>
                               ) : (
                                 <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right px-6">
+                              {effectiveStatus !== 'Available' && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 rounded-sm font-black text-[9px] uppercase border-amber-500/30 text-amber-700 hover:bg-amber-50 shadow-sm"
+                                  onClick={() => setReleaseTarget(v)}
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark Available
+                                </Button>
                               )}
                             </TableCell>
                           </TableRow>
@@ -1590,11 +1649,35 @@ export default function ManageAllTripsPage() {
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleConfirmCancel} 
-              disabled={isCancelling}
+              disabled={isProcessing}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg"
             >
-              {isCancelling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Confirm Cancellation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!releaseTarget} onOpenChange={(o) => !o && setReleaseTarget(null)}>
+        <AlertDialogContent className="rounded-sm max-w-md w-[95vw]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-700 font-black uppercase tracking-tight">
+              <RotateCcw className="h-5 w-5" /> Manual Fleet Release
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed text-left text-foreground/80">
+              Force-release <strong>{releaseTarget?.plateNumber}</strong>? <br/><br/>
+              This will <strong>reject any active allotments or ongoing trips</strong> for this vehicle and return it to the Available pool instantly. Use this only for administrative correction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 flex-col sm:flex-row">
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleMarkAvailable} 
+              disabled={isProcessing}
+              className="bg-amber-600 text-white hover:bg-amber-700 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg border-none"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Force Release Asset"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
