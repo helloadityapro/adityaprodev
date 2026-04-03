@@ -103,14 +103,17 @@ export default function FinishTripPage({ params }: { params: Promise<{ assignmen
   };
 
   const handleFinishTrip = async () => {
-    if (!user || !trip || !photo || !reading) return;
+    if (!user || !trip || !reading) return;
     setIsProcessing(true);
 
     try {
-      const storage = getStorage(firebaseApp);
-      const photoRef = ref(storage, `trips/${assignmentId}/finish_${Date.now()}.jpg`);
-      await uploadString(photoRef, photo, 'data_url', { contentType: 'image/jpeg' });
-      const photoUrl = await getDownloadURL(photoRef);
+      let photoUrl = "";
+      if (photo) {
+        const storage = getStorage(firebaseApp);
+        const photoRef = ref(storage, `trips/${assignmentId}/finish_${Date.now()}.jpg`);
+        await uploadString(photoRef, photo, 'data_url', { contentType: 'image/jpeg' });
+        photoUrl = await getDownloadURL(photoRef);
+      }
 
       const endValue = parseFloat(reading);
 
@@ -119,7 +122,7 @@ export default function FinishTripPage({ params }: { params: Promise<{ assignmen
         status: 'Completed',
         endTime: serverTimestamp(),
         endReading: endValue,
-        endReadingPhoto: photoUrl,
+        endReadingPhoto: photoUrl || null,
         updatedAt: serverTimestamp()
       });
 
@@ -236,7 +239,7 @@ export default function FinishTripPage({ params }: { params: Promise<{ assignmen
           <Button 
             className="w-full h-16 text-xl font-black rounded-sm shadow-xl bg-slate-900 transition-all active:scale-[0.98]" 
             onClick={handleFinishTrip}
-            disabled={isProcessing || !photo || !reading || parseFloat(reading) <= (trip?.startReading || 0)}
+            disabled={isProcessing || !reading || parseFloat(reading) <= (trip?.startReading || 0)}
           >
             {isProcessing ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : 'END TRIP & CHECK-OUT'}
           </Button>
