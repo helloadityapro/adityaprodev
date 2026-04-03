@@ -458,7 +458,7 @@ function EditTripDialog({
                                   <PopoverTrigger asChild>
                                     <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal rounded-sm h-11 text-left", !field.value && "text-muted-foreground")}>{field.value || "Select destination..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
                                   </PopoverTrigger>
-                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><ScrollArea className="h-[150px]">{filteredDropSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsDropPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
+                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><ScrollArea className="h-[150px]">{filteredDropSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(site.name); setIsDropPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
                                 </Popover>
                               ) : (
                                 <FormControl><Input placeholder="Enter destination address..." {...field} className="h-11 rounded-sm" /></FormControl>
@@ -576,16 +576,11 @@ export default function ManageAllTripsPage() {
 
   const driversList = React.useMemo(() => allUsers?.filter(u => u.role === 'Driver') || [], [allUsers]);
 
-  const availableVehicles = React.useMemo(() => {
-    if (!vehicles || !assignments) return [];
-    const busyVehicleIds = new Set(
-      assignments
-        .filter(a => a.status === 'Approved' || a.status === 'Ongoing')
-        .map(a => a.vehicleId)
-        .filter(Boolean)
-    );
-    return vehicles.filter(v => v.status === 'Available' && !busyVehicleIds.has(v.id));
-  }, [vehicles, assignments]);
+  const availableVehiclesForAllotment = React.useMemo(() => {
+    if (!vehicles) return [];
+    // Rely strictly on vehicle status for immediate reactivity
+    return vehicles.filter(v => v.status === 'Available');
+  }, [vehicles]);
 
   // Deep Link Handling
   React.useEffect(() => {
@@ -1036,7 +1031,7 @@ export default function ManageAllTripsPage() {
                               <div className="flex justify-end items-center gap-1">
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
                                 {(isAdmin || isManager) && trip.status === 'Pending' && (
-                                  <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-3 shadow-sm" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
+                                  <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
                                 )}
                                 {(isAdmin || isManager || trip.userId === user?.uid) && trip.status === 'Pending' && (
                                   <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setEditingAssignment(trip); }} title="Edit Request"><Pencil className="h-4 w-4" /></Button>
@@ -1221,7 +1216,7 @@ export default function ManageAllTripsPage() {
                         className="w-full h-8 text-[10px] font-black uppercase text-amber-700 hover:text-amber-800"
                         onClick={() => setReleaseTarget(v)}
                       >
-                        <RotateCcw className="h-3 w-3 mr-1.5" /> Mark as Available
+                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark as Available
                       </Button>
                     </CardFooter>
                   )}
@@ -1275,7 +1270,7 @@ export default function ManageAllTripsPage() {
                                 <div className="flex items-center gap-2">
                                   <UserCircle2 className="h-4 w-4 text-primary" />
                                   <div className="flex flex-col">
-                                    <span className="text-xs font-bold">{activeTrip.username}</span>
+                                    <span className="text-xs font-bold">{activeTrip.userName}</span>
                                     <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {activeTrip.driverName}</span>
                                   </div>
                                 </div>
@@ -1380,7 +1375,7 @@ export default function ManageAllTripsPage() {
                       <SelectValue placeholder="Allot Vehicle..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableVehicles.map(v => (
+                      {availableVehiclesForAllotment.map(v => (
                         <SelectItem key={v.id} value={v.id} className="text-xs font-bold">
                           {v.make} {v.model} ({v.plateNumber}) — {v.ownership}
                         </SelectItem>
