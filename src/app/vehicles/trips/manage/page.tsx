@@ -548,15 +548,15 @@ function ScheduledTripsDialog({
         ? ` (with ${trip.coPassengers.map(p => p.name).join(', ')})` 
         : '';
       const stops = trip.intermediateStops && trip.intermediateStops.length > 0
-        ? `\n🛑 *Stops:* ${trip.intermediateStops.map(s => s.location).join(', ')}`
+        ? `\n\u{1F6D1} *Stops:* ${trip.intermediateStops.map(s => s.location).join(', ')}`
         : '';
 
       message += `*${index + 1}. @${trip.userName}${passengerList}*\n`;
-      message += `📍 *Pickup:* ${trip.pickupLocation}\n`;
-      message += `🕒 *Reporting:* ${formatTo12Hr(trip.reportingTime)}${stops}\n`;
-      message += `🏁 *Drop:* ${trip.dropLocation}\n`;
-      message += `🚗 *Vehicle:* ${trip.vehicleDetails || 'Pending Allotment'}\n`;
-      message += `👤 *Driver:* ${trip.driverName || 'Pending Designation'}\n`;
+      message += `\u{1F4CD} *Pickup:* ${trip.pickupLocation}\n`;
+      message += `\u{1F552} *Reporting:* ${formatTo12Hr(trip.reportingTime)}${stops}\n`;
+      message += `\u{1F3C1} *Drop:* ${trip.dropLocation}\n`;
+      message += `\u{1F697} *Vehicle:* ${trip.vehicleDetails || 'Pending Allotment'}\n`;
+      message += `\u{1F464} *Driver:* ${trip.driverName || 'Pending Designation'}\n`;
       message += `------------------\n\n`;
     });
 
@@ -821,28 +821,28 @@ export default function ManageAllTripsPage() {
 
     switch (trip.status) {
       case 'Pending':
-        header = "🚨 *Aditya Pro - New Vehicle Request*";
+        header = "\u{1F6A8} *Aditya Pro - New Vehicle Request*";
         body = `*Requester:* ${trip.userName}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
         break;
       case 'Approved':
-        header = "✅ *Aditya Pro - Vehicle Allotted*";
+        header = "\u{2705} *Aditya Pro - Vehicle Allotted*";
         body = `*Requester:* ${trip.userName}\n*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Ownership:* ${trip.vehicleOwnership}\n*Trip Date:* ${trip.tripDate}\n*Ready for departure.*`;
         break;
       case 'Ongoing':
-        header = "🚦 *Aditya Pro - Trip Ongoing*";
-        body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} ➔ ${trip.destinations[0]?.location || 'Destination'}`;
+        header = "\u{1F6A6} *Aditya Pro - Trip Ongoing*";
+        body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} \u{2794} ${trip.destinations[0]?.location || 'Destination'}`;
         break;
       case 'Completed':
         const distance = (trip.endReading || 0) - (trip.startReading || 0);
-        header = "🏁 *Aditya Pro - Trip Completed*";
+        header = "\u{1F3C1} *Aditya Pro - Trip Completed*";
         body = `*Vehicle:* ${trip.vehicleDetails}\n*Personnel:* ${trip.userName}\n*Distance:* ${distance.toFixed(1)} KM\n*Finished At:* ${trip.endTime ? format(trip.endTime.toDate(), 'HH:mm') : 'N/A'}`;
         break;
       case 'Rejected':
-        header = "❌ *Aditya Pro - Trip Cancelled*";
+        header = "\u{274C} *Aditya Pro - Trip Cancelled*";
         body = `*Request Ref:* ${trip.id.slice(0, 8)}\n*Requester:* ${trip.userName}\n*Site:* ${trip.pickupLocation}\n*The trip request has been revoked.*`;
         break;
       default:
-        header = "ℹ️ *Aditya Pro - Trip Update*";
+        header = "\u{2139}\u{FE0F} *Aditya Pro - Trip Update*";
         body = `*Status:* ${trip.status}\n*Site:* ${trip.pickupLocation}`;
     }
 
@@ -1405,7 +1405,7 @@ export default function ManageAllTripsPage() {
                         <div className="flex flex-col gap-1.5">
                           <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Itinerary</span>
                           <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700">
-                            <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation} ➔ {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
+                            <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation} \u{2794} {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
                           </div>
                         </div>
                       </div>
@@ -1482,7 +1482,7 @@ export default function ManageAllTripsPage() {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
+                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
                               )}
                             </TableCell>
                             <TableCell>
@@ -1496,7 +1496,7 @@ export default function ManageAllTripsPage() {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
+                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right px-6">
@@ -1590,7 +1590,7 @@ export default function ManageAllTripsPage() {
                     <SelectContent>
                       {availableVehiclesForAllotment.map(v => (
                         <SelectItem key={v.id} value={v.id} className="text-xs font-bold">
-                          {v.make} {v.model} ({v.plateNumber}) — {v.ownership}
+                          {v.make} {v.model} ({v.plateNumber}) \u{2014} {v.ownership}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1607,7 +1607,7 @@ export default function ManageAllTripsPage() {
                         value={approvalTarget?.rentedDriverDetails || ""}
                         onChange={(e) => setApprovalState(prev => prev ? { ...prev, rentedDriverDetails: e.target.value } : null)}
                       />
-                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver — No system selection required.</p>
+                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver \u{2014} No system selection required.</p>
                     </>
                   ) : (
                     <>
@@ -1731,7 +1731,7 @@ export default function ManageAllTripsPage() {
                         <div className="h-10 w-10 rounded-sm bg-muted flex items-center justify-center text-muted-foreground shrink-0"><UserCog className="h-6 w-6" /></div>
                         <div className="flex flex-col min-w-0">
                           <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Assigned Driver</span>
-                          <span className="text-sm font-black truncate">{detailsAssignment.driverName || '—'}</span>
+                          <span className="text-sm font-black truncate">{detailsAssignment.driverName || '\u2014'}</span>
                         </div>
                       </div>
                     </div>
@@ -1901,4 +1901,41 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
       </CardContent>
     </Card>
   );
+}
+
+function handleWhatsAppShare(trip: Assignment) {
+  let header = "";
+  let body = "";
+  const tripUrl = `${window.location.origin}/vehicles/trips/manage?view=${trip.id}`;
+
+  switch (trip.status) {
+    case 'Pending':
+      header = "\u{1F6A8} *Aditya Pro - New Vehicle Request*";
+      body = `*Requester:* ${trip.userName}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
+      break;
+    case 'Approved':
+      header = "\u{2705} *Aditya Pro - Vehicle Allotted*";
+      body = `*Requester:* ${trip.userName}\n*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Ownership:* ${trip.vehicleOwnership}\n*Trip Date:* ${trip.tripDate}\n*Ready for departure.*`;
+      break;
+    case 'Ongoing':
+      header = "\u{1F6A6} *Aditya Pro - Trip Ongoing*";
+      body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} \u{2794} ${trip.destinations[0]?.location || 'Destination'}`;
+      break;
+    case 'Completed':
+      const distance = (trip.endReading || 0) - (trip.startReading || 0);
+      header = "\u{1F3C1} *Aditya Pro - Trip Completed*";
+      body = `*Vehicle:* ${trip.vehicleDetails}\n*Personnel:* ${trip.userName}\n*Distance:* ${distance.toFixed(1)} KM\n*Finished At:* ${trip.endTime ? format(trip.endTime.toDate(), 'HH:mm') : 'N/A'}`;
+      break;
+    case 'Rejected':
+      header = "\u{274C} *Aditya Pro - Trip Cancelled*";
+      body = `*Request Ref:* ${trip.id.slice(0, 8)}\n*Requester:* ${trip.userName}\n*Site:* ${trip.pickupLocation}\n*The trip request has been revoked.*`;
+      break;
+    default:
+      header = "\u{2139}\u{FE0F} *Aditya Pro - Trip Update*";
+      body = `*Status:* ${trip.status}\n*Site:* ${trip.pickupLocation}`;
+  }
+
+  const message = `${header}\n\n${body}\n\n*View Audit Log:* ${tripUrl}`;
+  const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+  window.open(url, '_blank');
 }
