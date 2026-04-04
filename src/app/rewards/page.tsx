@@ -379,11 +379,11 @@ export default function RewardsPage() {
           <p className="text-muted-foreground text-sm">Track your earned rewards and performance ranking.</p>
         </div>
         
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center gap-1.5 w-full md:w-auto">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="flex-1 sm:flex-none rounded-sm h-11 px-3 text-primary border-primary/10 font-bold text-[10px] uppercase gap-1.5">
-                <CircleHelp className="h-4 w-4" /> Rules
+              <Button variant="outline" className="flex-1 sm:flex-none rounded-sm h-9 px-2 text-primary border-primary/10 font-bold text-[9px] uppercase gap-1 shrink-0">
+                <CircleHelp className="h-3.5 w-3.5" /> Rules
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-[280px] p-0 rounded-sm border-primary/10 bg-white shadow-2xl overflow-hidden">
@@ -403,9 +403,12 @@ export default function RewardsPage() {
                   <span>Material Log</span><span className="text-right font-black text-primary">0.1</span>
                   <span>Task (All)</span><span className="text-right font-black text-primary">0.25</span>
                 </div>
-                <div className="p-3 bg-muted/20 rounded-sm space-y-1">
-                  <p className="text-[10px] leading-tight text-muted-foreground">
-                    <span className="font-bold text-primary">Bonus:</span> Managers get 50% from team. X-Factor applies.
+                <div className="p-3 bg-muted/20 rounded-sm space-y-1.5">
+                  <p className="text-[10px] leading-tight text-muted-foreground font-bold">
+                    1 Point = ₹5.00
+                  </p>
+                  <p className="text-[9px] leading-tight text-muted-foreground/60 italic">
+                    <span className="font-bold text-primary not-italic">Bonus:</span> Managers get 50% from team. X-Factor applies.
                   </p>
                 </div>
               </div>
@@ -416,24 +419,24 @@ export default function RewardsPage() {
             <Button 
               onClick={() => setSelectedHistoryUser(userProfile)} 
               variant="outline" 
-              className="flex-1 sm:flex-none rounded-sm font-bold border-primary text-primary hover:bg-primary/5 h-11 px-4 text-[10px] uppercase"
+              className="flex-1 sm:flex-none rounded-sm font-bold border-primary text-primary hover:bg-primary/5 h-9 px-2 text-[9px] uppercase shrink-0"
             >
-              <History className="mr-2 h-4 w-4" /> History
+              <History className="mr-1.5 h-3.5 w-3.5" /> History
             </Button>
           )}
           
-          <div className="flex items-center gap-1.5 flex-1 sm:flex-none">
+          <div className="flex items-center gap-1 flex-1 sm:flex-none">
             <Button 
               onClick={() => setIsRedeemDialogOpen(true)}
-              className="flex-1 rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-4 text-[10px] uppercase shadow-md"
+              className="flex-1 rounded-sm font-bold bg-green-600 hover:bg-green-700 h-9 px-3 text-[9px] uppercase shadow-md shrink-0"
               disabled={!canRedeem}
             >
-              <CreditCard className="mr-2 h-4 w-4" /> Redeem
+              <CreditCard className="mr-1.5 h-3.5 w-3.5" /> Redeem
             </Button>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="icon" className="h-11 w-11 rounded-sm border-primary/10 text-primary shrink-0">
-                  <Info className="h-4 w-4" />
+                <Button variant="outline" size="icon" className="h-9 w-9 rounded-sm border-primary/10 text-primary shrink-0">
+                  <Info className="h-3.5 w-3.5" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 rounded-sm border-primary/10 shadow-2xl p-4 bg-white">
