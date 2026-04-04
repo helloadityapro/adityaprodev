@@ -379,76 +379,36 @@ export default function RewardsPage() {
           <p className="text-muted-foreground text-sm">Track your earned rewards and performance ranking.</p>
         </div>
         
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full h-11 w-11 text-primary hover:bg-primary/5 border border-primary/10">
-                <CircleHelp className="h-6 w-6" />
+              <Button variant="outline" className="rounded-sm h-11 px-3 text-primary border-primary/10 font-bold text-[10px] uppercase gap-1.5 flex-1 sm:flex-none">
+                <CircleHelp className="h-4 w-4" /> Rules
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-[calc(100vw-2rem)] xs:w-[350px] p-0 rounded-sm border-primary/10 bg-white shadow-2xl overflow-hidden">
-              <div className="bg-primary/5 p-4 border-b">
-                <h3 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                  <Star className="h-3.5 w-3.5 fill-primary" /> Reward Point System
+            <PopoverContent align="end" className="w-[280px] p-0 rounded-sm border-primary/10 bg-white shadow-2xl overflow-hidden">
+              <div className="bg-primary/5 p-3 border-b">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                  <Star className="h-3 w-3 fill-primary" /> Point System
                 </h3>
               </div>
-              <ScrollArea className="max-h-[400px]">
-                <div className="p-5 space-y-6">
-                  <section className="space-y-3">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest border-l-2 border-blue-500 pl-2">Operations</p>
-                    <div className="space-y-2.5">
-                      <div className="flex justify-between items-center text-xs font-bold">
-                        <span className="text-foreground">PtW Submission</span>
-                        <span className="text-primary">1.0 Pts</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs font-medium italic opacity-70 border-b border-dashed pb-1">
-                        <span className="text-muted-foreground pl-2">If correction required</span>
-                        <span className="text-primary">0.5 Pts</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs font-bold">
-                        <span className="text-foreground">DPR Log</span>
-                        <span className="text-primary">1.0 Pts</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs font-bold">
-                        <span className="text-foreground">Material Movement</span>
-                        <span className="text-primary">0.1 Pts</span>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="space-y-3">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest border-l-2 border-amber-500 pl-2">Assignments</p>
-                    <div className="space-y-2.5">
-                      <div className="flex justify-between items-center text-xs font-bold">
-                        <span className="text-foreground">Task Assignment</span>
-                        <span className="text-primary">0.25 Pts</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs font-bold">
-                        <span className="text-foreground">Task Completion</span>
-                        <span className="text-primary">0.25 Pts</span>
-                      </div>
-                    </div>
-                  </section>
-
-                  <section className="space-y-3">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest border-l-2 border-emerald-500 pl-2">Supervisors</p>
-                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-sm">
-                      <p className="text-[10px] text-emerald-800 leading-relaxed font-medium">
-                        Managers receive <strong className="text-emerald-950">50% Inheritance</strong> of the base points earned by their reporting engineers for PtW and Movements.
-                      </p>
-                    </div>
-                  </section>
-
-                  <section className="space-y-3 pt-2">
-                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-100 rounded-sm">
-                      <TrendingUp className="h-4 w-4 text-amber-600 shrink-0" />
-                      <p className="text-[10px] text-amber-800 font-bold uppercase leading-snug">
-                        Multipliers (X-Factor) are applied to base engineer points based on seniority.
-                      </p>
-                    </div>
-                  </section>
+              <div className="p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                  <div className="font-bold text-muted-foreground uppercase border-b pb-1">Activity</div>
+                  <div className="font-bold text-muted-foreground uppercase border-b pb-1 text-right">Points</div>
+                  
+                  <span>PtW Request</span><span className="text-right font-black text-primary">1.0</span>
+                  <span className="pl-2 italic opacity-60">Correction</span><span className="text-right font-black text-primary">0.5</span>
+                  <span>DPR Submission</span><span className="text-right font-black text-primary">1.0</span>
+                  <span>Material Log</span><span className="text-right font-black text-primary">0.1</span>
+                  <span>Task (All)</span><span className="text-right font-black text-primary">0.25</span>
                 </div>
-              </ScrollArea>
+                <div className="p-3 bg-muted/20 rounded-sm space-y-1">
+                  <p className="text-[10px] leading-tight text-muted-foreground">
+                    <span className="font-bold text-primary">Bonus:</span> Managers get 50% from team. X-Factor applies.
+                  </p>
+                </div>
+              </div>
             </PopoverContent>
           </Popover>
 
@@ -456,7 +416,7 @@ export default function RewardsPage() {
             <Button 
               onClick={() => setSelectedHistoryUser(userProfile)} 
               variant="outline" 
-              className="flex-1 sm:flex-none rounded-sm font-bold border-primary text-primary hover:bg-primary/5 h-11 px-4 text-xs uppercase"
+              className="flex-1 sm:flex-none rounded-sm font-bold border-primary text-primary hover:bg-primary/5 h-11 px-4 text-[10px] uppercase"
             >
               <History className="mr-2 h-4 w-4" /> History
             </Button>
@@ -465,7 +425,7 @@ export default function RewardsPage() {
           <div className="flex items-center gap-2 flex-1 sm:flex-none">
             <Button 
               onClick={() => setIsRedeemDialogOpen(true)}
-              className="flex-1 rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-4 text-xs uppercase shadow-md"
+              className="flex-1 rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-4 text-[10px] uppercase shadow-md"
               disabled={!canRedeem}
             >
               <CreditCard className="mr-2 h-4 w-4" /> Redeem
@@ -512,7 +472,6 @@ export default function RewardsPage() {
           <CardContent className="p-2 sm:p-6 pt-0">
             <div className="text-lg sm:text-3xl font-black text-green-700 tabular-nums">₹{monetaryValue.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</div>
           </CardContent>
-        </Card>
 
         <Card className="bg-primary/5 border-primary/20 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-2 sm:p-6">
