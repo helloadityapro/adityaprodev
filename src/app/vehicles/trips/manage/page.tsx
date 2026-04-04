@@ -571,6 +571,7 @@ function ScheduledTripsDialog({
       const passengerList = trip.coPassengers && trip.coPassengers.length > 0 
         ? ` (with ${trip.coPassengers.map(p => (p.name || '').trim()).join(', ')})` 
         : '';
+      
       const stops = trip.intermediateStops && trip.intermediateStops.length > 0
         ? `\n\u{1F6D1} *Stops:* ${trip.intermediateStops.map(s => s.location).join(', ')}`
         : '';
@@ -1552,7 +1553,7 @@ export default function ManageAllTripsPage() {
                     </div>
                   ) : (
                     <div className="pt-3 border-t text-center py-2">
-                      <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">No Active Assignment</span>
+                      <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">Awaiting</span>
                     </div>
                   )}
                 </CardContent>
@@ -1627,7 +1628,7 @@ export default function ManageAllTripsPage() {
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
+                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>
                             )}
                           </TableCell>
                           <TableCell>
@@ -1641,7 +1642,7 @@ export default function ManageAllTripsPage() {
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
+                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right px-6">
@@ -1979,7 +1980,7 @@ export default function ManageAllTripsPage() {
       </Dialog>
 
       <AlertDialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
-        <AlertDialogContent className="rounded-sm max-w-md w-[95vw]">
+        <AlertDialogContent className="rounded-sm max-md w-[95vw]">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
               <CircleX className="h-5 w-5" /> Confirm Cancellation
@@ -1988,7 +1989,7 @@ export default function ManageAllTripsPage() {
               Revoke this trip request? If a vehicle was alloted, it will be returned to the available pool.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 flex flex-col sm:flex-row">
+          <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleConfirmCancel} 
@@ -2013,7 +2014,7 @@ export default function ManageAllTripsPage() {
               This will <strong>reject any active allotments or ongoing trips</strong> for this vehicle and return it to the Available pool instantly. Use this only for administrative correction.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 flex flex-col sm:flex-row">
+          <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleMarkAvailable} 
