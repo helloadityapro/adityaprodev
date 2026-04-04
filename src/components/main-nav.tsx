@@ -53,7 +53,7 @@ import {
   Navigation,
   CheckSquare,
   ListTodo,
-  Checklist
+  ClipboardCheck
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -678,7 +678,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton tooltip="Checklists" isActive={pathname.startsWith('/checklists')} className="rounded-sm">
-                  <Checklist className="h-4 w-4 text-primary" />
+                  <ClipboardCheck className="h-4 w-4 text-primary" />
                   <span className="font-medium">Checklists</span>
                   <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                 </SidebarMenuButton>

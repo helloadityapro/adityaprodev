@@ -22,7 +22,8 @@ import {
   Building2, 
   CheckCircle2, 
   ClipboardCheck,
-  AlertCircle
+  AlertCircle,
+  Save
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -217,7 +218,7 @@ export default function MmsChecklistPage() {
                       {filteredTables.length > 0 ? filteredTables.map(table => (
                         <Button key={table.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { setSelectedTableId(table.id); setSelectedTableName(table.tableName); setIsTablePopoverOpen(false); }}>
                           <Check className={cn("mr-2 h-4 w-4 text-primary", selectedTableId === table.id ? "opacity-100" : "opacity-0")} />
-                          <div className="flex flex-col items-start overflow-hidden">
+                          <div className="flex flex-col items-start overflow-hidden text-left">
                             <span className="truncate">{table.tableName}</span>
                             <span className="text-[8px] uppercase text-muted-foreground">{table.configurationType}</span>
                           </div>
