@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -35,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 
 type Site = {
   id: string;
@@ -247,7 +247,7 @@ export default function MmsChecklistPage() {
               <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">2. Select Physical Table</Label>
               <Popover open={isTablePopoverOpen} onOpenChange={setIsTablePopoverOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" disabled={!selectedSiteId} role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm", !selectedTableId && "text-muted-foreground")}>
+                  <Button variant="outline" disabled={!selectedSiteId} role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !selectedTableId && "text-muted-foreground")}>
                     {selectedTableId ? selectedTableName : "Choose table..."}
                     <LayoutGrid className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -280,7 +280,7 @@ export default function MmsChecklistPage() {
               <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">3. BoM Configuration Source</Label>
               <Popover open={isBomPopoverOpen} onOpenChange={setIsBomPopoverOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" disabled={!selectedSiteId} role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm", !selectedBomId && "text-muted-foreground")}>
+                  <Button variant="outline" disabled={!selectedSiteId} role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !selectedBomId && "text-muted-foreground")}>
                     <span className="truncate">{selectedBomId ? selectedBomName : "Select BoM Configuration..."}</span>
                     <Settings2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -288,7 +288,7 @@ export default function MmsChecklistPage() {
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                   <div className="flex items-center border-b px-3">
                     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                    <Input placeholder="Filter BoM items..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearchQuery} onChange={e => setBomSearchQuery(e.target.value)} />
+                    <Input placeholder="Filter BoM items..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearchQuery} onChange={e => setBomSearchQuery(e.target.value)} />
                   </div>
                   <ScrollArea className="h-[200px]">
                     <div className="p-1">
@@ -410,7 +410,7 @@ export default function MmsChecklistPage() {
               onClick={handleSubmit}
               disabled={isSubmitting || componentRows.length === 0}
             >
-              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <><Save className="mr-2 h-5 w-5" /> PUBLISH CHECKLIST</>}
+              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <><Save className="mr-2 h-4 w-4" /> PUBLISH CHECKLIST</>}
             </Button>
           </CardFooter>
         </Card>
