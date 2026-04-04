@@ -55,7 +55,9 @@ import {
   RotateCcw,
   ListChecks,
   Share2,
-  ArrowUp
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -741,6 +743,12 @@ export default function ManageAllTripsPage() {
   const [activeTab, setActiveTab] = React.useState("registry");
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
+  
+  // Fleet Tab Specific States
+  const [fleetSearch, setFleetSearch] = React.useState("");
+  const [fleetStatusFilter, setFleetStatusFilter] = React.useState("all");
+  const [fleetSortConfig, setFleetSortConfig] = React.useState<{ key: 'plate' | 'ownership' | 'status'; direction: 'asc' | 'desc' }>({ key: 'plate', direction: 'asc' });
+
   const [approvalTarget, setApprovalState] = React.useState<{ assignment: Assignment, vehicleId: string, driverId: string, rentedDriverDetails: string } | null>(null);
   const [detailsAssignment, setDetailsAssignment] = React.useState<Assignment | null>(null);
   const [editingAssignment, setEditingAssignment] = React.useState<Assignment | null>(null);
@@ -889,6 +897,66 @@ export default function ManageAllTripsPage() {
       return dateB - dateA;
     });
   }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper, userRole]);
+
+  // Unified Fleet filtering and sorting logic
+  const filteredSortedFleet = React.useMemo(() => {
+    if (!vehicles) return [];
+    
+    let result = vehicles.map(v => {
+      const activeTrip = assignments?.find(a => a.vehicleId === v.id && (a.status === 'Approved' || a.status === 'Ongoing'));
+      const effectiveStatus = activeTrip ? (activeTrip.status === 'Approved' ? 'Allotted' : 'Ongoing') : 'Available';
+      return { ...v, effectiveStatus, activeTrip };
+    });
+
+    result = result.filter(v => {
+      const search = fleetSearch.toLowerCase();
+      const matchesSearch = v.plateNumber.toLowerCase().includes(search) || 
+                           v.make.toLowerCase().includes(search) || 
+                           v.model.toLowerCase().includes(search) ||
+                           v.ownership.toLowerCase().includes(search) ||
+                           v.effectiveStatus.toLowerCase().includes(search) ||
+                           (v.activeTrip?.userName || '').toLowerCase().includes(search);
+      
+      const matchesStatus = fleetStatusFilter === 'all' || v.effectiveStatus === fleetStatusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+
+    result.sort((a, b) => {
+      const { key, direction } = fleetSortConfig;
+      let valA: any = '';
+      let valB: any = '';
+
+      if (key === 'plate') {
+        valA = a.plateNumber.toLowerCase();
+        valB = b.plateNumber.toLowerCase();
+      } else if (key === 'ownership') {
+        valA = a.ownership.toLowerCase();
+        valB = b.ownership.toLowerCase();
+      } else if (key === 'status') {
+        valA = a.effectiveStatus.toLowerCase();
+        valB = b.effectiveStatus.toLowerCase();
+      }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [vehicles, fleetSearch, fleetStatusFilter, fleetSortConfig, assignments]);
+
+  const handleFleetSort = (key: 'plate' | 'ownership' | 'status') => {
+    setFleetSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const FleetSortIcon = ({ column }: { column: 'plate' | 'ownership' | 'status' }) => {
+    if (fleetSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return fleetSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+  };
 
   const stats = React.useMemo(() => {
     return {
@@ -1418,66 +1486,92 @@ export default function ManageAllTripsPage() {
         </TabsContent>
 
         <TabsContent value="fleet" className="animate-in fade-in-50 duration-300">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 px-1">
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search fleet (plate, personnel, site)..." 
+                className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
+                value={fleetSearch} 
+                onChange={e => setFleetSearch(e.target.value)} 
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={fleetStatusFilter} onValueChange={setFleetStatusFilter}>
+                <SelectTrigger className="w-[140px] h-9 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20 bg-background">
+                  <SelectValue placeholder="Fleet Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[10px] font-bold uppercase">All Status</SelectItem>
+                  <SelectItem value="Available" className="text-[10px] font-bold uppercase text-emerald-600">Available</SelectItem>
+                  <SelectItem value="Allotted" className="text-[10px] font-bold uppercase text-amber-600">Allotted</SelectItem>
+                  <SelectItem value="Ongoing" className="text-[10px] font-bold uppercase text-blue-600">Ongoing</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" onClick={() => { setFleetSearch(""); setFleetStatusFilter("all"); }}>
+                <FilterX className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
           <div className="md:hidden space-y-4">
-            {vehicles?.map(v => {
-              const activeTrip = assignments?.find(a => a.vehicleId === v.id && (a.status === 'Approved' || a.status === 'Ongoing'));
-              const effectiveStatus = activeTrip ? (activeTrip.status === 'Approved' ? 'Allotted' : 'Ongoing') : 'Available';
-              return (
-                <Card key={v.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden">
-                  <CardHeader className="p-4 bg-muted/5 border-b flex flex-row items-center justify-between space-y-0">
-                    <div className="flex items-center gap-2">
-                      <CarFront className="h-4 w-4 text-primary" />
-                      <span className="font-mono text-xs font-black uppercase">{v.plateNumber}</span>
-                    </div>
-                    <Badge variant="outline" className={cn(
-                      "text-[8px] font-black uppercase h-5 px-1.5",
-                      effectiveStatus === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                      effectiveStatus === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                      "bg-amber-50 text-amber-700 border-amber-200"
-                    )}>{effectiveStatus}</Badge>
-                  </CardHeader>
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold">{v.make} {v.model}</span>
-                      <span className="text-[9px] text-muted-foreground uppercase font-medium">{v.ownership} Vehicle</span>
-                    </div>
-                    {activeTrip ? (
-                      <div className="space-y-3 pt-3 border-t">
-                        <div className="flex items-center gap-2">
-                          <UserCircle2 className="h-3.5 w-3.5 text-primary" />
-                          <div className="flex flex-col">
-                            <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Personnel</span>
-                            <span className="text-11px font-bold">{activeTrip.userName}</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                          <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Itinerary</span>
-                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700">
-                            <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation} \u{2794} {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
-                          </div>
+            {filteredSortedFleet.length > 0 ? filteredSortedFleet.map(v => (
+              <Card key={v.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden">
+                <CardHeader className="p-4 bg-muted/5 border-b flex flex-row items-center justify-between space-y-0">
+                  <div className="flex items-center gap-2">
+                    <CarFront className="h-4 w-4 text-primary" />
+                    <span className="font-mono text-xs font-black uppercase">{v.plateNumber}</span>
+                  </div>
+                  <Badge variant="outline" className={cn(
+                    "text-[8px] font-black uppercase h-5 px-1.5",
+                    v.effectiveStatus === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                    v.effectiveStatus === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                    "bg-amber-50 text-amber-700 border-amber-200"
+                  )}>{v.effectiveStatus}</Badge>
+                </CardHeader>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold">{v.make} {v.model}</span>
+                    <span className="text-[9px] text-muted-foreground uppercase font-medium">{v.ownership} Vehicle</span>
+                  </div>
+                  {v.activeTrip ? (
+                    <div className="space-y-3 pt-3 border-t">
+                      <div className="flex items-center gap-2">
+                        <UserCircle2 className="h-3.5 w-3.5 text-primary" />
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Personnel</span>
+                          <span className="text-[11px] font-bold">{v.activeTrip.userName}</span>
                         </div>
                       </div>
-                    ) : (
-                      <div className="pt-3 border-t text-center py-2">
-                        <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">No Active Assignment</span>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Itinerary</span>
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700">
+                          <MapPin className="h-3 w-3" /> {v.activeTrip.pickupLocation} \u{2794} {v.activeTrip.destinations[v.activeTrip.destinations.length - 1]?.location}
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
-                  {effectiveStatus !== 'Available' && (
-                    <CardFooter className="bg-muted/5 border-t p-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="w-full h-8 text-[10px] font-black uppercase text-amber-700 hover:text-amber-800"
-                        onClick={() => setReleaseTarget(v)}
-                      >
-                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark as Available
-                      </Button>
-                    </CardFooter>
+                    </div>
+                  ) : (
+                    <div className="pt-3 border-t text-center py-2">
+                      <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">No Active Assignment</span>
+                    </div>
                   )}
-                </Card>
-              );
-            })}
+                </CardContent>
+                {v.effectiveStatus !== 'Available' && (
+                  <CardFooter className="bg-muted/5 border-t p-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full h-8 text-[10px] font-black uppercase text-amber-700 hover:text-amber-800"
+                      onClick={() => setReleaseTarget(v)}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark as Available
+                    </Button>
+                  </CardFooter>
+                )}
+              </Card>
+            )) : (
+              <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No vehicles found.</div>
+            )}
           </div>
 
           <div className="hidden md:block">
@@ -1487,81 +1581,85 @@ export default function ManageAllTripsPage() {
                   <Table>
                     <TableHeader className="bg-muted/30">
                       <TableRow>
-                        <TableHead className="px-6">Vehicle Identity</TableHead>
-                        <TableHead>Ownership</TableHead>
-                        <TableHead>Fleet Status</TableHead>
+                        <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('plate')}>
+                          <div className="flex items-center">Vehicle Identity <FleetSortIcon column="plate" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('ownership')}>
+                          <div className="flex items-center">Ownership <FleetSortIcon column="ownership" /></div>
+                        </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('status')}>
+                          <div className="flex items-center">Fleet Status <FleetSortIcon column="status" /></div>
+                        </TableHead>
                         <TableHead className="min-w-[200px]">Current Personnel</TableHead>
                         <TableHead className="min-w-[250px]">Current Itinerary</TableHead>
                         <TableHead className="text-right px-6">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {vehicles?.sort((a, b) => a.plateNumber.localeCompare(b.plateNumber)).map(v => {
-                        const activeTrip = assignments?.find(a => a.vehicleId === v.id && (a.status === 'Approved' || a.status === 'Ongoing'));
-                        const effectiveStatus = activeTrip ? (activeTrip.status === 'Approved' ? 'Allotted' : 'Ongoing') : 'Available';
-                        return (
-                          <TableRow key={v.id} className="hover:bg-muted/5">
-                            <TableCell className="px-6 py-4">
-                              <div className="flex flex-col">
-                                <span className="text-sm font-bold">{v.make} {v.model}</span>
-                                <span className="font-mono text-[10px] font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
+                      {filteredSortedFleet.length > 0 ? filteredSortedFleet.map(v => (
+                        <TableRow key={v.id} className="hover:bg-muted/5">
+                          <TableCell className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold">{v.make} {v.model}</span>
+                              <span className="font-mono text-[10px] font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="rounded-sm text-[9px] font-black uppercase px-1.5 h-5">{v.ownership}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn(
+                              "text-[9px] font-black uppercase rounded-sm px-2 h-5",
+                              v.effectiveStatus === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                              v.effectiveStatus === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                              "bg-amber-50 text-amber-700 border-amber-200"
+                            )}>
+                              {v.effectiveStatus}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {v.activeTrip ? (
+                              <div className="flex items-center gap-2">
+                                <UserCircle2 className="h-4 w-4 text-primary" />
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-bold">{v.activeTrip.userName}</span>
+                                  <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {v.activeTrip.driverName}</span>
+                                </div>
                               </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className="rounded-sm text-[9px] font-black uppercase px-1.5 h-5">{v.ownership}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className={cn(
-                                "text-[9px] font-black uppercase rounded-sm px-2 h-5",
-                                effectiveStatus === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                                effectiveStatus === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                                "bg-amber-50 text-amber-700 border-amber-200"
-                              )}>
-                                {effectiveStatus}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {activeTrip ? (
-                                <div className="flex items-center gap-2">
-                                  <UserCircle2 className="h-4 w-4 text-primary" />
-                                  <div className="flex flex-col">
-                                    <span className="text-xs font-bold">{activeTrip.userName}</span>
-                                    <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {activeTrip.driverName}</span>
-                                  </div>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {v.activeTrip ? (
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-700">
+                                  <MapPin className="h-3 w-3" /> {v.activeTrip.pickupLocation}
                                 </div>
-                              ) : (
-                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {activeTrip ? (
-                                <div className="flex flex-col gap-1">
-                                  <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-700">
-                                    <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation}
-                                  </div>
-                                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-primary ml-4">
-                                    <ArrowRight className="h-2.5 w-2.5" /> {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
-                                  </div>
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-primary ml-4">
+                                  <ArrowRight className="h-2.5 w-2.5" /> {v.activeTrip.destinations[v.activeTrip.destinations.length - 1]?.location}
                                 </div>
-                              ) : (
-                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right px-6">
-                              {effectiveStatus !== 'Available' && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="h-8 rounded-sm font-black text-[9px] uppercase border-amber-500/30 text-amber-700 hover:bg-amber-50 shadow-sm"
-                                  onClick={() => setReleaseTarget(v)}
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark Available
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            {v.effectiveStatus !== 'Available' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 rounded-sm font-black text-[9px] uppercase border-amber-500/30 text-amber-700 hover:bg-amber-50 shadow-sm"
+                                onClick={() => setReleaseTarget(v)}
+                              >
+                                <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark Available
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )) : (
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No matching fleet records found.</TableCell></TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -1865,7 +1963,7 @@ export default function ManageAllTripsPage() {
             )}
           </ScrollArea>
 
-          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 flex-col sm:flex-row">
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
             {detailsAssignment && (
               <Button 
                 variant="outline" 
@@ -1890,7 +1988,7 @@ export default function ManageAllTripsPage() {
               Revoke this trip request? If a vehicle was alloted, it will be returned to the available pool.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 flex-col sm:flex-row">
+          <AlertDialogFooter className="gap-2 flex flex-col sm:flex-row">
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleConfirmCancel} 
@@ -1915,7 +2013,7 @@ export default function ManageAllTripsPage() {
               This will <strong>reject any active allotments or ongoing trips</strong> for this vehicle and return it to the Available pool instantly. Use this only for administrative correction.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 flex-col sm:flex-row">
+          <AlertDialogFooter className="gap-2 flex flex-col sm:flex-row">
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleMarkAvailable} 
