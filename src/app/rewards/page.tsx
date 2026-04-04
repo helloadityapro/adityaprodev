@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -41,6 +40,9 @@ type UserProfile = {
   role: string;
   totalPoints?: number;
   pointsMultiplier?: number;
+  hiddenPermitIds?: string[];
+  assignedProjectIds?: string[];
+  ownDataOnly?: boolean;
 };
 
 type RewardSettings = {
@@ -320,11 +322,9 @@ export default function RewardsPage() {
         title: "Redemption Request Pending",
         description: `Your request to redeem ${pts} points (₹${(pts * pointValue).toFixed(2)}) has been logged.`,
         link: "/rewards",
-        push: false // In-app only for self
+        push: false
       });
 
-      // Special notification for Admins
-      const adminEmails = ['khalil@adityagreenenergy.com'];
       const usersSnap = await getDocs(query(collection(firestore, 'users'), where('role', '==', 'Admin')));
       usersSnap.forEach(adminDoc => {
         sendNotification(firestore, {
@@ -379,10 +379,10 @@ export default function RewardsPage() {
           <p className="text-muted-foreground text-sm">Track your earned rewards and performance ranking.</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="rounded-sm h-11 px-3 text-primary border-primary/10 font-bold text-[10px] uppercase gap-1.5 flex-1 sm:flex-none">
+              <Button variant="outline" className="flex-1 sm:flex-none rounded-sm h-11 px-3 text-primary border-primary/10 font-bold text-[10px] uppercase gap-1.5">
                 <CircleHelp className="h-4 w-4" /> Rules
               </Button>
             </PopoverTrigger>
@@ -422,34 +422,13 @@ export default function RewardsPage() {
             </Button>
           )}
           
-          <div className="flex items-center gap-2 flex-1 sm:flex-none">
-            <Button 
-              onClick={() => setIsRedeemDialogOpen(true)}
-              className="flex-1 rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-4 text-[10px] uppercase shadow-md"
-              disabled={!canRedeem}
-            >
-              <CreditCard className="mr-2 h-4 w-4" /> Redeem
-            </Button>
-            {!canRedeem && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-11 w-10 rounded-sm text-muted-foreground shrink-0">
-                    <Info className="h-5 w-5" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" className="w-[calc(100vw-2rem)] xs:w-80 rounded-sm border-primary/10 bg-white shadow-xl">
-                  <div className="space-y-2">
-                    <p className="text-sm font-bold text-muted-foreground flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4" /> Redemption Threshold
-                    </p>
-                    <p className="text-xs text-muted-foreground leading-relaxed font-medium">
-                      Redemption is available once your account balance reaches <strong>₹{MIN_REDEEM_VALUE_RS}.00</strong>.
-                    </p>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
-          </div>
+          <Button 
+            onClick={() => setIsRedeemDialogOpen(true)}
+            className="flex-1 sm:flex-none rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-4 text-[10px] uppercase shadow-md"
+            disabled={!canRedeem}
+          >
+            <CreditCard className="mr-2 h-4 w-4" /> Redeem
+          </Button>
         </div>
       </div>
 
@@ -472,6 +451,7 @@ export default function RewardsPage() {
           <CardContent className="p-2 sm:p-6 pt-0">
             <div className="text-lg sm:text-3xl font-black text-green-700 tabular-nums">₹{monetaryValue.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</div>
           </CardContent>
+        </Card>
 
         <Card className="bg-primary/5 border-primary/20 rounded-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-2 sm:p-6">
