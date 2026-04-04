@@ -686,9 +686,9 @@ function ScheduledTripsDialog({
                               <p className="text-xs font-bold">{stop.location}</p>
                             </div>
                           ))}
-                          <div className="relative pl-6 border-l-2 border-primary">
-                            <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
-                            <p className="text-[9px] font-black uppercase text-primary tracking-tighter">Final Drop</p>
+                          <div className="relative pl-6 border-l-2 border-emerald-500">
+                            <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
+                            <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Final Drop</p>
                             <p className="text-xs font-bold">{trip.dropLocation}</p>
                           </div>
                         </div>
@@ -1407,7 +1407,7 @@ export default function ManageAllTripsPage() {
                                   </div>
                                 )}
                                 {trip.destinations.length > 0 && (
-                                  <div className="flex items-center gap-1.5 text-xs font-black text-primary ml-4">
+                                  <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
                                     <MapPin className="h-3 w-3" /> {trip.destinations[trip.destinations.length - 1]?.location}
                                   </div>
                                 )}
@@ -1555,7 +1555,7 @@ export default function ManageAllTripsPage() {
                                 </div>
                               )}
                               {trip.destinations.length > 0 && (
-                                <div className="flex items-center gap-1.5 text-xs font-black text-primary ml-4">
+                                <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
                                   <MapPin className="h-3 w-3" /> {trip.destinations[trip.destinations.length - 1]?.location}
                                 </div>
                               )}
@@ -1743,7 +1743,7 @@ export default function ManageAllTripsPage() {
                                 <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-700">
                                   <MapPin className="h-3 w-3" /> {v.activeTrip.pickupLocation}
                                 </div>
-                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-primary ml-4">
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 ml-4">
                                   <MapPin className="h-2.5 w-2.5" /> {v.activeTrip.destinations[v.activeTrip.destinations.length - 1]?.location}
                                 </div>
                               </div>
