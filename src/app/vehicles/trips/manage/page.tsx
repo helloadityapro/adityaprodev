@@ -198,43 +198,6 @@ const formatTo12Hr = (time?: string) => {
   }
 };
 
-function handleWhatsAppShare(trip: Assignment) {
-  let header = "";
-  let body = "";
-  const tripUrl = `${window.location.origin}/vehicles/trips/manage?view=${trip.id}`;
-
-  switch (trip.status) {
-    case 'Pending':
-      header = "🚨 *Aditya Pro - New Vehicle Request*";
-      body = `*Requester:* ${trip.userName}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
-      break;
-    case 'Approved':
-      header = "✅ *Aditya Pro - Vehicle Allotted*";
-      body = `*Requester:* ${trip.userName}\n*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Ownership:* ${trip.vehicleOwnership}\n*Trip Date:* ${trip.tripDate}\n*Ready for departure.*`;
-      break;
-    case 'Ongoing':
-      header = "🚦 *Aditya Pro - Trip Ongoing*";
-      body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} ➔ ${trip.destinations[0]?.location || 'Destination'}`;
-      break;
-    case 'Completed':
-      const distance = (trip.endReading || 0) - (trip.startReading || 0);
-      header = "🏁 *Aditya Pro - Trip Completed*";
-      body = `*Vehicle:* ${trip.vehicleDetails}\n*Personnel:* ${trip.userName}\n*Distance:* ${distance.toFixed(1)} KM\n*Finished At:* ${trip.endTime ? format(trip.endTime.toDate(), 'HH:mm') : 'N/A'}`;
-      break;
-    case 'Rejected':
-      header = "❌ *Aditya Pro - Trip Cancelled*";
-      body = `*Request Ref:* ${trip.id.slice(0, 8)}\n*Requester:* ${trip.userName}\n*Site:* ${trip.pickupLocation}\n*The trip request has been revoked.*`;
-      break;
-    default:
-      header = "ℹ️ *Aditya Pro - Trip Update*";
-      body = `*Status:* ${trip.status}\n*Site:* ${trip.pickupLocation}`;
-  }
-
-  const message = `${header}\n\n${body}\n\n*View Audit Log:* ${tripUrl}`;
-  const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-  window.open(url, '_blank');
-}
-
 /**
  * Dialog component to edit trip request details.
  */
@@ -575,10 +538,12 @@ function EditTripDialog({
  */
 function ScheduledTripsDialog({ 
   assignments, 
+  allUsers,
   open, 
   onOpenChange 
 }: { 
   assignments: Assignment[], 
+  allUsers: UserProfile[],
   open: boolean, 
   onOpenChange: (o: boolean) => void 
 }) {
@@ -606,16 +571,19 @@ function ScheduledTripsDialog({
         ? `\n🛑 *Stops:* ${trip.intermediateStops.map(s => s.location).join(', ')}`
         : '';
 
+      const driverObj = allUsers?.find(u => u.id === trip.driverId);
+      const driverInfo = trip.driverName ? `${trip.driverName}${driverObj?.mobile ? ` (${driverObj.mobile})` : ""}` : 'Pending Designation';
+
       message += `*${index + 1}. ${trip.userName}${passengerList}*\n`;
       message += `📍 *Pickup:* ${trip.pickupLocation}\n`;
       message += `🕒 *Reporting:* ${formatTo12Hr(trip.reportingTime)}${stops}\n`;
       message += `🏁 *Drop:* ${trip.dropLocation}\n`;
       message += `🚗 *Vehicle:* ${trip.vehicleDetails || 'Pending Allotment'}\n`;
-      message += `👤 *Driver:* ${trip.driverName || 'Pending Designation'}\n`;
+      message += `👤 *Driver:* ${driverInfo}\n`;
       message += `------------------\n\n`;
     });
 
-    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   return (
@@ -824,6 +792,45 @@ export default function ManageAllTripsPage() {
     if (!vehicles) return [];
     return vehicles.filter(v => v.status === 'Available');
   }, [vehicles]);
+
+  const handleGlobalWhatsAppShare = (trip: Assignment) => {
+    let header = "";
+    let body = "";
+    const tripUrl = `${window.location.origin}/vehicles/trips/manage?view=${trip.id}`;
+    
+    const driverObj = allUsers?.find(u => u.id === trip.driverId);
+    const driverDisplay = trip.driverName ? `${trip.driverName}${driverObj?.mobile ? ` (${driverObj.mobile})` : ""}` : 'Pending Allotment';
+
+    switch (trip.status) {
+      case 'Pending':
+        header = "🚨 *AdityaPro - New Vehicle Request*";
+        body = `*Requester:* ${trip.userName}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
+        break;
+      case 'Approved':
+        header = "✅ *AdityaPro - Vehicle Allotted*";
+        body = `*Requester:* ${trip.userName}\n*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${driverDisplay}\n*Ownership:* ${trip.vehicleOwnership}\n*Trip Date:* ${trip.tripDate}\n*Ready for departure.*`;
+        break;
+      case 'Ongoing':
+        header = "🚦 *AdityaPro - Trip Ongoing*";
+        body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${driverDisplay}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} ➔ ${trip.destinations[0]?.location || 'Destination'}`;
+        break;
+      case 'Completed':
+        const distance = (trip.endReading || 0) - (trip.startReading || 0);
+        header = "🏁 *AdityaPro - Trip Completed*";
+        body = `*Vehicle:* ${trip.vehicleDetails}\n*Personnel:* ${trip.userName}\n*Distance:* ${distance.toFixed(1)} KM\n*Finished At:* ${trip.endTime ? format(trip.endTime.toDate(), 'HH:mm') : 'N/A'}`;
+        break;
+      case 'Rejected':
+        header = "❌ *AdityaPro - Trip Cancelled*";
+        body = `*Request Ref:* ${trip.id.slice(0, 8)}\n*Requester:* ${trip.userName}\n*Site:* ${trip.pickupLocation}\n*The trip request has been revoked.*`;
+        break;
+      default:
+        header = "ℹ️ *AdityaPro - Trip Update*";
+        body = `*Status:* ${trip.status}\n*Site:* ${trip.pickupLocation}`;
+    }
+
+    const message = `${header}\n\n${body}\n\n*View Audit Log:* ${tripUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
+  };
 
   React.useEffect(() => {
     const viewId = searchParams.get('view');
@@ -1159,7 +1166,7 @@ export default function ManageAllTripsPage() {
                       )}
                       
                       <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => handleWhatsAppShare(trip)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => handleGlobalWhatsAppShare(trip)}>
                           <MessageCircle className="h-4 w-4" />
                         </Button>
                         {(isAdmin || isManager) && trip.status === 'Pending' && (
@@ -1271,7 +1278,7 @@ export default function ManageAllTripsPage() {
                             </TableCell>
                             <TableCell className="text-right px-6">
                               <div className="flex justify-end items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleGlobalWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
                                 {(isAdmin || isManager) && trip.status === 'Pending' && (
                                   <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
                                 )}
@@ -1329,7 +1336,7 @@ export default function ManageAllTripsPage() {
                     </div>
 
                     <div className="pt-2 border-t border-primary/5 flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => { e.stopPropagation(); handleWhatsAppShare(trip); }}><MessageCircle className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => { e.stopPropagation(); handleGlobalWhatsAppShare(trip); }}><MessageCircle className="h-4 w-4" /></Button>
                       <Button size="sm" className="h-8 rounded-sm font-black text-[10px] px-4" onClick={(e) => { e.stopPropagation(); setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" }); }}>Allot Now</Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={(e) => { e.stopPropagation(); setDetailsAssignment(trip); }}><Eye className="h-4 w-4" /></Button>
                     </div>
@@ -1384,7 +1391,7 @@ export default function ManageAllTripsPage() {
                           </TableCell>
                           <TableCell className="text-right px-6">
                             <div className="flex justify-end items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleGlobalWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
                               <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
                               {(isAdmin || isManager || trip.userId === user?.uid) && (
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setEditingAssignment(trip); }} title="Edit Request"><Pencil className="h-4 w-4" /></Button>
@@ -1569,6 +1576,7 @@ export default function ManageAllTripsPage() {
 
       <ScheduledTripsDialog 
         assignments={assignments || []} 
+        allUsers={allUsers || []}
         open={isScheduledTripsOpen} 
         onOpenChange={setIsScheduledTripsOpen} 
       />
@@ -1856,7 +1864,7 @@ export default function ManageAllTripsPage() {
               <Button 
                 variant="outline" 
                 className="w-full sm:mr-auto sm:w-auto h-11 rounded-sm font-black uppercase text-[10px] tracking-widest text-green-700 border-green-200 hover:bg-green-50"
-                onClick={() => handleWhatsAppShare(detailsAssignment)}
+                onClick={() => handleGlobalWhatsAppShare(detailsAssignment)}
               >
                 <MessageCircle className="h-4 w-4 mr-1.5" /> Share WA
               </Button>
