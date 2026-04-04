@@ -561,25 +561,29 @@ function ScheduledTripsDialog({
   const handleShareOnWhatsApp = () => {
     if (filtered.length === 0) return;
     
-    let message = `*AdityaPro - Scheduled Trips for ${format(new Date(selectedDate), 'dd MMM yyyy')} (${statusFilter === 'all' ? 'All Active' : statusFilter})*\n\n`;
+    const formattedDate = format(new Date(selectedDate), 'dd MMM yyyy');
+    const statusInfo = statusFilter === 'all' ? 'All Active' : statusFilter;
+    let message = `*AdityaPro - Scheduled Trips for ${formattedDate} (${statusInfo})*\n\n`;
     
     filtered.forEach((trip, index) => {
       const passengerList = trip.coPassengers && trip.coPassengers.length > 0 
-        ? ` (with ${trip.coPassengers.map(p => p.name).join(', ')})` 
+        ? ` (with ${trip.coPassengers.map(p => (p.name || '').trim()).join(', ')})` 
         : '';
       const stops = trip.intermediateStops && trip.intermediateStops.length > 0
-        ? `\n🛑 *Stops:* ${trip.intermediateStops.map(s => s.location).join(', ')}`
+        ? `\n\u{1F6D1} *Stops:* ${trip.intermediateStops.map(s => s.location).join(', ')}`
         : '';
 
       const driverObj = allUsers?.find(u => u.id === trip.driverId);
-      const driverInfo = trip.driverName ? `${trip.driverName}${driverObj?.mobile ? ` (${driverObj.mobile})` : ""}` : 'Pending Designation';
+      const driverInfo = trip.driverName 
+        ? `${driverObj?.mobile ? `(${driverObj.mobile}) ` : ""}${trip.driverName}` 
+        : 'Pending Allotment';
 
-      message += `*${index + 1}. ${trip.userName}${passengerList}*\n`;
-      message += `📍 *Pickup:* ${trip.pickupLocation}\n`;
-      message += `🕒 *Reporting:* ${formatTo12Hr(trip.reportingTime)}${stops}\n`;
-      message += `🏁 *Drop:* ${trip.dropLocation}\n`;
-      message += `🚗 *Vehicle:* ${trip.vehicleDetails || 'Pending Allotment'}\n`;
-      message += `👤 *Driver:* ${driverInfo}\n`;
+      message += `*${index + 1}. ${(trip.userName || '').trim()}${passengerList}*\n`;
+      message += `\u{1F4CD} *Pickup:* ${trip.pickupLocation}\n`;
+      message += `\u{1F552} *Reporting:* ${formatTo12Hr(trip.reportingTime)}${stops}\n`;
+      message += `\u{1F3C1} *Drop:* ${trip.dropLocation}\n`;
+      message += `\u{1F697} *Vehicle:* ${trip.vehicleDetails || 'Pending Allotment'}\n`;
+      message += `\u{1F464} *Driver:* ${driverInfo}\n`;
       message += `------------------\n\n`;
     });
 
@@ -799,32 +803,34 @@ export default function ManageAllTripsPage() {
     const tripUrl = `${window.location.origin}/vehicles/trips/manage?view=${trip.id}`;
     
     const driverObj = allUsers?.find(u => u.id === trip.driverId);
-    const driverDisplay = trip.driverName ? `${trip.driverName}${driverObj?.mobile ? ` (${driverObj.mobile})` : ""}` : 'Pending Allotment';
+    const driverDisplay = trip.driverName 
+      ? `${driverObj?.mobile ? `(${driverObj.mobile}) ` : ""}${trip.driverName}` 
+      : 'Pending Allotment';
 
     switch (trip.status) {
       case 'Pending':
-        header = "🚨 *AdityaPro - New Vehicle Request*";
-        body = `*Requester:* ${trip.userName}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
+        header = "\u{1F6A8} *AdityaPro - New Vehicle Request*";
+        body = `*Requester:* ${(trip.userName || '').trim()}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
         break;
       case 'Approved':
-        header = "✅ *AdityaPro - Vehicle Allotted*";
-        body = `*Requester:* ${trip.userName}\n*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${driverDisplay}\n*Ownership:* ${trip.vehicleOwnership}\n*Trip Date:* ${trip.tripDate}\n*Ready for departure.*`;
+        header = "\u{2705} *AdityaPro - Vehicle Allotted*";
+        body = `*Requester:* ${(trip.userName || '').trim()}\n*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${driverDisplay}\n*Ownership:* ${trip.vehicleOwnership}\n*Trip Date:* ${trip.tripDate}\n*Ready for departure.*`;
         break;
       case 'Ongoing':
-        header = "🚦 *AdityaPro - Trip Ongoing*";
-        body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${driverDisplay}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} ➔ ${trip.destinations[0]?.location || 'Destination'}`;
+        header = "\u{1F6A6} *AdityaPro - Trip Ongoing*";
+        body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${driverDisplay}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} \u{2794} ${trip.destinations[0]?.location || 'Destination'}`;
         break;
       case 'Completed':
         const distance = (trip.endReading || 0) - (trip.startReading || 0);
-        header = "🏁 *AdityaPro - Trip Completed*";
+        header = "\u{1F3C1} *AdityaPro - Trip Completed*";
         body = `*Vehicle:* ${trip.vehicleDetails}\n*Personnel:* ${trip.userName}\n*Distance:* ${distance.toFixed(1)} KM\n*Finished At:* ${trip.endTime ? format(trip.endTime.toDate(), 'HH:mm') : 'N/A'}`;
         break;
       case 'Rejected':
-        header = "❌ *AdityaPro - Trip Cancelled*";
+        header = "\u{274C} *AdityaPro - Trip Cancelled*";
         body = `*Request Ref:* ${trip.id.slice(0, 8)}\n*Requester:* ${trip.userName}\n*Site:* ${trip.pickupLocation}\n*The trip request has been revoked.*`;
         break;
       default:
-        header = "ℹ️ *AdityaPro - Trip Update*";
+        header = "\u{2139}\u{FE0F} *AdityaPro - Trip Update*";
         body = `*Status:* ${trip.status}\n*Site:* ${trip.pickupLocation}`;
     }
 
@@ -1331,7 +1337,7 @@ export default function ManageAllTripsPage() {
                       </div>
                       <div className="flex items-start gap-2 text-xs font-medium text-muted-foreground">
                         <MapPinned className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                        <span className="line-clamp-1">{trip.pickupLocation} ➔ {trip.destinations[trip.destinations.length - 1]?.location}</span>
+                        <span className="line-clamp-1">{trip.pickupLocation} \u{2794} {trip.destinations[trip.destinations.length - 1]?.location}</span>
                       </div>
                     </div>
 
@@ -1441,13 +1447,13 @@ export default function ManageAllTripsPage() {
                           <UserCircle2 className="h-3.5 w-3.5 text-primary" />
                           <div className="flex flex-col">
                             <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Personnel</span>
-                            <span className="text-[11px] font-bold">{activeTrip.userName}</span>
+                            <span className="text-11px font-bold">{activeTrip.userName}</span>
                           </div>
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Itinerary</span>
                           <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700">
-                            <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation} ➔ {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
+                            <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation} \u{2794} {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
                           </div>
                         </div>
                       </div>
@@ -1524,7 +1530,7 @@ export default function ManageAllTripsPage() {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
+                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
                               )}
                             </TableCell>
                             <TableCell>
@@ -1538,7 +1544,7 @@ export default function ManageAllTripsPage() {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">—</span>
+                                <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">\u{2014}</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right px-6">
@@ -1633,7 +1639,7 @@ export default function ManageAllTripsPage() {
                     <SelectContent>
                       {availableVehiclesForAllotment.map(v => (
                         <SelectItem key={v.id} value={v.id} className="text-xs font-bold">
-                          {v.make} {v.model} ({v.plateNumber}) — {v.ownership}
+                          {v.make} {v.model} ({v.plateNumber}) \u{2014} {v.ownership}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1650,7 +1656,7 @@ export default function ManageAllTripsPage() {
                         value={approvalTarget?.rentedDriverDetails || ""}
                         onChange={(e) => setApprovalState(prev => prev ? { ...prev, rentedDriverDetails: e.target.value } : null)}
                       />
-                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver — No system selection required.</p>
+                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver \u{2014} No system selection required.</p>
                     </>
                   ) : (
                     <>
@@ -1774,7 +1780,7 @@ export default function ManageAllTripsPage() {
                         <div className="h-10 w-10 rounded-sm bg-muted flex items-center justify-center text-muted-foreground shrink-0"><UserCog className="h-6 w-6" /></div>
                         <div className="flex flex-col min-w-0">
                           <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Assigned Driver</span>
-                          <span className="text-sm font-black truncate">{detailsAssignment.driverName || '—'}</span>
+                          <span className="text-sm font-black truncate">{detailsAssignment.driverName || '\u{2014}'}</span>
                         </div>
                       </div>
                     </div>
