@@ -52,7 +52,8 @@ import {
   Building2,
   Navigation,
   CheckSquare,
-  ListTodo
+  ListTodo,
+  Checklist
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -666,6 +667,38 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
               </SidebarMenuItem>
             </Collapsible>
           )}
+        </SidebarMenu>
+      </SidebarGroup>
+
+      {/* Checklists Section */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Checklists</SidebarGroupLabel>
+        <SidebarMenu>
+          <Collapsible asChild defaultOpen={pathname.startsWith('/checklists')} className="group/collapsible">
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton tooltip="Checklists" isActive={pathname.startsWith('/checklists')} className="rounded-sm">
+                  <Checklist className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Checklists</span>
+                  <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {canShow('checklists-mms') && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/checklists/mms'} onClick={handleMobileClose}>
+                        <Link href="/checklists/mms">
+                          <LayoutGrid className="h-4 w-4" />
+                          <span>Table Level MMS</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
         </SidebarMenu>
       </SidebarGroup>
 

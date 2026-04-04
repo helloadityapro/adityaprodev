@@ -257,6 +257,34 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteId", "tableName", "bomItemId", "modulesPerTable"]
+    },
+    "MMSChecklist": {
+      "title": "MMS Checklist",
+      "type": "object",
+      "description": "Table-level verification for Mounting Structures.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "tableId": { "type": "string" },
+        "tableName": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "checked": { "type": "boolean" },
+              "remarks": { "type": "string" }
+            }
+          }
+        },
+        "generalRemarks": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "tableId", "userId"]
     }
   },
   "auth": {
@@ -318,6 +346,10 @@
     "/table_configurations/{tableId}": {
       "schema": { "$ref": "#/backend/entities/TableConfiguration" },
       "description": "Master data for table structures."
+    },
+    "/mms_checklists/{checklistId}": {
+      "schema": { "$ref": "#/backend/entities/MMSChecklist" },
+      "description": "Table-level verification records."
     },
     "/notifications/{notifId}": {
       "schema": { "$ref": "#/backend/entities/Notification" },

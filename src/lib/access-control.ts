@@ -20,6 +20,7 @@ export type PageKey =
   | 'visits' 
   | 'trips' 
   | 'attendance'
+  | 'checklists-mms'
   | 'master-data-tables-add'
   | 'master-data-tables-list'
   | 'admin-attendance-summary'
@@ -51,7 +52,7 @@ export type PageKey =
 export interface AppPage {
   id: PageKey;
   label: string;
-  category: 'Main Hub' | 'Operations' | 'Administration' | 'Project Detail Tabs' | 'Master Data';
+  category: 'Main Hub' | 'Operations' | 'Administration' | 'Project Detail Tabs' | 'Master Data' | 'Checklists';
   path: string;
 }
 
@@ -72,6 +73,8 @@ export const APP_PAGES: AppPage[] = [
   { id: 'visits', label: 'Site Visits', category: 'Operations', path: '/site-visits/active' },
   { id: 'trips', label: 'Vehicle Trips', category: 'Operations', path: '/vehicles/trips/manage' },
   { id: 'attendance', label: 'Personnel Attendance', category: 'Operations', path: '/attendance' },
+
+  { id: 'checklists-mms', label: 'Table Level MMS Checklist', category: 'Checklists', path: '/checklists/mms' },
 
   { id: 'master-data-tables-add', label: 'Add Tables Data', category: 'Master Data', path: '/master-data/tables/add' },
   { id: 'master-data-tables-list', label: 'Tables Data', category: 'Master Data', path: '/master-data/tables/list' },
@@ -124,6 +127,7 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/payments')) return 'payments';
   if (path.startsWith('/site-visits')) return 'visits';
   if (path.startsWith('/attendance')) return 'attendance';
+  if (path.startsWith('/checklists/mms')) return 'checklists-mms';
   if (path.startsWith('/master-data')) {
     if (path.includes('/tables/add')) return 'master-data-tables-add';
     if (path.includes('/tables/list')) return 'master-data-tables-list';
