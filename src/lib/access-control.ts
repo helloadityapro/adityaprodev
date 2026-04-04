@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview Definition of all available sidebar pages and their keys.
  * This acts as the source of truth for the User Access Management system.
@@ -19,6 +20,8 @@ export type PageKey =
   | 'visits' 
   | 'trips' 
   | 'attendance'
+  | 'master-data-tables-add'
+  | 'master-data-tables-list'
   | 'admin-attendance-summary'
   | 'admin-day-report'
   | 'admin-lms'
@@ -48,7 +51,7 @@ export type PageKey =
 export interface AppPage {
   id: PageKey;
   label: string;
-  category: 'Main Hub' | 'Operations' | 'Administration' | 'Project Detail Tabs';
+  category: 'Main Hub' | 'Operations' | 'Administration' | 'Project Detail Tabs' | 'Master Data';
   path: string;
 }
 
@@ -69,6 +72,9 @@ export const APP_PAGES: AppPage[] = [
   { id: 'visits', label: 'Site Visits', category: 'Operations', path: '/site-visits/active' },
   { id: 'trips', label: 'Vehicle Trips', category: 'Operations', path: '/vehicles/trips/manage' },
   { id: 'attendance', label: 'Personnel Attendance', category: 'Operations', path: '/attendance' },
+
+  { id: 'master-data-tables-add', label: 'Add Tables Data', category: 'Master Data', path: '/master-data/tables/add' },
+  { id: 'master-data-tables-list', label: 'Tables Data', category: 'Master Data', path: '/master-data/tables/list' },
   
   { id: 'admin-attendance-summary', label: 'Daily Presence Summary', category: 'Administration', path: '/admin/attendance-summary' },
   { id: 'admin-day-report', label: 'Full Day Audit Report', category: 'Administration', path: '/admin/day-report' },
@@ -118,6 +124,10 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/payments')) return 'payments';
   if (path.startsWith('/site-visits')) return 'visits';
   if (path.startsWith('/attendance')) return 'attendance';
+  if (path.startsWith('/master-data')) {
+    if (path.includes('/tables/add')) return 'master-data-tables-add';
+    if (path.includes('/tables/list')) return 'master-data-tables-list';
+  }
   
   // 3. Vehicles specific (Handling both management and requests under 'trips' key)
   if (path.startsWith('/vehicles/trips') || path.startsWith('/vehicles/request')) return 'trips';

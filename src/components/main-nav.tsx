@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -29,16 +30,6 @@ import {
   CirclePlus,
   TrendingUp,
   HandCoins,
-  FilePlus,
-  MapPinned,
-  Car,
-  CalendarCheck,
-  Clock,
-  List,
-  Building2,
-  Navigation,
-  CheckSquare,
-  ListTodo,
   FileText,
   Table as TableIcon,
   ArrowLeftRight,
@@ -50,7 +41,18 @@ import {
   Tag,
   IndianRupee,
   PieChart,
-  Lock
+  Lock,
+  LayoutGrid,
+  FilePlus,
+  MapPinned,
+  Car,
+  CalendarCheck,
+  Clock,
+  List,
+  Building2,
+  Navigation,
+  CheckSquare,
+  ListTodo
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -664,6 +666,48 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
               </SidebarMenuItem>
             </Collapsible>
           )}
+        </SidebarMenu>
+      </SidebarGroup>
+
+      {/* MASTER DATA Section */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">MASTER DATA</SidebarGroupLabel>
+        <SidebarMenu>
+          <Collapsible asChild defaultOpen={pathname.startsWith('/master-data')} className="group/collapsible">
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton tooltip="Table Configuration" isActive={pathname.startsWith('/master-data/tables')} className="rounded-sm">
+                  <LayoutGrid className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Table Configuration</span>
+                  <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {canShow('master-data-tables-add') && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/master-data/tables/add'} onClick={handleMobileClose}>
+                        <Link href="/master-data/tables/add">
+                          <Plus className="h-4 w-4" />
+                          <span>Add Tables Data</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                  {canShow('master-data-tables-list') && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/master-data/tables/list'} onClick={handleMobileClose}>
+                        <Link href="/master-data/tables/list">
+                          <List className="h-4 w-4" />
+                          <span>Tables Data</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
         </SidebarMenu>
       </SidebarGroup>
       

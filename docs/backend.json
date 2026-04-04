@@ -230,6 +230,33 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name"]
+    },
+    "TableConfiguration": {
+      "title": "Table Configuration",
+      "type": "object",
+      "description": "Definition of solar module mounting tables for specific sites.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "tableName": { "type": "string" },
+        "bomItemId": { "type": "string" },
+        "configurationType": { "type": "string" },
+        "modulesPerTable": { "type": "number" },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "quantityPerSet": { "type": "number" },
+              "unit": { "type": "string" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "tableName", "bomItemId", "modulesPerTable"]
     }
   },
   "auth": {
@@ -287,6 +314,10 @@
     "/inventory_categories/{categoryId}": {
       "schema": { "$ref": "#/backend/entities/InventoryCategory" },
       "description": "Categories for inventory items."
+    },
+    "/table_configurations/{tableId}": {
+      "schema": { "$ref": "#/backend/entities/TableConfiguration" },
+      "description": "Master data for table structures."
     },
     "/notifications/{notifId}": {
       "schema": { "$ref": "#/backend/entities/Notification" },

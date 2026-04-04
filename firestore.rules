@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -73,6 +74,11 @@ service cloud.firestore {
 
     match /inventory_categories/{categoryId} {
       allow read, write: if isSignedIn();
+    }
+
+    match /table_configurations/{tableId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && getUserData().get('role', '') == 'Site Manager');
     }
 
     match /vehicle_assignments/{assignmentId} {
