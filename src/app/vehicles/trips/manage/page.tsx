@@ -292,7 +292,7 @@ function EditTripDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] p-0 overflow-hidden flex flex-col rounded-sm border-none shadow-2xl bg-background">
+      <DialogContent className="max-w-3xl max-h-[95vh] h-[90vh] p-0 overflow-hidden flex flex-col rounded-sm border-none shadow-2xl bg-background">
         <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
           <DialogTitle className="text-xl font-black uppercase tracking-tight">Modify Trip Request</DialogTitle>
           <DialogDescription className="text-xs font-medium">Update itinerary and trip metadata for: {assignment?.userName}</DialogDescription>
@@ -531,9 +531,8 @@ function EditTripDialog({
               </form>
             </Form>
           </div>
-          <ScrollBar orientation="vertical" />
         </ScrollArea>
-        <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex-col sm:flex-row">
+        <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
           <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
           <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
             {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Applying...</> : <><Save className="h-4 w-4 mr-2" /> Apply Updates</>}
@@ -604,7 +603,7 @@ function ScheduledTripsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] h-[80vh] flex flex-col p-0 rounded-sm overflow-hidden shadow-2xl bg-background">
+      <DialogContent className="max-w-3xl max-h-[95vh] h-[80vh] flex flex-col p-0 rounded-sm overflow-hidden shadow-2xl bg-background">
         <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
@@ -711,7 +710,7 @@ function ScheduledTripsDialog({
                           </div>
                           {trip.coPassengers && trip.coPassengers.length > 0 && (
                             <div className="space-y-1.5">
-                              <Label className="text-[9px] font-black uppercase text-muted-foreground flex items-center gap-1.5"><Users className="h-3 w-3" /> Co-passengers</Label>
+                              <Label className="text-[9px] font-black uppercase text-muted-foreground flex items-gap-1.5"><Users className="h-3 w-3" /> Co-passengers</Label>
                               <div className="flex flex-wrap gap-1.5">
                                 {trip.coPassengers.map(p => (
                                   <Badge key={p.id} variant="secondary" className="text-[8px] h-4 rounded-sm font-bold bg-muted/50 border-none">{p.name}</Badge>
@@ -732,7 +731,6 @@ function ScheduledTripsDialog({
               </div>
             )}
           </div>
-          <ScrollBar orientation="vertical" />
         </ScrollArea>
         <DialogFooter className="p-4 border-t bg-muted/10 shrink-0">
           <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close</Button></DialogClose>
@@ -1308,7 +1306,7 @@ export default function ManageAllTripsPage() {
                       <MapPin className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">{trip.pickupLocation}</span>
                     </div>
-                    {trip.destinations.length > 1 && (
+                    {trip.intermediateStops.length > 1 && (
                       <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
                         {trip.destinations.slice(0, -1).map((dest, i) => (
                           <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
@@ -1807,7 +1805,7 @@ export default function ManageAllTripsPage() {
       />
 
       <Dialog open={!!approvalTarget} onOpenChange={(o) => !o && setApprovalState(null)}>
-        <DialogContent className="max-w-xl w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+        <DialogContent className="max-w-xl w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-auto max-h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Fuel className="h-5 w-5 text-primary" /></div>
@@ -1818,7 +1816,7 @@ export default function ManageAllTripsPage() {
             </div>
           </DialogHeader>
           
-          <ScrollArea className="max-h-[60vh]">
+          <ScrollArea className="flex-1">
             <div className="p-6 space-y-8 text-left">
               <div className="space-y-4">
                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] flex items-center gap-2">
@@ -1917,7 +1915,7 @@ export default function ManageAllTripsPage() {
       </Dialog>
 
       <Dialog open={!!detailsAssignment} onOpenChange={(o) => !o && handleCloseDetail()}>
-        <DialogContent className="max-w-3xl w-[98vw] h-[92vh] sm:h-[95vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+        <DialogContent className="max-w-3xl w-[98vw] h-[95vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
           <DialogHeader className="p-4 sm:p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><MapPinned className="h-5 w-5 text-primary" /></div>
