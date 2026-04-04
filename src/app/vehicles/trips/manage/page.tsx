@@ -57,7 +57,11 @@ import {
   Share2,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown
+  ArrowUpDown,
+  ZoomIn,
+  ZoomOut,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -750,6 +754,13 @@ export default function ManageAllTripsPage() {
   const [fleetStatusFilter, setFleetStatusFilter] = React.useState("all");
   const [fleetSortConfig, setFleetSortConfig] = React.useState<{ key: 'plate' | 'ownership' | 'status'; direction: 'asc' | 'desc' }>({ key: 'plate', direction: 'asc' });
 
+  // Viewer States
+  const [viewUrl, setViewUrl] = React.useState<string | null>(null);
+  const [viewUrls, setViewUrls] = React.useState<string[]>([]);
+  const [currentUrlIndex, setCurrentUrlIndex] = React.useState(0);
+  const [zoom, setZoom] = React.useState(1);
+  const viewerRef = React.useRef<HTMLDivElement>(null);
+
   const [approvalTarget, setApprovalState] = React.useState<{ assignment: Assignment, vehicleId: string, driverId: string, rentedDriverDetails: string } | null>(null);
   const [detailsAssignment, setDetailsAssignment] = React.useState<Assignment | null>(null);
   const [editingAssignment, setEditingAssignment] = React.useState<Assignment | null>(null);
@@ -864,6 +875,83 @@ export default function ManageAllTripsPage() {
     const queryStr = params.toString();
     router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
   };
+
+  const openViewer = (url: string, assignment: Assignment) => {
+    const urls = [assignment.startReadingPhoto, assignment.endReadingPhoto].filter(Boolean) as string[];
+    const index = urls.indexOf(url);
+    setViewUrls(urls);
+    setCurrentUrlIndex(index >= 0 ? index : 0);
+    setViewUrl(url);
+    setZoom(1);
+  };
+
+  const nextUrl = () => {
+    if (viewUrls.length <= 1) return;
+    const nextIdx = (currentUrlIndex + 1) % viewUrls.length;
+    setCurrentUrlIndex(nextIdx);
+    setViewUrl(viewUrls[nextIdx]);
+    setZoom(1);
+  };
+
+  const prevUrl = () => {
+    if (viewUrls.length <= 1) return;
+    const prevIdx = (currentUrlIndex - 1 + viewUrls.length) % viewUrls.length;
+    setCurrentUrlIndex(prevIdx);
+    setViewUrl(viewUrls[prevIdx]);
+    setZoom(1);
+  };
+
+  const isVideoUrl = (url: string) => {
+    const lowUrl = url.toLowerCase();
+    return lowUrl.includes('.mp4') || lowUrl.includes('.mov') || lowUrl.includes('.webm') || lowUrl.includes('.ogg');
+  };
+
+  // Zoom logic for media preview
+  React.useEffect(() => {
+    const el = viewerRef.current;
+    if (!el || !viewUrl) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setZoom(prev => {
+        const delta = e.deltaY > 0 ? -0.2 : 0.2;
+        return Math.min(Math.max(prev + delta, 0.5), 4);
+      });
+    };
+
+    let initialDist = 0;
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        initialDist = Math.hypot(
+          e.touches[0].pageX - e.touches[1].pageX,
+          e.touches[0].pageY - e.touches[1].pageY
+        );
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const dist = Math.hypot(
+          e.touches[0].pageX - e.touches[1].pageX,
+          e.touches[0].pageY - e.touches[1].pageY
+        );
+        const delta = (dist - initialDist) / 100;
+        setZoom(prev => Math.min(Math.max(prev + delta, 0.5), 4));
+        initialDist = dist;
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart);
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+    };
+  }, [viewUrl]);
 
   const filteredAssignments = React.useMemo(() => {
     if (!assignments || !userProfile) return [];
@@ -1107,7 +1195,7 @@ export default function ManageAllTripsPage() {
     }
   };
 
-  if (isUserLoading || isProfileLoading || isAssignmentsLoading || isVehiclesLoading || isUsersLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-500px w-full" /></div>;
+  if (isUserLoading || isProfileLoading || isAssignmentsLoading || isVehiclesLoading || isUsersLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
@@ -1921,7 +2009,10 @@ export default function ManageAllTripsPage() {
                             <span className="text-lg font-black text-primary font-mono">{detailsAssignment.startReading} KM</span>
                           </div>
                           {detailsAssignment.startReadingPhoto && (
-                            <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/5 shadow-md group">
+                            <div 
+                              className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/5 shadow-md group cursor-pointer"
+                              onClick={() => openViewer(detailsAssignment.startReadingPhoto!, detailsAssignment)}
+                            >
                               <img src={detailsAssignment.startReadingPhoto} className="w-full h-full object-cover" alt="Start Proof" />
                               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                                 <Maximize2 className="h-6 w-6 text-white" />
@@ -1947,7 +2038,10 @@ export default function ManageAllTripsPage() {
                               </span>
                             </div>
                             {detailsAssignment.endReadingPhoto && (
-                              <div className="relative aspect-video rounded-sm overflow-hidden border-2 border-emerald-100 shadow-md group">
+                              <div 
+                                className="relative aspect-video rounded-sm overflow-hidden border-2 border-emerald-100 shadow-md group cursor-pointer"
+                                onClick={() => openViewer(detailsAssignment.endReadingPhoto!, detailsAssignment)}
+                              >
                                 <img src={detailsAssignment.endReadingPhoto} className="w-full h-full object-cover" alt="End Proof" />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                                   <Maximize2 className="h-6 w-6 text-white" />
@@ -1976,6 +2070,67 @@ export default function ManageAllTripsPage() {
             )}
             <DialogClose asChild><Button variant="outline" className="w-full sm:w-auto rounded-sm font-black uppercase text-[10px] h-11 px-8 tracking-widest">Close Audit</Button></DialogClose>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Media Preview Dialog */}
+      <Dialog open={!!viewUrl} onOpenChange={(o) => { if(!o) { setZoom(1); setViewUrl(null); setViewUrls([]); } }}>
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Audit Media Detail</DialogTitle>
+            <DialogDescription>Enlarged view of site audit proof.</DialogDescription>
+          </DialogHeader>
+          
+          <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }} title="Zoom In">
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }} title="Zoom Out">
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }} title="Reset Zoom">
+              <RotateCcw className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {viewUrls.length > 1 && (
+            <>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); prevUrl(); }}>
+                  <ChevronLeft className="h-8 w-8" />
+                </Button>
+              </div>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); nextUrl(); }}>
+                  <ChevronRight className="h-8 w-8" />
+                </Button>
+              </div>
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
+                <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
+                  {currentUrlIndex + 1} / {viewUrls.length}
+                </Badge>
+              </div>
+            </>
+          )}
+          
+          <div className="relative w-full h-full overflow-auto p-4 flex">
+            <div 
+              ref={viewerRef}
+              className={cn(
+                "m-auto transition-transform duration-200 ease-out flex items-center justify-center",
+                zoom > 1 ? "cursor-move" : "cursor-default"
+              )}
+              style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
+            >
+              {viewUrl && (
+                isVideoUrl(viewUrl) ? (
+                  <video src={viewUrl} controls autoPlay className="max-w-full max-h-[85vh] shadow-2xl" />
+                ) : (
+                  <img src={viewUrl} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Audit Evidence" />
+                )
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
