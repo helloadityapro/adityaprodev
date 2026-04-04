@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -62,7 +61,7 @@ export default function TablesDataPage() {
     return tables.filter(t => 
       t.tableName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.configurationType.toLowerCase().includes(searchTerm.toLowerCase())
+      (t.configurationType || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [tables, searchTerm]);
 
@@ -98,7 +97,7 @@ export default function TablesDataPage() {
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search by table, site or configuration..." 
+            placeholder="Search by table or site..." 
             className="pl-10 h-10 text-sm rounded-sm border-primary/20 bg-background"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -123,7 +122,6 @@ export default function TablesDataPage() {
                   <TableHead className="w-12"></TableHead>
                   <TableHead className="px-6">Project Site</TableHead>
                   <TableHead>Table Name</TableHead>
-                  <TableHead>Configuration Type</TableHead>
                   <TableHead className="text-center">Modules/Table</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
@@ -144,11 +142,6 @@ export default function TablesDataPage() {
                         </div>
                       </TableCell>
                       <TableCell className="font-bold text-sm text-primary">{t.tableName}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="rounded-sm font-bold text-[9px] uppercase tracking-wider border-primary/20 bg-primary/5 text-primary h-5 px-2">
-                          {t.configurationType}
-                        </Badge>
-                      </TableCell>
                       <TableCell className="text-center">
                         <Badge className="font-mono font-black rounded-sm px-3 h-7 bg-slate-900 text-white border-none shadow-sm">
                           {t.modulesPerTable}
@@ -164,8 +157,8 @@ export default function TablesDataPage() {
                     </TableRow>
                     {expandedRows.has(t.id) && (
                       <TableRow className="bg-primary/[0.02]">
-                        <TableCell colSpan={6} className="p-0 border-b">
-                          <div className="p-6 px-16 space-y-4 animate-in slide-in-from-top-1 duration-200">
+                        <TableCell colSpan={5} className="p-0 border-b">
+                          <div className="p-6 px-12 space-y-4 animate-in slide-in-from-top-1 duration-200">
                             <div className="flex items-center gap-2 mb-2">
                               <Layers className="h-3.5 w-3.5 text-primary" />
                               <span className="text-[10px] font-black uppercase tracking-widest text-primary">Member Breakdown</span>
@@ -192,7 +185,7 @@ export default function TablesDataPage() {
                   </React.Fragment>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">
+                    <TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic">
                       <div className="flex flex-col items-center gap-2 opacity-40">
                         <Boxes className="h-10 w-10" />
                         <p className="text-sm font-bold uppercase tracking-widest">No table records discovered</p>
