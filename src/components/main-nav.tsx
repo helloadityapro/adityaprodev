@@ -676,9 +676,9 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
           <Collapsible asChild defaultOpen={pathname.startsWith('/master-data')} className="group/collapsible">
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
-                <SidebarMenuButton tooltip="Table Configuration" isActive={pathname.startsWith('/master-data/tables')} className="rounded-sm">
+                <SidebarMenuButton tooltip="Master Data" isActive={pathname.startsWith('/master-data/tables')} className="rounded-sm">
                   <LayoutGrid className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Table Configuration</span>
+                  <span className="font-medium">Master Data</span>
                   <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                 </SidebarMenuButton>
               </CollapsibleTrigger>
