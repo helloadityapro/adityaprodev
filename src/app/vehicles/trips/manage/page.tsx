@@ -214,7 +214,7 @@ function handleWhatsAppShare(trip: Assignment) {
       break;
     case 'Ongoing':
       header = "\u{1F6A6} *Aditya Pro - Trip Ongoing*";
-      body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} ➔ ${trip.destinations[0]?.location || 'Destination'}`;
+      body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} \u{2794} ${trip.destinations[0]?.location || 'Destination'}`;
       break;
     case 'Completed':
       const distance = (trip.endReading || 0) - (trip.startReading || 0);
@@ -620,7 +620,7 @@ function ScheduledTripsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 rounded-sm overflow-hidden shadow-2xl bg-background">
+      <DialogContent className="max-w-3xl max-h-[90vh] h-[80vh] flex flex-col p-0 rounded-sm overflow-hidden shadow-2xl bg-background">
         <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
@@ -657,7 +657,7 @@ function ScheduledTripsDialog({
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 bg-muted/10 relative">
+        <ScrollArea className="flex-1 bg-muted/10">
           <div className="p-6 space-y-6">
             <div className="flex items-center justify-between border-b-2 border-primary/10 pb-2">
               <h3 className="text-sm font-black uppercase tracking-widest text-primary">
@@ -748,7 +748,6 @@ function ScheduledTripsDialog({
               </div>
             )}
           </div>
-          <ScrollBar orientation="vertical" />
         </ScrollArea>
         <DialogFooter className="p-4 border-t bg-muted/10 shrink-0">
           <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close</Button></DialogClose>
@@ -1324,7 +1323,7 @@ export default function ManageAllTripsPage() {
                       </div>
                       <div className="flex items-start gap-2 text-xs font-medium text-muted-foreground">
                         <MapPinned className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                        <span className="line-clamp-1">{trip.pickupLocation} ➔ {trip.destinations[trip.destinations.length - 1]?.location}</span>
+                        <span className="line-clamp-1">{trip.pickupLocation} \u{2794} {trip.destinations[trip.destinations.length - 1]?.location}</span>
                       </div>
                     </div>
 
@@ -1440,7 +1439,7 @@ export default function ManageAllTripsPage() {
                         <div className="flex flex-col gap-1.5">
                           <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Itinerary</span>
                           <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700">
-                            <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation} ➔ {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
+                            <MapPin className="h-3 w-3" /> {activeTrip.pickupLocation} \u{2794} {activeTrip.destinations[activeTrip.destinations.length - 1]?.location}
                           </div>
                         </div>
                       </div>
@@ -1625,7 +1624,7 @@ export default function ManageAllTripsPage() {
                     <SelectContent>
                       {availableVehiclesForAllotment.map(v => (
                         <SelectItem key={v.id} value={v.id} className="text-xs font-bold">
-                          {v.make} {v.model} ({v.plateNumber}) — {v.ownership}
+                          {v.make} {v.model} ({v.plateNumber}) \u{2014} {v.ownership}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1642,7 +1641,7 @@ export default function ManageAllTripsPage() {
                         value={approvalTarget?.rentedDriverDetails || ""}
                         onChange={(e) => setApprovalState(prev => prev ? { ...prev, rentedDriverDetails: e.target.value } : null)}
                       />
-                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver — No system selection required.</p>
+                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver \u{2014} No system selection required.</p>
                     </>
                   ) : (
                     <>
@@ -1766,7 +1765,7 @@ export default function ManageAllTripsPage() {
                         <div className="h-10 w-10 rounded-sm bg-muted flex items-center justify-center text-muted-foreground shrink-0"><UserCog className="h-6 w-6" /></div>
                         <div className="flex flex-col min-w-0">
                           <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Assigned Driver</span>
-                          <span className="text-sm font-black truncate">{detailsAssignment.driverName || '—'}</span>
+                          <span className="text-sm font-black truncate">{detailsAssignment.driverName || '\u{2014}'}</span>
                         </div>
                       </div>
                     </div>
