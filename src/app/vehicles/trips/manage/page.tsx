@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -55,7 +54,8 @@ import {
   ShieldCheck,
   RotateCcw,
   ListChecks,
-  Share2
+  Share2,
+  ArrowUp
 } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -73,7 +73,7 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import * as XLSX from 'xlsx';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast";
@@ -197,6 +197,43 @@ const formatTo12Hr = (time?: string) => {
     return time;
   }
 };
+
+function handleWhatsAppShare(trip: Assignment) {
+  let header = "";
+  let body = "";
+  const tripUrl = `${window.location.origin}/vehicles/trips/manage?view=${trip.id}`;
+
+  switch (trip.status) {
+    case 'Pending':
+      header = "\u{1F6A8} *Aditya Pro - New Vehicle Request*";
+      body = `*Requester:* ${trip.userName}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
+      break;
+    case 'Approved':
+      header = "\u{2705} *Aditya Pro - Vehicle Allotted*";
+      body = `*Requester:* ${trip.userName}\n*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Ownership:* ${trip.vehicleOwnership}\n*Trip Date:* ${trip.tripDate}\n*Ready for departure.*`;
+      break;
+    case 'Ongoing':
+      header = "\u{1F6A6} *Aditya Pro - Trip Ongoing*";
+      body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} ➔ ${trip.destinations[0]?.location || 'Destination'}`;
+      break;
+    case 'Completed':
+      const distance = (trip.endReading || 0) - (trip.startReading || 0);
+      header = "\u{1F3C1} *Aditya Pro - Trip Completed*";
+      body = `*Vehicle:* ${trip.vehicleDetails}\n*Personnel:* ${trip.userName}\n*Distance:* ${distance.toFixed(1)} KM\n*Finished At:* ${trip.endTime ? format(trip.endTime.toDate(), 'HH:mm') : 'N/A'}`;
+      break;
+    case 'Rejected':
+      header = "\u{274C} *Aditya Pro - Trip Cancelled*";
+      body = `*Request Ref:* ${trip.id.slice(0, 8)}\n*Requester:* ${trip.userName}\n*Site:* ${trip.pickupLocation}\n*The trip request has been revoked.*`;
+      break;
+    default:
+      header = "\u{2139}\u{FE0F} *Aditya Pro - Trip Update*";
+      body = `*Status:* ${trip.status}\n*Site:* ${trip.pickupLocation}`;
+  }
+
+  const message = `${header}\n\n${body}\n\n*View Audit Log:* ${tripUrl}`;
+  const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+  window.open(url, '_blank');
+}
 
 /**
  * Dialog component to edit trip request details.
@@ -620,7 +657,7 @@ function ScheduledTripsDialog({
           </div>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 bg-muted/10">
+        <ScrollArea className="flex-1 bg-muted/10 relative">
           <div className="p-6 space-y-6">
             <div className="flex items-center justify-between border-b-2 border-primary/10 pb-2">
               <h3 className="text-sm font-black uppercase tracking-widest text-primary">
@@ -711,8 +748,9 @@ function ScheduledTripsDialog({
               </div>
             )}
           </div>
+          <ScrollBar orientation="vertical" />
         </ScrollArea>
-        <DialogFooter className="p-4 border-t bg-muted/10">
+        <DialogFooter className="p-4 border-t bg-muted/10 shrink-0">
           <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
@@ -1898,41 +1936,4 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
       </CardContent>
     </Card>
   );
-}
-
-function handleWhatsAppShare(trip: Assignment) {
-  let header = "";
-  let body = "";
-  const tripUrl = `${window.location.origin}/vehicles/trips/manage?view=${trip.id}`;
-
-  switch (trip.status) {
-    case 'Pending':
-      header = "\u{1F6A8} *Aditya Pro - New Vehicle Request*";
-      body = `*Requester:* ${trip.userName}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
-      break;
-    case 'Approved':
-      header = "\u{2705} *Aditya Pro - Vehicle Allotted*";
-      body = `*Requester:* ${trip.userName}\n*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Ownership:* ${trip.vehicleOwnership}\n*Trip Date:* ${trip.tripDate}\n*Ready for departure.*`;
-      break;
-    case 'Ongoing':
-      header = "\u{1F6A6} *Aditya Pro - Trip Ongoing*";
-      body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${trip.driverName}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} ➔ ${trip.destinations[0]?.location || 'Destination'}`;
-      break;
-    case 'Completed':
-      const distance = (trip.endReading || 0) - (trip.startReading || 0);
-      header = "\u{1F3C1} *Aditya Pro - Trip Completed*";
-      body = `*Vehicle:* ${trip.vehicleDetails}\n*Personnel:* ${trip.userName}\n*Distance:* ${distance.toFixed(1)} KM\n*Finished At:* ${trip.endTime ? format(trip.endTime.toDate(), 'HH:mm') : 'N/A'}`;
-      break;
-    case 'Rejected':
-      header = "\u{274C} *Aditya Pro - Trip Cancelled*";
-      body = `*Request Ref:* ${trip.id.slice(0, 8)}\n*Requester:* ${trip.userName}\n*Site:* ${trip.pickupLocation}\n*The trip request has been revoked.*`;
-      break;
-    default:
-      header = "\u{2139}\u{FE0F} *Aditya Pro - Trip Update*";
-      body = `*Status:* ${trip.status}\n*Site:* ${trip.pickupLocation}`;
-  }
-
-  const message = `${header}\n\n${body}\n\n*View Audit Log:* ${tripUrl}`;
-  const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-  window.open(url, '_blank');
 }
