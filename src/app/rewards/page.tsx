@@ -6,7 +6,7 @@ import { collection, doc, query, orderBy, limit, where, or, and, getDocs, server
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send, MapPin, Clock, AlertCircle, Search, FileDown, CircleHelp } from "lucide-react";
+import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send, MapPin, Clock, AlertCircle, Search, FileDown, CircleHelp, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -422,13 +422,32 @@ export default function RewardsPage() {
             </Button>
           )}
           
-          <Button 
-            onClick={() => setIsRedeemDialogOpen(true)}
-            className="flex-1 sm:flex-none rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-4 text-[10px] uppercase shadow-md"
-            disabled={!canRedeem}
-          >
-            <CreditCard className="mr-2 h-4 w-4" /> Redeem
-          </Button>
+          <div className="flex items-center gap-1.5 flex-1 sm:flex-none">
+            <Button 
+              onClick={() => setIsRedeemDialogOpen(true)}
+              className="flex-1 rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-4 text-[10px] uppercase shadow-md"
+              disabled={!canRedeem}
+            >
+              <CreditCard className="mr-2 h-4 w-4" /> Redeem
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="icon" className="h-11 w-11 rounded-sm border-primary/10 text-primary shrink-0">
+                  <Info className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 rounded-sm border-primary/10 shadow-2xl p-4 bg-white">
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                    <ShieldCheck className="h-3 w-3" /> Payout Criteria
+                  </h4>
+                  <p className="text-[11px] font-medium leading-relaxed text-muted-foreground italic">
+                    A minimum balance equivalent to <span className="font-black text-foreground not-italic">₹{MIN_REDEEM_VALUE_RS.toFixed(2)}</span> is mandatory to initiate a redemption request.
+                  </p>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </div>
 
