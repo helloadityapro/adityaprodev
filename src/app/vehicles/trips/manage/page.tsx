@@ -669,9 +669,7 @@ function ScheduledTripsDialog({
                         trip.status === 'Ongoing' ? "bg-primary text-white border-none" : 
                         trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
                         "bg-yellow-50 text-yellow-700 border-yellow-200"
-                      )}>
-                        {trip.status}
-                      </Badge>
+                      )}>{trip.status}</Badge>
                     </CardHeader>
                     <CardContent className="p-4 bg-background/50">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1229,7 +1227,7 @@ export default function ManageAllTripsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
         <SummaryCard title="Logs Found" value={stats.total} icon={History} color="primary" />
         <SummaryCard title="Awaiting Allotment" value={stats.pending} icon={AlertCircle} color="amber" />
         <SummaryCard title="Active Journeys" value={stats.ongoing} icon={Timer} color="blue" />
@@ -1360,7 +1358,7 @@ export default function ManageAllTripsPage() {
                         <TableHead>Trip Date</TableHead>
                         <TableHead>Fleet Resource</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="text-right px-6">Actions</TableHead>
+                        <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1445,7 +1443,7 @@ export default function ManageAllTripsPage() {
                                 {trip.status}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-right px-6">
+                            <TableCell className="text-right px-6 whitespace-nowrap">
                               <div className="flex justify-end items-center gap-1">
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleGlobalWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
                                 {(isAdmin || isManager) && trip.status === 'Pending' && (
@@ -1539,7 +1537,7 @@ export default function ManageAllTripsPage() {
                       <TableHead>Itinerary Summary</TableHead>
                       <TableHead>Trip Date</TableHead>
                       <TableHead>Request Date</TableHead>
-                      <TableHead className="text-right px-6">Actions</TableHead>
+                      <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1580,7 +1578,7 @@ export default function ManageAllTripsPage() {
                           <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">
                             {trip.requestDate ? format(trip.requestDate.toDate(), 'dd MMM, HH:mm') : '—'}
                           </TableCell>
-                          <TableCell className="text-right px-6">
+                          <TableCell className="text-right px-6 whitespace-nowrap">
                             <div className="flex justify-end items-center gap-1">
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleGlobalWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
                               <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
@@ -1709,7 +1707,7 @@ export default function ManageAllTripsPage() {
                         </TableHead>
                         <TableHead className="min-w-[200px]">Current Personnel</TableHead>
                         <TableHead className="min-w-[250px]">Current Itinerary</TableHead>
-                        <TableHead className="text-right px-6">Actions</TableHead>
+                        <TableHead className="text-right px-6 min-w-[150px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1763,16 +1761,18 @@ export default function ManageAllTripsPage() {
                               <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-right px-6">
+                          <TableCell className="text-right px-6 whitespace-nowrap">
                             {v.effectiveStatus !== 'Available' && (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-8 rounded-sm font-black text-[9px] uppercase border-amber-500/30 text-amber-700 hover:bg-amber-50 shadow-sm"
-                                onClick={() => setReleaseTarget(v)}
-                              >
-                                <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark Available
-                              </Button>
+                              <div className="flex justify-end items-center">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 rounded-sm font-black text-[9px] uppercase border-amber-500/30 text-amber-700 hover:bg-amber-50 shadow-sm"
+                                  onClick={() => setReleaseTarget(v)}
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark Available
+                                </Button>
+                              </div>
                             )}
                           </TableCell>
                         </TableRow>
@@ -1825,13 +1825,13 @@ export default function ManageAllTripsPage() {
                 <div className="bg-muted/20 border rounded-sm p-4 space-y-4">
                   <div className="relative pl-6 border-l-2 border-emerald-500 pb-2">
                     <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
-                    <p className="text-[10px] font-black uppercase text-emerald-700 tracking-tighter">Pickup Location</p>
+                    <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Pickup Location</p>
                     <p className="text-sm font-black">{approvalTarget?.assignment.pickupLocation}</p>
                   </div>
                   {approvalTarget?.assignment.destinations.map((d, i) => (
                     <div key={i} className="relative pl-6 border-l-2 border-primary">
                       <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
-                      <p className="text-[10px] font-black uppercase text-primary tracking-tighter">
+                      <p className="text-[9px] font-black uppercase text-primary tracking-tighter">
                         {i === approvalTarget.assignment.destinations.length - 1 ? 'Final Destination' : `Stop #${i + 1}`}
                       </p>
                       <p className="text-sm font-black">{d.location}</p>
