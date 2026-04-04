@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, orderBy, where, or, serverTimestamp, and, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, or, and, getDocs, writeBatch } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -61,7 +61,9 @@ import {
   ZoomIn,
   ZoomOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  IndianRupee,
+  PieChart
 } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -1046,7 +1048,7 @@ export default function ManageAllTripsPage() {
 
   const FleetSortIcon = ({ column }: { column: 'plate' | 'ownership' | 'status' }) => {
     if (fleetSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-    return fleetSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    return fleetSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
 
   const stats = React.useMemo(() => {
@@ -1277,81 +1279,72 @@ export default function ManageAllTripsPage() {
 
         <TabsContent value="registry" className="animate-in fade-in-50 duration-300">
           <div className="md:hidden space-y-4">
-            {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => {
-              const isAssignedDriver = trip.driverId === user?.uid;
-              const isRequester = trip.userId === user?.uid;
-              const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
-              const canStartTrip = (trip.status === 'Approved') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
-              const canEndTrip = (trip.status === 'Ongoing') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
-
-              return (
-                <Card key={trip.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setDetailsAssignment(trip)}>
-                  <CardContent className="p-4 space-y-4">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex flex-col gap-1 min-w-0">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yy') : '—'}
-                        </span>
-                        <h3 className="font-bold text-sm text-foreground leading-tight truncate">{trip.userName}</h3>
-                      </div>
-                      <Badge variant="outline" className={cn(
-                        "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                        trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                        trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                        trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
-                        trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
-                        "bg-red-50 text-red-700 border-red-200"
-                      )}>
-                        {trip.status}
-                      </Badge>
+            {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => (
+              <Card key={trip.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setDetailsAssignment(trip)}>
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yy') : '—'}
+                      </span>
+                      <h3 className="font-bold text-sm text-foreground leading-tight truncate">{trip.userName}</h3>
                     </div>
+                    <Badge variant="outline" className={cn(
+                      "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                      trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                      trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                      trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
+                      trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+                      "bg-red-50 text-red-700 border-red-200"
+                    )}>
+                      {trip.status}
+                    </Badge>
+                  </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-start gap-2 text-xs font-black text-emerald-700">
-                        <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                        <span className="line-clamp-1">{trip.pickupLocation}</span>
-                      </div>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{trip.pickupLocation}</span>
+                    </div>
+                    {trip.destinations.length > 1 && (
                       <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
-                        {trip.destinations.map((dest, i) => (
+                        {trip.destinations.slice(0, -1).map((dest, i) => (
                           <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                            {i === trip.destinations.length - 1 ? <MapPin className="h-2.5 w-2.5" /> : <ArrowRight className="h-2.5 w-2.5" />}
-                            <span className="line-clamp-1">{dest.location}</span>
+                            <ArrowRight className="h-2.5 w-2.5 shrink-0" />
+                            <span className="truncate">{dest.location}</span>
                           </div>
                         ))}
                       </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
-                      {trip.vehicleId ? (
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-bold text-foreground truncate max-w-[120px]">{trip.vehicleDetails}</span>
-                          <span className="text-[8px] font-black text-muted-foreground uppercase">{trip.driverName}</span>
-                        </div>
-                      ) : (
-                        <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">Awaiting Resource</span>
-                      )}
-                      
-                      <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => handleGlobalWhatsAppShare(trip)}>
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                        {(isAdmin || isManager) && trip.status === 'Pending' && (
-                          <Button size="sm" className="h-8 rounded-sm font-black text-[10px] px-2" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot</Button>
-                        )}
-                        {canStartTrip && (
-                          <Button size="sm" className="h-8 rounded-sm bg-blue-600 text-white font-bold px-3 text-[10px]" asChild><Link href={`/vehicles/trips/${trip.id}/start`}>Start</Link></Button>
-                        )}
-                        {canEndTrip && (
-                          <Button size="sm" className="h-8 rounded-sm bg-red-600 text-white font-bold px-3 text-[10px]" asChild><Link href={`/vehicles/trips/${trip.id}/finish`}>End</Link></Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={(e) => { e.stopPropagation(); setDetailsAssignment(trip); }}><Eye className="h-4 w-4" /></Button>
+                    )}
+                    {trip.destinations.length > 0 && (
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{trip.destinations[trip.destinations.length - 1]?.location}</span>
                       </div>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
+                    {trip.vehicleId ? (
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-bold text-foreground truncate max-w-[120px]">{trip.vehicleDetails}</span>
+                        <span className="text-[8px] font-black text-muted-foreground uppercase">{trip.driverName}</span>
+                      </div>
+                    ) : (
+                      <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">Awaiting Resource</span>
+                    )}
+                    
+                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => handleGlobalWhatsAppShare(trip)}>
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={(e) => { e.stopPropagation(); setDetailsAssignment(trip); }}><Eye className="h-4 w-4" /></Button>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            }) : (
+                  </div>
+                </CardContent>
+              </Card>
+            )) : (
               <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No logs discovered.</div>
             )}
           </div>
@@ -1395,20 +1388,23 @@ export default function ManageAllTripsPage() {
                             <TableCell>
                               <div className="flex flex-col gap-1.5">
                                 <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
-                                  <MapPin className="h-3 w-3" /> {trip.pickupLocation}
+                                  <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                  <span className="truncate">{trip.pickupLocation}</span>
                                 </div>
                                 {trip.destinations.length > 1 && (
-                                  <div className="flex flex-col gap-1 ml-4 border-l border-primary/10 pl-2">
+                                  <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
                                     {trip.destinations.slice(0, -1).map((dest, i) => (
                                       <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                                        <ArrowRight className="h-2.5 w-2.5" /> {dest.location}
+                                        <ArrowRight className="h-2.5 w-2.5 shrink-0" />
+                                        <span className="truncate">{dest.location}</span>
                                       </div>
                                     ))}
                                   </div>
                                 )}
                                 {trip.destinations.length > 0 && (
                                   <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
-                                    <MapPin className="h-3 w-3" /> {trip.destinations[trip.destinations.length - 1]?.location}
+                                    <MapPin className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{trip.destinations[trip.destinations.length - 1]?.location}</span>
                                   </div>
                                 )}
                               </div>
@@ -1498,15 +1494,27 @@ export default function ManageAllTripsPage() {
                       <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[8px] font-black uppercase rounded-sm h-5">Action Required</Badge>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-xs font-bold text-primary">
-                        <Calendar className="h-3.5 w-3.5" />
-                        {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yyyy') : '—'} @ {trip.reportingTime}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{trip.pickupLocation}</span>
                       </div>
-                      <div className="flex items-start gap-2 text-xs font-medium text-muted-foreground">
-                        <MapPinned className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                        <span className="line-clamp-1">{trip.pickupLocation} \u{2794} {trip.destinations[trip.destinations.length - 1]?.location}</span>
-                      </div>
+                      {trip.destinations.length > 1 && (
+                        <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
+                          {trip.destinations.slice(0, -1).map((dest, i) => (
+                            <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
+                              <ArrowRight className="h-2.5 w-2.5 shrink-0" />
+                              <span className="truncate">{dest.location}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {trip.destinations.length > 0 && (
+                        <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{trip.destinations[trip.destinations.length - 1]?.location}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-2 border-t border-primary/5 flex justify-end gap-2">
@@ -1543,20 +1551,23 @@ export default function ManageAllTripsPage() {
                           <TableCell>
                             <div className="flex flex-col gap-1.5">
                               <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
-                                <MapPin className="h-3 w-3" /> {trip.pickupLocation}
+                                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">{trip.pickupLocation}</span>
                               </div>
                               {trip.destinations.length > 1 && (
-                                <div className="flex flex-col gap-1 ml-4 border-l border-primary/10 pl-2">
+                                <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
                                   {trip.destinations.slice(0, -1).map((dest, i) => (
                                     <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                                      <ArrowRight className="h-2.5 w-2.5" /> {dest.location}
+                                      <ArrowRight className="h-2.5 w-2.5 shrink-0" />
+                                      <span className="truncate">{dest.location}</span>
                                     </div>
                                   ))}
                                 </div>
                               )}
                               {trip.destinations.length > 0 && (
                                 <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
-                                  <MapPin className="h-3 w-3" /> {trip.destinations[trip.destinations.length - 1]?.location}
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{trip.destinations[trip.destinations.length - 1]?.location}</span>
                                 </div>
                               )}
                             </div>
@@ -1739,12 +1750,14 @@ export default function ManageAllTripsPage() {
                           </TableCell>
                           <TableCell>
                             {v.activeTrip ? (
-                              <div className="flex flex-col gap-1">
+                              <div className="flex flex-col gap-1.5">
                                 <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-700">
-                                  <MapPin className="h-3 w-3" /> {v.activeTrip.pickupLocation}
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{v.activeTrip.pickupLocation}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 ml-4">
-                                  <MapPin className="h-2.5 w-2.5" /> {v.activeTrip.destinations[v.activeTrip.destinations.length - 1]?.location}
+                                  <MapPin className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="truncate">{v.activeTrip.destinations[v.activeTrip.destinations.length - 1]?.location}</span>
                                 </div>
                               </div>
                             ) : (
