@@ -111,6 +111,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { sendNotification } from '@/lib/notifications';
 import { getPageKeyByPath, type PageKey, slugifyRole } from "@/lib/access-control";
 
+const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
+
 type Assignment = {
   id: string;
   userId: string;
@@ -399,7 +401,7 @@ function EditTripDialog({
                                     </FormControl>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                                    <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-10 border-none" value={pickupSearchQuery} onChange={e => setPickupSearchQuery(e.target.value)} /></div>
+                                    <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={pickupSearchQuery} onChange={e => setPickupSearchQuery(e.target.value)} /></div>
                                     <ScrollArea className="h-[150px]">{filteredPickupSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsPickupPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea>
                                   </PopoverContent>
                                 </Popover>
@@ -1199,28 +1201,30 @@ export default function ManageAllTripsPage() {
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <MapPinned className="h-6 w-6 text-primary" />
-            <h1>Manage Trips</h1>
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <MapPinned className="h-6 w-6 text-primary" />
+              <h1>Manage Trips</h1>
+            </div>
+            <p className="text-muted-foreground text-sm font-medium">Trip coordination hub for authorized project itineraries.</p>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Trip coordination hub for authorized project itineraries.</p>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {(isAdmin || isManager || isHR) && (
-            <Button 
-              variant="outline" 
-              onClick={() => setIsScheduledTripsOpen(true)}
-              className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary hover:bg-primary/5"
-            >
-              <ListChecks className="h-4 w-4 mr-2" /> Scheduled Trips
+          
+          <div className="flex items-center gap-2">
+            {(isAdmin || isManager || isHR) && (
+              <Button 
+                variant="outline" 
+                onClick={() => setIsScheduledTripsOpen(true)}
+                className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary hover:bg-primary/5"
+              >
+                <ListChecks className="h-4 w-4 mr-2" /> Scheduled Trips
+              </Button>
+            )}
+            <Button asChild className="h-10 rounded-sm font-bold shadow-md px-6">
+              <Link href="/vehicles/request"><Plus className="h-4 w-4 mr-2" /> Request Vehicle</Link>
             </Button>
-          )}
-          <Button asChild className="h-10 rounded-sm font-bold shadow-md px-6">
-            <Link href="/vehicles/request"><Plus className="h-4 w-4 mr-2" /> Request Vehicle</Link>
-          </Button>
+          </div>
         </div>
       </div>
 
@@ -1311,7 +1315,7 @@ export default function ManageAllTripsPage() {
                       <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
                         {trip.destinations.map((dest, i) => (
                           <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                            <ArrowRight className="h-2.5 w-2.5" />
+                            {i === trip.destinations.length - 1 ? <MapPin className="h-2.5 w-2.5" /> : <ArrowRight className="h-2.5 w-2.5" />}
                             <span className="line-clamp-1">{dest.location}</span>
                           </div>
                         ))}
@@ -1393,13 +1397,20 @@ export default function ManageAllTripsPage() {
                                 <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
                                   <MapPin className="h-3 w-3" /> {trip.pickupLocation}
                                 </div>
-                                <div className="flex flex-col gap-1 ml-4 border-l border-primary/10 pl-2">
-                                  {trip.destinations.map((dest, i) => (
-                                    <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                                      <ArrowRight className="h-2.5 w-2.5" /> {dest.location}
-                                    </div>
-                                  ))}
-                                </div>
+                                {trip.destinations.length > 1 && (
+                                  <div className="flex flex-col gap-1 ml-4 border-l border-primary/10 pl-2">
+                                    {trip.destinations.slice(0, -1).map((dest, i) => (
+                                      <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
+                                        <ArrowRight className="h-2.5 w-2.5" /> {dest.location}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {trip.destinations.length > 0 && (
+                                  <div className="flex items-center gap-1.5 text-xs font-black text-primary ml-4">
+                                    <MapPin className="h-3 w-3" /> {trip.destinations[trip.destinations.length - 1]?.location}
+                                  </div>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -1463,7 +1474,7 @@ export default function ManageAllTripsPage() {
                           </TableRow>
                         );
                       }) : (
-                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No logs discovered.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No logs discovered.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1534,13 +1545,20 @@ export default function ManageAllTripsPage() {
                               <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
                                 <MapPin className="h-3 w-3" /> {trip.pickupLocation}
                               </div>
-                              <div className="flex flex-col gap-1 ml-4 border-l border-primary/10 pl-2">
-                                {trip.destinations.map((dest, i) => (
-                                  <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                                    <ArrowRight className="h-2.5 w-2.5" /> {dest.location}
-                                  </div>
-                                ))}
-                              </div>
+                              {trip.destinations.length > 1 && (
+                                <div className="flex flex-col gap-1 ml-4 border-l border-primary/10 pl-2">
+                                  {trip.destinations.slice(0, -1).map((dest, i) => (
+                                    <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
+                                      <ArrowRight className="h-2.5 w-2.5" /> {dest.location}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {trip.destinations.length > 0 && (
+                                <div className="flex items-center gap-1.5 text-xs font-black text-primary ml-4">
+                                  <MapPin className="h-3 w-3" /> {trip.destinations[trip.destinations.length - 1]?.location}
+                                </div>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1641,7 +1659,7 @@ export default function ManageAllTripsPage() {
                     </div>
                   ) : (
                     <div className="pt-3 border-t text-center py-2">
-                      <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">Awaiting</span>
+                      <span className="text-[9px] font-bold text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>
                     </div>
                   )}
                 </CardContent>
@@ -1726,7 +1744,7 @@ export default function ManageAllTripsPage() {
                                   <MapPin className="h-3 w-3" /> {v.activeTrip.pickupLocation}
                                 </div>
                                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-primary ml-4">
-                                  <ArrowRight className="h-2.5 w-2.5" /> {v.activeTrip.destinations[v.activeTrip.destinations.length - 1]?.location}
+                                  <MapPin className="h-2.5 w-2.5" /> {v.activeTrip.destinations[v.activeTrip.destinations.length - 1]?.location}
                                 </div>
                               </div>
                             ) : (
@@ -1801,7 +1819,9 @@ export default function ManageAllTripsPage() {
                   {approvalTarget?.assignment.destinations.map((d, i) => (
                     <div key={i} className="relative pl-6 border-l-2 border-primary">
                       <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
-                      <p className="text-[10px] font-black uppercase text-primary tracking-tighter">Destination {i + 1}</p>
+                      <p className="text-[10px] font-black uppercase text-primary tracking-tighter">
+                        {i === approvalTarget.assignment.destinations.length - 1 ? 'Final Destination' : `Stop #${i + 1}`}
+                      </p>
                       <p className="text-sm font-black">{d.location}</p>
                       <p className="text-[10px] font-bold text-muted-foreground italic leading-relaxed">"{d.purpose}"</p>
                     </div>
@@ -1919,16 +1939,22 @@ export default function ManageAllTripsPage() {
                         <p className="text-sm font-black">{detailsAssignment.pickupLocation}</p>
                         <Badge variant="secondary" className="mt-1 text-[8px] h-4 rounded-sm px-1.5 font-bold uppercase">{detailsAssignment.pickupType}</Badge>
                       </div>
-                      {detailsAssignment.destinations.map((dest, idx) => (
-                        <div key={idx} className="relative">
-                          <div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
-                          <p className="text-[9px] font-black uppercase text-primary tracking-tighter">
-                            {idx === detailsAssignment.destinations.length - 1 ? 'Final Drop' : `Stop #${idx + 1}`}
-                          </p>
-                          <p className="text-sm font-black">{dest.location}</p>
-                          <p className="text-[10px] font-medium italic text-muted-foreground">"{dest.purpose}"</p>
-                        </div>
-                      ))}
+                      {detailsAssignment.destinations.map((dest, idx) => {
+                        const isLast = idx === detailsAssignment.destinations.length - 1;
+                        return (
+                          <div key={idx} className="relative">
+                            <div className={cn("absolute -left-[31px] top-0 h-3 w-3 rounded-full ring-4 ring-background", isLast ? "bg-emerald-500" : "bg-primary")} />
+                            <p className={cn("text-[9px] font-black uppercase tracking-tighter", isLast ? "text-emerald-700" : "text-primary")}>
+                              {isLast ? 'Final Drop' : `Stop #${idx + 1}`}
+                            </p>
+                            <p className="text-sm font-black">{dest.location}</p>
+                            <p className="text-[10px] font-medium italic text-muted-foreground">"{dest.purpose}"</p>
+                            {isLast && detailsAssignment.dropType && (
+                              <Badge variant="secondary" className="mt-1 text-[8px] h-4 rounded-sm px-1.5 font-bold uppercase">{detailsAssignment.dropType}</Badge>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                     <div className="space-y-4">
                       <div className="p-4 bg-muted/20 border rounded-sm space-y-3">
@@ -2159,7 +2185,7 @@ export default function ManageAllTripsPage() {
       </AlertDialog>
 
       <AlertDialog open={!!releaseTarget} onOpenChange={(o) => !o && setReleaseTarget(null)}>
-        <AlertDialogContent className="rounded-sm max-w-md w-[95vw]">
+        <AlertDialogContent className="rounded-sm max-md w-[95vw]">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-amber-700 font-black uppercase tracking-tight">
               <RotateCcw className="h-5 w-5" /> Manual Fleet Release
