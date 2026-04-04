@@ -359,7 +359,7 @@ export default function RewardsPage() {
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-48" />
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-3">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-32 w-full" />
@@ -379,18 +379,18 @@ export default function RewardsPage() {
           <p className="text-muted-foreground text-sm">Track your earned rewards and performance ranking.</p>
         </div>
         
-        <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-3 w-full md:w-auto">
           {userProfile && (
             <Button 
               onClick={() => setSelectedHistoryUser(userProfile)} 
               variant="outline" 
-              className="rounded-sm font-bold border-primary text-primary hover:bg-primary/5 h-11 px-4 text-xs uppercase"
+              className="flex-1 sm:flex-none rounded-sm font-bold border-primary text-primary hover:bg-primary/5 h-11 px-4 text-xs uppercase"
             >
               <History className="mr-2 h-4 w-4" /> History
             </Button>
           )}
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1 sm:flex-none">
             <Button 
               onClick={() => setIsRedeemDialogOpen(true)}
               className="flex-1 rounded-sm font-bold bg-green-600 hover:bg-green-700 h-11 px-4 text-xs uppercase shadow-md"
@@ -421,34 +421,34 @@ export default function RewardsPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Card className="bg-amber-500/5 border-amber-500/20 rounded-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-amber-600 tracking-widest">Total Points</CardTitle>
-            <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-2 sm:p-6">
+            <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase text-amber-600 tracking-widest">Total Points</CardTitle>
+            <Star className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500 fill-amber-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black text-amber-700 tabular-nums">{userPoints.toFixed(2)}</div>
+          <CardContent className="p-2 sm:p-6 pt-0">
+            <div className="text-lg sm:text-3xl font-black text-amber-700 tabular-nums">{userPoints.toFixed(2)}</div>
           </CardContent>
         </Card>
 
         <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-green-600 tracking-widest">Estimated Value</CardTitle>
-            <Coins className="h-4 w-4 text-green-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-2 sm:p-6">
+            <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase text-green-600 tracking-widest">Value</CardTitle>
+            <Coins className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black text-green-700 tabular-nums">₹{monetaryValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+          <CardContent className="p-2 sm:p-6 pt-0">
+            <div className="text-lg sm:text-3xl font-black text-green-700 tabular-nums">₹{monetaryValue.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</div>
           </CardContent>
         </Card>
 
-        <Card className="bg-primary/5 border-primary/20 rounded-sm sm:col-span-2 md:col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[10px] font-black uppercase text-primary tracking-widest">Global Rank</CardTitle>
-            <Award className="h-4 w-4 text-primary" />
+        <Card className="bg-primary/5 border-primary/20 rounded-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-2 sm:p-6">
+            <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase text-primary tracking-widest">Rank</CardTitle>
+            <Award className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-black text-primary tabular-nums">
+          <CardContent className="p-2 sm:p-6 pt-0">
+            <div className="text-lg sm:text-3xl font-black text-primary tabular-nums">
               #{leaders && user ? (leaders.findIndex(l => l.id === user.uid) !== -1 ? leaders.findIndex(l => l.id === user.uid) + 1 : '—') : '—'}
             </div>
           </CardContent>
