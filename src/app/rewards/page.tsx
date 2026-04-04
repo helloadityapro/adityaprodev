@@ -7,7 +7,7 @@ import { collection, doc, query, orderBy, limit, where, or, and, getDocs, server
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send, MapPin, Clock, AlertCircle, Search, FileDown } from "lucide-react";
+import { Trophy, Coins, Award, TrendingUp, Medal, Star, User, Info, History, Eye, X, Loader2, FileCheck, FileText, ArrowLeftRight, CreditCard, Send, MapPin, Clock, AlertCircle, Search, FileDown, CircleHelp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -380,6 +380,78 @@ export default function RewardsPage() {
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full h-11 w-11 text-primary hover:bg-primary/5 border border-primary/10">
+                <CircleHelp className="h-6 w-6" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-[calc(100vw-2rem)] xs:w-[350px] p-0 rounded-sm border-primary/10 bg-white shadow-2xl overflow-hidden">
+              <div className="bg-primary/5 p-4 border-b">
+                <h3 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                  <Star className="h-3.5 w-3.5 fill-primary" /> Reward Point System
+                </h3>
+              </div>
+              <ScrollArea className="max-h-[400px]">
+                <div className="p-5 space-y-6">
+                  <section className="space-y-3">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest border-l-2 border-blue-500 pl-2">Operations</p>
+                    <div className="space-y-2.5">
+                      <div className="flex justify-between items-center text-xs font-bold">
+                        <span className="text-foreground">PtW Submission</span>
+                        <span className="text-primary">1.0 Pts</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs font-medium italic opacity-70 border-b border-dashed pb-1">
+                        <span className="text-muted-foreground pl-2">If correction required</span>
+                        <span className="text-primary">0.5 Pts</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs font-bold">
+                        <span className="text-foreground">DPR Log</span>
+                        <span className="text-primary">1.0 Pts</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs font-bold">
+                        <span className="text-foreground">Material Movement</span>
+                        <span className="text-primary">0.1 Pts</span>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="space-y-3">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest border-l-2 border-amber-500 pl-2">Assignments</p>
+                    <div className="space-y-2.5">
+                      <div className="flex justify-between items-center text-xs font-bold">
+                        <span className="text-foreground">Task Assignment</span>
+                        <span className="text-primary">0.25 Pts</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs font-bold">
+                        <span className="text-foreground">Task Completion</span>
+                        <span className="text-primary">0.25 Pts</span>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="space-y-3">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest border-l-2 border-emerald-500 pl-2">Supervisors</p>
+                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-sm">
+                      <p className="text-[10px] text-emerald-800 leading-relaxed font-medium">
+                        Managers receive <strong className="text-emerald-950">50% Inheritance</strong> of the base points earned by their reporting engineers for PtW and Movements.
+                      </p>
+                    </div>
+                  </section>
+
+                  <section className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-100 rounded-sm">
+                      <TrendingUp className="h-4 w-4 text-amber-600 shrink-0" />
+                      <p className="text-[10px] text-amber-800 font-bold uppercase leading-snug">
+                        Multipliers (X-Factor) are applied to base engineer points based on seniority.
+                      </p>
+                    </div>
+                  </section>
+                </div>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+
           {userProfile && (
             <Button 
               onClick={() => setSelectedHistoryUser(userProfile)} 
@@ -616,7 +688,7 @@ export default function RewardsPage() {
                   type="number" 
                   placeholder="Enter point amount..." 
                   value={redeemPoints} 
-                  onChange={(e) => setRedeemPoints(e.target.value)}
+                  onChange={(e) => setRedeemPoints(e.target.value)} 
                   className="rounded-sm font-black h-14 text-xl px-4 pr-14 focus-visible:ring-primary/20"
                   disabled={!canRedeem}
                 />
@@ -640,7 +712,7 @@ export default function RewardsPage() {
               disabled={isRedeeming || !redeemPoints || parseFloat(redeemPoints) <= 0 || parseFloat(redeemPoints) > userPoints || !canRedeem}
               className="w-full sm:flex-1 h-12 font-black uppercase text-xs rounded-sm bg-green-600 hover:bg-green-700 shadow-lg"
             >
-              {isRedeeming ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+              {isRedeeming ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="mr-2 h-4 w-4 mr-2" />}
               Submit
             </Button>
           </DialogFooter>
