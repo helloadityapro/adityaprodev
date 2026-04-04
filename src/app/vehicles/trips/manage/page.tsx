@@ -531,6 +531,7 @@ function EditTripDialog({
               </form>
             </Form>
           </div>
+          <ScrollBar orientation="vertical" />
         </ScrollArea>
         <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex-col sm:flex-row">
           <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
@@ -1664,7 +1665,7 @@ export default function ManageAllTripsPage() {
                       <div className="flex flex-col gap-1.5">
                         <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Itinerary</span>
                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700">
-                          <MapPin className="h-3 w-3" /> {v.activeTrip.pickupLocation} \u{2794} {v.activeTrip.destinations[v.activeTrip.destinations.length - 1]?.location}
+                          <MapPin className="h-3 w-3" /> {v.activeTrip.pickupLocation} ➔ {v.activeTrip.destinations[v.activeTrip.destinations.length - 1]?.location}
                         </div>
                       </div>
                     </div>
@@ -1859,7 +1860,7 @@ export default function ManageAllTripsPage() {
                     <SelectContent>
                       {availableVehiclesForAllotment.map(v => (
                         <SelectItem key={v.id} value={v.id} className="text-xs font-bold">
-                          {v.make} {v.model} ({v.plateNumber}) \u{2014} {v.ownership}
+                          {v.make} {v.model} ({v.plateNumber}) — {v.ownership}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1876,7 +1877,7 @@ export default function ManageAllTripsPage() {
                         value={approvalTarget?.rentedDriverDetails || ""}
                         onChange={(e) => setApprovalState(prev => prev ? { ...prev, rentedDriverDetails: e.target.value } : null)}
                       />
-                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver \u{2014} No system selection required.</p>
+                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver — No system selection required.</p>
                     </>
                   ) : (
                     <>
@@ -1902,7 +1903,7 @@ export default function ManageAllTripsPage() {
             </div>
           </ScrollArea>
 
-          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 flex-col sm:flex-row">
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
             <DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-11 rounded-sm font-black uppercase text-[10px] tracking-widest">Cancel</Button></DialogClose>
             <Button 
               onClick={handleApprove} 
@@ -2006,7 +2007,7 @@ export default function ManageAllTripsPage() {
                         <div className="h-10 w-10 rounded-sm bg-muted flex items-center justify-center text-muted-foreground shrink-0"><UserCog className="h-6 w-6" /></div>
                         <div className="flex flex-col min-w-0">
                           <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Assigned Driver</span>
-                          <span className="text-sm font-black truncate">{detailsAssignment.driverName || '\u{2014}'}</span>
+                          <span className="text-sm font-black truncate">{detailsAssignment.driverName || '—'}</span>
                         </div>
                       </div>
                     </div>
