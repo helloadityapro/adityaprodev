@@ -421,7 +421,7 @@ function EditTripDialog({
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <Label className="text-xs font-bold uppercase">Intermediate Stops</Label>
-                          <Button type="button" variant="outline" size="sm" onClick={() => appendStop({ type: 'Site', location: '', purpose: '' })} className="h-7 text-[10px] font-bold"><Plus className="h-3 w-3 mr-1" /> Add Stop</Button>
+                          <Button type="button" variant="outline" size="sm" onClick={() => appendStop({ type: 'Site', location: '', purpose: '' })} className="h-7 text-[10px] font-bold"><Plus className="h-3.5 w-3.5 mr-1" /> Add Stop</Button>
                         </div>
                         {stopFields.map((field, idx) => (
                           <div key={field.id} className="p-4 border rounded-sm bg-muted/5 space-y-3 relative group">
@@ -488,7 +488,7 @@ function EditTripDialog({
                                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><ScrollArea className="h-[150px]">{filteredDropSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsDropPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
                                 </Popover>
                               ) : (
-                                <FormControl><Input placeholder="Enter destination address..." {...field} className="h-11 rounded-sm" /></FormControl>
+                                <FormControl><Input placeholder="Enter final destination address..." {...field} className="h-11 rounded-sm" /></FormControl>
                               )}
                               <FormMessage />
                             </FormItem>
@@ -1196,6 +1196,10 @@ export default function ManageAllTripsPage() {
     }
   };
 
+  const handleSaveSites = async () => {
+    // Legacy mapping support placeholder
+  };
+
   if (isUserLoading || isProfileLoading || isAssignmentsLoading || isVehiclesLoading || isUsersLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
@@ -1276,72 +1280,97 @@ export default function ManageAllTripsPage() {
 
         <TabsContent value="registry" className="animate-in fade-in-50 duration-300">
           <div className="md:hidden space-y-4">
-            {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => (
-              <Card key={trip.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setDetailsAssignment(trip)}>
-                <CardContent className="p-4 space-y-4">
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="flex flex-col gap-1 min-w-0">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yy') : '—'}
-                      </span>
-                      <h3 className="font-bold text-sm text-foreground leading-tight truncate">{trip.userName}</h3>
-                    </div>
-                    <Badge variant="outline" className={cn(
-                      "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                      trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                      trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                      trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
-                      trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
-                      "bg-red-50 text-red-700 border-red-200"
-                    )}>
-                      {trip.status}
-                    </Badge>
-                  </div>
+            {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => {
+              const isAssignedDriver = trip.driverId === user?.uid;
+              const isRequester = trip.userId === user?.uid;
+              const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
+              const canStartTrip = (trip.status === 'Approved') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
+              const canEndTrip = (trip.status === 'Ongoing') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
 
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
-                      <MapPin className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{trip.pickupLocation}</span>
+              return (
+                <Card key={trip.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setDetailsAssignment(trip)}>
+                  <CardContent className="p-4 space-y-4">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yy') : '—'}
+                        </span>
+                        <h3 className="font-bold text-sm text-foreground leading-tight truncate">{trip.userName}</h3>
+                      </div>
+                      <Badge variant="outline" className={cn(
+                        "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                        trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                        trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                        trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
+                        trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+                        "bg-red-50 text-red-700 border-red-200"
+                      )}>
+                        {trip.status}
+                      </Badge>
                     </div>
-                    {trip.intermediateStops.length > 1 && (
-                      <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
-                        {trip.destinations.slice(0, -1).map((dest, i) => (
-                          <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                            <ArrowRight className="h-2.5 w-2.5 shrink-0" />
-                            <span className="truncate">{dest.location}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {trip.destinations.length > 0 && (
-                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
-                        <MapPin className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{trip.destinations[trip.destinations.length - 1]?.location}</span>
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
-                    {trip.vehicleId ? (
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-bold text-foreground truncate max-w-[120px]">{trip.vehicleDetails}</span>
-                        <span className="text-[8px] font-black text-muted-foreground uppercase">{trip.driverName}</span>
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{trip.pickupLocation}</span>
                       </div>
-                    ) : (
-                      <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">Awaiting Resource</span>
-                    )}
-                    
-                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => handleGlobalWhatsAppShare(trip)}>
-                        <MessageCircle className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={(e) => { e.stopPropagation(); setDetailsAssignment(trip); }}><Eye className="h-4 w-4" /></Button>
+                      {trip.destinations.length > 1 && (
+                        <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
+                          {trip.destinations.slice(0, -1).map((dest, i) => (
+                            <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
+                              <ArrowRight className="h-2.5 w-2.5 shrink-0" />
+                              <span className="truncate">{dest.location}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {trip.destinations.length > 0 && (
+                        <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{trip.destinations[trip.destinations.length - 1]?.location}</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )) : (
+
+                    <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
+                      {trip.vehicleId ? (
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-bold text-foreground truncate max-w-[120px]">{trip.vehicleDetails}</span>
+                          <span className="text-[8px] font-black text-muted-foreground uppercase">{trip.driverName}</span>
+                        </div>
+                      ) : (
+                        <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">Awaiting Resource</span>
+                      )}
+                      
+                      <div className="flex gap-1 items-center" onClick={e => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => handleGlobalWhatsAppShare(trip)}>
+                          <MessageCircle className="h-4 w-4" />
+                        </Button>
+                        
+                        {(isAdmin || isManager || trip.userId === user?.uid) && trip.status === 'Pending' && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => setEditingAssignment(trip)}><Pencil className="h-4 w-4" /></Button>
+                        )}
+
+                        {canStartTrip && (
+                          <Button size="sm" className="h-8 rounded-sm bg-blue-600 hover:bg-blue-700 font-bold px-3 text-[10px] uppercase" asChild><Link href={`/vehicles/trips/${trip.id}/start`}><PlayCircle className="h-3.5 w-3.5 mr-1" /> Start</Link></Button>
+                        )}
+                        
+                        {canEndTrip && (
+                          <Button size="sm" className="h-8 rounded-sm bg-red-600 hover:bg-red-700 font-bold px-3 text-[10px] uppercase" asChild><Link href={`/vehicles/trips/${trip.id}/finish`}><Flag className="h-3.5 w-3.5 mr-1" /> End</Link></Button>
+                        )}
+
+                        {canCancel && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={() => setCancelTarget(trip)}><CircleX className="h-4 w-4" /></Button>
+                        )}
+
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setDetailsAssignment(trip)}><Eye className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            }) : (
               <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No logs discovered.</div>
             )}
           </div>
@@ -1517,6 +1546,13 @@ export default function ManageAllTripsPage() {
                     <div className="pt-2 border-t border-primary/5 flex justify-end gap-2">
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => { e.stopPropagation(); handleGlobalWhatsAppShare(trip); }}><MessageCircle className="h-4 w-4" /></Button>
                       <Button size="sm" className="h-8 rounded-sm font-black text-[10px] px-4" onClick={(e) => { e.stopPropagation(); setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" }); }}>Allot Now</Button>
+                      
+                      {(isAdmin || isManager || trip.userId === user?.uid) && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={(e) => { e.stopPropagation(); setEditingAssignment(trip); }}><Pencil className="h-4 w-4" /></Button>
+                      )}
+                      
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={(e) => { e.stopPropagation(); setCancelTarget(trip); }}><CircleX className="h-4 w-4" /></Button>
+                      
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={(e) => { e.stopPropagation(); setDetailsAssignment(trip); }}><Eye className="h-4 w-4" /></Button>
                     </div>
                   </CardContent>
