@@ -24,7 +24,7 @@ import { WorkAnniversary } from "@/components/work-anniversary";
 import { BottomNav } from "@/components/bottom-nav";
 import { QuickActions } from "@/components/quick-actions";
 import { CredentialsPromptDialog } from "@/components/credentials-prompt-dialog";
-import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock } from "lucide-react";
+import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock, Cake, Award } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from '@capacitor/core';
@@ -169,6 +169,22 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
+
+  // Celebration detection
+  const isBirthday = React.useMemo(() => {
+    if (!userProfile?.dob) return false;
+    const today = new Date();
+    const dob = new Date(userProfile.dob);
+    return today.getMonth() === dob.getMonth() && today.getDate() === dob.getDate();
+  }, [userProfile?.dob]);
+
+  const isAnniversary = React.useMemo(() => {
+    if (!userProfile?.doj) return false;
+    const today = new Date();
+    const doj = new Date(userProfile.doj);
+    const years = today.getFullYear() - doj.getFullYear();
+    return years > 0 && today.getMonth() === doj.getMonth() && today.getDate() === doj.getDate();
+  }, [userProfile?.doj]);
 
   const isAuthorized = React.useMemo(() => {
     if (isAuthPage || isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
@@ -317,7 +333,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
                   newDisplayedIds.add(notif.id);
                   wasUpdated = true;
-              } else if (!notif.read && notif.push) {
+              } else if (!notif.read && !notif.push) {
                   // Mark as displayed to keep the session tracking consistent
                   // but do not fire a toast (let PushNotificationManager handle it)
                   if (!displayedNotifIds.has(notif.id)) {
@@ -401,6 +417,42 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              {/* Special Day Header Indicators */}
+              <AnimatePresence>
+                {isBirthday && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8, x: 20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    className="mr-1 sm:mr-2"
+                  >
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => window.dispatchEvent(new Event('trigger-birthday-celebration'))}
+                      className="h-9 px-2 sm:px-3 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 rounded-full border border-amber-500/20 gap-1.5 transition-all active:scale-95 group"
+                    >
+                      <Cake className="h-4 w-4 animate-bounce group-hover:scale-110" />
+                      <span className="text-[10px] font-black uppercase tracking-tight hidden xs:inline">Happy Birthday!</span>
+                    </Button>
+                  </motion.div>
+                )}
+                {isAnniversary && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8, x: 20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    className="mr-1 sm:mr-2"
+                  >
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => window.dispatchEvent(new Event('trigger-anniversary-celebration'))}
+                      className="h-9 px-2 sm:px-3 bg-primary/10 text-primary hover:bg-primary/20 rounded-full border border-primary/20 gap-1.5 transition-all active:scale-95 group"
+                    >
+                      <Award className="h-4 w-4 animate-pulse group-hover:scale-110" />
+                      <span className="text-[10px] font-black uppercase tracking-tight hidden xs:inline">Work Anniversary!</span>
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="hidden md:flex">
                 <QuickActions />
               </div>
