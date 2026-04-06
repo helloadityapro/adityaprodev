@@ -123,6 +123,7 @@ export default function TaskListPage() {
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
+  const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? userProfile.role.toLowerCase().replace(/\s+/g, '-') : 'site-engineer');
 
   const tasksQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
@@ -173,11 +174,15 @@ export default function TaskListPage() {
 
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+      : roleConfigs?.find(c => c.id === userRoleStr)?.ownDataOnly ?? false;
 
     if (isOwnDataOnly && !isSuper) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
       list = list.filter(task => {
+        // If the task is explicitly assigned to or by this user, they should see it 
+        // regardless of the site-based filtering policy.
+        if (task.assignedToId === user?.uid || task.assignedById === user?.uid) return true;
+        
         if (!task.siteId) return true;
         return assignedIds.has(task.siteId);
       });
@@ -207,7 +212,7 @@ export default function TaskListPage() {
         const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
     });
-  }, [tasks, searchTerm, statusFilter, activeTab, user, userProfile, roleConfigs, isSuper, isAdmin, queryDateRange]);
+  }, [tasks, searchTerm, statusFilter, activeTab, user, userProfile, roleConfigs, isSuper, isAdmin, queryDateRange, userRoleStr]);
 
   const stats = React.useMemo(() => {
     const myTasks = filteredTasks.filter(t => t.assignedToId === user?.uid);
@@ -428,14 +433,14 @@ export default function TaskListPage() {
                 <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
                   <div className="grid grid-cols-2 gap-4 flex-1">
                     <div className="flex flex-col">
-                      <span className="text-[8px] text-muted-foreground uppercase font-black tracking-tighter">Assigned To</span>
+                      <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Assigned To</span>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <User className="h-2.5 w-2.5 text-primary" />
                         <span className="text-[10px] font-bold truncate">{task.assignedToName}</span>
                       </div>
                     </div>
                     <div className="flex flex-col border-l pl-4 border-primary/5">
-                      <span className="text-[8px] text-muted-foreground uppercase font-black tracking-tighter">Assigned By</span>
+                      <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Assigned By</span>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <User className="h-2.5 w-2.5 text-muted-foreground" />
                         <span className="text-[10px] font-bold truncate">{task.assignedByName}</span>
@@ -601,7 +606,7 @@ export default function TaskListPage() {
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                     Delete Task
                 </AlertDialogAction>
