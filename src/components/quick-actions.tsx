@@ -19,7 +19,8 @@ import {
   Package,
   CheckSquare,
   Plus,
-  Navigation
+  Navigation,
+  Fuel
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion } from 'framer-motion';
@@ -33,6 +34,12 @@ export function QuickActions() {
       icon: <Navigation className="mr-2 h-4 w-4 text-indigo-500" />,
       href: '/site-visits/start',
       description: 'Check-in to a project site',
+    },
+    {
+      label: 'Request a Vehicle',
+      icon: <Fuel className="mr-2 h-4 w-4 text-orange-500" />,
+      href: '/vehicles/request',
+      description: 'Allotment for site trip',
     },
     {
       label: 'Request PtW',

@@ -15,7 +15,8 @@ import {
   CalendarCheck2,
   LayoutList,
   ShieldCheck,
-  UserCircle2
+  UserCircle2,
+  Fuel
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -59,6 +60,12 @@ export function BottomNav() {
       icon: <Navigation className="h-4 w-4 text-indigo-500" />,
       href: '/site-visits/start',
       description: 'Check-in to a project site',
+    },
+    {
+      label: 'Request a Vehicle',
+      icon: <Fuel className="h-4 w-4 text-orange-500" />,
+      href: '/vehicles/request',
+      description: 'Allotment for site trip',
     },
     {
       label: 'Request PtW',
@@ -149,7 +156,7 @@ export function BottomNav() {
                 QUICKLY
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-primary/5" />
-              <ScrollArea className="max-h-[60vh]">
+              <ScrollArea className="max-h-[70vh]">
                 <div className="p-1">
                   {quickActions.map((action) => (
                     <DropdownMenuItem
