@@ -208,536 +208,6 @@ const formatTo12Hr = (time?: string) => {
   }
 };
 
-/**
- * Dialog component to edit trip request details.
- */
-function EditTripDialog({ 
-  assignment, 
-  open, 
-  onOpenChange, 
-  sites, 
-  allUsers,
-  onSave
-}: { 
-  assignment: Assignment | null, 
-  open: boolean, 
-  onOpenChange: (o: boolean) => void,
-  sites: Site[],
-  allUsers: UserProfile[],
-  onSave: (values: z.infer<typeof editRequestSchema>) => Promise<void>
-}) {
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [isPickupPopoverOpen, setIsPickupPopoverOpen] = React.useState(false);
-  const [pickupSearchQuery, setPickupSearchQuery] = React.useState("");
-  const [openStopPopoverIndex, setOpenStopPopoverIndex] = React.useState<number | null>(null);
-  const [stopSearchQuery, setStopSearchQuery] = React.useState("");
-  const [isDropPopoverOpen, setIsDropPopoverOpen] = React.useState(false);
-  const [dropSearchQuery, setDropSearchQuery] = React.useState("");
-  const [isPassengerPopoverOpen, setIsPassengerPopoverOpen] = React.useState(false);
-  const [passengerSearchQuery, setPassengerSearchQuery] = React.useState("");
-
-  const form = useForm<z.infer<typeof editRequestSchema>>({
-    resolver: zodResolver(editRequestSchema),
-    defaultValues: { 
-      pickupType: 'Site',
-      pickupLocation: '',
-      tripDate: '',
-      reportingTime: '09:00 AM',
-      intermediateStops: [],
-      dropType: 'Site',
-      dropLocation: '',
-      purpose: '',
-      coPassengers: []
-    },
-  });
-
-  const { fields: stopFields, append: appendStop, remove: removeStop } = useFieldArray({
-    control: form.control,
-    name: "intermediateStops"
-  });
-
-  const pickupType = form.watch('pickupType');
-  const dropType = form.watch('dropType');
-  const coPassengers = form.watch('coPassengers');
-
-  React.useEffect(() => {
-    if (assignment) {
-      form.reset({
-        pickupType: assignment.pickupType || 'Site',
-        pickupLocation: assignment.pickupLocation || '',
-        tripDate: assignment.tripDate || '',
-        reportingTime: assignment.reportingTime || '09:00 AM',
-        intermediateStops: assignment.intermediateStops || [],
-        dropType: assignment.dropType || 'Site',
-        dropLocation: assignment.dropLocation || '',
-        purpose: assignment.purpose || '',
-        coPassengers: assignment.coPassengers || []
-      });
-    }
-  }, [assignment, form]);
-
-  const handleSubmit = async (values: z.infer<typeof editRequestSchema>) => {
-    setIsSubmitting(true);
-    await onSave(values);
-    setIsSubmitting(false);
-  };
-
-  const filteredPickupSites = sites.filter(s => s.name.toLowerCase().includes(pickupSearchQuery.toLowerCase()));
-  const filteredStopSites = sites.filter(s => s.name.toLowerCase().includes(stopSearchQuery.toLowerCase()));
-  const filteredDropSites = sites.filter(s => s.name.toLowerCase().includes(dropSearchQuery.toLowerCase()));
-  const filteredPotentialPassengers = allUsers.filter(u => 
-    (u.username || '').toLowerCase().includes(passengerSearchQuery.toLowerCase()) ||
-    (u.email || '').toLowerCase().includes(passengerSearchQuery.toLowerCase())
-  );
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[95vh] h-[90vh] p-0 overflow-hidden flex flex-col rounded-sm border-none shadow-2xl bg-background">
-        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
-          <DialogTitle className="text-xl font-black uppercase tracking-tight">Modify Trip Request</DialogTitle>
-          <DialogDescription className="text-xs font-medium">Update itinerary and trip metadata for: {assignment?.userName}</DialogDescription>
-        </DialogHeader>
-        <ScrollArea className="flex-1">
-          <div className="p-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="tripDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Trip Date</FormLabel>
-                        <FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="reportingTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Reporting Time (12h)</FormLabel>
-                        <FormControl>
-                          <div className="flex items-center gap-2">
-                            <Input 
-                              className="h-11 rounded-sm w-[60px] text-center font-bold" 
-                              placeholder="HH"
-                              maxLength={2}
-                              value={field.value?.split(':')[0] || "09"}
-                              onChange={(e) => {
-                                const h = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                field.onChange(`${h}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${field.value?.split(' ')[1] || "AM"}`);
-                              }}
-                            />
-                            <span className="font-bold">:</span>
-                            <Input 
-                              className="h-11 rounded-sm w-[60px] text-center font-bold" 
-                              placeholder="MM"
-                              maxLength={2}
-                              value={field.value?.split(':')[1]?.split(' ')[0] || "00"}
-                              onChange={(e) => {
-                                const m = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                field.onChange(`${field.value?.split(':')[0] || "09"}:${m} ${field.value?.split(' ')[1] || "AM"}`);
-                              }}
-                            />
-                            <Select 
-                              value={field.value?.split(' ')[1] || "AM"} 
-                              onValueChange={(p) => field.onChange(`${field.value?.split(':')[0] || "09"}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${p}`)}
-                            >
-                              <SelectTrigger className="h-11 rounded-sm w-[80px]"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="AM">AM</SelectItem>
-                                <SelectItem value="PM">PM</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Route Details</Label>
-                  <Card className="rounded-sm border-dashed">
-                    <CardContent className="pt-6 space-y-6">
-                      <div className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="pickupType"
-                          render={({ field }) => (
-                            <FormItem className="space-y-3">
-                              <FormLabel className="text-xs font-bold uppercase">Pickup Type</FormLabel>
-                              <FormControl>
-                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
-                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id="edit-src-site" /><Label htmlFor="edit-src-site" className="text-xs font-bold">Project Site</Label></div>
-                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id="edit-src-other" /><Label htmlFor="edit-src-other" className="text-xs font-bold">Other</Label></div>
-                                </RadioGroup>
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="pickupLocation"
-                          render={({ field }) => (
-                            <FormItem>
-                              {pickupType === 'Site' ? (
-                                <Popover open={isPickupPopoverOpen} onOpenChange={setIsPickupPopoverOpen}>
-                                  <PopoverTrigger asChild>
-                                    <FormControl>
-                                      <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        className={cn(
-                                          "w-full justify-between font-normal rounded-sm h-11 text-left",
-                                          !field.value && "text-muted-foreground"
-                                        )}
-                                      >
-                                        <span className="truncate">{field.value || "Select pickup..."}</span>
-                                        <CheckCircle2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                      </Button>
-                                    </FormControl>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                                    <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={pickupSearchQuery} onChange={e => setPickupSearchQuery(e.target.value)} /></div>
-                                    <ScrollArea className="h-[150px]">{filteredPickupSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsPickupPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea>
-                                  </PopoverContent>
-                                </Popover>
-                              ) : (
-                                <FormControl><Input placeholder="Enter pickup address..." {...field} className="h-11 rounded-sm" /></FormControl>
-                              )}
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <Separator />
-
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-xs font-bold uppercase text-muted-foreground">Intermediate Stops</Label>
-                          <Button type="button" variant="outline" size="sm" onClick={() => appendStop({ type: 'Site', location: '', purpose: '' })} className="h-7 text-[10px] font-bold"><Plus className="h-3.5 w-3.5 mr-1" /> Add Stop</Button>
-                        </div>
-                        {stopFields.map((field, idx) => (
-                          <div key={field.id} className="p-4 border rounded-sm bg-muted/5 space-y-3 relative group">
-                            <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6 text-destructive rounded-sm" onClick={() => removeStop(idx)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                            <FormField
-                              control={form.control}
-                              name={`intermediateStops.${idx}.type`}
-                              render={({ field: typeField }) => (
-                                <RadioGroup onValueChange={typeField.onChange} value={typeField.value} className="flex gap-4 mb-2">
-                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id={`stop-${idx}-site`} /><Label htmlFor={`stop-${idx}-site`} className="text-[10px] font-bold">Site</Label></div>
-                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id={`stop-${idx}-other`} /><Label htmlFor={`stop-${idx}-other`} className="text-[10px] font-bold">Other</Label></div>
-                                </RadioGroup>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name={`intermediateStops.${idx}.location`}
-                              render={({ field: locField }) => (
-                                <FormItem className="flex flex-col">
-                                  {form.watch(`intermediateStops.${idx}.type`) === 'Site' ? (
-                                    <Popover open={openStopPopoverIndex === idx} onOpenChange={o => setOpenStopPopoverIndex(o ? idx : null)}>
-                                      <PopoverTrigger asChild><FormControl><Button variant="outline" className="w-full justify-between h-9 rounded-sm bg-background">{locField.value || "Choose Site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
-                                      <PopoverContent className="w-[300px] p-0"><ScrollArea className="h-[150px]">{filteredStopSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { locField.onChange(s.name); setOpenStopPopoverIndex(null); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
-                                    </Popover>
-                                  ) : (
-                                    <FormControl><Input placeholder="Address..." {...locField} className="h-9 rounded-sm bg-background" /></FormControl>
-                                  )}
-                                </FormItem>
-                              )}
-                            />
-                            <FormField control={form.control} name={`intermediateStops.${idx}.purpose`} render={({ field }) => (<Input placeholder="Purpose of stop..." {...field} className="h-9 rounded-sm bg-background text-xs" />)} />
-                          </div>
-                        ))}
-                      </div>
-
-                      <Separator />
-
-                      <div className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="dropType"
-                          render={({ field }) => (
-                            <FormItem className="space-y-3">
-                              <FormLabel className="text-xs font-bold uppercase">Final Drop-off</FormLabel>
-                              <FormControl>
-                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
-                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id="edit-drop-site" /><Label htmlFor="edit-drop-site" className="text-xs font-bold">Project Site</Label></div>
-                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id="edit-drop-other" /><Label htmlFor="edit-drop-other" className="text-xs font-bold">Other</Label></div>
-                                </RadioGroup>
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="dropLocation"
-                          render={({ field }) => (
-                            <FormItem>
-                              {dropType === 'Site' ? (
-                                <Popover open={isDropPopoverOpen} onOpenChange={setIsDropPopoverOpen}>
-                                  <PopoverTrigger asChild>
-                                    <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal rounded-sm h-11 text-left", !field.value && "text-muted-foreground")}>{field.value || "Select destination..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><ScrollArea className="h-[150px]">{filteredDropSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsDropPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
-                                </Popover>
-                              ) : (
-                                <FormControl><Input placeholder="Enter final destination address..." {...field} className="h-11 rounded-sm" /></FormControl>
-                              )}
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Co-passengers</Label>
-                    <Popover open={isPassengerPopoverOpen} onOpenChange={setIsPassengerPopoverOpen}>
-                      <PopoverTrigger asChild><Button variant="outline" size="sm" className="h-7 text-[10px] font-bold"><UserPlus className="h-3 w-3 mr-1" /> Add</Button></PopoverTrigger>
-                      <PopoverContent className="w-[300px] p-0" align="end">
-                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search personnel..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={passengerSearchQuery} onChange={e => setPassengerSearchQuery(e.target.value)} /></div>
-                        <ScrollArea className="h-[200px]">{filteredPotentialPassengers.map(u => (<Button key={u.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { if(!coPassengers.some(p => p.id === u.id)) { form.setValue('coPassengers', [...coPassengers, { id: u.id, name: u.username }]); } setIsPassengerPopoverOpen(false); }}>{u.username}</Button>))}</ScrollArea>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="flex flex-wrap gap-2 min-h-[40px] p-3 border rounded-sm bg-muted/5">
-                    {coPassengers.map(p => (
-                      <Badge key={p.id} variant="secondary" className="gap-1.5 h-7 px-2 rounded-sm font-bold text-[10px] uppercase">
-                        {p.name}
-                        <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => form.setValue('coPassengers', coPassengers.filter(x => x.id !== p.id))} />
-                      </Badge>
-                    ))}
-                    {coPassengers.length === 0 && <span className="text-[10px] font-bold text-muted-foreground/40 italic">No co-passengers added.</span>}
-                  </div>
-                </div>
-
-                <FormField control={form.control} name="purpose" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">General Trip Note</FormLabel>
-                    <FormControl><Textarea rows={3} placeholder="Describe the trip context..." {...field} className="rounded-sm" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </form>
-            </Form>
-          </div>
-        </ScrollArea>
-        <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
-          <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
-          <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
-            {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Applying...</> : <><Save className="h-4 w-4 mr-2" /> Apply Updates</>}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-/**
- * Dialog to view and share scheduled trips for a specific date.
- */
-function ScheduledTripsDialog({ 
-  assignments, 
-  allUsers,
-  open, 
-  onOpenChange 
-}: { 
-  assignments: Assignment[], 
-  allUsers: UserProfile[],
-  open: boolean, 
-  onOpenChange: (o: boolean) => void 
-}) {
-  const [selectedDate, setSelectedDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
-  const [statusFilter, setStatusFilter] = React.useState<string>("all");
-  
-  const filtered = React.useMemo(() => {
-    return assignments.filter(a => {
-      const dateMatch = a.tripDate === selectedDate;
-      const statusMatch = statusFilter === 'all' ? a.status !== 'Rejected' : a.status === statusFilter;
-      return dateMatch && statusMatch;
-    });
-  }, [assignments, selectedDate, statusFilter]);
-
-  const handleShareOnWhatsApp = () => {
-    if (filtered.length === 0) return;
-    
-    const formattedDate = format(new Date(selectedDate), 'dd MMM yyyy');
-    const statusInfo = statusFilter === 'all' ? 'All Active' : statusFilter;
-    let message = `*AdityaPro - Scheduled Trips for ${formattedDate} (${statusInfo})*\n\n`;
-    
-    filtered.forEach((trip, index) => {
-      const passengerList = trip.coPassengers && trip.coPassengers.length > 0 
-        ? ` (with ${trip.coPassengers.map(p => (p.name || '').trim()).join(', ')})` 
-        : '';
-      
-      const stops = trip.intermediateStops && trip.intermediateStops.length > 0
-        ? `\n\u{1F6D1} *Stops:* ${trip.intermediateStops.map(s => s.location).join(', ')}`
-        : '';
-
-      const driverObj = allUsers?.find(u => u.id === trip.driverId);
-      const driverInfo = trip.driverName 
-        ? `${driverObj?.mobile ? `(${driverObj.mobile}) ` : ""}${trip.driverName}` 
-        : 'Pending Allotment';
-
-      message += `*${index + 1}. ${(trip.userName || '').trim()}${passengerList}*\n`;
-      message += `\u{1F4CD} *Pickup:* ${trip.pickupLocation}\n`;
-      message += `\u{1F552} *Reporting:* ${formatTo12Hr(trip.reportingTime)}${stops}\n`;
-      message += `\u{1F3C1} *Drop:* ${trip.dropLocation}\n`;
-      message += `\u{1F697} *Vehicle:* ${trip.vehicleDetails || 'Pending Allotment'}\n`;
-      message += `\u{1F464} *Driver:* ${driverInfo}\n`;
-      message += `------------------\n\n`;
-    });
-
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[95vh] h-[80vh] flex flex-col p-0 rounded-sm overflow-hidden shadow-2xl bg-background">
-        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
-                <ListChecks className="h-5 w-5 text-primary" /> Scheduled Trips Overview
-              </DialogTitle>
-              <DialogDescription className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Audit upcoming logistics deployments</DialogDescription>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 w-32 rounded-sm font-bold text-[10px] uppercase bg-background border-primary/20">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-[10px] font-bold uppercase">All Active</SelectItem>
-                  <SelectItem value="Approved" className="text-[10px] font-bold uppercase">Approved</SelectItem>
-                  <SelectItem value="Completed" className="text-[10px] font-bold uppercase">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input 
-                type="date" 
-                value={selectedDate} 
-                onChange={e => setSelectedDate(e.target.value)} 
-                className="h-9 w-40 rounded-sm font-bold text-xs bg-background border-primary/20" 
-              />
-              <Button 
-                onClick={handleShareOnWhatsApp} 
-                disabled={filtered.length === 0}
-                className="h-9 bg-green-600 hover:bg-green-700 text-white font-black uppercase text-[10px] px-4 shadow-md"
-              >
-                <Share2 className="h-3.5 w-3.5 mr-1.5" /> Share WA
-              </Button>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <ScrollArea className="flex-1 bg-muted/10">
-          <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between border-b-2 border-primary/10 pb-2">
-              <h3 className="text-sm font-black uppercase tracking-widest text-primary">
-                Trips for {format(new Date(selectedDate), 'eeee, dd MMM yyyy')}
-              </h3>
-              <Badge variant="secondary" className="rounded-full font-black text-[9px] uppercase">{filtered.length} Results</Badge>
-            </div>
-            
-            {filtered.length > 0 ? (
-              <div className="grid gap-6">
-                {filtered.map((trip, idx) => (
-                  <Card key={trip.id} className="rounded-sm border-primary/10 shadow-sm overflow-hidden group">
-                    <CardHeader className="bg-background py-3 border-b flex flex-row items-center justify-between space-y-0">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center font-black text-xs text-primary border border-primary/20">
-                          {idx + 1}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-sm text-foreground">{trip.userName}</span>
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">{formatTo12Hr(trip.reportingTime)}</span>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className={cn(
-                        "text-[8px] font-black uppercase h-5 rounded-sm",
-                        trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" : 
-                        trip.status === 'Ongoing' ? "bg-primary text-white border-none" : 
-                        trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
-                        "bg-yellow-50 text-yellow-700 border-yellow-200"
-                      )}>{trip.status}</Badge>
-                    </CardHeader>
-                    <CardContent className="p-4 bg-background/50">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                          <div className="relative pl-6 border-l-2 border-emerald-500 pb-2">
-                            <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
-                            <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Pickup</p>
-                            <p className="text-xs font-bold">{trip.pickupLocation}</p>
-                          </div>
-                          {trip.intermediateStops?.map((stop, sIdx) => (
-                            <div key={sIdx} className="relative pl-6 border-l-2 border-primary/30 pb-2">
-                              <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-muted-foreground/30 ring-4 ring-background" />
-                              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Stop #{sIdx + 1}</p>
-                              <p className="text-xs font-bold">{stop.location}</p>
-                            </div>
-                          ))}
-                          <div className="relative pl-6 border-l-2 border-emerald-500">
-                            <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
-                            <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Final Drop</p>
-                            <p className="text-xs font-bold">{trip.dropLocation}</p>
-                          </div>
-                        </div>
-                        <div className="space-y-4">
-                          <div className="p-3 bg-muted/20 rounded-sm border border-primary/5">
-                            <Label className="text-[9px] font-black uppercase text-muted-foreground block mb-2">Fleet Allotment</Label>
-                            <div className="flex flex-col gap-2">
-                              <div className="flex items-center gap-2">
-                                <CarFront className="h-3.5 w-3.5 text-primary" />
-                                <span className="text-[11px] font-black uppercase">{trip.vehicleDetails || 'Pending'}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <UserCog className="h-3.5 w-3.5 text-primary" />
-                                <span className="text-[11px] font-black uppercase">{trip.driverName || 'Pending'}</span>
-                              </div>
-                            </div>
-                          </div>
-                          {trip.coPassengers && trip.coPassengers.length > 0 && (
-                            <div className="space-y-1.5">
-                              <Label className="text-[9px] font-black uppercase text-muted-foreground flex items-gap-1.5"><Users className="h-3 w-3" /> Co-passengers</Label>
-                              <div className="flex flex-wrap gap-1.5">
-                                {trip.coPassengers.map(p => (
-                                  <Badge key={p.id} variant="secondary" className="text-[8px] h-4 rounded-sm font-bold bg-muted/50 border-none">{p.name}</Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
-                <Calendar className="h-16 w-16 mb-4" />
-                <p className="font-black uppercase tracking-widest text-sm">No {statusFilter === 'all' ? 'active' : statusFilter.toLowerCase()} trips scheduled for this date</p>
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-        <DialogFooter className="p-4 border-t bg-muted/10 shrink-0">
-          <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close</Button></DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export default function ManageAllTripsPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -813,6 +283,16 @@ export default function ManageAllTripsPage() {
 
   const driversList = React.useMemo(() => allUsers?.filter(u => u.role === 'Driver') || [], [allUsers]);
 
+  const stats = React.useMemo(() => {
+    if (!assignments) return { total: 0, pending: 0, ongoing: 0, completed: 0 };
+    return {
+      total: assignments.length,
+      pending: assignments.filter(a => a.status === 'Pending').length,
+      ongoing: assignments.filter(a => a.status === 'Ongoing').length,
+      completed: assignments.filter(a => a.status === 'Completed').length,
+    };
+  }, [assignments]);
+
   const availableVehiclesForAllotment = React.useMemo(() => {
     if (!vehicles) return [];
     const base = vehicles.filter(v => v.status === 'Available');
@@ -824,16 +304,6 @@ export default function ManageAllTripsPage() {
     }
     return base;
   }, [vehicles, approvalTarget]);
-
-  const stats = React.useMemo(() => {
-    if (!assignments) return { total: 0, pending: 0, ongoing: 0, completed: 0 };
-    return {
-      total: assignments.length,
-      pending: assignments.filter(a => a.status === 'Pending').length,
-      ongoing: assignments.filter(a => a.status === 'Ongoing').length,
-      completed: assignments.filter(a => a.status === 'Completed').length,
-    };
-  }, [assignments]);
 
   const handleGlobalWhatsAppShare = (trip: Assignment) => {
     let header = "";
@@ -994,6 +464,28 @@ export default function ManageAllTripsPage() {
     }
   };
 
+  const handleSaveEdit = async (values: z.infer<typeof editRequestSchema>) => {
+    if (!editingAssignment) return;
+    try {
+      const combinedDestinations = [
+        ...values.intermediateStops,
+        { type: values.dropType, location: values.dropLocation, purpose: 'Final Destination' }
+      ];
+
+      const assignmentRef = doc(firestore, 'vehicle_assignments', editingAssignment.id);
+      updateDocumentNonBlocking(assignmentRef, {
+        ...values,
+        destinations: combinedDestinations,
+        updatedAt: serverTimestamp(),
+      });
+
+      toast({ title: 'Request Updated', description: 'Trip details have been modified.' });
+      setEditingAssignment(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    }
+  };
+
   const filteredAssignments = React.useMemo(() => {
     if (!assignments || !userProfile) return [];
     
@@ -1064,6 +556,22 @@ export default function ManageAllTripsPage() {
   const FleetSortIcon = ({ column }: { column: 'plate' | 'ownership' | 'status' }) => {
     if (fleetSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
     return fleetSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
+
+  const handleCloseDetail = () => {
+    setDetailsAssignment(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    router.replace(`${pathname}?${params.toString()}`);
+  };
+
+  const openViewer = (url: string, trip: Assignment) => {
+    const urls = [trip.startReadingPhoto, trip.endReadingPhoto].filter(Boolean) as string[];
+    const index = urls.indexOf(url);
+    setViewUrls(urls);
+    setCurrentUrlIndex(index >= 0 ? index : 0);
+    setViewUrl(url);
+    setZoom(1);
   };
 
   return (
@@ -1455,7 +963,7 @@ export default function ManageAllTripsPage() {
               </>
             )}
           </ScrollArea>
-          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 flex flex-col sm:flex-row"><DialogClose asChild><Button variant="outline" className="w-full sm:w-auto rounded-sm font-black uppercase text-[10px] h-11 px-8 tracking-widest">Close Audit</Button></DialogClose></DialogFooter>
+          <DialogFooter className="p-3 sm:p-4 bg-muted/5 border-t gap-2 sm:gap-3 shrink-0 no-print"><DialogClose asChild><Button variant="outline" className="w-full sm:w-auto rounded-sm font-black uppercase text-[10px] h-11 px-8 tracking-widest">Close Audit</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1682,7 +1190,7 @@ function TripItinerary({ trip }: { trip: Assignment }) {
         </div>
       )}
       <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
-        <MapPin className="h-3 w-3 shrink-0" />
+        <MapPin className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate">{trip.dropLocation}</span>
       </div>
     </div>
@@ -1707,5 +1215,529 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
         <div className="text-xl sm:text-2xl font-black">{value}</div>
       </CardContent>
     </Card>
+  );
+}
+
+function EditTripDialog({ 
+  assignment, 
+  open, 
+  onOpenChange, 
+  sites, 
+  allUsers,
+  onSave
+}: { 
+  assignment: Assignment | null, 
+  open: boolean, 
+  onOpenChange: (o: boolean) => void,
+  sites: Site[],
+  allUsers: UserProfile[],
+  onSave: (values: z.infer<typeof editRequestSchema>) => Promise<void>
+}) {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isPickupPopoverOpen, setIsPickupPopoverOpen] = React.useState(false);
+  const [pickupSearchQuery, setPickupSearchQuery] = React.useState("");
+  const [openStopPopoverIndex, setOpenStopPopoverIndex] = React.useState<number | null>(null);
+  const [stopSearchQuery, setStopSearchQuery] = React.useState("");
+  const [isDropPopoverOpen, setIsDropPopoverOpen] = React.useState(false);
+  const [dropSearchQuery, setDropSearchQuery] = React.useState("");
+  const [isPassengerPopoverOpen, setIsPassengerPopoverOpen] = React.useState(false);
+  const [passengerSearchQuery, setPassengerSearchQuery] = React.useState("");
+
+  const form = useForm<z.infer<typeof editRequestSchema>>({
+    resolver: zodResolver(editRequestSchema),
+    defaultValues: { 
+      pickupType: 'Site',
+      pickupLocation: '',
+      tripDate: '',
+      reportingTime: '09:00 AM',
+      intermediateStops: [],
+      dropType: 'Site',
+      dropLocation: '',
+      purpose: '',
+      coPassengers: []
+    },
+  });
+
+  const { fields: stopFields, append: appendStop, remove: removeStop } = useFieldArray({
+    control: form.control,
+    name: "intermediateStops"
+  });
+
+  const pickupType = form.watch('pickupType');
+  const dropType = form.watch('dropType');
+  const coPassengers = form.watch('coPassengers');
+
+  React.useEffect(() => {
+    if (assignment) {
+      form.reset({
+        pickupType: assignment.pickupType || 'Site',
+        pickupLocation: assignment.pickupLocation || '',
+        tripDate: assignment.tripDate || '',
+        reportingTime: assignment.reportingTime || '09:00 AM',
+        intermediateStops: assignment.intermediateStops || [],
+        dropType: assignment.dropType || 'Site',
+        dropLocation: assignment.dropLocation || '',
+        purpose: assignment.purpose || '',
+        coPassengers: assignment.coPassengers || []
+      });
+    }
+  }, [assignment, form]);
+
+  const handleSubmit = async (values: z.infer<typeof editRequestSchema>) => {
+    setIsSubmitting(true);
+    await onSave(values);
+    setIsSubmitting(false);
+  };
+
+  const filteredPickupSites = sites.filter(s => s.name.toLowerCase().includes(pickupSearchQuery.toLowerCase()));
+  const filteredStopSites = sites.filter(s => s.name.toLowerCase().includes(stopSearchQuery.toLowerCase()));
+  const filteredDropSites = sites.filter(s => s.name.toLowerCase().includes(dropSearchQuery.toLowerCase()));
+  const filteredPotentialPassengers = allUsers.filter(u => 
+    (u.username || '').toLowerCase().includes(passengerSearchQuery.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(passengerSearchQuery.toLowerCase())
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[95vh] h-[90vh] p-0 overflow-hidden flex flex-col rounded-sm border-none shadow-2xl bg-background">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
+          <DialogTitle className="text-xl font-black uppercase tracking-tight">Modify Trip Request</DialogTitle>
+          <DialogDescription className="text-xs font-medium">Update itinerary and trip metadata for: {assignment?.userName}</DialogDescription>
+        </DialogHeader>
+        <ScrollArea className="flex-1">
+          <div className="p-6">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="tripDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Trip Date</FormLabel>
+                        <FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="reportingTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Reporting Time (12h)</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center gap-2">
+                            <Input 
+                              className="h-11 rounded-sm w-[60px] text-center font-bold" 
+                              placeholder="HH"
+                              maxLength={2}
+                              value={field.value?.split(':')[0] || "09"}
+                              onChange={(e) => {
+                                const h = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                field.onChange(`${h}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${field.value?.split(' ')[1] || "AM"}`);
+                              }}
+                            />
+                            <span className="font-bold">:</span>
+                            <Input 
+                              className="h-11 rounded-sm w-[60px] text-center font-bold" 
+                              placeholder="MM"
+                              maxLength={2}
+                              value={field.value?.split(':')[1]?.split(' ')[0] || "00"}
+                              onChange={(e) => {
+                                const m = e.target.value.replace(/\D/g, '').slice(0, 2);
+                                field.onChange(`${field.value?.split(':')[0] || "09"}:${m} ${field.value?.split(' ')[1] || "AM"}`);
+                              }}
+                            />
+                            <Select 
+                              value={field.value?.split(' ')[1] || "AM"} 
+                              onValueChange={(p) => field.onChange(`${field.value?.split(':')[0] || "09"}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${p}`)}
+                            >
+                              <SelectTrigger className="h-11 rounded-sm w-[80px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="AM">AM</SelectItem>
+                                <SelectItem value="PM">PM</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Route Details</Label>
+                  <Card className="rounded-sm border-dashed">
+                    <CardContent className="pt-6 space-y-6">
+                      <div className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="pickupType"
+                          render={({ field }) => (
+                            <FormItem className="space-y-3">
+                              <FormLabel className="text-xs font-bold uppercase">Pickup Type</FormLabel>
+                              <FormControl>
+                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id="edit-src-site" /><Label htmlFor="edit-src-site" className="text-xs font-bold">Project Site</Label></div>
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id="edit-src-other" /><Label htmlFor="edit-src-other" className="text-xs font-bold">Other</Label></div>
+                                </RadioGroup>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="pickupLocation"
+                          render={({ field }) => (
+                            <FormItem>
+                              {pickupType === 'Site' ? (
+                                <Popover open={isPickupPopoverOpen} onOpenChange={setIsPickupPopoverOpen}>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        className={cn(
+                                          "w-full justify-between font-normal rounded-sm h-11 text-left",
+                                          !field.value && "text-muted-foreground"
+                                        )}
+                                      >
+                                        <span className="truncate">{field.value || "Select pickup..."}</span>
+                                        <CheckCircle2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                                    <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={pickupSearchQuery} onChange={e => setPickupSearchQuery(e.target.value)} /></div>
+                                    <ScrollArea className="h-[150px]">{filteredPickupSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsPickupPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea>
+                                  </PopoverContent>
+                                </Popover>
+                              ) : (
+                                <FormControl><Input placeholder="Enter pickup address..." {...field} className="h-11 rounded-sm" /></FormControl>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Intermediate Stops</Label>
+                          <Button type="button" variant="outline" size="sm" onClick={() => appendStop({ type: 'Site', location: '', purpose: '' })} className="h-7 text-[10px] font-bold"><Plus className="h-3.5 w-3.5 mr-1" /> Add Stop</Button>
+                        </div>
+                        {stopFields.map((field, idx) => (
+                          <div key={field.id} className="p-4 border rounded-sm bg-muted/5 space-y-3 relative group">
+                            <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6 text-destructive rounded-sm" onClick={() => removeStop(idx)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                            <FormField
+                              control={form.control}
+                              name={`intermediateStops.${idx}.type`}
+                              render={({ field: typeField }) => (
+                                <RadioGroup onValueChange={typeField.onChange} value={typeField.value} className="flex gap-4 mb-2">
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id={`stop-${idx}-site`} /><Label htmlFor={`stop-${idx}-site`} className="text-[10px] font-bold">Site</Label></div>
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id={`stop-${idx}-other`} /><Label htmlFor={`stop-${idx}-other`} className="text-[10px] font-bold">Other</Label></div>
+                                </RadioGroup>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name={`intermediateStops.${idx}.location`}
+                              render={({ field: locField }) => (
+                                <FormItem className="flex flex-col">
+                                  {form.watch(`intermediateStops.${idx}.type`) === 'Site' ? (
+                                    <Popover open={openStopPopoverIndex === idx} onOpenChange={o => setOpenStopPopoverIndex(o ? idx : null)}>
+                                      <PopoverTrigger asChild><FormControl><Button variant="outline" className="w-full justify-between h-9 rounded-sm bg-background">{locField.value || "Choose Site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
+                                      <PopoverContent className="w-[300px] p-0"><ScrollArea className="h-[150px]">{filteredStopSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { locField.onChange(s.name); setOpenStopPopoverIndex(null); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
+                                    </Popover>
+                                  ) : (
+                                    <FormControl><Input placeholder="Address..." {...locField} className="h-9 rounded-sm bg-background" /></FormControl>
+                                  )}
+                                </FormItem>
+                              )}
+                            />
+                            <FormField control={form.control} name={`intermediateStops.${idx}.purpose`} render={({ field }) => (<Input placeholder="Purpose of stop..." {...field} className="h-9 rounded-sm bg-background text-xs" />)} />
+                          </div>
+                        ))}
+                      </div>
+
+                      <Separator />
+
+                      <div className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="dropType"
+                          render={({ field }) => (
+                            <FormItem className="space-y-3">
+                              <FormLabel className="text-xs font-bold uppercase">Final Drop-off</FormLabel>
+                              <FormControl>
+                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id="edit-drop-site" /><Label htmlFor="edit-drop-site" className="text-xs font-bold">Project Site</Label></div>
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id="edit-drop-other" /><Label htmlFor="edit-drop-other" className="text-xs font-bold">Other</Label></div>
+                                </RadioGroup>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="dropLocation"
+                          render={({ field }) => (
+                            <FormItem>
+                              {dropType === 'Site' ? (
+                                <Popover open={isDropPopoverOpen} onOpenChange={setIsDropPopoverOpen}>
+                                  <PopoverTrigger asChild>
+                                    <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal rounded-sm h-11 text-left", !field.value && "text-muted-foreground")}>{field.value || "Select destination..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><ScrollArea className="h-[150px]">{filteredDropSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsDropPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea></PopoverContent>
+                                </Popover>
+                              ) : (
+                                <FormControl><Input placeholder="Enter final destination address..." {...field} className="h-11 rounded-sm" /></FormControl>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Co-passengers</Label>
+                    <Popover open={isPassengerPopoverOpen} onOpenChange={setIsPassengerPopoverOpen}>
+                      <PopoverTrigger asChild><Button variant="outline" size="sm" className="h-7 text-[10px] font-bold"><UserPlus className="h-3 w-3 mr-1" /> Add</Button></PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="end">
+                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search personnel..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={passengerSearchQuery} onChange={e => setPassengerSearchQuery(e.target.value)} /></div>
+                        <ScrollArea className="h-[200px]">{filteredPotentialPassengers.map(u => (<Button key={u.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { if(!coPassengers.some(p => p.id === u.id)) { form.setValue('coPassengers', [...coPassengers, { id: u.id, name: u.username }]); } setIsPassengerPopoverOpen(false); }}>{u.username}</Button>))}</ScrollArea>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div className="flex flex-wrap gap-2 min-h-[40px] p-3 border rounded-sm bg-muted/5">
+                    {coPassengers.map(p => (
+                      <Badge key={p.id} variant="secondary" className="gap-1.5 h-7 px-2 rounded-sm font-bold text-[10px] uppercase">
+                        {p.name}
+                        <X className="h-3 w-3 cursor-pointer hover:text-destructive" onClick={() => form.setValue('coPassengers', coPassengers.filter(x => x.id !== p.id))} />
+                      </Badge>
+                    ))}
+                    {coPassengers.length === 0 && <span className="text-[10px] font-bold text-muted-foreground/40 italic">No co-passengers added.</span>}
+                  </div>
+                </div>
+
+                <FormField control={form.control} name="purpose" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">General Trip Note</FormLabel>
+                    <FormControl><Textarea rows={3} placeholder="Describe the trip context..." {...field} className="rounded-sm" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </form>
+            </Form>
+          </div>
+        </ScrollArea>
+        <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
+          <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
+          <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
+            {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Applying...</> : <><Save className="h-4 w-4 mr-2" /> Apply Updates</>}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ScheduledTripsDialog({ 
+  assignments, 
+  allUsers,
+  open, 
+  onOpenChange 
+}: { 
+  assignments: Assignment[], 
+  allUsers: UserProfile[],
+  open: boolean, 
+  onOpenChange: (o: boolean) => void 
+}) {
+  const [selectedDate, setSelectedDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
+  const [statusFilter, setStatusFilter] = React.useState<string>("all");
+  
+  const filtered = React.useMemo(() => {
+    return assignments.filter(a => {
+      const dateMatch = a.tripDate === selectedDate;
+      const statusMatch = statusFilter === 'all' ? a.status !== 'Rejected' : a.status === statusFilter;
+      return dateMatch && statusMatch;
+    });
+  }, [assignments, selectedDate, statusFilter]);
+
+  const handleShareOnWhatsApp = () => {
+    if (filtered.length === 0) return;
+    
+    const formattedDate = format(new Date(selectedDate), 'dd MMM yyyy');
+    const statusInfo = statusFilter === 'all' ? 'All Active' : statusFilter;
+    let message = `*AdityaPro - Scheduled Trips for ${formattedDate} (${statusInfo})*\n\n`;
+    
+    filtered.forEach((trip, index) => {
+      const passengerList = trip.coPassengers && trip.coPassengers.length > 0 
+        ? ` (with ${trip.coPassengers.map(p => (p.name || '').trim()).join(', ')})` 
+        : '';
+      
+      const stops = trip.intermediateStops && trip.intermediateStops.length > 0
+        ? `\n\u{1F6D1} *Stops:* ${trip.intermediateStops.map(s => s.location).join(', ')}`
+        : '';
+
+      const driverObj = allUsers?.find(u => u.id === trip.driverId);
+      const driverInfo = trip.driverName 
+        ? `${driverObj?.mobile ? `(${driverObj.mobile}) ` : ""}${trip.driverName}` 
+        : 'Pending Allotment';
+
+      message += `*${index + 1}. ${(trip.userName || '').trim()}${passengerList}*\n`;
+      message += `\u{1F4CD} *Pickup:* ${trip.pickupLocation}\n`;
+      message += `\u{1F552} *Reporting:* ${formatTo12Hr(trip.reportingTime)}${stops}\n`;
+      message += `\u{1F3C1} *Drop:* ${trip.dropLocation}\n`;
+      message += `\u{1F697} *Vehicle:* ${trip.vehicleDetails || 'Pending Allotment'}\n`;
+      message += `\u{1F464} *Driver:* ${driverInfo}\n`;
+      message += `------------------\n\n`;
+    });
+
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[95vh] h-[80vh] flex flex-col p-0 rounded-sm overflow-hidden shadow-2xl bg-background">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                <ListChecks className="h-5 w-5 text-primary" /> Scheduled Trips Overview
+              </DialogTitle>
+              <DialogDescription className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Audit upcoming logistics deployments</DialogDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9 w-32 rounded-sm font-bold text-[10px] uppercase bg-background border-primary/20">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[10px] font-bold uppercase">All Active</SelectItem>
+                  <SelectItem value="Approved" className="text-[10px] font-bold uppercase">Approved</SelectItem>
+                  <SelectItem value="Completed" className="text-[10px] font-bold uppercase">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input 
+                type="date" 
+                value={selectedDate} 
+                onChange={e => setSelectedDate(e.target.value)} 
+                className="h-9 w-40 rounded-sm font-bold text-xs bg-background border-primary/20" 
+              />
+              <Button 
+                onClick={handleShareOnWhatsApp} 
+                disabled={filtered.length === 0}
+                className="h-9 bg-green-600 hover:bg-green-700 text-white font-black uppercase text-[10px] px-4 shadow-md"
+              >
+                <Share2 className="h-3.5 w-3.5 mr-1.5" /> Share WA
+              </Button>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 bg-muted/10">
+          <div className="p-6 space-y-6">
+            <div className="flex items-center justify-between border-b-2 border-primary/10 pb-2">
+              <h3 className="text-sm font-black uppercase tracking-widest text-primary">
+                Trips for {format(new Date(selectedDate), 'eeee, dd MMM yyyy')}
+              </h3>
+              <Badge variant="secondary" className="rounded-full font-black text-[9px] uppercase">{filtered.length} Results</Badge>
+            </div>
+            
+            {filtered.length > 0 ? (
+              <div className="grid gap-6">
+                {filtered.map((trip, idx) => (
+                  <Card key={trip.id} className="rounded-sm border-primary/10 shadow-sm overflow-hidden group">
+                    <CardHeader className="bg-background py-3 border-b flex flex-row items-center justify-between space-y-0">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center font-black text-xs text-primary border border-primary/20">
+                          {idx + 1}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm text-foreground">{trip.userName}</span>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">{formatTo12Hr(trip.reportingTime)}</span>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={cn(
+                        "text-[8px] font-black uppercase h-5 rounded-sm",
+                        trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" : 
+                        trip.status === 'Ongoing' ? "bg-primary text-white border-none" : 
+                        trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+                        "bg-yellow-50 text-yellow-700 border-yellow-200"
+                      )}>{trip.status}</Badge>
+                    </CardHeader>
+                    <CardContent className="p-4 bg-background/50">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div className="relative pl-6 border-l-2 border-emerald-500 pb-2">
+                            <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
+                            <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Pickup</p>
+                            <p className="text-xs font-bold">{trip.pickupLocation}</p>
+                          </div>
+                          {trip.intermediateStops?.map((stop, sIdx) => (
+                            <div key={sIdx} className="relative pl-6 border-l-2 border-primary/30 pb-2">
+                              <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-muted-foreground/30 ring-4 ring-background" />
+                              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Stop #{sIdx + 1}</p>
+                              <p className="text-xs font-bold">{stop.location}</p>
+                            </div>
+                          ))}
+                          <div className="relative pl-6 border-l-2 border-emerald-500">
+                            <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
+                            <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Final Drop</p>
+                            <p className="text-xs font-bold">{trip.dropLocation}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="p-3 bg-muted/20 rounded-sm border border-primary/5">
+                            <Label className="text-[9px] font-black uppercase text-muted-foreground block mb-2">Fleet Allotment</Label>
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <CarFront className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-[11px] font-black uppercase">{trip.vehicleDetails || 'Pending'}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <UserCog className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-[11px] font-black uppercase">{trip.driverName || 'Pending'}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {trip.coPassengers && trip.coPassengers.length > 0 && (
+                            <div className="space-y-1.5">
+                              <Label className="text-[9px] font-black uppercase text-muted-foreground flex items-gap-1.5"><Users className="h-3 w-3" /> Co-passengers</Label>
+                              <div className="flex flex-wrap gap-1.5">
+                                {trip.coPassengers.map(p => (
+                                  <Badge key={p.id} variant="secondary" className="text-[8px] h-4 rounded-sm font-bold bg-muted/50 border-none">{p.name}</Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
+                <Calendar className="h-16 w-16 mb-4" />
+                <p className="font-black uppercase tracking-widest text-sm">No {statusFilter === 'all' ? 'active' : statusFilter.toLowerCase()} trips scheduled for this date</p>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+        <DialogFooter className="p-4 border-t bg-muted/10 shrink-0">
+          <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close</Button></DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
