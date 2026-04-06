@@ -7,8 +7,8 @@ import { collection, doc, query, where, or, serverTimestamp, increment, getDoc }
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
-import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, FileDown, MessageCircle, User } from "lucide-react";
+import { format, subDays, subMonths, subYears } from "date-fns";
+import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, MessageCircle, User } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type DPR = {
   id: string;
@@ -59,8 +60,9 @@ export default function DPRListPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [startDate, setStartDate] = React.useState("");
-  const [endDate, setEndDate] = React.useState("");
+  const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [editingDpr, setEditingDpr] = React.useState<DPR | null>(null);
   const [deletingDpr, setDeletingDpr] = React.useState<DPR | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -93,6 +95,31 @@ export default function DPRListPage() {
 
   const { data: dprs, isLoading: dprsLoading } = useCollection<DPR>(dprsQuery);
 
+  const queryDateRange = React.useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    switch (dateFilter) {
+      case 'today':
+        return { start: todayStr, end: todayStr };
+      case 'yesterday':
+        const yesterday = format(subDays(today, 1), 'yyyy-MM-dd');
+        return { start: yesterday, end: yesterday };
+      case '7days':
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastMonth':
+        return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastYear':
+        return { start: format(subYears(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime':
+        return { start: '1970-01-01', end: '2099-12-31' };
+      case 'custom':
+        return { start: customStart, end: customEnd };
+      default:
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+    }
+  }, [dateFilter, customStart, customEnd]);
+
   const sortedAndFilteredDprs = React.useMemo(() => {
     if (!dprs || !userProfile) return [];
     
@@ -100,6 +127,7 @@ export default function DPRListPage() {
       ? userProfile.ownDataOnly 
       : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
 
+    const { start, end } = queryDateRange;
     let result = dprs;
 
     if (isOwnDataOnly && !isSuper) {
@@ -112,13 +140,7 @@ export default function DPRListPage() {
         (dpr.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         dpr.description.toLowerCase().includes(searchTerm.toLowerCase());
       
-      let matchesDate = true;
-      if (startDate) {
-        matchesDate = matchesDate && dpr.reportDate >= startDate;
-      }
-      if (endDate) {
-        matchesDate = matchesDate && dpr.reportDate <= endDate;
-      }
+      const matchesDate = dpr.reportDate >= start && dpr.reportDate <= end;
       
       return matchesSearch && matchesDate;
     });
@@ -128,7 +150,7 @@ export default function DPRListPage() {
         const dateB = new Date(b.reportDate || (b.createdAt?.toDate?.() || 0)).getTime();
         return dateB - dateA;
     });
-  }, [dprs, searchTerm, startDate, endDate, userProfile, roleConfigs, isSuper]);
+  }, [dprs, searchTerm, queryDateRange, userProfile, roleConfigs, isSuper]);
 
   const handleDelete = async () => {
     if (!deletingDpr || !firestore) return;
@@ -182,8 +204,7 @@ export default function DPRListPage() {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setStartDate("");
-    setEndDate("");
+    setDateFilter("7days");
   };
 
   return (
@@ -197,49 +218,55 @@ export default function DPRListPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="md:col-span-2 space-y-1">
-          <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search</Label>
+          <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search Records</Label>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search..." 
+              placeholder="Search site, user or update..." 
               className="pl-8 h-9 md:h-10 rounded-sm border-primary/20 text-xs md:text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 md:contents gap-2">
-          <div className="space-y-1">
-            <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">From Date</Label>
-            <div className="relative">
-              <Calendar className="absolute left-2 top-2.5 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground pointer-events-none" />
-              <Input 
-                type="date" 
-                className="pl-8 h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" 
-                value={startDate} 
-                onChange={(e) => setStartDate(e.target.value)} 
-              />
-            </div>
-          </div>
-          <div className="space-y-1 flex gap-1.5 items-end">
-            <div className="flex-1 space-y-1">
-              <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">To Date</Label>
-              <div className="relative">
-                <Calendar className="absolute left-2 top-2.5 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground pointer-events-none" />
-                <Input 
-                  type="date" 
-                  className="pl-8 h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" 
-                  value={endDate} 
-                  onChange={(e) => setEndDate(e.target.value)} 
-                />
+        
+        <div className="space-y-1">
+          <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Time Range</Label>
+          <Select value={dateFilter} onValueChange={setDateFilter}>
+            <SelectTrigger className="h-9 md:h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+              <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
+              <SelectValue placeholder="Select Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+              <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
+              <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+              <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+              <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
+              <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
+              <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-end gap-2">
+          {dateFilter === 'custom' ? (
+            <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95">
+              <div className="flex-1 space-y-1">
+                <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" />
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
-              <FilterX className="h-3.5 w-3.5 md:h-4 md:w-4" />
-            </Button>
-          </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
+            <FilterX className="h-3.5 w-3.5 md:h-4 md:w-4" />
+          </Button>
         </div>
       </div>
 
@@ -249,11 +276,7 @@ export default function DPRListPage() {
             <div>
               <CardTitle>Daily Progress Updates</CardTitle>
               <CardDescription>
-                {startDate || endDate ? (
-                  <span className="text-primary font-semibold">
-                    Report for {startDate || 'Start'} to {endDate || 'Today'}
-                  </span>
-                ) : "Comprehensive list of daily site activities."}
+                Viewing records from {queryDateRange.start} to {queryDateRange.end}
               </CardDescription>
             </div>
             <div className="hidden print:block text-right">
@@ -399,7 +422,7 @@ export default function DPRListPage() {
             </>
           ) : (
             <div className="text-center py-24 text-muted-foreground italic bg-muted/5">
-              {searchTerm || startDate || endDate ? "No results found matching your filters." : "No reports found matching your criteria."}
+              No reports found for the selected time range.
             </div>
           )}
         </CardContent>

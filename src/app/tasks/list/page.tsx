@@ -7,7 +7,7 @@ import { collection, doc, query, where, serverTimestamp, increment, getDoc, limi
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
+import { format, subDays, subMonths, subYears } from "date-fns";
 import { ListTodo, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, CheckCircle2, AlertCircle, User, MapPin, MoreHorizontal, ArrowRight } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
@@ -106,6 +106,9 @@ export default function TaskListPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [activeTab, setActiveTab] = React.useState("all");
+  const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   
   const [actionTask, setActionTask] = React.useState<Task | null>(null);
   const [pendingStatus, setPendingStatus] = React.useState<Task['status'] | "">("");
@@ -132,9 +135,35 @@ export default function TaskListPage() {
   const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
   const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
 
+  const queryDateRange = React.useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    switch (dateFilter) {
+      case 'today':
+        return { start: todayStr, end: todayStr };
+      case 'yesterday':
+        const yesterday = format(subDays(today, 1), 'yyyy-MM-dd');
+        return { start: yesterday, end: yesterday };
+      case '7days':
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastMonth':
+        return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastYear':
+        return { start: format(subYears(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime':
+        return { start: '1970-01-01', end: '2099-12-31' };
+      case 'custom':
+        return { start: customStart, end: customEnd };
+      default:
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+    }
+  }, [dateFilter, customStart, customEnd]);
+
   const filteredTasks = React.useMemo(() => {
     if (!tasks || !userProfile) return [];
     
+    const { start, end } = queryDateRange;
     let list = tasks;
 
     if (!isAdmin) {
@@ -156,6 +185,9 @@ export default function TaskListPage() {
     }
 
     list = list.filter(task => {
+      const tDate = task.createdAt?.toDate?.() || new Date(task.createdAt);
+      const tDateStr = format(tDate, 'yyyy-MM-dd');
+
       const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         task.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         task.assignedToName.toLowerCase().includes(searchTerm.toLowerCase());
@@ -166,7 +198,9 @@ export default function TaskListPage() {
         (activeTab === 'my-tasks' && task.assignedToId === user?.uid) ||
         (activeTab === 'assigned-by-me' && task.assignedById === user?.uid);
 
-      return matchesSearch && matchesStatus && matchesTab;
+      const matchesDate = tDateStr >= start && tDateStr <= end;
+
+      return matchesSearch && matchesStatus && matchesTab && matchesDate;
     });
 
     return list.sort((a, b) => {
@@ -174,7 +208,7 @@ export default function TaskListPage() {
         const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
     });
-  }, [tasks, searchTerm, statusFilter, activeTab, user, userProfile, roleConfigs, isSuper, isAdmin]);
+  }, [tasks, searchTerm, statusFilter, activeTab, user, userProfile, roleConfigs, isSuper, isAdmin, queryDateRange]);
 
   const stats = React.useMemo(() => {
     const myTasks = filteredTasks.filter(t => t.assignedToId === user?.uid);
@@ -253,6 +287,7 @@ export default function TaskListPage() {
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
+    setDateFilter("7days");
   };
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
@@ -299,37 +334,75 @@ export default function TaskListPage() {
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-            <TabsList className="grid w-full grid-cols-3 md:w-[400px] rounded-sm bg-muted/50 h-9 p-1">
-              <TabsTrigger value="all" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">All Records</TabsTrigger>
-              <TabsTrigger value="my-tasks" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">Assigned To Me</TabsTrigger>
-              <TabsTrigger value="assigned-by-me" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">Assigned By Me</TabsTrigger>
-            </TabsList>
-          </Tabs>
+        <div className="flex flex-col gap-4 bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
+              <TabsList className="grid w-full grid-cols-3 md:w-[400px] rounded-sm bg-muted/50 h-9 p-1">
+                <TabsTrigger value="all" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">All Records</TabsTrigger>
+                <TabsTrigger value="my-tasks" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">Assigned To Me</TabsTrigger>
+                <TabsTrigger value="assigned-by-me" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">Assigned By Me</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search..." 
-                className="pl-9 h-9 rounded-sm border-primary/20 text-xs"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 md:w-64">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search..." 
+                  className="pl-9 h-9 rounded-sm border-primary/20 text-xs"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[120px] rounded-sm h-9 border-primary/20 text-xs font-bold uppercase">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs font-bold">All Status</SelectItem>
+                  {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s} className="text-xs font-medium">{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[120px] rounded-sm h-9 border-primary/20 text-xs font-bold uppercase">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs font-bold">All Status</SelectItem>
-                {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s} className="text-xs font-medium">{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-sm" onClick={clearFilters} title="Clear Filters">
-              <FilterX className="h-3.5 w-3.5 md:h-4 md:w-4" />
-            </Button>
+          </div>
+
+          <div className="flex flex-col md:flex-row items-end gap-4 w-full border-t pt-4">
+            <div className="w-full md:w-[200px] space-y-1">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Time Range</Label>
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+                  <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
+                  <SelectValue placeholder="Select Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+                  <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
+                  <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+                  <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+                  <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
+                  <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
+                  <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2 flex-1 w-full md:w-auto">
+              {dateFilter === 'custom' ? (
+                <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95">
+                  <div className="flex-1 space-y-1">
+                    <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-9 rounded-sm border-primary/20 text-xs" />
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-9 rounded-sm border-primary/20 text-xs" />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1" />
+              )}
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
+                <FilterX className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -385,7 +458,7 @@ export default function TaskListPage() {
             </Card>
           )) : (
             <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-              No tasks found matching criteria.
+              No tasks found for the selected time range.
             </div>
           )}
         </div>

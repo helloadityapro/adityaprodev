@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -7,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { History, Clock, User, MapPin, FileText, ArrowRight, Eye, Search, Calendar, FilterX, FileCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
+import { format, subDays, subMonths, subYears } from "date-fns";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import {
@@ -22,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type TimelineEntry = {
   status: string;
@@ -54,8 +56,9 @@ export default function PtwActivitiesPage() {
   const { user } = useUser();
 
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [startDate, setStartDate] = React.useState("");
-  const [endDate, setEndDate] = React.useState("");
+  const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
@@ -75,8 +78,35 @@ export default function PtwActivitiesPage() {
 
   const { data: allPermits, isLoading } = useCollection<Permit>(permitsQuery);
 
+  const queryDateRange = React.useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    switch (dateFilter) {
+      case 'today':
+        return { start: todayStr, end: todayStr };
+      case 'yesterday':
+        const yesterday = format(subDays(today, 1), 'yyyy-MM-dd');
+        return { start: yesterday, end: yesterday };
+      case '7days':
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastMonth':
+        return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastYear':
+        return { start: format(subYears(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime':
+        return { start: '1970-01-01', end: '2099-12-31' };
+      case 'custom':
+        return { start: customStart, end: customEnd };
+      default:
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+    }
+  }, [dateFilter, customStart, customEnd]);
+
   const filteredActivities = React.useMemo(() => {
     if (!allPermits) return [];
+
+    const { start, end } = queryDateRange;
 
     // Flatten timeline entries
     const flattened: any[] = [];
@@ -106,13 +136,7 @@ export default function PtwActivitiesPage() {
         (activity.remarks || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         activity.action.toLowerCase().includes(searchTerm.toLowerCase());
 
-      let matchesDate = true;
-      if (startDate) {
-        matchesDate = matchesDate && activityDateStr >= startDate;
-      }
-      if (endDate) {
-        matchesDate = matchesDate && activityDateStr <= endDate;
-      }
+      const matchesDate = activityDateStr >= start && activityDateStr <= end;
 
       return matchesSearch && matchesDate;
     });
@@ -123,12 +147,11 @@ export default function PtwActivitiesPage() {
       const dateB = b.timestamp?.toDate?.()?.getTime() || (typeof b.timestamp === 'string' ? new Date(b.timestamp).getTime() : 0);
       return dateB - dateA;
     });
-  }, [allPermits, searchTerm, startDate, endDate]);
+  }, [allPermits, searchTerm, queryDateRange]);
 
   const clearFilters = () => {
     setSearchTerm("");
-    setStartDate("");
-    setEndDate("");
+    setDateFilter("7days");
   };
 
   if (isLoading || isProfileLoading) {
@@ -147,49 +170,55 @@ export default function PtwActivitiesPage() {
         <p className="text-muted-foreground text-sm font-medium">Historical log of all permit-related actions and status changes.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="md:col-span-2 space-y-1">
           <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search Activities</Label>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search..." 
+              placeholder="Search serial, site or user..." 
               className="pl-8 h-9 md:h-10 rounded-sm border-primary/20 text-xs md:text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
-        <div className="grid grid-cols-2 md:contents gap-2">
-          <div className="space-y-1">
-            <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">From Date</Label>
-            <div className="relative">
-              <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground pointer-events-none" />
-              <Input 
-                type="date" 
-                className="pl-8 h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" 
-                value={startDate} 
-                onChange={(e) => setStartDate(e.target.value)} 
-              />
-            </div>
-          </div>
-          <div className="space-y-1 flex gap-1.5 items-end">
-            <div className="flex-1 space-y-1">
-              <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">To Date</Label>
-              <div className="relative">
-                <Calendar className="absolute left-2.5 top-2.5 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground pointer-events-none" />
-                <Input 
-                  type="date" 
-                  className="pl-8 h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" 
-                  value={endDate} 
-                  onChange={(e) => setEndDate(e.target.value)} 
-                />
+        
+        <div className="space-y-1">
+          <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Time Range</Label>
+          <Select value={dateFilter} onValueChange={setDateFilter}>
+            <SelectTrigger className="h-9 md:h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+              <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
+              <SelectValue placeholder="Select Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+              <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
+              <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+              <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+              <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
+              <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
+              <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-end gap-2">
+          {dateFilter === 'custom' ? (
+            <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95">
+              <div className="flex-1 space-y-1">
+                <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" />
+              </div>
+              <div className="flex-1 space-y-1">
+                <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" />
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
-              <FilterX className="h-3.5 w-3.5 md:h-4 md:w-4" />
-            </Button>
-          </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
+            <FilterX className="h-3.5 w-3.5 md:h-4 md:w-4" />
+          </Button>
         </div>
       </div>
 
@@ -305,7 +334,7 @@ export default function PtwActivitiesPage() {
               <History className="h-12 w-12 text-muted-foreground/30 mb-4" />
               <h3 className="text-lg font-semibold">No Activity Found</h3>
               <p className="text-muted-foreground max-sm mx-auto">
-                {searchTerm || startDate || endDate ? "No activities match your filters." : "There are no recorded permit activities to display at this time."}
+                No activities recorded for the selected time range.
               </p>
             </div>
           )}

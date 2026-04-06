@@ -27,14 +27,11 @@ import {
   MapPin, 
   Maximize2, 
   X, 
-  ZoomIn, 
-  ZoomOut, 
-  RotateCcw, 
-  Search, 
+  FolderArchive, 
+  ArrowLeft, 
   ChevronLeft, 
   ChevronRight, 
-  ShieldCheck, 
-  PlayCircle,
+  PlayCircle, 
   FileCheck,
   RefreshCw,
   Calendar,
@@ -46,7 +43,9 @@ import {
   FilterX,
   Check,
   ChevronsUpDown,
-  Loader2
+  Loader2,
+  ShieldCheck,
+  Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
@@ -56,7 +55,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { format } from "date-fns";
+import { format, subDays, subMonths, subYears } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { isSuperAdmin } from "@/lib/auth-constants";
@@ -191,6 +190,9 @@ export default function PtwListPage() {
   const [statusFilter, setStatusFilter] = React.useState('all');
   const [userFilter, setUserFilter] = React.useState('all');
   const [siteFilter, setSiteFilter] = React.useState('all');
+  const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   
   const [isUserPopoverOpen, setIsUserPopoverOpen] = React.useState(false);
   const [userSearchQuery, setUserSearchQuery] = React.useState("");
@@ -237,6 +239,31 @@ export default function PtwListPage() {
   const sitesQuery = useMemoFirebase(() => isAdmin ? collection(firestore, 'sites') : null, [firestore, isAdmin]);
   const { data: sites } = useCollection<{ name: string, id: string }>(sitesQuery);
 
+  const queryDateRange = React.useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    switch (dateFilter) {
+      case 'today':
+        return { start: todayStr, end: todayStr };
+      case 'yesterday':
+        const yesterday = format(subDays(today, 1), 'yyyy-MM-dd');
+        return { start: yesterday, end: yesterday };
+      case '7days':
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastMonth':
+        return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastYear':
+        return { start: format(subYears(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime':
+        return { start: '1970-01-01', end: '2099-12-31' };
+      case 'custom':
+        return { start: customStart, end: customEnd };
+      default:
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+    }
+  }, [dateFilter, customStart, customEnd]);
+
   const filteredPermits = React.useMemo(() => {
     if (!permits || !userProfile) return [];
     
@@ -252,14 +279,21 @@ export default function PtwListPage() {
       list = list.filter(p => assignedIds.has(p.siteId));
     }
 
+    const { start, end } = queryDateRange;
+
     return list.filter(p => {
+        const pDate = p.requestDate?.toDate?.() || new Date(p.requestDate);
+        const pDateStr = format(pDate, 'yyyy-MM-dd');
+
         const matchesStatus = statusFilter === 'all' ? true : p.status === statusFilter;
         const matchesUser = userFilter === 'all' ? true : p.siteEngineerId === userFilter;
         const matchesSite = siteFilter === 'all' ? true : p.siteName === siteFilter;
         const matchesSearch = p.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                              p.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              p.siteEngineerName?.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchesStatus && matchesSearch && matchesUser && matchesSite;
+        const matchesDate = pDateStr >= start && pDateStr <= end;
+
+        return matchesStatus && matchesSearch && matchesUser && matchesSite && matchesDate;
       })
       .sort((a, b) => {
         const { key, direction } = sortConfig;
@@ -271,7 +305,7 @@ export default function PtwListPage() {
         }
         return direction === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
       });
-  }, [permits, statusFilter, userFilter, siteFilter, searchTerm, sortConfig, userProfile, roleConfigs, isSuper]);
+  }, [permits, statusFilter, userFilter, siteFilter, searchTerm, sortConfig, userProfile, roleConfigs, isSuper, queryDateRange]);
 
   const stats = React.useMemo(() => {
     return {
@@ -407,7 +441,7 @@ export default function PtwListPage() {
 
       <div className="grid gap-2 grid-cols-3 sm:gap-4">
         <Card className="bg-primary/5 border-primary/10 rounded-sm">
-          <CardHeader className="p-2 sm:p-4 pb-1 sm:pb-2"><CardTitle className="text-[8px] sm:text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Total</CardTitle></CardHeader>
+          <CardHeader className="p-2 sm:p-4 pb-1 sm:pb-2"><CardTitle className="text-[8px] sm:text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Filtered Total</CardTitle></CardHeader>
           <CardContent className="p-2 sm:p-4 pt-0 font-black text-base sm:text-2xl">{stats.total}</CardContent>
         </Card>
         <Card className="bg-amber-500/5 border-amber-500/10 rounded-sm">
@@ -421,79 +455,113 @@ export default function PtwListPage() {
       </div>
 
       <div className="flex flex-col gap-4 bg-card p-4 border rounded-sm shadow-sm">
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full">
-          <div className="relative w-full flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
+          <div className="relative w-full md:col-span-2">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search by serial or site..." className="pl-9 h-10 rounded-sm bg-muted/20 border-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
-          {isAdmin && (
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" className="w-full md:w-[180px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
-                    {userFilter === 'all' ? "All Engineers" : engineers?.find(e => e.id === userFilter)?.username || "Filter Personnel"}
-                    <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[240px] p-0" align="start">
-                  <div className="flex items-center border-b px-3">
-                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                    <Input placeholder="Search engineers..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" value={userSearchQuery} onChange={(e) => setUserSearchQuery(e.target.value)} />
-                  </div>
-                  <ScrollArea className="h-[200px]">
-                    <div className="p-1">
-                      <Button variant="ghost" className="w-full justify-start font-bold text-xs rounded-sm h-9" onClick={() => { setUserFilter('all'); setIsUserPopoverOpen(false); setUserSearchQuery(""); }}>
-                        <Check className={cn("mr-2 h-3 w-3", userFilter === 'all' ? "opacity-100" : "opacity-0")} />
-                        All Engineers
-                      </Button>
-                      {filteredEngineersList.map(eng => (
-                        <Button key={eng.id} variant="ghost" className="w-full justify-start font-medium text-xs rounded-sm h-9" onClick={() => { setUserFilter(eng.id); setIsUserPopoverOpen(false); setUserSearchQuery(""); }}>
-                          <Check className={cn("mr-2 h-3 w-3", userFilter === eng.id ? "opacity-100" : "opacity-0")} />
-                          {eng.username}
-                        </Button>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
+          
+          <div className="space-y-1">
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+                <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
+                <SelectValue placeholder="Time Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+                <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
+                <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+                <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+                <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
+                <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
+                <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-              <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" className="w-full md:w-[180px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
-                    {siteFilter === 'all' ? "All Sites" : siteFilter}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[240px] p-0" align="start">
-                  <div className="flex items-center border-b px-3">
-                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                    <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" value={siteSearchQuery} onChange={(e) => setSiteSearchQuery(e.target.value)} />
-                  </div>
-                  <ScrollArea className="h-[200px]">
-                    <div className="p-1">
-                      <Button variant="ghost" className="w-full justify-start font-bold text-xs rounded-sm h-9" onClick={() => { setSiteFilter('all'); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}>
-                        <Check className={cn("mr-2 h-3 w-3", siteFilter === 'all' ? "opacity-100" : "opacity-0")} />
-                        All Sites
-                      </Button>
-                      {filteredSitesListForFilter.map(site => (
-                        <Button key={site.id} variant="ghost" className="w-full justify-start font-medium text-xs rounded-sm h-9" onClick={() => { setSiteFilter(site.name); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}>
-                          <Check className={cn("mr-2 h-4 w-4 text-primary", siteFilter === site.name ? "opacity-100" : "opacity-0")} />
-                          {site.name}
-                        </Button>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
-
-              <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setStatusFilter('all'); setUserFilter('all'); setSiteFilter('all'); }} className="h-10 w-10 text-muted-foreground rounded-sm">
-                <FilterX className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
+          <div className="flex items-end gap-2">
+            {dateFilter === 'custom' ? (
+              <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95">
+                <div className="flex-1 space-y-1">
+                  <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-10 rounded-sm border-primary/20 text-xs" />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-10 rounded-sm border-primary/20 text-xs" />
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
+            <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
+              <FilterX className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
+
+        {isAdmin && (
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full md:w-[180px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
+                  {userFilter === 'all' ? "All Engineers" : engineers?.find(e => e.id === userFilter)?.username || "Filter Personnel"}
+                  <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[240px] p-0" align="start">
+                <div className="flex items-center border-b px-3">
+                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Input placeholder="Search engineers..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" value={userSearchQuery} onChange={(e) => setUserSearchQuery(e.target.value)} />
+                </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="p-1">
+                    <Button variant="ghost" className="w-full justify-start font-bold text-xs rounded-sm h-9" onClick={() => { setUserFilter('all'); setIsUserPopoverOpen(false); setUserSearchQuery(""); }}>
+                      <Check className={cn("mr-2 h-3 w-3", userFilter === 'all' ? "opacity-100" : "opacity-0")} />
+                      All Engineers
+                    </Button>
+                    {filteredEngineersList.map(eng => (
+                      <Button key={eng.id} variant="ghost" className="w-full justify-start font-medium text-xs rounded-sm h-9" onClick={() => { setUserFilter(eng.id); setIsUserPopoverOpen(false); setUserSearchQuery(""); }}>
+                        <Check className={cn("mr-2 h-3 w-3", userFilter === eng.id ? "opacity-100" : "opacity-0")} />
+                        {eng.username}
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+
+            <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full md:w-[180px] h-10 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
+                  {siteFilter === 'all' ? "All Sites" : siteFilter}
+                  <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[240px] p-0" align="start">
+                <div className="flex items-center border-b px-3">
+                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" value={siteSearchQuery} onChange={(e) => setSiteSearchQuery(e.target.value)} />
+                </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="p-1">
+                    <Button variant="ghost" className="w-full justify-start font-bold text-xs rounded-sm h-9" onClick={() => { setSiteFilter('all'); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}>
+                      <Check className={cn("mr-2 h-3 w-3", siteFilter === 'all' ? "opacity-100" : "opacity-0")} />
+                      All Sites
+                    </Button>
+                    {filteredSitesListForFilter.map(site => (
+                      <Button key={site.id} variant="ghost" className="w-full justify-start font-medium text-xs rounded-sm h-9" onClick={() => { setSiteFilter(site.name); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}>
+                        <Check className={cn("mr-2 h-4 w-4 text-primary", siteFilter === site.name ? "opacity-100" : "opacity-0")} />
+                        {site.name}
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 no-print">
-          {[{ id: 'all', label: 'All' }, { id: 'Pending', label: 'Pending Manager' }, { id: 'ManagerApproved', label: 'Pending Admin' }, { id: 'Approved', label: 'Approved' }, { id: 'Rejected', label: 'Rejected' }].map(s => (
+          {[{ id: 'all', label: 'All Status' }, { id: 'Pending', label: 'Pending Manager' }, { id: 'ManagerApproved', label: 'Pending Admin' }, { id: 'Approved', label: 'Approved' }, { id: 'Rejected', label: 'Rejected' }].map(s => (
             <Badge key={s.id} variant={statusFilter === s.id ? 'default' : 'outline'} className="cursor-pointer font-bold text-[10px] sm:text-xs h-7 sm:h-8 px-2.5 sm:px-4 rounded-sm border-primary/20" onClick={() => setStatusFilter(s.id)}>{s.label}</Badge>
           ))}
         </div>
@@ -526,7 +594,7 @@ export default function PtwListPage() {
               </div>
             </CardContent>
           </Card>
-        )) : <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No records found.</div>}
+        )) : <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No records found for selected filters.</div>}
       </div>
 
       <div className="hidden md:block">
