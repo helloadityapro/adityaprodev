@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -45,7 +44,8 @@ import {
   ChevronsUpDown,
   Loader2,
   ShieldCheck,
-  Activity
+  Activity,
+  Search
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
@@ -218,7 +218,7 @@ export default function PtwListPage() {
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === "Admin";
-  const userRole = isAdmin ? "Admin" : (userProfile?.role || "Site Engineer");
+  const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
 
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole || !user || isProfileLoading) return null;
@@ -428,6 +428,12 @@ export default function PtwListPage() {
 
   const handleCloseDetails = () => {
     setDetailsPermit(null);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setDateFilter("7days");
   };
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
