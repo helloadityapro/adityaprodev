@@ -112,7 +112,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { sendNotification } from '@/lib/notifications';
 import { getPageKeyByPath, type PageKey, slugifyRole } from "@/lib/access-control";
-import { downloadAndShareRemoteFile, saveAndShareFile } from '@/lib/file-utils';
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
 
@@ -816,9 +815,6 @@ export default function ManageAllTripsPage() {
 
   const availableVehiclesForAllotment = React.useMemo(() => {
     if (!vehicles) return [];
-    
-    // For normal allotment, only available vehicles.
-    // But when re-allotting, the currently assigned vehicle should also appear.
     const base = vehicles.filter(v => v.status === 'Available');
     if (approvalTarget?.assignment?.vehicleId) {
       const currentV = vehicles.find(v => v.id === approvalTarget.assignment.vehicleId);
@@ -828,6 +824,16 @@ export default function ManageAllTripsPage() {
     }
     return base;
   }, [vehicles, approvalTarget]);
+
+  const stats = React.useMemo(() => {
+    if (!assignments) return { total: 0, pending: 0, ongoing: 0, completed: 0 };
+    return {
+      total: assignments.length,
+      pending: assignments.filter(a => a.status === 'Pending').length,
+      ongoing: assignments.filter(a => a.status === 'Ongoing').length,
+      completed: assignments.filter(a => a.status === 'Completed').length,
+    };
+  }, [assignments]);
 
   const handleGlobalWhatsAppShare = (trip: Assignment) => {
     let header = "";
@@ -842,7 +848,7 @@ export default function ManageAllTripsPage() {
     switch (trip.status) {
       case 'Pending':
         header = "\u{1F6A8} *AdityaPro - New Vehicle Request*";
-        body = `*Requester:* ${(trip.userName || '').trim()}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
+        body = `*Requester:* ${(trip.userName || '').trim()}\n*Trip Date:* ${trip.tripDate}\n*Pickup:* ${trip.pickupLocation}\n*Drop:* ${trip.dropLocation || trip.destinations[trip.destinations.length - 1]?.location}\n*Purpose:* ${trip.purpose}`;
         break;
       case 'Approved':
         header = "\u{2705} *AdityaPro - Vehicle Allotted*";
@@ -850,7 +856,7 @@ export default function ManageAllTripsPage() {
         break;
       case 'Ongoing':
         header = "\u{1F6A6} *AdityaPro - Trip Ongoing*";
-        body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${driverDisplay}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} \u{2794} ${trip.destinations[0]?.location || 'Destination'}`;
+        body = `*Vehicle:* ${trip.vehicleDetails}\n*Driver:* ${driverDisplay}\n*Started At:* ${trip.startTime ? format(trip.startTime.toDate(), 'HH:mm') : 'N/A'}\n*Current Route:* ${trip.pickupLocation} \u{2794} ${trip.dropLocation}`;
         break;
       case 'Completed':
         const distance = (trip.endReading || 0) - (trip.startReading || 0);
@@ -869,139 +875,6 @@ export default function ManageAllTripsPage() {
     const message = `${header}\n\n${body}\n\n*View Audit Log:* ${tripUrl}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, '_blank');
   };
-
-  React.useEffect(() => {
-    const viewId = searchParams.get('view');
-    if (viewId && assignments && assignments.length > 0) {
-      const found = assignments.find(a => a.id === viewId);
-      if (found) {
-        setDetailsAssignment(found);
-      }
-    }
-  }, [searchParams, assignments]);
-
-  const handleCloseDetail = () => {
-    setDetailsAssignment(null);
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete('view');
-    const queryStr = params.toString();
-    router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
-  };
-
-  const openViewer = (url: string, assignment: Assignment) => {
-    const urls = [assignment.startReadingPhoto, assignment.endReadingPhoto].filter(Boolean) as string[];
-    const index = urls.indexOf(url);
-    setViewUrls(urls);
-    setCurrentUrlIndex(index >= 0 ? index : 0);
-    setViewUrl(url);
-    setZoom(1);
-  };
-
-  const nextUrl = () => {
-    if (viewUrls.length <= 1) return;
-    const nextIdx = (currentUrlIndex + 1) % viewUrls.length;
-    setCurrentUrlIndex(nextIdx);
-    setViewUrl(viewUrls[nextIdx]);
-    setZoom(1);
-  };
-
-  const prevUrl = () => {
-    if (viewUrls.length <= 1) return;
-    const prevIdx = (currentUrlIndex - 1 + viewUrls.length) % viewUrls.length;
-    setCurrentUrlIndex(prevIdx);
-    setViewUrl(viewUrls[prevIdx]);
-    setZoom(1);
-  };
-
-  const filteredAssignments = React.useMemo(() => {
-    if (!assignments || !userProfile) return [];
-    
-    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
-      ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userRoleStr)?.ownDataOnly ?? false;
-
-    let result = assignments;
-
-    if (isOwnDataOnly && !isSuper) {
-      const assignedIds = new Set(userProfile.assignedProjectIds || []);
-      result = result.filter(trip => {
-        if (trip.siteId) return assignedIds.has(trip.siteId);
-        return true; 
-      });
-    }
-
-    return result.filter(trip => {
-      const matchesSearch = trip.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trip.pickupLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (trip.vehicleDetails || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (trip.driverName || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = statusFilter === 'all' || trip.status === statusFilter;
-      const isQueue = activeTab === 'queue' ? trip.status === 'Pending' : true;
-      
-      return matchesSearch && matchesStatus && isQueue;
-    }).sort((a, b) => {
-      const dateA = a.requestDate?.toDate?.()?.getTime() || 0;
-      const dateB = b.requestDate?.toDate?.()?.getTime() || 0;
-      return dateB - dateA;
-    });
-  }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper, userRoleStr]);
-
-  const stats = React.useMemo(() => {
-    return {
-      total: filteredAssignments.length,
-      pending: filteredAssignments.filter(a => a.status === 'Pending').length,
-      ongoing: filteredAssignments.filter(a => a.status === 'Ongoing').length,
-      completed: filteredAssignments.filter(a => a.status === 'Completed').length,
-    };
-  }, [filteredAssignments]);
-
-  const filteredSortedFleet = React.useMemo(() => {
-    if (!vehicles) return [];
-    
-    let result = vehicles.map(v => {
-      const activeTrip = assignments?.find(a => a.vehicleId === v.id && (a.status === 'Approved' || a.status === 'Ongoing'));
-      const effectiveStatus = activeTrip ? (activeTrip.status === 'Approved' ? 'Allotted' : 'Ongoing') : 'Available';
-      return { ...v, effectiveStatus, activeTrip };
-    });
-
-    result = result.filter(v => {
-      const search = fleetSearch.toLowerCase();
-      const matchesSearch = v.plateNumber.toLowerCase().includes(search) || 
-                           v.make.toLowerCase().includes(search) || 
-                           v.model.toLowerCase().includes(search) ||
-                           v.ownership.toLowerCase().includes(search) ||
-                           v.effectiveStatus.toLowerCase().includes(search) ||
-                           (v.activeTrip?.userName || '').toLowerCase().includes(search);
-      
-      const matchesStatus = fleetStatusFilter === 'all' || v.effectiveStatus === fleetStatusFilter;
-      
-      return matchesSearch && matchesStatus;
-    });
-
-    result.sort((a, b) => {
-      const { key, direction } = fleetSortConfig;
-      let valA: any = '';
-      let valB: any = '';
-
-      if (key === 'plate') {
-        valA = a.plateNumber.toLowerCase();
-        valB = b.plateNumber.toLowerCase();
-      } else if (key === 'ownership') {
-        valA = a.ownership.toLowerCase();
-        valB = b.ownership.toLowerCase();
-      } else if (key === 'status') {
-        valA = a.effectiveStatus.toLowerCase();
-        valB = b.effectiveStatus.toLowerCase();
-      }
-
-      if (valA < valB) return direction === 'asc' ? -1 : 1;
-      if (valA > valB) return direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  }, [vehicles, fleetSearch, fleetStatusFilter, fleetSortConfig, assignments]);
 
   const handleApprove = async () => {
     if (!approvalTarget?.vehicleId || !approvalTarget?.driverId) {
@@ -1036,7 +909,6 @@ export default function ManageAllTripsPage() {
         approvalDate: serverTimestamp(),
       });
 
-      // Update vehicle statuses
       if (oldVehicleId && oldVehicleId !== vehicleId) {
         updateDocumentNonBlocking(doc(firestore, 'vehicles', oldVehicleId), { status: 'Available' });
       }
@@ -1064,27 +936,6 @@ export default function ManageAllTripsPage() {
       setApprovalState(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
-    }
-  };
-
-  const handleSaveEdit = async (values: z.infer<typeof editRequestSchema>) => {
-    if (!editingAssignment) return;
-    try {
-      const combinedDestinations = [
-        ...values.intermediateStops,
-        { type: values.dropType, location: values.dropLocation, purpose: 'Final Destination' }
-      ];
-
-      await updateDocumentNonBlocking(doc(firestore, 'vehicle_assignments', editingAssignment.id), {
-        ...values,
-        destinations: combinedDestinations,
-        updatedAt: serverTimestamp()
-      });
-
-      toast({ title: 'Request Updated', description: 'Itinerary changes applied successfully.' });
-      setEditingAssignment(null);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
     }
   };
 
@@ -1121,7 +972,6 @@ export default function ManageAllTripsPage() {
 
     try {
       const activeAssignments = assignments.filter(a => a.vehicleId === releaseTarget.id && (a.status === 'Approved' || a.status === 'Ongoing'));
-      
       const batch = writeBatch(firestore);
       activeAssignments.forEach(a => {
         batch.update(doc(firestore, 'vehicle_assignments', a.id), {
@@ -1130,14 +980,12 @@ export default function ManageAllTripsPage() {
           adminRemarks: 'Force-released by system administration.'
         });
       });
-
       batch.update(doc(firestore, 'vehicles', releaseTarget.id), {
         status: 'Available',
         updatedAt: serverTimestamp()
       });
-
       await batch.commit();
-      toast({ title: 'Vehicle Released', description: `${releaseTarget.plateNumber} is now available for new allotments.` });
+      toast({ title: 'Vehicle Released', description: `${releaseTarget.plateNumber} is now available.` });
       setReleaseTarget(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
@@ -1146,19 +994,77 @@ export default function ManageAllTripsPage() {
     }
   };
 
+  const filteredAssignments = React.useMemo(() => {
+    if (!assignments || !userProfile) return [];
+    
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userRoleStr)?.ownDataOnly ?? false;
+
+    let result = assignments;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      result = result.filter(trip => {
+        if (trip.siteId) return assignedIds.has(trip.siteId);
+        return true; 
+      });
+    }
+
+    return result.filter(trip => {
+      const matchesSearch = trip.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        trip.pickupLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (trip.vehicleDetails || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (trip.driverName || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || trip.status === statusFilter;
+      const isQueue = activeTab === 'queue' ? trip.status === 'Pending' : true;
+      
+      return matchesSearch && matchesStatus && isQueue;
+    }).sort((a, b) => {
+      const dateA = a.requestDate?.toDate?.()?.getTime() || 0;
+      const dateB = b.requestDate?.toDate?.()?.getTime() || 0;
+      return dateB - dateA;
+    });
+  }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper, userRoleStr]);
+
+  const filteredSortedFleet = React.useMemo(() => {
+    if (!vehicles) return [];
+    let result = vehicles.map(v => {
+      const activeTrip = assignments?.find(a => a.vehicleId === v.id && (a.status === 'Approved' || a.status === 'Ongoing'));
+      const effectiveStatus = activeTrip ? (activeTrip.status === 'Approved' ? 'Allotted' : 'Ongoing') : 'Available';
+      return { ...v, effectiveStatus, activeTrip };
+    });
+    result = result.filter(v => {
+      const search = fleetSearch.toLowerCase();
+      const matchesSearch = v.plateNumber.toLowerCase().includes(search) || 
+                           v.make.toLowerCase().includes(search) || 
+                           v.model.toLowerCase().includes(search) ||
+                           v.ownership.toLowerCase().includes(search) ||
+                           v.effectiveStatus.toLowerCase().includes(search) ||
+                           (v.activeTrip?.userName || '').toLowerCase().includes(search);
+      const matchesStatus = fleetStatusFilter === 'all' || v.effectiveStatus === fleetStatusFilter;
+      return matchesSearch && matchesStatus;
+    });
+    result.sort((a, b) => {
+      const { key, direction } = fleetSortConfig;
+      let valA: any = a[key]?.toLowerCase() || '';
+      let valB: any = b[key]?.toLowerCase() || '';
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return result;
+  }, [vehicles, fleetSearch, fleetStatusFilter, fleetSortConfig, assignments]);
+
   const handleFleetSort = (key: 'plate' | 'ownership' | 'status') => {
-    setFleetSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
+    setFleetSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
   };
 
   const FleetSortIcon = ({ column }: { column: 'plate' | 'ownership' | 'status' }) => {
     if (fleetSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
     return fleetSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
-
-  if (isUserLoading || isProfileLoading || isAssignmentsLoading || isVehiclesLoading || isUsersLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
@@ -1215,7 +1121,7 @@ export default function ManageAllTripsPage() {
             <div className="relative w-full md:w-64">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Search personnel or location..." 
+                placeholder="Search..." 
                 className="pl-8 h-9 text-xs rounded-sm border-primary/20" 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -1237,206 +1143,135 @@ export default function ManageAllTripsPage() {
         </div>
 
         <TabsContent value="registry" className="animate-in fade-in-50 duration-300">
-          <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
-                      <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
-                      <TableHead className="min-w-[250px]">Itinerary</TableHead>
-                      <TableHead>Trip Date</TableHead>
-                      <TableHead>Fleet Resource</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => {
-                      const isAssignedDriver = trip.driverId === user?.uid;
-                      const isRequester = trip.userId === user?.uid;
-                      const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
-                      const canStartTrip = (trip.status === 'Approved') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
-                      const canEndTrip = (trip.status === 'Ongoing') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-4">
+            {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => (
+              <TripMobileCard 
+                key={trip.id} 
+                trip={trip} 
+                user={user} 
+                isAdmin={isAdmin} 
+                isHR={isHR} 
+                isManager={isManager}
+                allUsers={allUsers}
+                onDetails={setDetailsAssignment}
+                onEdit={setEditingAssignment}
+                onCancel={setCancelTarget}
+                onAllot={setApprovalState}
+                onWhatsApp={handleGlobalWhatsAppShare}
+              />
+            )) : (
+              <div className="text-center py-12 text-muted-foreground italic text-xs bg-card border border-dashed rounded-sm">No trip records found.</div>
+            )}
+          </div>
 
-                      return (
-                        <TableRow key={trip.id} className="hover:bg-muted/5 transition-colors group">
-                          <TableCell className="px-6 py-4">
-                            <div className="flex flex-col gap-1">
-                              <span className="font-bold text-sm text-foreground">{trip.userName}</span>
-                              {trip.coPassengers && trip.coPassengers.length > 0 && (
-                                <div className="flex items-center gap-1">
-                                  <Users className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-[9px] font-bold text-muted-foreground uppercase">+{trip.coPassengers.length} pax</span>
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1.5">
-                              <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
-                                <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate">{trip.pickupLocation}</span>
-                              </div>
-                              {trip.intermediateStops && trip.intermediateStops.length > 0 && (
-                                <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
-                                  {trip.intermediateStops.map((dest, i) => (
-                                    <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                                      <ArrowRight className="h-2.5 w-2.5 shrink-0" />
-                                      <span className="truncate">{dest.location}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
-                                <MapPin className="h-3 w-3 shrink-0" />
-                                <span className="truncate">{trip.dropLocation}</span>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-                                <Calendar className="h-3.5 w-3.5 text-primary" />
-                                {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yyyy') : '—'}
-                              </div>
-                              <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground uppercase">
-                                <Clock className="h-3 w-3" />
-                                {trip.reportingTime}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {trip.vehicleId ? (
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs font-bold">{trip.vehicleDetails}</span>
-                                  <Badge variant="secondary" className="h-3.5 px-1 text-[7px] font-black uppercase rounded-sm border-none bg-muted text-muted-foreground">{trip.vehicleOwnership || 'Owned'}</Badge>
-                                </div>
-                                <span className="text-[10px] text-muted-foreground font-black uppercase">{trip.driverName}</span>
-                              </div>
-                            ) : (
-                              <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">Awaiting Resource</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={cn(
-                              "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                              trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                              trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                              trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
-                              trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
-                              "bg-red-50 text-red-700 border-red-200"
-                            )}>
-                              {trip.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right px-6 whitespace-nowrap">
-                            <div className="flex justify-end items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleGlobalWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
-                              {(isAdmin || isHR) && trip.status === 'Approved' && (
-                                <Button size="sm" variant="outline" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 border-primary/20 text-primary hover:bg-primary/5" onClick={() => setApprovalState({ assignment: trip, vehicleId: trip.vehicleId || "", driverId: trip.driverId || "", rentedDriverDetails: trip.driverName?.startsWith('Rented: ') ? trip.driverName.replace('Rented: ', '') : "" })}>Change Allotment</Button>
-                              )}
-                              {(isAdmin || isManager) && trip.status === 'Pending' && (
-                                <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
-                              )}
-                              {(isAdmin || isManager || trip.userId === user?.uid) && trip.status === 'Pending' && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={() => setEditingAssignment(trip)} title="Edit Request"><Pencil className="h-4 w-4" /></Button>
-                              )}
-                              {canStartTrip && (
-                                <Button size="sm" className="h-8 rounded-sm bg-blue-600 hover:bg-blue-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild><Link href={`/vehicles/trips/${trip.id}/start`}><PlayCircle className="h-3.5 w-3.5 mr-1" /> Start</Link></Button>
-                              )}
-                              {canEndTrip && (
-                                <Button size="sm" className="h-8 rounded-sm bg-red-600 hover:bg-red-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild><Link href={`/vehicles/trips/${trip.id}/finish`}><Flag className="h-3.5 w-3.5 mr-1" /> End</Link></Button>
-                              )}
-                              {canCancel && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setCancelTarget(trip)} title="Cancel Trip"><CircleX className="h-4 w-4" /></Button>
-                              )}
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setDetailsAssignment(trip)} title="View Details"><Eye className="h-4 w-4" /></Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    }) : (
-                      <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No logs discovered.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
+            <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
+                        <TableHead className="min-w-[250px]">Itinerary</TableHead>
+                        <TableHead>Trip Date</TableHead>
+                        <TableHead>Fleet Resource</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => (
+                        <TripTableRow 
+                          key={trip.id} 
+                          trip={trip} 
+                          user={user} 
+                          isAdmin={isAdmin} 
+                          isHR={isHR} 
+                          isManager={isManager}
+                          allUsers={allUsers}
+                          onDetails={setDetailsAssignment}
+                          onEdit={setEditingAssignment}
+                          onCancel={setCancelTarget}
+                          onAllot={setApprovalState}
+                          onWhatsApp={handleGlobalWhatsAppShare}
+                        />
+                      )) : (
+                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No logs discovered.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="queue" className="animate-in fade-in-50 duration-300">
-          <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
-                      <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
-                      <TableHead className="min-w-[250px]">Itinerary</TableHead>
-                      <TableHead>Trip Date</TableHead>
-                      <TableHead>Request Date</TableHead>
-                      <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? (
-                      filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
-                        <TableRow key={trip.id} className="hover:bg-muted/5 transition-colors">
-                          <TableCell className="px-6 py-4 font-bold text-sm">{trip.userName}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1.5">
-                              <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
-                                <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate">{trip.pickupLocation}</span>
-                              </div>
-                              {trip.intermediateStops && trip.intermediateStops.length > 0 && (
-                                <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
-                                  {trip.intermediateStops.map((dest, i) => (
-                                    <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                                      <ArrowRight className="h-2.5 w-2.5 shrink-0" />
-                                      <span className="truncate">{dest.location}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
-                                <MapPin className="h-3 w-3 shrink-0" />
-                                <span className="truncate">{trip.dropLocation}</span>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <span className="text-xs font-bold text-foreground">{trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yyyy') : '—'}</span>
-                              <span className="text-[10px] text-muted-foreground uppercase">{trip.reportingTime}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">
-                            {trip.requestDate ? format(trip.requestDate.toDate(), 'dd MMM, HH:mm') : '—'}
-                          </TableCell>
-                          <TableCell className="text-right px-6 whitespace-nowrap">
-                            <div className="flex justify-end items-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleGlobalWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
-                              <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
-                              {(isAdmin || isManager || trip.userId === user?.uid) && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={() => setEditingAssignment(trip)} title="Edit Request"><Pencil className="h-4 w-4" /></Button>
-                              )}
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setCancelTarget(trip)} title="Cancel Request"><CircleX className="h-4 w-4" /></Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">Queue empty.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="md:hidden space-y-4">
+            {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
+              <TripMobileCard 
+                key={trip.id} 
+                trip={trip} 
+                user={user} 
+                isAdmin={isAdmin} 
+                isHR={isHR} 
+                isManager={isManager}
+                allUsers={allUsers}
+                onDetails={setDetailsAssignment}
+                onEdit={setEditingAssignment}
+                onCancel={setCancelTarget}
+                onAllot={setApprovalState}
+                onWhatsApp={handleGlobalWhatsAppShare}
+              />
+            )) : (
+              <div className="text-center py-12 text-muted-foreground italic text-xs bg-card border border-dashed rounded-sm">Queue empty.</div>
+            )}
+          </div>
+
+          <div className="hidden md:block">
+            <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
+                        <TableHead className="min-w-[250px]">Itinerary</TableHead>
+                        <TableHead>Trip Date</TableHead>
+                        <TableHead>Request Date</TableHead>
+                        <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? (
+                        filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
+                          <TripTableRow 
+                            key={trip.id} 
+                            trip={trip} 
+                            user={user} 
+                            isAdmin={isAdmin} 
+                            isHR={isHR} 
+                            isManager={isManager}
+                            allUsers={allUsers}
+                            onDetails={setDetailsAssignment}
+                            onEdit={setEditingAssignment}
+                            onCancel={setCancelTarget}
+                            onAllot={setApprovalState}
+                            onWhatsApp={handleGlobalWhatsAppShare}
+                            isQueueView
+                          />
+                        ))
+                      ) : (
+                        <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">Queue empty.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="fleet" className="animate-in fade-in-50 duration-300">
@@ -1444,7 +1279,7 @@ export default function ManageAllTripsPage() {
             <div className="relative w-full md:w-80">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Search fleet (plate, personnel, site)..." 
+                placeholder="Search fleet..." 
                 className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
                 value={fleetSearch} 
                 onChange={e => setFleetSearch(e.target.value)} 
@@ -1475,17 +1310,17 @@ export default function ManageAllTripsPage() {
                   <TableHeader className="bg-muted/30">
                     <TableRow>
                       <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('plate')}>
-                        <div className="flex items-center">Vehicle Identity <FleetSortIcon column="plate" /></div>
+                        <div className="flex items-center">Vehicle <FleetSortIcon column="plate" /></div>
                       </TableHead>
                       <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('ownership')}>
                         <div className="flex items-center">Ownership <FleetSortIcon column="ownership" /></div>
                       </TableHead>
                       <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('status')}>
-                        <div className="flex items-center">Fleet Status <FleetSortIcon column="status" /></div>
+                        <div className="flex items-center">Status <FleetSortIcon column="status" /></div>
                       </TableHead>
-                      <TableHead className="min-w-[200px]">Current Personnel</TableHead>
+                      <TableHead className="min-w-[200px]">Current User</TableHead>
                       <TableHead className="min-w-[250px]">Current Itinerary</TableHead>
-                      <TableHead className="text-right px-6 min-w-[150px]">Actions</TableHead>
+                      <TableHead className="text-right px-6">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1497,9 +1332,7 @@ export default function ManageAllTripsPage() {
                             <span className="font-mono text-[10px] font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="rounded-sm text-[9px] font-black uppercase px-1.5 h-5">{v.ownership}</Badge>
-                        </TableCell>
+                        <TableCell><Badge variant="secondary" className="rounded-sm text-[9px] font-black uppercase px-1.5 h-5">{v.ownership}</Badge></TableCell>
                         <TableCell>
                           <Badge variant="outline" className={cn(
                             "text-[9px] font-black uppercase rounded-sm px-2 h-5",
@@ -1517,44 +1350,25 @@ export default function ManageAllTripsPage() {
                                 <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {v.activeTrip.driverName}</span>
                               </div>
                             </div>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>
-                          )}
+                          ) : <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>}
                         </TableCell>
                         <TableCell>
                           {v.activeTrip ? (
-                            <div className="flex flex-col gap-1.5">
-                              <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-700">
-                                <MapPin className="h-3 w-3 shrink-0" />
-                                <span className="truncate">{v.activeTrip.pickupLocation}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 ml-4">
-                                <MapPin className="h-2.5 w-2.5 shrink-0" />
-                                <span className="truncate">{v.activeTrip.dropLocation}</span>
-                              </div>
+                            <div className="flex flex-col gap-1.5 text-[10px]">
+                              <div className="flex items-center gap-1.5 font-black text-emerald-700"><MapPin className="h-3 w-3 shrink-0" />{v.activeTrip.pickupLocation}</div>
+                              <div className="flex items-center gap-1.5 font-bold text-emerald-700 ml-4"><MapPin className="h-2.5 w-2.5 shrink-0" />{v.activeTrip.dropLocation}</div>
                             </div>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>
-                          )}
+                          ) : <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>}
                         </TableCell>
-                        <TableCell className="text-right px-6 whitespace-nowrap">
+                        <TableCell className="text-right px-6">
                           {v.effectiveStatus !== 'Available' && (
-                            <div className="flex justify-end items-center">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-8 rounded-sm font-black text-[9px] uppercase border-amber-500/30 text-amber-700 hover:bg-amber-50 shadow-sm"
-                                onClick={() => setReleaseTarget(v)}
-                              >
-                                <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark Available
-                              </Button>
-                            </div>
+                            <Button variant="outline" size="sm" className="h-8 rounded-sm font-black text-[9px] uppercase border-amber-500/30 text-amber-700" onClick={() => setReleaseTarget(v)}>
+                              <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Release
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
-                    )) : (
-                      <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No matching fleet records found.</TableCell></TableRow>
-                    )}
+                    )) : <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No fleet records.</TableCell></TableRow>}
                   </TableBody>
                 </Table>
               </div>
@@ -1563,21 +1377,8 @@ export default function ManageAllTripsPage() {
         </TabsContent>
       </Tabs>
 
-      <EditTripDialog 
-        assignment={editingAssignment} 
-        open={!!editingAssignment} 
-        onOpenChange={(o) => !o && setEditingAssignment(null)} 
-        sites={sites || []}
-        allUsers={allUsers || []}
-        onSave={handleSaveEdit}
-      />
-
-      <ScheduledTripsDialog 
-        assignments={assignments || []} 
-        allUsers={allUsers || []}
-        open={isScheduledTripsOpen} 
-        onOpenChange={setIsScheduledTripsOpen} 
-      />
+      <EditTripDialog assignment={editingAssignment} open={!!editingAssignment} onOpenChange={(o) => !o && setEditingAssignment(null)} sites={sites || []} allUsers={allUsers || []} onSave={handleSaveEdit} />
+      <ScheduledTripsDialog assignments={assignments || []} allUsers={allUsers || []} open={isScheduledTripsOpen} onOpenChange={setIsScheduledTripsOpen} />
 
       <Dialog open={!!approvalTarget} onOpenChange={(o) => !o && setApprovalState(null)}>
         <DialogContent className="max-w-xl w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-auto max-h-[90vh]">
@@ -1590,104 +1391,37 @@ export default function ManageAllTripsPage() {
               </div>
             </div>
           </DialogHeader>
-          
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-8 text-left">
               <div className="space-y-4">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] flex items-center gap-2">
-                  <MapPin className="h-3 w-3" /> Logged Route Itinerary
-                </Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] flex items-center gap-2"><MapPin className="h-3 w-3" /> Logged Route Itinerary</Label>
                 <div className="bg-muted/20 border rounded-sm p-4 space-y-4">
-                  <div className="relative pl-6 border-l-2 border-emerald-500 pb-2">
-                    <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
-                    <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Pickup Location</p>
-                    <p className="text-sm font-black">{approvalTarget?.assignment.pickupLocation}</p>
-                  </div>
-                  {approvalTarget?.assignment.intermediateStops?.map((d, i) => (
-                    <div key={i} className="relative pl-6 border-l-2 border-primary pb-2">
-                      <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
-                      <p className="text-[9px] font-black uppercase text-primary tracking-tighter">Stop #{i + 1}</p>
-                      <p className="text-sm font-black">{d.location}</p>
-                      <p className="text-[10px] font-bold text-muted-foreground italic leading-relaxed">"{d.purpose}"</p>
-                    </div>
-                  ))}
-                  <div className="relative pl-6 border-l-2 border-emerald-500">
-                    <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
-                    <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Final Drop</p>
-                    <p className="text-sm font-black">{approvalTarget?.assignment.dropLocation}</p>
-                  </div>
+                  <div className="relative pl-6 border-l-2 border-emerald-500 pb-2"><div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" /><p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Pickup</p><p className="text-sm font-black">{approvalTarget?.assignment.pickupLocation}</p></div>
+                  {approvalTarget?.assignment.intermediateStops?.map((d, i) => (<div key={i} className="relative pl-6 border-l-2 border-primary pb-2"><div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" /><p className="text-[9px] font-black uppercase text-primary tracking-tighter">Stop #{i + 1}</p><p className="text-sm font-black">{d.location}</p></div>))}
+                  <div className="relative pl-6 border-l-2 border-emerald-500"><div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" /><p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Final Drop</p><p className="text-sm font-black">{approvalTarget?.assignment.dropLocation}</p></div>
                 </div>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3 text-left">
+                <div className="space-y-3">
                   <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Select Fleet Vehicle</Label>
-                  <Select onValueChange={(val) => {
-                    const v = vehicles?.find(x => x.id === val);
-                    setApprovalState(prev => prev ? { 
-                      ...prev, 
-                      vehicleId: val, 
-                      driverId: v?.ownership === 'Rented' ? 'RENTED' : '' 
-                    } : null);
-                  }} value={approvalTarget?.vehicleId}>
-                    <SelectTrigger className="rounded-sm border-primary/20 h-11 font-bold text-sm bg-muted/5">
-                      <SelectValue placeholder="Allot Vehicle..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableVehiclesForAllotment.map(v => (
-                        <SelectItem key={v.id} value={v.id} className="text-xs font-bold">
-                          {v.make} {v.model} ({v.plateNumber}) — {v.ownership}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
+                  <Select onValueChange={(val) => { const v = vehicles?.find(x => x.id === val); setApprovalState(prev => prev ? { ...prev, vehicleId: val, driverId: v?.ownership === 'Rented' ? 'RENTED' : '' } : null); }} value={approvalTarget?.vehicleId}>
+                    <SelectTrigger className="rounded-sm border-primary/20 h-11 font-bold text-sm bg-muted/5"><SelectValue placeholder="Allot Vehicle..." /></SelectTrigger>
+                    <SelectContent>{availableVehiclesForAllotment.map(v => (<SelectItem key={v.id} value={v.id} className="text-xs font-bold">{v.make} {v.model} ({v.plateNumber})</SelectItem>))}</SelectContent>
                   </Select>
                 </div>
-
-                <div className="space-y-3 text-left">
+                <div className="space-y-3">
                   {vehicles?.find(v => v.id === approvalTarget?.vehicleId)?.ownership === 'Rented' ? (
-                    <>
-                      <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Rented Driver Info (Optional)</Label>
-                      <Input 
-                        placeholder="Name / Phone..." 
-                        className="h-11 font-bold text-sm rounded-sm"
-                        value={approvalTarget?.rentedDriverDetails || ""}
-                        onChange={(e) => setApprovalState(prev => prev ? { ...prev, rentedDriverDetails: e.target.value } : null)}
-                      />
-                      <p className="text-[9px] text-muted-foreground italic font-medium">External driver — No system selection required.</p>
-                    </>
+                    <><Label className="text-[10px] font-black uppercase text-primary tracking-widest">Rented Driver Info</Label><Input placeholder="Name / Phone..." className="h-11 font-bold text-sm rounded-sm" value={approvalTarget?.rentedDriverDetails || ""} onChange={(e) => setApprovalState(prev => prev ? { ...prev, rentedDriverDetails: e.target.value } : null)} /></>
                   ) : (
-                    <>
-                      <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Assign System Driver</Label>
-                      <Select 
-                        disabled={!approvalTarget?.vehicleId}
-                        value={approvalTarget?.driverId}
-                        onValueChange={(val) => setApprovalState(prev => prev ? { ...prev, driverId: val } : null)}
-                      >
-                        <SelectTrigger className="rounded-sm border-primary/20 h-11 font-bold text-sm bg-muted/5">
-                          <SelectValue placeholder="Designate Driver..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {driversList.map(d => (
-                            <SelectItem key={d.id} value={d.id} className="text-xs font-bold">{d.username}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </>
+                    <><Label className="text-[10px] font-black uppercase text-primary tracking-widest">Assign System Driver</Label><Select disabled={!approvalTarget?.vehicleId} value={approvalTarget?.driverId} onValueChange={(val) => setApprovalState(prev => prev ? { ...prev, driverId: val } : null)}><SelectTrigger className="rounded-sm border-primary/20 h-11 font-bold text-sm bg-muted/5"><SelectValue placeholder="Designate Driver..." /></SelectTrigger><SelectContent>{driversList.map(d => (<SelectItem key={d.id} value={d.id} className="text-xs font-bold">{d.username}</SelectItem>))}</SelectContent></Select></>
                   )}
                 </div>
               </div>
             </div>
           </ScrollArea>
-
           <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
             <DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-11 rounded-sm font-black uppercase text-[10px] tracking-widest">Cancel</Button></DialogClose>
-            <Button 
-              onClick={handleApprove} 
-              className="w-full sm:flex-1 h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-xl bg-primary hover:bg-primary/90" 
-              disabled={!approvalTarget?.vehicleId || !approvalTarget?.driverId}
-            >
-              Confirm Allotment
-            </Button>
+            <Button onClick={handleApprove} className="w-full sm:flex-1 h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-xl" disabled={!approvalTarget?.vehicleId || !approvalTarget?.driverId}>Confirm Allotment</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1695,308 +1429,262 @@ export default function ManageAllTripsPage() {
       <Dialog open={!!detailsAssignment} onOpenChange={(o) => !o && handleCloseDetail()}>
         <DialogContent className="max-w-3xl w-[98vw] h-[95vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
           <DialogHeader className="p-4 sm:p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-2 rounded-sm"><MapPinned className="h-5 w-5 text-primary" /></div>
-              <div>
-                <DialogTitle className="text-base sm:text-xl font-black uppercase tracking-tight">Trip Audit Log</DialogTitle>
-                <DialogDescription className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Request ID: {detailsAssignment?.id.slice(0, 8)}</DialogDescription>
-              </div>
-            </div>
-            {detailsAssignment && (
-              <Badge variant="outline" className={cn(
-                "text-[8px] sm:text-[9px] font-black uppercase rounded-sm px-1.5 sm:px-2 h-5 sm:h-6",
-                detailsAssignment.status === 'Completed' ? "bg-green-100 text-green-800" : 
-                detailsAssignment.status === 'Ongoing' ? "bg-primary text-white border-none" : "bg-muted"
-              )}>
-                {detailsAssignment.status}
-              </Badge>
-            )}
+            <div className="flex items-center gap-3"><div className="bg-primary/10 p-2 rounded-sm"><MapPinned className="h-5 w-5 text-primary" /></div><div><DialogTitle className="text-base sm:text-xl font-black uppercase tracking-tight">Trip Audit Log</DialogTitle><DialogDescription className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">ID: {detailsAssignment?.id.slice(0, 8)}</DialogDescription></div></div>
+            {detailsAssignment && <Badge variant="outline" className={cn("text-[8px] sm:text-[9px] font-black uppercase rounded-sm px-1.5 h-5 sm:h-6", detailsAssignment.status === 'Completed' ? "bg-green-100 text-green-800" : detailsAssignment.status === 'Ongoing' ? "bg-primary text-white border-none" : "bg-muted")}>{detailsAssignment.status}</Badge>}
           </DialogHeader>
-
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 p-4 sm:p-8 space-y-10 sm:space-y-12">
             {detailsAssignment && (
-              <div className="p-4 sm:p-8 space-y-10 sm:space-y-12 text-left">
+              <>
                 <section className="space-y-6">
-                  <div className="flex items-center gap-2 border-b pb-2">
-                    <Navigation className="h-4 w-4 text-primary" />
-                    <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-foreground">Trip Itinerary</h3>
-                  </div>
+                  <div className="flex items-center gap-2 border-b pb-2"><Navigation className="h-4 w-4 text-primary" /><h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em]">Itinerary</h3></div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-6 relative border-l-2 border-primary/10 ml-3 pl-6">
-                      <div className="relative">
-                        <div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
-                        <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Pickup Location</p>
-                        <p className="text-sm font-black">{detailsAssignment.pickupLocation}</p>
-                        <Badge variant="secondary" className="mt-1 text-[8px] h-4 rounded-sm px-1.5 font-bold uppercase">{detailsAssignment.pickupType}</Badge>
-                      </div>
-                      {detailsAssignment.intermediateStops && detailsAssignment.intermediateStops.map((dest, idx) => (
-                        <div key={idx} className="relative">
-                          <div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
-                          <p className="text-[9px] font-black uppercase text-primary tracking-tighter">Stop #{idx + 1}</p>
-                          <p className="text-sm font-black">{dest.location}</p>
-                          <p className="text-[10px] font-medium italic text-muted-foreground">"{dest.purpose}"</p>
-                        </div>
-                      ))}
-                      <div className="relative">
-                        <div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
-                        <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Final Drop</p>
-                        <p className="text-sm font-black">{detailsAssignment.dropLocation}</p>
-                        {detailsAssignment.dropType && (
-                          <Badge variant="secondary" className="mt-1 text-[8px] h-4 rounded-sm px-1.5 font-bold uppercase">{detailsAssignment.dropType}</Badge>
-                        )}
-                      </div>
+                      <div className="relative"><div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" /><p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Pickup</p><p className="text-sm font-black">{detailsAssignment.pickupLocation}</p></div>
+                      {detailsAssignment.intermediateStops?.map((dest, idx) => (<div key={idx} className="relative"><div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" /><p className="text-[9px] font-black uppercase text-primary tracking-tighter">Stop #{idx + 1}</p><p className="text-sm font-black">{dest.location}</p></div>))}
+                      <div className="relative"><div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" /><p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Final Drop</p><p className="text-sm font-black">{detailsAssignment.dropLocation}</p></div>
                     </div>
                     <div className="space-y-4">
-                      <div className="p-4 bg-muted/20 border rounded-sm space-y-3">
-                        <div className="flex justify-between items-center text-[9px] sm:text-[10px] font-black uppercase text-muted-foreground">
-                          <span className="flex items-center gap-1.5"><Calendar className="h-3 w-3" /> Trip Date</span>
-                          <span className="text-foreground">{detailsAssignment.tripDate}</span>
-                        </div>
-                        <Separator className="opacity-50" />
-                        <div className="flex justify-between items-center text-[9px] sm:text-[10px] font-black uppercase text-muted-foreground">
-                          <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Reporting</span>
-                          <span className="text-foreground">{detailsAssignment.reportingTime}</span>
-                        </div>
-                      </div>
-                      <div className="p-4 bg-primary/[0.02] border border-primary/10 rounded-sm">
-                        <Label className="text-[9px] font-black uppercase text-primary tracking-widest block mb-2">Trip Purpose</Label>
-                        <p className="text-xs font-medium italic text-foreground/80 leading-relaxed">"{detailsAssignment.purpose}"</p>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-                <section className="space-y-6">
-                  <div className="flex items-center gap-2 border-b pb-2">
-                    <HardHat className="h-4 w-4 text-primary" />
-                    <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-foreground">Fleet & Personnel</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-sm bg-primary/10 flex items-center justify-center text-primary shrink-0"><UserCircle2 className="h-6 w-6" /></div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Requester</span>
-                          <span className="text-sm font-black truncate">{detailsAssignment.userName}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-sm bg-muted flex items-center justify-center text-muted-foreground shrink-0"><UserCog className="h-6 w-6" /></div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Assigned Driver</span>
-                          <span className="text-sm font-black truncate">{detailsAssignment.driverName || '—'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-sm bg-primary/5 border border-primary/10 flex items-center justify-center text-primary font-black text-xs shrink-0">V</div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Resource</span>
-                          <span className="text-sm font-black uppercase truncate">{detailsAssignment.vehicleDetails || 'Allotment Pending'}</span>
-                        </div>
-                      </div>
-                      {detailsAssignment.coPassengers && detailsAssignment.coPassengers.length > 0 && (
-                        <div className="p-3 bg-muted/10 border rounded-sm">
-                          <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest block mb-2">Co-passengers ({detailsAssignment.coPassengers.length})</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {detailsAssignment.coPassengers.map((p, i) => (
-                              <Badge key={i} variant="outline" className="text-[8px] rounded-full px-2 h-4 border-primary/10 bg-background">{p.name}</Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      <div className="p-4 bg-muted/20 border rounded-sm space-y-3"><div className="flex justify-between items-center text-[9px] font-black uppercase text-muted-foreground"><span>Date</span><span className="text-foreground">{detailsAssignment.tripDate}</span></div><Separator className="opacity-50" /><div className="flex justify-between items-center text-[9px] font-black uppercase text-muted-foreground"><span>Reporting</span><span className="text-foreground">{detailsAssignment.reportingTime}</span></div></div>
+                      <div className="p-4 bg-primary/[0.02] border border-primary/10 rounded-sm"><Label className="text-[9px] font-black uppercase text-primary tracking-widest block mb-2">Purpose</Label><p className="text-xs font-medium italic text-foreground/80 leading-relaxed">"{detailsAssignment.purpose}"</p></div>
                     </div>
                   </div>
                 </section>
                 {(detailsAssignment.status === 'Ongoing' || detailsAssignment.status === 'Completed') && (
-                  <section className="space-y-6 pb-10">
-                    <div className="flex items-center gap-2 border-b pb-2">
-                      <ShieldCheck className="h-4 w-4 text-primary" />
-                      <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-foreground">Digital Audit Proof</h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-4">
-                        <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                          <PlayCircle className="h-3 w-3" /> Start Verification
-                        </Label>
-                        <div className="bg-muted/20 border rounded-sm p-4 space-y-4">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-bold uppercase text-muted-foreground">Odometer Reading</span>
-                            <span className="text-lg font-black text-primary font-mono">{detailsAssignment.startReading} KM</span>
-                          </div>
-                          {detailsAssignment.startReadingPhoto && (
-                            <div 
-                              className="relative aspect-video rounded-sm overflow-hidden border-2 border-primary/5 shadow-md group cursor-pointer"
-                              onClick={() => openViewer(detailsAssignment.startReadingPhoto!, detailsAssignment)}
-                            >
-                              <img src={detailsAssignment.startReadingPhoto} className="w-full h-full object-cover" alt="Start Proof" />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                <Maximize2 className="h-6 w-6 text-white" />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      {detailsAssignment.status === 'Completed' && (
-                        <div className="space-y-4">
-                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                            <Flag className="h-3 w-3" /> Conclusion Audit
-                          </Label>
-                          <div className="bg-emerald-50/50 border border-emerald-100 rounded-sm p-4 space-y-4">
-                            <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-bold uppercase text-emerald-700">Final Reading</span>
-                              <span className="text-lg font-black text-emerald-900 font-mono">{detailsAssignment.endReading} KM</span>
-                            </div>
-                            <div className="flex justify-between items-center pt-2 border-t border-emerald-100">
-                              <span className="text-[10px] font-bold uppercase text-emerald-700">Total Distance</span>
-                              <span className="text-sm font-black text-emerald-900">
-                                {((detailsAssignment.endReading || 0) - (detailsAssignment.startReading || 0)).toFixed(1)} KM
-                              </span>
-                            </div>
-                            {detailsAssignment.endReadingPhoto && (
-                              <div 
-                                className="relative aspect-video rounded-sm overflow-hidden border-2 border-emerald-100 shadow-md group cursor-pointer"
-                                onClick={() => openViewer(detailsAssignment.endReadingPhoto!, detailsAssignment)}
-                              >
-                                <img src={detailsAssignment.endReadingPhoto} className="w-full h-full object-cover" alt="End Proof" />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                  <Maximize2 className="h-6 w-6 text-white" />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </section>
+                  <section className="space-y-6"><div className="flex items-center gap-2 border-b pb-2"><ShieldCheck className="h-4 w-4 text-primary" /><h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em]">Digital Audit Proof</h3></div><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div className="space-y-4"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><PlayCircle className="h-3 w-3" /> Start</Label><div className="bg-muted/20 border rounded-sm p-4 space-y-4"><div className="flex justify-between items-center"><span className="text-[10px] font-bold uppercase text-muted-foreground">Odometer</span><span className="text-lg font-black text-primary font-mono">{detailsAssignment.startReading} KM</span></div>{detailsAssignment.startReadingPhoto && (<div className="relative aspect-video rounded-sm overflow-hidden border cursor-pointer" onClick={() => openViewer(detailsAssignment.startReadingPhoto!, detailsAssignment)}><img src={detailsAssignment.startReadingPhoto} className="w-full h-full object-cover" alt="Start" /></div>)}</div></div>{detailsAssignment.status === 'Completed' && (<div className="space-y-4"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><Flag className="h-3 w-3" /> Conclusion</Label><div className="bg-emerald-50/50 border border-emerald-100 rounded-sm p-4 space-y-4"><div className="flex justify-between items-center"><span className="text-[10px] font-bold uppercase text-emerald-700">Final Reading</span><span className="text-lg font-black text-emerald-900 font-mono">{detailsAssignment.endReading} KM</span></div>{detailsAssignment.endReadingPhoto && (<div className="relative aspect-video rounded-sm overflow-hidden border border-emerald-100 cursor-pointer" onClick={() => openViewer(detailsAssignment.endReadingPhoto!, detailsAssignment)}><img src={detailsAssignment.endReadingPhoto} className="w-full h-full object-cover" alt="End" /></div>)}</div></div>)}</div></section>
                 )}
-              </div>
+              </>
             )}
           </ScrollArea>
-
-          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
-            {detailsAssignment && (
-              <Button 
-                variant="outline" 
-                className="w-full sm:mr-auto sm:w-auto h-11 rounded-sm font-black uppercase text-[10px] tracking-widest text-green-700 border-green-200 hover:bg-green-50"
-                onClick={() => handleGlobalWhatsAppShare(detailsAssignment)}
-              >
-                <MessageCircle className="h-4 w-4 mr-1.5" /> Share WA
-              </Button>
-            )}
-            <DialogClose asChild><Button variant="outline" className="w-full sm:w-auto rounded-sm font-black uppercase text-[10px] h-11 px-8 tracking-widest">Close Audit</Button></DialogClose>
-          </DialogFooter>
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 flex flex-col sm:flex-row"><DialogClose asChild><Button variant="outline" className="w-full sm:w-auto rounded-sm font-black uppercase text-[10px] h-11 px-8 tracking-widest">Close Audit</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Media Preview Dialog */}
       <Dialog open={!!viewUrl} onOpenChange={(o) => { if(!o) { setZoom(1); setViewUrl(null); setViewUrls([]); } }}>
-        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Audit Media Detail</DialogTitle>
-            <DialogDescription>Enlarged view of site audit proof.</DialogDescription>
-          </DialogHeader>
-          
-          <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }} title="Zoom In">
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }} title="Zoom Out">
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }} title="Reset Zoom">
-              <RotateCcw className="h-5 w-5" />
-            </Button>
-          </div>
-
-          {viewUrls.length > 1 && (
-            <>
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); prevUrl(); }}>
-                  <ChevronLeft className="h-8 w-8" />
-                </Button>
-              </div>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); nextUrl(); }}>
-                  <ChevronRight className="h-8 w-8" />
-                </Button>
-              </div>
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
-                <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
-                  {currentUrlIndex + 1} / {viewUrls.length}
-                </Badge>
-              </div>
-            </>
-          )}
-          
-          <div className="relative w-full h-full overflow-auto p-4 flex">
-            <div 
-              ref={viewerRef}
-              className={cn(
-                "m-auto transition-transform duration-200 ease-out flex items-center justify-center",
-                zoom > 1 ? "cursor-move" : "cursor-default"
-              )}
-              style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
-            >
-              {viewUrl && (
-                isVideoUrl(viewUrl) ? (
-                  <video src={viewUrl} controls autoPlay className="max-w-full max-h-[85vh] shadow-2xl" />
-                ) : (
-                  <img src={viewUrl} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Audit Evidence" />
-                )
-              )}
-            </div>
-          </div>
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
+          <div className="absolute top-4 left-4 flex gap-2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }}><ZoomIn className="h-4 w-4" /></Button><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }}><ZoomOut className="h-4 w-4" /></Button><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }}><RotateCcw className="h-5 w-5" /></Button></div>
+          <div className="relative w-full h-full overflow-auto p-4 flex"><div ref={viewerRef} className={cn("m-auto transition-transform duration-200", zoom > 1 ? "cursor-move" : "cursor-default")} style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}>{viewUrl && <img src={viewUrl} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Evidence" />}</div></div>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
-        <AlertDialogContent className="rounded-sm max-md w-[95vw]">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
-              <CircleX className="h-5 w-5" /> Confirm Cancellation
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium leading-relaxed text-left">
-              Revoke this trip request? If a vehicle was alloted, it will be returned to the available pool.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmCancel} 
-              disabled={isProcessing}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg"
-            >
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Confirm Cancellation
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
+        <AlertDialogContent className="rounded-sm max-md w-[95vw]"><AlertDialogHeader><AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight"><CircleX className="h-5 w-5" /> Confirm Cancellation</AlertDialogTitle><AlertDialogDescription className="text-sm font-medium">Revoke this trip request? This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel><AlertDialogAction onClick={handleConfirmCancel} disabled={isProcessing} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Cancellation"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog open={!!releaseTarget} onOpenChange={(o) => !o && setReleaseTarget(null)}>
-        <AlertDialogContent className="rounded-sm max-md w-[95vw]">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-amber-700 font-black uppercase tracking-tight">
-              <RotateCcw className="h-5 w-5" /> Manual Fleet Release
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium leading-relaxed text-left text-foreground/80">
-              Force-release <strong>{releaseTarget?.plateNumber}</strong>? <br/><br/>
-              This will <strong>reject any active allotments or ongoing trips</strong> for this vehicle and return it to the Available pool instantly. Use this only for administrative correction.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleMarkAvailable} 
-              disabled={isProcessing}
-              className="bg-amber-600 text-white hover:bg-amber-700 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg border-none"
-            >
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Force Release Asset"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
+        <AlertDialogContent className="rounded-sm max-md w-[95vw]"><AlertDialogHeader><AlertDialogTitle className="text-amber-700 font-black uppercase tracking-tight">Force Release Asset</AlertDialogTitle><AlertDialogDescription>Force-release {releaseTarget?.plateNumber}? This cancels active allotments for this vehicle.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel><AlertDialogAction onClick={handleMarkAvailable} disabled={isProcessing} className="bg-amber-600 text-white hover:bg-amber-700 rounded-sm font-black uppercase text-[10px] h-11">Force Release</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+/**
+ * Functional component for a desktop table row.
+ */
+function TripTableRow({ trip, user, isAdmin, isHR, isManager, allUsers, onDetails, onEdit, onCancel, onAllot, onWhatsApp, isQueueView = false }: any) {
+  const isAssignedDriver = trip.driverId === user?.uid;
+  const isRequester = trip.userId === user?.uid;
+  const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
+  const canStartTrip = (trip.status === 'Approved') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
+  const canEndTrip = (trip.status === 'Ongoing') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
+
+  return (
+    <TableRow className="hover:bg-muted/5 transition-colors group">
+      <TableCell className="px-6 py-4">
+        <div className="flex flex-col gap-1">
+          <span className="font-bold text-sm text-foreground">{trip.userName}</span>
+          {trip.coPassengers && trip.coPassengers.length > 0 && (
+            <div className="flex items-center gap-1">
+              <Users className="h-3 w-3 text-muted-foreground" />
+              <span className="text-[9px] font-bold text-muted-foreground uppercase">+{trip.coPassengers.length} pax</span>
+            </div>
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <TripItinerary trip={trip} />
+      </TableCell>
+      <TableCell>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+            <Calendar className="h-3.5 w-3.5 text-primary" />
+            {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yy') : '—'}
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground uppercase">
+            <Clock className="h-3 w-3" />
+            {trip.reportingTime}
+          </div>
+        </div>
+      </TableCell>
+      {!isQueueView && (
+        <TableCell>
+          {trip.vehicleId ? (
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold">{trip.vehicleDetails}</span>
+                <Badge variant="secondary" className="h-3.5 px-1 text-[7px] font-black uppercase rounded-sm border-none bg-muted text-muted-foreground">{trip.vehicleOwnership || 'Owned'}</Badge>
+              </div>
+              <span className="text-[10px] text-muted-foreground font-black uppercase">{trip.driverName}</span>
+            </div>
+          ) : (
+            <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">Awaiting Resource</span>
+          )}
+        </TableCell>
+      )}
+      {isQueueView && (
+        <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">
+          {trip.requestDate ? format(trip.requestDate.toDate(), 'dd MMM, HH:mm') : '—'}
+        </TableCell>
+      )}
+      {!isQueueView && (
+        <TableCell>
+          <Badge variant="outline" className={cn(
+            "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+            trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+            trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
+            trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
+            trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+            "bg-red-50 text-red-700 border-red-200"
+          )}>
+            {trip.status}
+          </Badge>
+        </TableCell>
+      )}
+      <TableCell className="text-right px-6 whitespace-nowrap">
+        <div className="flex justify-end items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => onWhatsApp(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
+          {(isAdmin || isHR) && trip.status === 'Approved' && (
+            <Button size="sm" variant="outline" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 border-primary/20 text-primary hover:bg-primary/5" onClick={() => onAllot({ assignment: trip, vehicleId: trip.vehicleId || "", driverId: trip.driverId || "", rentedDriverDetails: trip.driverName?.startsWith('Rented: ') ? trip.driverName.replace('Rented: ', '') : "" })}>Change Allotment</Button>
+          )}
+          {(isAdmin || isManager) && trip.status === 'Pending' && (
+            <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => onAllot({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
+          )}
+          {(isAdmin || isManager || trip.userId === user?.uid) && trip.status === 'Pending' && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={() => onEdit(trip)} title="Edit Request"><Pencil className="h-4 w-4" /></Button>
+          )}
+          {canStartTrip && (
+            <Button size="sm" className="h-8 rounded-sm bg-blue-600 hover:bg-blue-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild><Link href={`/vehicles/trips/${trip.id}/start`}><PlayCircle className="h-3.5 w-3.5 mr-1" /> Start</Link></Button>
+          )}
+          {canEndTrip && (
+            <Button size="sm" className="h-8 rounded-sm bg-red-600 hover:bg-red-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild><Link href={`/vehicles/trips/${trip.id}/finish`}><Flag className="h-3.5 w-3.5 mr-1" /> End</Link></Button>
+          )}
+          {canCancel && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => onCancel(trip)} title="Cancel Trip"><CircleX className="h-4 w-4" /></Button>
+          )}
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => onDetails(trip)} title="View Details"><Eye className="h-4 w-4" /></Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+/**
+ * Functional component for a mobile card.
+ */
+function TripMobileCard({ trip, user, isAdmin, isHR, isManager, onDetails, onEdit, onCancel, onAllot, onWhatsApp }: any) {
+  const isAssignedDriver = trip.driverId === user?.uid;
+  const isRequester = trip.userId === user?.uid;
+  const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
+  const canStartTrip = (trip.status === 'Approved') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
+  const canEndTrip = (trip.status === 'Ongoing') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
+
+  return (
+    <Card className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => onDetails(trip)}>
+      <CardContent className="p-4 space-y-4">
+        <div className="flex justify-between items-start gap-4">
+          <div className="flex flex-col gap-1 min-w-0">
+            <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yy') : '—'}
+              <span className="mx-1">•</span>
+              <Clock className="h-3 w-3" />
+              {trip.reportingTime}
+            </span>
+            <h3 className="font-bold text-sm leading-tight text-foreground truncate">{trip.userName}</h3>
+          </div>
+          <Badge variant="outline" className={cn(
+            "text-[8px] font-black uppercase rounded-sm px-1.5 h-5 shrink-0",
+            trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+            trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
+            trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
+            trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+            "bg-red-50 text-red-700 border-red-200"
+          )}>{trip.status}</Badge>
+        </div>
+
+        <TripItinerary trip={trip} />
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Fleet Resource</p>
+            {trip.vehicleId ? (
+              <div className="flex flex-col">
+                <span className="text-xs font-bold truncate">{trip.vehicleDetails}</span>
+                <span className="text-[9px] font-black text-primary uppercase">{trip.driverName}</span>
+              </div>
+            ) : <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting Resource</span>}
+          </div>
+          <div className="space-y-1">
+            <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Passengers</p>
+            <div className="flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-[10px] font-bold text-foreground">
+                {trip.coPassengers && trip.coPassengers.length > 0 ? `+${trip.coPassengers.length} personnel` : 'Requester Only'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-primary/5 flex flex-wrap justify-end items-center gap-2" onClick={e => e.stopPropagation()}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => onWhatsApp(trip)}><MessageCircle className="h-4 w-4" /></Button>
+          {(isAdmin || isHR) && trip.status === 'Approved' && (
+            <Button size="sm" variant="outline" className="h-8 rounded-sm font-black text-[9px] uppercase border-primary/20 text-primary" onClick={() => onAllot({ assignment: trip, vehicleId: trip.vehicleId || "", driverId: trip.driverId || "", rentedDriverDetails: trip.driverName?.startsWith('Rented: ') ? trip.driverName.replace('Rented: ', '') : "" })}>Re-allot</Button>
+          )}
+          {(isAdmin || isManager) && trip.status === 'Pending' && (
+            <Button size="sm" className="h-8 rounded-sm font-black text-[9px] uppercase" onClick={() => onAllot({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
+          )}
+          {(isAdmin || isManager || trip.userId === user?.uid) && trip.status === 'Pending' && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => onEdit(trip)}><Pencil className="h-4 w-4" /></Button>
+          )}
+          {canStartTrip && (
+            <Button size="sm" className="h-8 rounded-sm bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 text-[10px] uppercase" asChild><Link href={`/vehicles/trips/${trip.id}/start`}><PlayCircle className="h-3.5 w-3.5 mr-1" /> Start</Link></Button>
+          )}
+          {canEndTrip && (
+            <Button size="sm" className="h-8 rounded-sm bg-red-600 hover:bg-red-700 text-white font-bold px-3 text-[10px] uppercase" asChild><Link href={`/vehicles/trips/${trip.id}/finish`}><Flag className="h-3.5 w-3.5 mr-1" /> End</Link></Button>
+          )}
+          {canCancel && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={() => onCancel(trip)}><CircleX className="h-4 w-4" /></Button>
+          )}
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => onDetails(trip)}><Eye className="h-4 w-4" /></Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Functional component for trip itinerary visualization.
+ */
+function TripItinerary({ trip }: { trip: Assignment }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
+        <MapPin className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">{trip.pickupLocation}</span>
+      </div>
+      {trip.intermediateStops && trip.intermediateStops.length > 0 && (
+        <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
+          {trip.intermediateStops.map((dest, i) => (
+            <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
+              <ArrowRight className="h-2.5 w-2.5 shrink-0" />
+              <span className="truncate">{dest.location}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
+        <MapPin className="h-3 w-3 shrink-0" />
+        <span className="truncate">{trip.dropLocation}</span>
+      </div>
     </div>
   );
 }
