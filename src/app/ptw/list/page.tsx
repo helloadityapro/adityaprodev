@@ -45,7 +45,10 @@ import {
   Loader2,
   ShieldCheck,
   Activity,
-  Search
+  Search,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
@@ -487,7 +490,7 @@ export default function PtwListPage() {
 
           <div className="flex items-end gap-2">
             {dateFilter === 'custom' ? (
-              <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95">
+              <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex-1 space-y-1">
                   <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-10 rounded-sm border-primary/20 text-xs" />
                 </div>
