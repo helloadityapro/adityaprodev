@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, orderBy, where, or, and, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, or, and, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -112,6 +112,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { sendNotification } from '@/lib/notifications';
 import { getPageKeyByPath, type PageKey, slugifyRole } from "@/lib/access-control";
+import { downloadAndShareRemoteFile, saveAndShareFile } from '@/lib/file-utils';
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
 
@@ -307,7 +308,7 @@ function EditTripDialog({
                     name="tripDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider">Trip Date</FormLabel>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Trip Date</FormLabel>
                         <FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl>
                         <FormMessage />
                       </FormItem>
@@ -318,7 +319,7 @@ function EditTripDialog({
                     name="reportingTime"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider">Reporting Time (12h)</FormLabel>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Reporting Time (12h)</FormLabel>
                         <FormControl>
                           <div className="flex items-center gap-2">
                             <Input 
@@ -420,7 +421,7 @@ function EditTripDialog({
 
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
-                          <Label className="text-xs font-bold uppercase">Intermediate Stops</Label>
+                          <Label className="text-xs font-bold uppercase text-muted-foreground">Intermediate Stops</Label>
                           <Button type="button" variant="outline" size="sm" onClick={() => appendStop({ type: 'Site', location: '', purpose: '' })} className="h-7 text-[10px] font-bold"><Plus className="h-3.5 w-3.5 mr-1" /> Add Stop</Button>
                         </div>
                         {stopFields.map((field, idx) => (
@@ -505,7 +506,7 @@ function EditTripDialog({
                     <Popover open={isPassengerPopoverOpen} onOpenChange={setIsPassengerPopoverOpen}>
                       <PopoverTrigger asChild><Button variant="outline" size="sm" className="h-7 text-[10px] font-bold"><UserPlus className="h-3 w-3 mr-1" /> Add</Button></PopoverTrigger>
                       <PopoverContent className="w-[300px] p-0" align="end">
-                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search personnel..." className="h-10 border-none" value={passengerSearchQuery} onChange={e => setPassengerSearchQuery(e.target.value)} /></div>
+                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search personnel..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={passengerSearchQuery} onChange={e => setPassengerSearchQuery(e.target.value)} /></div>
                         <ScrollArea className="h-[200px]">{filteredPotentialPassengers.map(u => (<Button key={u.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { if(!coPassengers.some(p => p.id === u.id)) { form.setValue('coPassengers', [...coPassengers, { id: u.id, name: u.username }]); } setIsPassengerPopoverOpen(false); }}>{u.username}</Button>))}</ScrollArea>
                       </PopoverContent>
                     </Popover>
@@ -523,7 +524,7 @@ function EditTripDialog({
 
                 <FormField control={form.control} name="purpose" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider">General Trip Note</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">General Trip Note</FormLabel>
                     <FormControl><Textarea rows={3} placeholder="Describe the trip context..." {...field} className="rounded-sm" /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -780,7 +781,7 @@ export default function ManageAllTripsPage() {
   const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
   const isHR = userProfile?.role === 'Manager - Human Resources';
-  const userRole = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
+  const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
   const assignmentsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
@@ -815,8 +816,18 @@ export default function ManageAllTripsPage() {
 
   const availableVehiclesForAllotment = React.useMemo(() => {
     if (!vehicles) return [];
-    return vehicles.filter(v => v.status === 'Available');
-  }, [vehicles]);
+    
+    // For normal allotment, only available vehicles.
+    // But when re-allotting, the currently assigned vehicle should also appear.
+    const base = vehicles.filter(v => v.status === 'Available');
+    if (approvalTarget?.assignment?.vehicleId) {
+      const currentV = vehicles.find(v => v.id === approvalTarget.assignment.vehicleId);
+      if (currentV && !base.find(v => v.id === currentV.id)) {
+        base.push(currentV);
+      }
+    }
+    return base;
+  }, [vehicles, approvalTarget]);
 
   const handleGlobalWhatsAppShare = (trip: Assignment) => {
     let header = "";
@@ -902,64 +913,12 @@ export default function ManageAllTripsPage() {
     setZoom(1);
   };
 
-  const isVideoUrl = (url: string) => {
-    const lowUrl = url.toLowerCase();
-    return lowUrl.includes('.mp4') || lowUrl.includes('.mov') || lowUrl.includes('.webm') || lowUrl.includes('.ogg');
-  };
-
-  // Zoom logic for media preview
-  React.useEffect(() => {
-    const el = viewerRef.current;
-    if (!el || !viewUrl) return;
-
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      setZoom(prev => {
-        const delta = e.deltaY > 0 ? -0.2 : 0.2;
-        return Math.min(Math.max(prev + delta, 0.5), 4);
-      });
-    };
-
-    let initialDist = 0;
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        initialDist = Math.hypot(
-          e.touches[0].pageX - e.touches[1].pageX,
-          e.touches[0].pageY - e.touches[1].pageY
-        );
-      }
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        e.preventDefault();
-        const dist = Math.hypot(
-          e.touches[0].pageX - e.touches[1].pageX,
-          e.touches[0].pageY - e.touches[1].pageY
-        );
-        const delta = (dist - initialDist) / 100;
-        setZoom(prev => Math.min(Math.max(prev + delta, 0.5), 4));
-        initialDist = dist;
-      }
-    };
-
-    el.addEventListener('wheel', onWheel, { passive: false });
-    el.addEventListener('touchstart', onTouchStart);
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-
-    return () => {
-      el.removeEventListener('wheel', onWheel);
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-    };
-  }, [viewUrl]);
-
   const filteredAssignments = React.useMemo(() => {
     if (!assignments || !userProfile) return [];
     
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userRole)?.ownDataOnly ?? false;
+      : roleConfigs?.find(c => c.id === userRoleStr)?.ownDataOnly ?? false;
 
     let result = assignments;
 
@@ -986,9 +945,17 @@ export default function ManageAllTripsPage() {
       const dateB = b.requestDate?.toDate?.()?.getTime() || 0;
       return dateB - dateA;
     });
-  }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper, userRole]);
+  }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper, userRoleStr]);
 
-  // Unified Fleet filtering and sorting logic
+  const stats = React.useMemo(() => {
+    return {
+      total: filteredAssignments.length,
+      pending: filteredAssignments.filter(a => a.status === 'Pending').length,
+      ongoing: filteredAssignments.filter(a => a.status === 'Ongoing').length,
+      completed: filteredAssignments.filter(a => a.status === 'Completed').length,
+    };
+  }, [filteredAssignments]);
+
   const filteredSortedFleet = React.useMemo(() => {
     if (!vehicles) return [];
     
@@ -1036,27 +1003,6 @@ export default function ManageAllTripsPage() {
     return result;
   }, [vehicles, fleetSearch, fleetStatusFilter, fleetSortConfig, assignments]);
 
-  const handleFleetSort = (key: 'plate' | 'ownership' | 'status') => {
-    setFleetSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  const FleetSortIcon = ({ column }: { column: 'plate' | 'ownership' | 'status' }) => {
-    if (fleetSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-    return fleetSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
-  };
-
-  const stats = React.useMemo(() => {
-    return {
-      total: filteredAssignments.length,
-      pending: filteredAssignments.filter(a => a.status === 'Pending').length,
-      ongoing: filteredAssignments.filter(a => a.status === 'Ongoing').length,
-      completed: filteredAssignments.filter(a => a.status === 'Completed').length,
-    };
-  }, [filteredAssignments]);
-
   const handleApprove = async () => {
     if (!approvalTarget?.vehicleId || !approvalTarget?.driverId) {
       toast({ variant: 'destructive', title: 'Selection Required', description: 'Please allot a vehicle and driver.' });
@@ -1078,6 +1024,8 @@ export default function ManageAllTripsPage() {
     }
 
     try {
+      const oldVehicleId = assignment.vehicleId;
+
       updateDocumentNonBlocking(doc(firestore, 'vehicle_assignments', assignment.id), {
         status: 'Approved',
         vehicleId,
@@ -1088,9 +1036,12 @@ export default function ManageAllTripsPage() {
         approvalDate: serverTimestamp(),
       });
 
+      // Update vehicle statuses
+      if (oldVehicleId && oldVehicleId !== vehicleId) {
+        updateDocumentNonBlocking(doc(firestore, 'vehicles', oldVehicleId), { status: 'Available' });
+      }
       updateDocumentNonBlocking(doc(firestore, 'vehicles', vehicleId), { status: 'Allotted' });
 
-      // Send Platform and Push Notification to Requester
       sendNotification(firestore, {
         userId: assignment.userId,
         title: "Vehicle Allotted",
@@ -1099,7 +1050,6 @@ export default function ManageAllTripsPage() {
         push: true
       });
 
-      // Send Platform and Push Notification to Driver (if system driver)
       if (finalDriverId !== 'RENTED') {
         sendNotification(firestore, {
           userId: finalDriverId,
@@ -1196,8 +1146,16 @@ export default function ManageAllTripsPage() {
     }
   };
 
-  const handleSaveSites = async () => {
-    // Legacy mapping support placeholder
+  const handleFleetSort = (key: 'plate' | 'ownership' | 'status') => {
+    setFleetSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const FleetSortIcon = ({ column }: { column: 'plate' | 'ownership' | 'status' }) => {
+    if (fleetSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return fleetSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
 
   if (isUserLoading || isProfileLoading || isAssignmentsLoading || isVehiclesLoading || isUsersLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
@@ -1279,298 +1237,145 @@ export default function ManageAllTripsPage() {
         </div>
 
         <TabsContent value="registry" className="animate-in fade-in-50 duration-300">
-          <div className="md:hidden space-y-4">
-            {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => {
-              const isAssignedDriver = trip.driverId === user?.uid;
-              const isRequester = trip.userId === user?.uid;
-              const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
-              const canStartTrip = (trip.status === 'Approved') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
-              const canEndTrip = (trip.status === 'Ongoing') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
-
-              return (
-                <Card key={trip.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setDetailsAssignment(trip)}>
-                  <CardContent className="p-4 space-y-4">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex flex-col gap-1 min-w-0">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yy') : '—'}
-                        </span>
-                        <h3 className="font-bold text-sm text-foreground leading-tight truncate">{trip.userName}</h3>
-                      </div>
-                      <Badge variant="outline" className={cn(
-                        "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                        trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                        trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                        trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
-                        trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
-                        "bg-red-50 text-red-700 border-red-200"
-                      )}>
-                        {trip.status}
-                      </Badge>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{trip.pickupLocation}</span>
-                      </div>
-                      {trip.destinations.length > 1 && (
-                        <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
-                          {trip.destinations.slice(0, -1).map((dest, i) => (
-                            <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                              <ArrowRight className="h-2.5 w-2.5 shrink-0" />
-                              <span className="truncate">{dest.location}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {trip.destinations.length > 0 && (
-                        <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
-                          <MapPin className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{trip.destinations[trip.destinations.length - 1]?.location}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
-                      {trip.vehicleId ? (
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-bold text-foreground truncate max-w-[120px]">{trip.vehicleDetails}</span>
-                          <span className="text-[8px] font-black text-muted-foreground uppercase">{trip.driverName}</span>
-                        </div>
-                      ) : (
-                        <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">Awaiting Resource</span>
-                      )}
-                      
-                      <div className="flex gap-1 items-center" onClick={e => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => handleGlobalWhatsAppShare(trip)}>
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                        
-                        {(isAdmin || isManager || trip.userId === user?.uid) && trip.status === 'Pending' && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => setEditingAssignment(trip)}><Pencil className="h-4 w-4" /></Button>
-                        )}
-
-                        {canStartTrip && (
-                          <Button size="sm" className="h-8 rounded-sm bg-blue-600 hover:bg-blue-700 font-bold px-3 text-[10px] uppercase" asChild><Link href={`/vehicles/trips/${trip.id}/start`}><PlayCircle className="h-3.5 w-3.5 mr-1" /> Start</Link></Button>
-                        )}
-                        
-                        {canEndTrip && (
-                          <Button size="sm" className="h-8 rounded-sm bg-red-600 hover:bg-red-700 font-bold px-3 text-[10px] uppercase" asChild><Link href={`/vehicles/trips/${trip.id}/finish`}><Flag className="h-3.5 w-3.5 mr-1" /> End</Link></Button>
-                        )}
-
-                        {canCancel && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={() => setCancelTarget(trip)}><CircleX className="h-4 w-4" /></Button>
-                        )}
-
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setDetailsAssignment(trip)}><Eye className="h-4 w-4" /></Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            }) : (
-              <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No logs discovered.</div>
-            )}
-          </div>
-
-          <div className="hidden md:block">
-            <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-muted/30">
-                      <TableRow>
-                        <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
-                        <TableHead className="min-w-[250px]">Itinerary</TableHead>
-                        <TableHead>Trip Date</TableHead>
-                        <TableHead>Fleet Resource</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => {
-                        const isAssignedDriver = trip.driverId === user?.uid;
-                        const isRequester = trip.userId === user?.uid;
-                        const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
-                        const canStartTrip = (trip.status === 'Approved') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
-                        const canEndTrip = (trip.status === 'Ongoing') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
-
-                        return (
-                          <TableRow key={trip.id} className="hover:bg-muted/5 transition-colors">
-                            <TableCell className="px-6 py-4">
-                              <div className="flex flex-col gap-1">
-                                <span className="font-bold text-sm text-foreground">{trip.userName}</span>
-                                {trip.coPassengers && trip.coPassengers.length > 0 && (
-                                  <div className="flex items-center gap-1">
-                                    <Users className="h-3 w-3 text-muted-foreground" />
-                                    <span className="text-[9px] font-bold text-muted-foreground uppercase">+{trip.coPassengers.length} pax</span>
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col gap-1.5">
-                                <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
-                                  <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                  <span className="truncate">{trip.pickupLocation}</span>
-                                </div>
-                                {trip.destinations.length > 1 && (
-                                  <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
-                                    {trip.destinations.slice(0, -1).map((dest, i) => (
-                                      <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                                        <ArrowRight className="h-2.5 w-2.5 shrink-0" />
-                                        <span className="truncate">{dest.location}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                {trip.destinations.length > 0 && (
-                                  <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
-                                    <MapPin className="h-3 w-3 shrink-0" />
-                                    <span className="truncate">{trip.destinations[trip.destinations.length - 1]?.location}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
-                                  <Calendar className="h-3.5 w-3.5 text-primary" />
-                                  {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yyyy') : '—'}
-                                </div>
-                                <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground uppercase">
-                                  <Clock className="h-3 w-3" />
-                                  {trip.reportingTime}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {trip.vehicleId ? (
-                                <div className="flex flex-col">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="text-xs font-bold">{trip.vehicleDetails}</span>
-                                    <Badge variant="secondary" className="h-3.5 px-1 text-[7px] font-black uppercase rounded-sm border-none bg-muted text-muted-foreground">{trip.vehicleOwnership || 'Owned'}</Badge>
-                                  </div>
-                                  <span className="text-[10px] text-muted-foreground font-black uppercase">{trip.driverName}</span>
-                                </div>
-                              ) : (
-                                <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">Awaiting Resource</span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className={cn(
-                                "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                                trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                                trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                                trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
-                                trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
-                                "bg-red-50 text-red-700 border-red-200"
-                              )}>
-                                {trip.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right px-6 whitespace-nowrap">
-                              <div className="flex justify-end items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleGlobalWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
-                                {(isAdmin || isManager) && trip.status === 'Pending' && (
-                                  <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
-                                )}
-                                {(isAdmin || isManager || trip.userId === user?.uid) && trip.status === 'Pending' && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setEditingAssignment(trip); }} title="Edit Request"><Pencil className="h-4 w-4" /></Button>
-                                )}
-                                {canStartTrip && (
-                                  <Button size="sm" className="h-8 rounded-sm bg-blue-600 hover:bg-blue-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild><Link href={`/vehicles/trips/${trip.id}/start`}><PlayCircle className="h-3.5 w-3.5 mr-1" /> Start</Link></Button>
-                                )}
-                                {canEndTrip && (
-                                  <Button size="sm" className="h-8 rounded-sm bg-red-600 hover:bg-red-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild><Link href={`/vehicles/trips/${trip.id}/finish`}><Flag className="h-3.5 w-3.5 mr-1" /> End</Link></Button>
-                                )}
-                                {canCancel && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setCancelTarget(trip)}><CircleX className="h-4 w-4" /></Button>
-                                )}
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={(e) => { e.stopPropagation(); setDetailsAssignment(trip); }}><Eye className="h-4 w-4" /></Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      }) : (
-                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No logs discovered.</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="queue" className="animate-in fade-in-50 duration-300">
-          <div className="md:hidden space-y-4">
-            {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? (
-              filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
-                <Card key={trip.id} className="border-l-4 border-l-amber-500 border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setDetailsAssignment(trip)}>
-                  <CardContent className="p-4 space-y-4">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex flex-col gap-1 min-w-0">
-                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">Request: {trip.requestDate ? format(trip.requestDate.toDate(), 'dd MMM, HH:mm') : '—'}</span>
-                        <h3 className="font-bold text-sm text-foreground truncate">{trip.userName}</h3>
-                      </div>
-                      <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[8px] font-black uppercase rounded-sm h-5">Action Required</Badge>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
-                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{trip.pickupLocation}</span>
-                      </div>
-                      {trip.destinations.length > 1 && (
-                        <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
-                          {trip.destinations.slice(0, -1).map((dest, i) => (
-                            <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
-                              <ArrowRight className="h-2.5 w-2.5 shrink-0" />
-                              <span className="truncate">{dest.location}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {trip.destinations.length > 0 && (
-                        <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
-                          <MapPin className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{trip.destinations[trip.destinations.length - 1]?.location}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="pt-2 border-t border-primary/5 flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={(e) => { e.stopPropagation(); handleGlobalWhatsAppShare(trip); }}><MessageCircle className="h-4 w-4" /></Button>
-                      <Button size="sm" className="h-8 rounded-sm font-black text-[10px] px-4" onClick={(e) => { e.stopPropagation(); setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" }); }}>Allot Now</Button>
-                      
-                      {(isAdmin || isManager || trip.userId === user?.uid) && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={(e) => { e.stopPropagation(); setEditingAssignment(trip); }}><Pencil className="h-4 w-4" /></Button>
-                      )}
-                      
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={(e) => { e.stopPropagation(); setCancelTarget(trip); }}><CircleX className="h-4 w-4" /></Button>
-                      
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={(e) => { e.stopPropagation(); setDetailsAssignment(trip); }}><Eye className="h-4 w-4" /></Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">Queue empty.</div>
-            )}
-          </div>
-
-          <div className="hidden md:block">
-            <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-              <CardContent className="p-0">
+          <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-muted/30">
                     <TableRow>
-                      <TableHead className="px-6">Requester</TableHead>
-                      <TableHead>Itinerary Summary</TableHead>
+                      <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
+                      <TableHead className="min-w-[250px]">Itinerary</TableHead>
+                      <TableHead>Trip Date</TableHead>
+                      <TableHead>Fleet Resource</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => {
+                      const isAssignedDriver = trip.driverId === user?.uid;
+                      const isRequester = trip.userId === user?.uid;
+                      const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
+                      const canStartTrip = (trip.status === 'Approved') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
+                      const canEndTrip = (trip.status === 'Ongoing') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
+
+                      return (
+                        <TableRow key={trip.id} className="hover:bg-muted/5 transition-colors group">
+                          <TableCell className="px-6 py-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="font-bold text-sm text-foreground">{trip.userName}</span>
+                              {trip.coPassengers && trip.coPassengers.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <Users className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-[9px] font-bold text-muted-foreground uppercase">+{trip.coPassengers.length} pax</span>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1.5">
+                              <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700">
+                                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">{trip.pickupLocation}</span>
+                              </div>
+                              {trip.intermediateStops && trip.intermediateStops.length > 0 && (
+                                <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
+                                  {trip.intermediateStops.map((dest, i) => (
+                                    <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
+                                      <ArrowRight className="h-2.5 w-2.5 shrink-0" />
+                                      <span className="truncate">{dest.location}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{trip.dropLocation}</span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                                <Calendar className="h-3.5 w-3.5 text-primary" />
+                                {trip.tripDate ? format(new Date(trip.tripDate), 'dd MMM yyyy') : '—'}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground uppercase">
+                                <Clock className="h-3 w-3" />
+                                {trip.reportingTime}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {trip.vehicleId ? (
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold">{trip.vehicleDetails}</span>
+                                  <Badge variant="secondary" className="h-3.5 px-1 text-[7px] font-black uppercase rounded-sm border-none bg-muted text-muted-foreground">{trip.vehicleOwnership || 'Owned'}</Badge>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground font-black uppercase">{trip.driverName}</span>
+                              </div>
+                            ) : (
+                              <span className="text-[9px] font-bold text-muted-foreground/40 uppercase italic">Awaiting Resource</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn(
+                              "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                              trip.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                              trip.status === 'Approved' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                              trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
+                              trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+                              "bg-red-50 text-red-700 border-red-200"
+                            )}>
+                              {trip.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right px-6 whitespace-nowrap">
+                            <div className="flex justify-end items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleGlobalWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
+                              {(isAdmin || isHR) && trip.status === 'Approved' && (
+                                <Button size="sm" variant="outline" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 border-primary/20 text-primary hover:bg-primary/5" onClick={() => setApprovalState({ assignment: trip, vehicleId: trip.vehicleId || "", driverId: trip.driverId || "", rentedDriverDetails: trip.driverName?.startsWith('Rented: ') ? trip.driverName.replace('Rented: ', '') : "" })}>Change Allotment</Button>
+                              )}
+                              {(isAdmin || isManager) && trip.status === 'Pending' && (
+                                <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
+                              )}
+                              {(isAdmin || isManager || trip.userId === user?.uid) && trip.status === 'Pending' && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={() => setEditingAssignment(trip)} title="Edit Request"><Pencil className="h-4 w-4" /></Button>
+                              )}
+                              {canStartTrip && (
+                                <Button size="sm" className="h-8 rounded-sm bg-blue-600 hover:bg-blue-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild><Link href={`/vehicles/trips/${trip.id}/start`}><PlayCircle className="h-3.5 w-3.5 mr-1" /> Start</Link></Button>
+                              )}
+                              {canEndTrip && (
+                                <Button size="sm" className="h-8 rounded-sm bg-red-600 hover:bg-red-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild><Link href={`/vehicles/trips/${trip.id}/finish`}><Flag className="h-3.5 w-3.5 mr-1" /> End</Link></Button>
+                              )}
+                              {canCancel && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setCancelTarget(trip)} title="Cancel Trip"><CircleX className="h-4 w-4" /></Button>
+                              )}
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setDetailsAssignment(trip)} title="View Details"><Eye className="h-4 w-4" /></Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }) : (
+                      <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No logs discovered.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="queue" className="animate-in fade-in-50 duration-300">
+          <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
+                      <TableHead className="min-w-[250px]">Itinerary</TableHead>
                       <TableHead>Trip Date</TableHead>
                       <TableHead>Request Date</TableHead>
                       <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
@@ -1587,9 +1392,9 @@ export default function ManageAllTripsPage() {
                                 <MapPin className="h-3.5 w-3.5 shrink-0" />
                                 <span className="truncate">{trip.pickupLocation}</span>
                               </div>
-                              {trip.destinations.length > 1 && (
+                              {trip.intermediateStops && trip.intermediateStops.length > 0 && (
                                 <div className="flex flex-col gap-1 ml-4 border-l-2 border-primary/10 pl-3">
-                                  {trip.destinations.slice(0, -1).map((dest, i) => (
+                                  {trip.intermediateStops.map((dest, i) => (
                                     <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-primary">
                                       <ArrowRight className="h-2.5 w-2.5 shrink-0" />
                                       <span className="truncate">{dest.location}</span>
@@ -1597,12 +1402,10 @@ export default function ManageAllTripsPage() {
                                   ))}
                                 </div>
                               )}
-                              {trip.destinations.length > 0 && (
-                                <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
-                                  <MapPin className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{trip.destinations[trip.destinations.length - 1]?.location}</span>
-                                </div>
-                              )}
+                              <div className="flex items-center gap-1.5 text-xs font-black text-emerald-700 ml-4">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{trip.dropLocation}</span>
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1619,9 +1422,9 @@ export default function ManageAllTripsPage() {
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleGlobalWhatsAppShare(trip)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
                               <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => setApprovalState({ assignment: trip, vehicleId: "", driverId: "", rentedDriverDetails: "" })}>Allot Vehicle</Button>
                               {(isAdmin || isManager || trip.userId === user?.uid) && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setEditingAssignment(trip); }} title="Edit Request"><Pencil className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={() => setEditingAssignment(trip)} title="Edit Request"><Pencil className="h-4 w-4" /></Button>
                               )}
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setCancelTarget(trip)}><CircleX className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setCancelTarget(trip)} title="Cancel Request"><CircleX className="h-4 w-4" /></Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -1631,9 +1434,9 @@ export default function ManageAllTripsPage() {
                     )}
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="fleet" className="animate-in fade-in-50 duration-300">
@@ -1665,162 +1468,98 @@ export default function ManageAllTripsPage() {
             </div>
           </div>
 
-          <div className="md:hidden space-y-4">
-            {filteredSortedFleet.length > 0 ? filteredSortedFleet.map(v => (
-              <Card key={v.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden">
-                <CardHeader className="p-4 bg-muted/5 border-b flex flex-row items-center justify-between space-y-0">
-                  <div className="flex items-center gap-2">
-                    <CarFront className="h-4 w-4 text-primary" />
-                    <span className="font-mono text-xs font-black uppercase">{v.plateNumber}</span>
-                  </div>
-                  <Badge variant="outline" className={cn(
-                    "text-[8px] font-black uppercase h-5 px-1.5",
-                    v.effectiveStatus === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                    v.effectiveStatus === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                    "bg-amber-50 text-amber-700 border-amber-200"
-                  )}>{v.effectiveStatus}</Badge>
-                </CardHeader>
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold">{v.make} {v.model}</span>
-                    <span className="text-[9px] text-muted-foreground uppercase font-medium">{v.ownership} Vehicle</span>
-                  </div>
-                  {v.activeTrip ? (
-                    <div className="space-y-3 pt-3 border-t">
-                      <div className="flex items-center gap-2">
-                        <UserCircle2 className="h-3.5 w-3.5 text-primary" />
-                        <div className="flex flex-col">
-                          <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Personnel</span>
-                          <span className="text-[11px] font-bold">{v.activeTrip.userName}</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-[8px] font-black uppercase text-muted-foreground leading-none">Itinerary</span>
-                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700">
-                          <MapPin className="h-3 w-3" /> {v.activeTrip.pickupLocation} ➔ {v.activeTrip.destinations[v.activeTrip.destinations.length - 1]?.location}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="pt-3 border-t text-center py-2">
-                      <span className="text-[9px] font-bold text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>
-                    </div>
-                  )}
-                </CardContent>
-                {v.effectiveStatus !== 'Available' && (
-                  <CardFooter className="bg-muted/5 border-t p-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="w-full h-8 text-[10px] font-black uppercase text-amber-700 hover:text-amber-800"
-                      onClick={() => setReleaseTarget(v)}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark as Available
-                    </Button>
-                  </CardFooter>
-                )}
-              </Card>
-            )) : (
-              <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No vehicles found.</div>
-            )}
-          </div>
-
-          <div className="hidden md:block">
-            <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-muted/30">
-                      <TableRow>
-                        <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('plate')}>
-                          <div className="flex items-center">Vehicle Identity <FleetSortIcon column="plate" /></div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('ownership')}>
-                          <div className="flex items-center">Ownership <FleetSortIcon column="ownership" /></div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('status')}>
-                          <div className="flex items-center">Fleet Status <FleetSortIcon column="status" /></div>
-                        </TableHead>
-                        <TableHead className="min-w-[200px]">Current Personnel</TableHead>
-                        <TableHead className="min-w-[250px]">Current Itinerary</TableHead>
-                        <TableHead className="text-right px-6 min-w-[150px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredSortedFleet.length > 0 ? filteredSortedFleet.map(v => (
-                        <TableRow key={v.id} className="hover:bg-muted/5">
-                          <TableCell className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-bold">{v.make} {v.model}</span>
-                              <span className="font-mono text-[10px] font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
+          <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('plate')}>
+                        <div className="flex items-center">Vehicle Identity <FleetSortIcon column="plate" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('ownership')}>
+                        <div className="flex items-center">Ownership <FleetSortIcon column="ownership" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('status')}>
+                        <div className="flex items-center">Fleet Status <FleetSortIcon column="status" /></div>
+                      </TableHead>
+                      <TableHead className="min-w-[200px]">Current Personnel</TableHead>
+                      <TableHead className="min-w-[250px]">Current Itinerary</TableHead>
+                      <TableHead className="text-right px-6 min-w-[150px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSortedFleet.length > 0 ? filteredSortedFleet.map(v => (
+                      <TableRow key={v.id} className="hover:bg-muted/5">
+                        <TableCell className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold">{v.make} {v.model}</span>
+                            <span className="font-mono text-[10px] font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="rounded-sm text-[9px] font-black uppercase px-1.5 h-5">{v.ownership}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn(
+                            "text-[9px] font-black uppercase rounded-sm px-2 h-5",
+                            v.effectiveStatus === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                            v.effectiveStatus === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                            "bg-amber-50 text-amber-700 border-amber-200"
+                          )}>{v.effectiveStatus}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {v.activeTrip ? (
+                            <div className="flex items-center gap-2">
+                              <UserCircle2 className="h-4 w-4 text-primary" />
+                              <div className="flex flex-col">
+                                <span className="text-xs font-bold">{v.activeTrip.userName}</span>
+                                <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {v.activeTrip.driverName}</span>
+                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="rounded-sm text-[9px] font-black uppercase px-1.5 h-5">{v.ownership}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className={cn(
-                              "text-[9px] font-black uppercase rounded-sm px-2 h-5",
-                              v.effectiveStatus === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                              v.effectiveStatus === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                              "bg-amber-50 text-amber-700 border-amber-200"
-                            )}>
-                              {v.effectiveStatus}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {v.activeTrip ? (
-                              <div className="flex items-center gap-2">
-                                <UserCircle2 className="h-4 w-4 text-primary" />
-                                <div className="flex flex-col">
-                                  <span className="text-xs font-bold">{v.activeTrip.userName}</span>
-                                  <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {v.activeTrip.driverName}</span>
-                                </div>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {v.activeTrip ? (
+                            <div className="flex flex-col gap-1.5">
+                              <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-700">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{v.activeTrip.pickupLocation}</span>
                               </div>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {v.activeTrip ? (
-                              <div className="flex flex-col gap-1.5">
-                                <div className="flex items-center gap-1.5 text-[10px] font-black text-emerald-700">
-                                  <MapPin className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{v.activeTrip.pickupLocation}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 ml-4">
-                                  <MapPin className="h-2.5 w-2.5 shrink-0" />
-                                  <span className="truncate">{v.activeTrip.destinations[v.activeTrip.destinations.length - 1]?.location}</span>
-                                </div>
+                              <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 ml-4">
+                                <MapPin className="h-2.5 w-2.5 shrink-0" />
+                                <span className="truncate">{v.activeTrip.dropLocation}</span>
                               </div>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right px-6 whitespace-nowrap">
-                            {v.effectiveStatus !== 'Available' && (
-                              <div className="flex justify-end items-center">
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="h-8 rounded-sm font-black text-[9px] uppercase border-amber-500/30 text-amber-700 hover:bg-amber-50 shadow-sm"
-                                  onClick={() => setReleaseTarget(v)}
-                                >
-                                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark Available
-                                </Button>
-                              </div>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      )) : (
-                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No matching fleet records found.</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right px-6 whitespace-nowrap">
+                          {v.effectiveStatus !== 'Available' && (
+                            <div className="flex justify-end items-center">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 rounded-sm font-black text-[9px] uppercase border-amber-500/30 text-amber-700 hover:bg-amber-50 shadow-sm"
+                                onClick={() => setReleaseTarget(v)}
+                              >
+                                <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Mark Available
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )) : (
+                      <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No matching fleet records found.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
@@ -1864,16 +1603,19 @@ export default function ManageAllTripsPage() {
                     <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Pickup Location</p>
                     <p className="text-sm font-black">{approvalTarget?.assignment.pickupLocation}</p>
                   </div>
-                  {approvalTarget?.assignment.destinations.map((d, i) => (
-                    <div key={i} className="relative pl-6 border-l-2 border-primary">
+                  {approvalTarget?.assignment.intermediateStops?.map((d, i) => (
+                    <div key={i} className="relative pl-6 border-l-2 border-primary pb-2">
                       <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
-                      <p className="text-[9px] font-black uppercase text-primary tracking-tighter">
-                        {i === approvalTarget.assignment.destinations.length - 1 ? 'Final Destination' : `Stop #${i + 1}`}
-                      </p>
+                      <p className="text-[9px] font-black uppercase text-primary tracking-tighter">Stop #{i + 1}</p>
                       <p className="text-sm font-black">{d.location}</p>
                       <p className="text-[10px] font-bold text-muted-foreground italic leading-relaxed">"{d.purpose}"</p>
                     </div>
                   ))}
+                  <div className="relative pl-6 border-l-2 border-emerald-500">
+                    <div className="absolute -left-[7px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
+                    <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Final Drop</p>
+                    <p className="text-sm font-black">{approvalTarget?.assignment.dropLocation}</p>
+                  </div>
                 </div>
               </div>
 
@@ -1887,7 +1629,7 @@ export default function ManageAllTripsPage() {
                       vehicleId: val, 
                       driverId: v?.ownership === 'Rented' ? 'RENTED' : '' 
                     } : null);
-                  }}>
+                  }} value={approvalTarget?.vehicleId}>
                     <SelectTrigger className="rounded-sm border-primary/20 h-11 font-bold text-sm bg-muted/5">
                       <SelectValue placeholder="Allot Vehicle..." />
                     </SelectTrigger>
@@ -1987,22 +1729,22 @@ export default function ManageAllTripsPage() {
                         <p className="text-sm font-black">{detailsAssignment.pickupLocation}</p>
                         <Badge variant="secondary" className="mt-1 text-[8px] h-4 rounded-sm px-1.5 font-bold uppercase">{detailsAssignment.pickupType}</Badge>
                       </div>
-                      {detailsAssignment.destinations.map((dest, idx) => {
-                        const isLast = idx === detailsAssignment.destinations.length - 1;
-                        return (
-                          <div key={idx} className="relative">
-                            <div className={cn("absolute -left-[31px] top-0 h-3 w-3 rounded-full ring-4 ring-background", isLast ? "bg-emerald-500" : "bg-primary")} />
-                            <p className={cn("text-[9px] font-black uppercase tracking-tighter", isLast ? "text-emerald-700" : "text-primary")}>
-                              {isLast ? 'Final Drop' : `Stop #${idx + 1}`}
-                            </p>
-                            <p className="text-sm font-black">{dest.location}</p>
-                            <p className="text-[10px] font-medium italic text-muted-foreground">"{dest.purpose}"</p>
-                            {isLast && detailsAssignment.dropType && (
-                              <Badge variant="secondary" className="mt-1 text-[8px] h-4 rounded-sm px-1.5 font-bold uppercase">{detailsAssignment.dropType}</Badge>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {detailsAssignment.intermediateStops && detailsAssignment.intermediateStops.map((dest, idx) => (
+                        <div key={idx} className="relative">
+                          <div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-primary ring-4 ring-background" />
+                          <p className="text-[9px] font-black uppercase text-primary tracking-tighter">Stop #{idx + 1}</p>
+                          <p className="text-sm font-black">{dest.location}</p>
+                          <p className="text-[10px] font-medium italic text-muted-foreground">"{dest.purpose}"</p>
+                        </div>
+                      ))}
+                      <div className="relative">
+                        <div className="absolute -left-[31px] top-0 h-3 w-3 rounded-full bg-emerald-500 ring-4 ring-background" />
+                        <p className="text-[9px] font-black uppercase text-emerald-700 tracking-tighter">Final Drop</p>
+                        <p className="text-sm font-black">{detailsAssignment.dropLocation}</p>
+                        {detailsAssignment.dropType && (
+                          <Badge variant="secondary" className="mt-1 text-[8px] h-4 rounded-sm px-1.5 font-bold uppercase">{detailsAssignment.dropType}</Badge>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-4">
                       <div className="p-4 bg-muted/20 border rounded-sm space-y-3">
