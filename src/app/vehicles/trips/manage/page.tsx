@@ -1,8 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, orderBy, where, or, and, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc, query, orderBy, where, or, and, getDocs, writeBatch, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -957,6 +957,50 @@ export default function ManageAllTripsPage() {
                     </div>
                   </div>
                 </section>
+
+                <section className="space-y-6">
+                  <div className="flex items-center gap-2 border-b pb-2">
+                    <Users className="h-4 w-4 text-primary" />
+                    <h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em]">Personnel & Fleet Audit</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Fleet Assignment</Label>
+                      <div className="p-4 bg-muted/20 border rounded-sm space-y-3">
+                        <div className="flex justify-between items-center text-[10px] font-bold">
+                          <span className="uppercase text-muted-foreground">Vehicle</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-foreground">{detailsAssignment.vehicleDetails || 'Pending Allotment'}</span>
+                            {detailsAssignment.vehicleOwnership && (
+                              <Badge variant="outline" className="text-[8px] h-4 px-1 text-primary border-primary/20 font-black uppercase">{detailsAssignment.vehicleOwnership}</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <Separator className="opacity-50" />
+                        <div className="flex justify-between items-center text-[10px] font-bold">
+                          <span className="uppercase text-muted-foreground">Driver</span>
+                          <span className="text-foreground">{detailsAssignment.driverName || 'Pending Allotment'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Co-passengers</Label>
+                      <div className="min-h-[80px] p-4 bg-muted/20 border rounded-sm flex flex-wrap gap-2 items-start content-start">
+                        {detailsAssignment.coPassengers && detailsAssignment.coPassengers.length > 0 ? (
+                          detailsAssignment.coPassengers.map((p, pIdx) => (
+                            <Badge key={pIdx} variant="secondary" className="rounded-sm font-bold text-[10px] bg-background border border-primary/5">
+                              <User className="h-2.5 w-2.5 mr-1 text-primary/60" /> {p.name}
+                            </Badge>
+                          ))
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground/40 italic font-bold uppercase w-full text-center mt-4">No co-passengers logged</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
                 {(detailsAssignment.status === 'Ongoing' || detailsAssignment.status === 'Completed') && (
                   <section className="space-y-6"><div className="flex items-center gap-2 border-b pb-2"><ShieldCheck className="h-4 w-4 text-primary" /><h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em]">Digital Audit Proof</h3></div><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div className="space-y-4"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><PlayCircle className="h-3 w-3" /> Start</Label><div className="bg-muted/20 border rounded-sm p-4 space-y-4"><div className="flex justify-between items-center"><span className="text-[10px] font-bold uppercase text-muted-foreground">Odometer</span><span className="text-lg font-black text-primary font-mono">{detailsAssignment.startReading} KM</span></div>{detailsAssignment.startReadingPhoto && (<div className="relative aspect-video rounded-sm overflow-hidden border cursor-pointer" onClick={() => openViewer(detailsAssignment.startReadingPhoto!, detailsAssignment)}><img src={detailsAssignment.startReadingPhoto} className="w-full h-full object-cover" alt="Start" /></div>)}</div></div>{detailsAssignment.status === 'Completed' && (<div className="space-y-4"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><Flag className="h-3 w-3" /> Conclusion</Label><div className="bg-emerald-50/50 border border-emerald-100 rounded-sm p-4 space-y-4"><div className="flex justify-between items-center"><span className="text-[10px] font-bold uppercase text-emerald-700">Final Reading</span><span className="text-lg font-black text-emerald-900 font-mono">{detailsAssignment.endReading} KM</span></div>{detailsAssignment.endReadingPhoto && (<div className="relative aspect-video rounded-sm overflow-hidden border border-emerald-100 cursor-pointer" onClick={() => openViewer(detailsAssignment.endReadingPhoto!, detailsAssignment)}><img src={detailsAssignment.endReadingPhoto} className="w-full h-full object-cover" alt="End" /></div>)}</div></div>)}</div></section>
                 )}
@@ -1741,3 +1785,4 @@ function ScheduledTripsDialog({
     </Dialog>
   );
 }
+
