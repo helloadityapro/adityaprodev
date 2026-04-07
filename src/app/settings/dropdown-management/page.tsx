@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where } from 'firebase/firestore';
-import { Trash2, SlidersHorizontal, Building2, UserCircle2, ShieldCheck, UserCog, UserPlus, Loader2 } from 'lucide-react';
+import { Trash2, SlidersHorizontal, Building2, UserCircle2, ShieldCheck, UserCog, UserPlus, Loader2, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,7 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 type PtwType = {
   id: string;
   name: string;
-  authorizedAdminId?: string;
+  authorizedAdminId?: string | null;
   authorizedAdminName?: string;
 };
 
@@ -47,7 +47,7 @@ const genericItemSchema = z.object({
 
 const ptwTypeSchema = z.object({
   name: z.string().min(1, 'Type name is required.'),
-  authorizedAdminId: z.string().min(1, 'Approver selection is required.'),
+  authorizedAdminId: z.string(),
 });
 
 export default function AdminSettingsPage() {
@@ -62,7 +62,7 @@ export default function AdminSettingsPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   const [assigningType, setAssigningType] = React.useState<PtwType | null>(null);
-  const [selectedAdminId, setSelectedAdminId] = React.useState<string>("");
+  const [selectedAdminId, setSelectedAdminId] = React.useState<string>("ALL");
   const [isAssigning, setIsAssigning] = React.useState(false);
 
   React.useEffect(() => {
@@ -85,7 +85,7 @@ export default function AdminSettingsPage() {
 
   const ptwTypeForm = useForm<z.infer<typeof ptwTypeSchema>>({
     resolver: zodResolver(ptwTypeSchema),
-    defaultValues: { name: '', authorizedAdminId: '' },
+    defaultValues: { name: '', authorizedAdminId: 'ALL' },
   });
 
   const roleForm = useForm<z.infer<typeof genericItemSchema>>({
@@ -99,13 +99,17 @@ export default function AdminSettingsPage() {
   });
 
   const onPtwTypeSubmit = (values: z.infer<typeof ptwTypeSchema>) => {
-    const admin = admins?.find(a => a.id === values.authorizedAdminId);
+    const isAll = values.authorizedAdminId === 'ALL';
+    const admin = !isAll ? admins?.find(a => a.id === values.authorizedAdminId) : null;
+    
     addDocumentNonBlocking(collection(firestore, 'ptw_types'), {
-      ...values,
-      authorizedAdminName: admin?.username || admin?.email || 'System'
+      name: values.name,
+      authorizedAdminId: isAll ? null : values.authorizedAdminId,
+      authorizedAdminName: isAll ? 'All Admins' : (admin?.username || admin?.email || 'System')
     });
-    toast({ title: 'Success', description: `New PTW Type "${values.name}" added with authorized approver.` });
-    ptwTypeForm.reset();
+    
+    toast({ title: 'Success', description: `New PTW Type "${values.name}" added.` });
+    ptwTypeForm.reset({ name: '', authorizedAdminId: 'ALL' });
   };
 
   const onRoleSubmit = (values: z.infer<typeof genericItemSchema>) => {
@@ -129,14 +133,17 @@ export default function AdminSettingsPage() {
     if (!assigningType || !selectedAdminId) return;
     setIsAssigning(true);
     try {
-      const admin = admins?.find(a => a.id === selectedAdminId);
+      const isAll = selectedAdminId === 'ALL';
+      const admin = !isAll ? admins?.find(a => a.id === selectedAdminId) : null;
+      
       updateDocumentNonBlocking(doc(firestore, 'ptw_types', assigningType.id), {
-        authorizedAdminId: selectedAdminId,
-        authorizedAdminName: admin?.username || admin?.email || 'System'
+        authorizedAdminId: isAll ? null : selectedAdminId,
+        authorizedAdminName: isAll ? 'All Admins' : (admin?.username || admin?.email || 'System')
       });
-      toast({ title: 'Approver Assigned', description: `Authorization for ${assigningType.name} updated.` });
+      
+      toast({ title: 'Approver Updated', description: `Authorization for ${assigningType.name} updated.` });
       setAssigningType(null);
-      setSelectedAdminId("");
+      setSelectedAdminId("ALL");
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
@@ -265,7 +272,7 @@ export default function AdminSettingsPage() {
                 <ShieldCheck className="h-5 w-5 text-primary" />
                 <CardTitle className="text-sm font-bold uppercase tracking-widest">Manage PTW Types & Authorization</CardTitle>
               </div>
-              <CardDescription className="text-xs">Define permit categories and assign their final authorized approvers.</CardDescription>
+              <CardDescription className="text-xs">Define permit categories and assign their final authorized approvers. Default is "All Admins".</CardDescription>
             </CardHeader>
             <CardContent className="pt-6">
               <Form {...ptwTypeForm}>
@@ -294,6 +301,7 @@ export default function AdminSettingsPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
+                            <SelectItem value="ALL" className="text-xs font-bold text-primary italic">All Admins (Default)</SelectItem>
                             {admins?.map(admin => (
                               <SelectItem key={admin.id} value={admin.id} className="text-xs font-bold">{admin.username}</SelectItem>
                             ))}
@@ -325,8 +333,10 @@ export default function AdminSettingsPage() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <UserCog className="h-3.5 w-3.5 text-primary opacity-60" />
-                            {type.authorizedAdminId ? (
-                              <span className="text-xs font-semibold">{type.authorizedAdminName}</span>
+                            {type.authorizedAdminId || type.authorizedAdminName === 'All Admins' ? (
+                              <span className={cn("text-xs font-semibold", !type.authorizedAdminId && "text-primary italic")}>
+                                {type.authorizedAdminName || 'All Admins'}
+                              </span>
                             ) : (
                               <Button 
                                 variant="outline" 
@@ -334,7 +344,7 @@ export default function AdminSettingsPage() {
                                 className="h-7 text-[10px] font-bold uppercase rounded-sm border-dashed border-primary/30 text-primary hover:bg-primary/5"
                                 onClick={() => {
                                   setAssigningType(type);
-                                  setSelectedAdminId("");
+                                  setSelectedAdminId("ALL");
                                 }}
                               >
                                 <UserPlus className="h-3 w-3 mr-1.5" /> Assign Approver
@@ -343,9 +353,17 @@ export default function AdminSettingsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right px-6">
-                          <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8 text-destructive" onClick={() => deleteItem('ptw_types', type.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8 text-primary" onClick={() => {
+                              setAssigningType(type);
+                              setSelectedAdminId(type.authorizedAdminId || "ALL");
+                            }}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8 text-destructive" onClick={() => deleteItem('ptw_types', type.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )) : (
@@ -362,15 +380,18 @@ export default function AdminSettingsPage() {
       <Dialog open={!!assigningType} onOpenChange={(o) => !o && setAssigningType(null)}>
         <DialogContent className="max-w-md rounded-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5 text-primary" /> Assign Authorized Approver</DialogTitle>
-            <DialogDescription className="text-xs font-medium">Select an Admin responsible for final approval of "{assigningType?.name}" permits.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5 text-primary" /> Set Authorized Approver</DialogTitle>
+            <DialogDescription className="text-xs font-medium">Select an Admin for "{assigningType?.name}" or allow all admins.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
             <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Admin User</Label>
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Approver Policy</Label>
               <Select value={selectedAdminId} onValueChange={setSelectedAdminId}>
-                <SelectTrigger className="h-11 rounded-sm"><SelectValue placeholder="Choose an Admin..." /></SelectTrigger>
+                <SelectTrigger className="h-11 rounded-sm">
+                  <SelectValue placeholder="Choose an option..." />
+                </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="ALL" className="text-xs font-bold text-primary italic">All Admins (Default)</SelectItem>
                   {admins?.map(admin => (
                     <SelectItem key={admin.id} value={admin.id} className="text-xs font-bold">{admin.username}</SelectItem>
                   ))}
@@ -381,11 +402,11 @@ export default function AdminSettingsPage() {
           <DialogFooter className="gap-2">
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold h-11 px-6 uppercase text-[10px]">Cancel</Button></DialogClose>
             <Button 
-              disabled={!selectedAdminId || isAssigning} 
+              disabled={isAssigning} 
               className="rounded-sm font-black h-11 px-8 uppercase text-[10px] tracking-widest shadow-lg"
               onClick={handleQuickAssign}
             >
-              {isAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Assignment"}
+              {isAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Assignment"}
             </Button>
           </DialogFooter>
         </DialogContent>
