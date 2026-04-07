@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where } from 'firebase/firestore';
-import { Trash2, SlidersHorizontal, Building2, UserCircle2, ShieldCheck, UserCog, UserPlus, Loader2, Check, Pencil } from 'lucide-react';
+import { Trash2, SlidersHorizontal, Building2, UserCircle2, ShieldCheck, UserCog, UserPlus, Loader2, Check, Pencil, ChevronsUpDown, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,11 +22,16 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 type PtwType = {
   id: string;
   name: string;
-  authorizedAdminId?: string | null;
+  authorizedAdminIds?: string[] | null;
+  authorizedAdminId?: string | null; // Keep for legacy compat
   authorizedAdminName?: string;
 };
 
@@ -48,12 +53,13 @@ const genericItemSchema = z.object({
 
 const ptwTypeSchema = z.object({
   name: z.string().min(1, 'Type name is required.'),
-  authorizedAdminId: z.string(),
+  authorizedAdminIds: z.array(z.string()).default([]),
 });
 
 export default function AdminSettingsPage() {
   const firestore = useFirestore();
-  const { toast } = useToast();
+  const toastResult = useToast();
+  const toast = toastResult.toast;
   const router = useRouter();
   const { user, isUserLoading } = useUser();
 
@@ -63,7 +69,7 @@ export default function AdminSettingsPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   const [assigningType, setAssigningType] = React.useState<PtwType | null>(null);
-  const [selectedAdminId, setSelectedAdminId] = React.useState<string>("ALL");
+  const [selectedAdminIds, setSelectedAdminIds] = React.useState<string[]>([]);
   const [isAssigning, setIsAssigning] = React.useState(false);
 
   React.useEffect(() => {
@@ -86,7 +92,7 @@ export default function AdminSettingsPage() {
 
   const ptwTypeForm = useForm<z.infer<typeof ptwTypeSchema>>({
     resolver: zodResolver(ptwTypeSchema),
-    defaultValues: { name: '', authorizedAdminId: 'ALL' },
+    defaultValues: { name: '', authorizedAdminIds: [] },
   });
 
   const roleForm = useForm<z.infer<typeof genericItemSchema>>({
@@ -100,17 +106,19 @@ export default function AdminSettingsPage() {
   });
 
   const onPtwTypeSubmit = (values: z.infer<typeof ptwTypeSchema>) => {
-    const isAll = values.authorizedAdminId === 'ALL';
-    const admin = !isAll ? admins?.find(a => a.id === values.authorizedAdminId) : null;
+    const selectedAdmins = admins?.filter(a => values.authorizedAdminIds.includes(a.id)) || [];
+    const adminNames = selectedAdmins.length > 0 
+      ? selectedAdmins.map(a => a.username || a.email).join(', ') 
+      : 'All Admins';
     
     addDocumentNonBlocking(collection(firestore, 'ptw_types'), {
       name: values.name,
-      authorizedAdminId: isAll ? null : values.authorizedAdminId,
-      authorizedAdminName: isAll ? 'All Admins' : (admin?.username || admin?.email || 'System')
+      authorizedAdminIds: values.authorizedAdminIds,
+      authorizedAdminName: adminNames
     });
     
     toast({ title: 'Success', description: `New PTW Type "${values.name}" added.` });
-    ptwTypeForm.reset({ name: '', authorizedAdminId: 'ALL' });
+    ptwTypeForm.reset({ name: '', authorizedAdminIds: [] });
   };
 
   const onRoleSubmit = (values: z.infer<typeof genericItemSchema>) => {
@@ -131,20 +139,22 @@ export default function AdminSettingsPage() {
   };
 
   const handleQuickAssign = async () => {
-    if (!assigningType || !selectedAdminId) return;
+    if (!assigningType) return;
     setIsAssigning(true);
     try {
-      const isAll = selectedAdminId === 'ALL';
-      const admin = !isAll ? admins?.find(a => a.id === selectedAdminId) : null;
+      const selectedAdmins = admins?.filter(a => selectedAdminIds.includes(a.id)) || [];
+      const adminNames = selectedAdmins.length > 0 
+        ? selectedAdmins.map(a => a.username || a.email).join(', ') 
+        : 'All Admins';
       
       updateDocumentNonBlocking(doc(firestore, 'ptw_types', assigningType.id), {
-        authorizedAdminId: isAll ? null : selectedAdminId,
-        authorizedAdminName: isAll ? 'All Admins' : (admin?.username || admin?.email || 'System')
+        authorizedAdminIds: selectedAdminIds,
+        authorizedAdminName: adminNames
       });
       
-      toast({ title: 'Approver Updated', description: `Authorization for ${assigningType.name} updated.` });
+      toast({ title: 'Approvers Updated', description: `Authorization for ${assigningType.name} updated.` });
       setAssigningType(null);
-      setSelectedAdminId("ALL");
+      setSelectedAdminIds([]);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
@@ -291,23 +301,46 @@ export default function AdminSettingsPage() {
                   />
                   <FormField
                     control={ptwTypeForm.control}
-                    name="authorizedAdminId"
+                    name="authorizedAdminIds"
                     render={({ field }) => (
                       <FormItem className="md:col-span-5">
-                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider">Authorized Approver (Admin)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="h-10 rounded-sm">
-                              <SelectValue placeholder="Select Admin" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="ALL" className="text-xs font-bold text-primary italic">All Admins (Default)</SelectItem>
-                            {admins?.map(admin => (
-                              <SelectItem key={admin.id} value={admin.id} className="text-xs font-bold">{admin.username}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider">Authorized Approvers (Admins)</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10", field.value.length === 0 && "text-muted-foreground")}>
+                                <span className="truncate">{field.value.length === 0 ? "All Admins (Default)" : `${field.value.length} Admins Selected`}</span>
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <ScrollArea className="h-64">
+                              <div className="p-2 space-y-1">
+                                {admins?.map(admin => (
+                                  <div key={admin.id} className="flex items-center space-x-2 p-2 hover:bg-muted/50 rounded-sm transition-colors">
+                                    <Checkbox 
+                                      id={`create-admin-${admin.id}`} 
+                                      checked={field.value.includes(admin.id)}
+                                      onCheckedChange={(checked) => {
+                                        const next = checked 
+                                          ? [...field.value, admin.id]
+                                          : field.value.filter(id => id !== admin.id);
+                                        field.onChange(next);
+                                      }}
+                                    />
+                                    <label htmlFor={`create-admin-${admin.id}`} className="text-xs font-medium cursor-pointer flex-1 py-1">
+                                      {admin.username}
+                                    </label>
+                                  </div>
+                                ))}
+                                {(!admins || admins.length === 0) && (
+                                  <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground">No Admins registered</p>
+                                )}
+                              </div>
+                            </ScrollArea>
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -323,7 +356,7 @@ export default function AdminSettingsPage() {
                   <TableHeader className="bg-muted/30">
                     <TableRow>
                       <TableHead className="px-6 font-black text-[10px] uppercase tracking-widest">PTW Type Name</TableHead>
-                      <TableHead className="font-black text-[10px] uppercase tracking-widest">Authorized Approver</TableHead>
+                      <TableHead className="font-black text-[10px] uppercase tracking-widest">Authorized Approvers</TableHead>
                       <TableHead className="text-right px-6 font-black text-[10px] uppercase tracking-widest">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -334,30 +367,16 @@ export default function AdminSettingsPage() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <UserCog className="h-3.5 w-3.5 text-primary opacity-60" />
-                            {type.authorizedAdminId || type.authorizedAdminName === 'All Admins' ? (
-                              <span className={cn("text-xs font-semibold", !type.authorizedAdminId && "text-primary italic")}>
-                                {type.authorizedAdminName || 'All Admins'}
-                              </span>
-                            ) : (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-7 text-[10px] font-bold uppercase rounded-sm border-dashed border-primary/30 text-primary hover:bg-primary/5"
-                                onClick={() => {
-                                  setAssigningType(type);
-                                  setSelectedAdminId("ALL");
-                                }}
-                              >
-                                <UserPlus className="h-3 w-3 mr-1.5" /> Assign Approver
-                              </Button>
-                            )}
+                            <span className={cn("text-xs font-semibold", (!type.authorizedAdminIds || type.authorizedAdminIds.length === 0) && "text-primary italic")}>
+                              {type.authorizedAdminName || 'All Admins'}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right px-6">
                           <div className="flex justify-end gap-1">
                             <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8 text-primary" onClick={() => {
                               setAssigningType(type);
-                              setSelectedAdminId(type.authorizedAdminId || "ALL");
+                              setSelectedAdminIds(type.authorizedAdminIds || []);
                             }}>
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -381,23 +400,36 @@ export default function AdminSettingsPage() {
       <Dialog open={!!assigningType} onOpenChange={(o) => !o && setAssigningType(null)}>
         <DialogContent className="max-w-md rounded-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5 text-primary" /> Set Authorized Approver</DialogTitle>
-            <DialogDescription className="text-xs font-medium">Select an Admin for "{assigningType?.name}" or allow all admins.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5 text-primary" /> Set Authorized Approvers</DialogTitle>
+            <DialogDescription className="text-xs font-medium">Select Admins for "{assigningType?.name}" or leave empty for all admins.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Approver Policy</Label>
-              <Select value={selectedAdminId} onValueChange={setSelectedAdminId}>
-                <SelectTrigger className="h-11 rounded-sm">
-                  <SelectValue placeholder="Choose an option..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL" className="text-xs font-bold text-primary italic">All Admins (Default)</SelectItem>
-                  {admins?.map(admin => (
-                    <SelectItem key={admin.id} value={admin.id} className="text-xs font-bold">{admin.username}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-3">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Designated Personnel</Label>
+              <div className="border rounded-sm bg-muted/10">
+                <ScrollArea className="h-64">
+                  <div className="p-2 space-y-1">
+                    {admins?.map(admin => (
+                      <div key={admin.id} className="flex items-center space-x-2 p-2 hover:bg-background rounded-sm transition-colors border-b border-border/10 last:border-0">
+                        <Checkbox 
+                          id={`edit-admin-${admin.id}`} 
+                          checked={selectedAdminIds.includes(admin.id)}
+                          onCheckedChange={(checked) => {
+                            const next = checked 
+                              ? [...selectedAdminIds, admin.id]
+                              : selectedAdminIds.filter(id => id !== admin.id);
+                            setSelectedAdminIds(next);
+                          }}
+                        />
+                        <label htmlFor={`edit-admin-${admin.id}`} className="text-xs font-medium cursor-pointer flex-1 py-1">
+                          {admin.username}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+              <p className="text-[10px] text-muted-foreground italic">Uncheck all to allow authorization by any administrator.</p>
             </div>
           </div>
           <DialogFooter className="gap-2">

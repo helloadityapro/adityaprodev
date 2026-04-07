@@ -99,6 +99,7 @@ type Permit = {
   siteEngineerName?: string;
   siteManagerId?: string;
   authorizedAdminId?: string;
+  authorizedAdminIds?: string[];
   adminId?: string;
   requestDate: any;
   statusChangeDate?: any;
@@ -216,12 +217,8 @@ export default function PtwListPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
-
-  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
-  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
-
-  const isSuper = isSuperAdmin(user?.email);
-  const isAdmin = isSuper || userProfile?.role === "Admin";
+  
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
 
   const permitsQuery = useMemoFirebase(() => {
@@ -271,14 +268,12 @@ export default function PtwListPage() {
   const filteredPermits = React.useMemo(() => {
     if (!permits || !userProfile) return [];
     
-    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
-      ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
-
+    const roleConfigsQueryRef = collection(firestore, 'system_settings', 'access', 'roles');
+    // Using simple filter logic for prototype robustness
     const hiddenIds = userProfile.hiddenPermitIds || [];
     let list = permits.filter(p => !hiddenIds.includes(p.id));
 
-    if (isOwnDataOnly && !isSuper) {
+    if (userProfile.ownDataOnly && !isSuper) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
       list = list.filter(p => assignedIds.has(p.siteId));
     }
@@ -309,7 +304,7 @@ export default function PtwListPage() {
         }
         return direction === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
       });
-  }, [permits, statusFilter, userFilter, siteFilter, searchTerm, sortConfig, userProfile, roleConfigs, isSuper, queryDateRange]);
+  }, [permits, statusFilter, userFilter, siteFilter, searchTerm, sortConfig, userProfile, isSuper, queryDateRange, firestore]);
 
   const stats = React.useMemo(() => {
     return {
@@ -342,7 +337,7 @@ export default function PtwListPage() {
 
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
 
   const handleAction = async (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
@@ -513,7 +508,7 @@ export default function PtwListPage() {
             <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" className="flex-1 h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
-                  {userFilter === 'all' ? "All Engineers" : engineers?.find(e => e.id === userFilter)?.username || "Filter Personnel"}
+                  <span className="truncate">{userFilter === 'all' ? "All Engineers" : engineers?.find(e => e.id === userFilter)?.username || "Filter Personnel"}</span>
                   <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
                 </Button>
               </PopoverTrigger>
@@ -542,7 +537,7 @@ export default function PtwListPage() {
             <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" className="flex-1 h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
-                  {siteFilter === 'all' ? "All Sites" : siteFilter}
+                  <span className="truncate">{siteFilter === 'all' ? "All Sites" : siteFilter}</span>
                   <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
                 </Button>
               </PopoverTrigger>
@@ -680,7 +675,7 @@ export default function PtwListPage() {
             {detailsPermit && detailsPermit.status !== 'Approved' && detailsPermit.status !== 'Rejected' && (
               <>
                 {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || 
-                  (isAdmin && detailsPermit.status === 'ManagerApproved' && (!detailsPermit.authorizedAdminId || detailsPermit.authorizedAdminId === user?.uid || isSuper))) && (
+                  (isAdmin && detailsPermit.status === 'ManagerApproved' && (!detailsPermit.authorizedAdminIds || detailsPermit.authorizedAdminIds.length === 0 || detailsPermit.authorizedAdminIds.includes(user?.uid) || detailsPermit.authorizedAdminId === user?.uid || isSuper))) && (
                   <div className="flex-1 flex gap-2">
                     <Button className="flex-1 h-10 sm:h-12 rounded-sm font-bold text-[10px] sm:text-xs bg-green-600 hover:bg-green-700 text-white shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>Approve</Button>
                     <Button variant="destructive" className="flex-1 h-10 sm:h-12 rounded-sm font-bold text-[10px] sm:text-xs shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>Reject</Button>
@@ -695,7 +690,11 @@ export default function PtwListPage() {
       <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { setZoom(1); setViewFile(null); setViewFiles([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
           <DialogHeader className="sr-only"><DialogTitle>Audit Media Detail</DialogTitle><DialogDescription>Enlarged view of site audit proof.</DialogDescription></DialogHeader>
-          <div className="absolute top-4 left-4 flex gap-2 z-50 no-print"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }}><ZoomIn className="h-4 w-4" /></Button><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }}><ZoomOut className="h-4 w-4" /></Button><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }}><RotateCcw className="h-5 w-5" /></Button></div>
+          <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }}><ZoomIn className="h-4 w-4" /></Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }}><ZoomOut className="h-4 w-4" /></Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }}><RotateCcw className="h-5 w-5" /></Button>
+          </div>
           {viewFiles.length > 1 && (<><div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print"><Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-8 w-8" /></Button></div><div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print"><Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-8 w-8" /></Button></div><div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print"><Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">{currentFileIndex + 1} / {viewFiles.length}</Badge></div></>)}
           <div className="relative w-full h-full overflow-auto p-4 flex"><div ref={viewerRef} className={cn("m-auto transition-transform duration-200 ease-out flex items-center justify-center", zoom > 1 ? "cursor-move" : "cursor-default")} style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}>{viewFile && (isVideo(viewFile) ? (<video src={viewFile.url} controls autoPlay className="max-w-full max-h-[85vh] shadow-2xl" />) : (<img src={viewFile.url} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Audit Evidence" />))}</div></div>
         </DialogContent>

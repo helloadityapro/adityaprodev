@@ -43,6 +43,7 @@ type PtwType = {
   id: string;
   name: string;
   authorizedAdminId?: string;
+  authorizedAdminIds?: string[];
 };
 
 type Site = {
@@ -324,9 +325,9 @@ export default function RaisePtwPage() {
 
       const effectiveSiteManagerId = userProfile.siteManagerId || (isCorrectionMode ? permitToCorrect?.siteManagerId : null) || null;
 
-      // Find authorized Admin for this PTW type
+      // Find authorized Admins for this PTW type
       const selectedType = ptwTypes?.find(t => t.name === values.ptwType);
-      const authorizedAdminId = selectedType?.authorizedAdminId || null;
+      const authorizedAdminIds = selectedType?.authorizedAdminIds || (selectedType?.authorizedAdminId ? [selectedType.authorizedAdminId] : []);
 
       const permitData: any = {
         siteId: selectedSite.id,
@@ -339,7 +340,8 @@ export default function RaisePtwPage() {
         status: targetStatus,
         statusChangeDate: serverTimestamp(),
         siteManagerId: effectiveSiteManagerId,
-        authorizedAdminId: authorizedAdminId,
+        authorizedAdminIds: authorizedAdminIds,
+        authorizedAdminId: selectedType?.authorizedAdminId || null,
       };
 
       let managerMobile = "";
