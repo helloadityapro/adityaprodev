@@ -218,7 +218,8 @@ export default function PtwListPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
   
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === "Admin";
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
 
   const permitsQuery = useMemoFirebase(() => {
@@ -623,7 +624,7 @@ export default function PtwListPage() {
                         <TableCell><StatusBadge permit={permit} /></TableCell>
                         <TableCell className="text-[10px] font-bold text-muted-foreground">{formatTimestamp(permit.requestDate)}</TableCell>
                         <TableCell className="text-right px-6">
-                          <div className="flex justify-end items-center gap-1">
+                          <div className="flex justify-end gap-1">
                             <WhatsAppUpdateEngineer permit={permit} />
                             {permit.status === 'Rejected' && (
                               <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-amber-600 rounded-sm" title="Resubmit with Corrections">

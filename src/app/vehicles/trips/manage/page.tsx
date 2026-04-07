@@ -1638,8 +1638,8 @@ function ScheduledTripsDialog({
         : 'Pending Allotment';
 
       message += `*${index + 1}. ${(trip.userName || '').trim()}${passengerList}*\n`;
-      message += `\u{1F4CD} *Pickup:* ${trip.pickupLocation}\n`;
       message += `\u{1F552} *Reporting:* ${formatTo12Hr(trip.reportingTime)}${stops}\n`;
+      message += `\u{1F4CD} *Pickup:* ${trip.pickupLocation}\n`;
       message += `\u{1F3C1} *Drop:* ${trip.dropLocation}\n`;
       message += `\u{1F697} *Vehicle:* ${trip.vehicleDetails || 'Pending Allotment'}\n`;
       message += `\u{1F464} *Driver:* ${driverInfo}\n`;
