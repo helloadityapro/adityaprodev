@@ -554,7 +554,7 @@ export default function ManageAllTripsPage() {
   };
 
   const FleetSortIcon = ({ column }: { column: 'plate' | 'ownership' | 'status' }) => {
-    if (fleetSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    if (fleetSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
     return fleetSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
 
@@ -889,7 +889,7 @@ export default function ManageAllTripsPage() {
       <ScheduledTripsDialog assignments={assignments || []} allUsers={allUsers || []} open={isScheduledTripsOpen} onOpenChange={setIsScheduledTripsOpen} />
 
       <Dialog open={!!approvalTarget} onOpenChange={(o) => !o && setApprovalState(null)}>
-        <DialogContent className="max-w-xl w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-auto max-h-[90vh]">
+        <DialogContent className="max-w-xl w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[80vh] sm:h-auto max-h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Fuel className="h-5 w-5 text-primary" /></div>
@@ -1785,4 +1785,3 @@ function ScheduledTripsDialog({
     </Dialog>
   );
 }
-

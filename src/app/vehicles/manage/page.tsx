@@ -326,12 +326,12 @@ export default function ManageVehiclesPage() {
 
       {/* Edit Vehicle Dialog */}
       <Dialog open={!!vehicleToEdit} onOpenChange={(o) => !o && setVehicleToEdit(null)}>
-        <DialogContent className="sm:max-w-[500px] rounded-sm p-0 overflow-hidden border-none shadow-2xl">
+      <DialogContent className="sm:max-w-[500px] max-h-[80vh] flex flex-col rounded-sm p-0 border-none shadow-2xl">
           <DialogHeader className="p-6 bg-primary/5 border-b">
             <DialogTitle className="text-xl font-black uppercase tracking-tight">Edit Vehicle Details</DialogTitle>
             <DialogDescription className="text-xs font-medium">Update registry information for {vehicleToEdit?.plateNumber}.</DialogDescription>
           </DialogHeader>
-          <div className="p-6">
+          <div className="p-6 overflow-y-auto flex-1">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-5">
                 <div className="grid grid-cols-2 gap-4">
