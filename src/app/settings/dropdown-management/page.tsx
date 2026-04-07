@@ -12,14 +12,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where } from 'firebase/firestore';
-import { Trash2, SlidersHorizontal, Building2, UserCircle2, ShieldCheck, UserCog } from 'lucide-react';
+import { Trash2, SlidersHorizontal, Building2, UserCircle2, ShieldCheck, UserCog, UserPlus, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 
 type PtwType = {
   id: string;
@@ -59,6 +60,10 @@ export default function AdminSettingsPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+
+  const [assigningType, setAssigningType] = React.useState<PtwType | null>(null);
+  const [selectedAdminId, setSelectedAdminId] = React.useState<string>("");
+  const [isAssigning, setIsAssigning] = React.useState(false);
 
   React.useEffect(() => {
     if (!isUserLoading && !isProfileLoading && !isAdmin) {
@@ -118,6 +123,25 @@ export default function AdminSettingsPage() {
   const deleteItem = (coll: string, id: string) => {
     deleteDocumentNonBlocking(doc(firestore, coll, id));
     toast({ title: 'Deleted' });
+  };
+
+  const handleQuickAssign = async () => {
+    if (!assigningType || !selectedAdminId) return;
+    setIsAssigning(true);
+    try {
+      const admin = admins?.find(a => a.id === selectedAdminId);
+      updateDocumentNonBlocking(doc(firestore, 'ptw_types', assigningType.id), {
+        authorizedAdminId: selectedAdminId,
+        authorizedAdminName: admin?.username || admin?.email || 'System'
+      });
+      toast({ title: 'Approver Assigned', description: `Authorization for ${assigningType.name} updated.` });
+      setAssigningType(null);
+      setSelectedAdminId("");
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setIsAssigning(false);
+    }
   };
 
   if (isUserLoading || isProfileLoading || ptwTypesLoading) {
@@ -301,7 +325,21 @@ export default function AdminSettingsPage() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <UserCog className="h-3.5 w-3.5 text-primary opacity-60" />
-                            <span className="text-xs font-semibold">{type.authorizedAdminName || 'Not Assigned'}</span>
+                            {type.authorizedAdminId ? (
+                              <span className="text-xs font-semibold">{type.authorizedAdminName}</span>
+                            ) : (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-7 text-[10px] font-bold uppercase rounded-sm border-dashed border-primary/30 text-primary hover:bg-primary/5"
+                                onClick={() => {
+                                  setAssigningType(type);
+                                  setSelectedAdminId("");
+                                }}
+                              >
+                                <UserPlus className="h-3 w-3 mr-1.5" /> Assign Approver
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-right px-6">
@@ -320,6 +358,38 @@ export default function AdminSettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!assigningType} onOpenChange={(o) => !o && setAssigningType(null)}>
+        <DialogContent className="max-w-md rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5 text-primary" /> Assign Authorized Approver</DialogTitle>
+            <DialogDescription className="text-xs font-medium">Select an Admin responsible for final approval of "{assigningType?.name}" permits.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Admin User</Label>
+              <Select value={selectedAdminId} onValueChange={setSelectedAdminId}>
+                <SelectTrigger className="h-11 rounded-sm"><SelectValue placeholder="Choose an Admin..." /></SelectTrigger>
+                <SelectContent>
+                  {admins?.map(admin => (
+                    <SelectItem key={admin.id} value={admin.id} className="text-xs font-bold">{admin.username}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold h-11 px-6 uppercase text-[10px]">Cancel</Button></DialogClose>
+            <Button 
+              disabled={!selectedAdminId || isAssigning} 
+              className="rounded-sm font-black h-11 px-8 uppercase text-[10px] tracking-widest shadow-lg"
+              onClick={handleQuickAssign}
+            >
+              {isAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Assignment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
