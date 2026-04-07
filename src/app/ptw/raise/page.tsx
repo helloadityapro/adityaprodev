@@ -42,6 +42,7 @@ const raisePtwSchema = z.object({
 type PtwType = {
   id: string;
   name: string;
+  authorizedAdminId?: string;
 };
 
 type Site = {
@@ -323,6 +324,10 @@ export default function RaisePtwPage() {
 
       const effectiveSiteManagerId = userProfile.siteManagerId || (isCorrectionMode ? permitToCorrect?.siteManagerId : null) || null;
 
+      // Find authorized Admin for this PTW type
+      const selectedType = ptwTypes?.find(t => t.name === values.ptwType);
+      const authorizedAdminId = selectedType?.authorizedAdminId || null;
+
       const permitData: any = {
         siteId: selectedSite.id,
         siteName: values.siteName,
@@ -334,6 +339,7 @@ export default function RaisePtwPage() {
         status: targetStatus,
         statusChangeDate: serverTimestamp(),
         siteManagerId: effectiveSiteManagerId,
+        authorizedAdminId: authorizedAdminId,
       };
 
       let managerMobile = "";

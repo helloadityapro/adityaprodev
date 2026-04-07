@@ -98,6 +98,7 @@ type Permit = {
   siteEngineerId: string;
   siteEngineerName?: string;
   siteManagerId?: string;
+  authorizedAdminId?: string;
   adminId?: string;
   requestDate: any;
   statusChangeDate?: any;
@@ -466,13 +467,13 @@ export default function PtwListPage() {
       <div className="flex flex-col gap-4 bg-card p-3 sm:p-4 border rounded-sm shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
           <div className="relative w-full md:col-span-2">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search by serial or site..." className="pl-9 h-9 rounded-sm bg-muted/20 border-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search by serial or site..." className="pl-9 h-10 rounded-sm bg-muted/20 border-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           
           <div className="space-y-1">
             <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] sm:text-xs uppercase">
+              <SelectTrigger className="h-10 rounded-sm border-primary/20 bg-background font-bold text-[10px] sm:text-xs uppercase">
                 <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
                 <SelectValue placeholder="Time Range" />
               </SelectTrigger>
@@ -492,26 +493,26 @@ export default function PtwListPage() {
             {dateFilter === 'custom' ? (
               <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex-1 space-y-1">
-                  <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-9 rounded-sm border-primary/20 text-[10px]" />
+                  <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-10 rounded-sm border-primary/20 text-[10px]" />
                 </div>
                 <div className="flex-1 space-y-1">
-                  <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-9 rounded-sm border-primary/20 text-[10px]" />
+                  <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-10 rounded-sm border-primary/20 text-[10px]" />
                 </div>
               </div>
             ) : (
               <div className="flex-1" />
             )}
-            <Button variant="ghost" size="icon" onClick={clearFilters} className="h-9 w-9 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
+            <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
               <FilterX className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
         {isAdmin && (
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-2 w-full no-wrap">
             <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full md:w-[180px] h-9 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
+                <Button variant="outline" role="combobox" className="flex-1 h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
                   {userFilter === 'all' ? "All Engineers" : engineers?.find(e => e.id === userFilter)?.username || "Filter Personnel"}
                   <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
                 </Button>
@@ -540,7 +541,7 @@ export default function PtwListPage() {
 
             <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full md:w-[180px] h-9 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
+                <Button variant="outline" role="combobox" className="flex-1 h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
                   {siteFilter === 'all' ? "All Sites" : siteFilter}
                   <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
                 </Button>
@@ -571,7 +572,7 @@ export default function PtwListPage() {
 
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 no-print">
           {[{ id: 'all', label: 'All Status' }, { id: 'Pending', label: 'Pending Manager' }, { id: 'ManagerApproved', label: 'Pending Admin' }, { id: 'Approved', label: 'Approved' }, { id: 'Rejected', label: 'Rejected' }].map(s => (
-            <Badge key={s.id} variant={statusFilter === s.id ? 'default' : 'outline'} className="cursor-pointer font-bold text-[10px] sm:text-xs h-7 sm:h-8 px-2 sm:px-4 rounded-sm border-primary/20" onClick={() => setStatusFilter(s.id)}>{s.label}</Badge>
+            <Badge key={s.id} variant={statusFilter === s.id ? 'default' : 'outline'} className="cursor-pointer font-bold text-[10px] h-7 px-2 sm:h-8 sm:px-4 rounded-sm border-primary/20" onClick={() => setStatusFilter(s.id)}>{s.label}</Badge>
           ))}
         </div>
       </div>
@@ -675,7 +676,19 @@ export default function PtwListPage() {
               </div>
             )}
           </ScrollArea>
-          <DialogFooter className="p-3 sm:p-4 bg-muted/5 border-t gap-2 sm:gap-3 shrink-0 no-print">{detailsPermit && detailsPermit.status !== 'Approved' && detailsPermit.status !== 'Rejected' && (<>{((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || (isAdmin && detailsPermit.status === 'ManagerApproved')) && (<div className="flex-1 flex gap-2"><Button className="flex-1 h-10 sm:h-12 rounded-sm font-bold text-[10px] sm:text-xs bg-green-600 hover:bg-green-700 text-white shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>Approve</Button><Button variant="destructive" className="flex-1 h-10 sm:h-12 rounded-sm font-bold text-[10px] sm:text-xs shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>Reject</Button></div>)}</>)}</DialogFooter>
+          <DialogFooter className="p-3 sm:p-4 bg-muted/5 border-t gap-2 sm:gap-3 shrink-0 no-print">
+            {detailsPermit && detailsPermit.status !== 'Approved' && detailsPermit.status !== 'Rejected' && (
+              <>
+                {((userRole === 'Site Manager' && detailsPermit.status === 'Pending' && detailsPermit.siteManagerId === user?.uid) || 
+                  (isAdmin && detailsPermit.status === 'ManagerApproved' && (!detailsPermit.authorizedAdminId || detailsPermit.authorizedAdminId === user?.uid || isSuper))) && (
+                  <div className="flex-1 flex gap-2">
+                    <Button className="flex-1 h-10 sm:h-12 rounded-sm font-bold text-[10px] sm:text-xs bg-green-600 hover:bg-green-700 text-white shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: isAdmin && detailsPermit.status === 'ManagerApproved' ? 'Approved' : 'ManagerApproved' }); }}>Approve</Button>
+                    <Button variant="destructive" className="flex-1 h-10 sm:h-12 rounded-sm font-bold text-[10px] sm:text-xs shadow-lg" onClick={() => { setDetailsPermit(null); setActionState({ permit: detailsPermit, status: 'Rejected' }); }}>Reject</Button>
+                  </div>
+                )}
+              </>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

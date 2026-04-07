@@ -13,16 +13,19 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
-import { Trash2, SlidersHorizontal, Building2, UserCircle2 } from 'lucide-react';
+import { collection, doc, query, where } from 'firebase/firestore';
+import { Trash2, SlidersHorizontal, Building2, UserCircle2, ShieldCheck, UserCog } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type PtwType = {
   id: string;
   name: string;
+  authorizedAdminId?: string;
+  authorizedAdminName?: string;
 };
 
 type GenericItem = {
@@ -39,6 +42,11 @@ type UserProfile = {
 
 const genericItemSchema = z.object({
   name: z.string().min(1, 'Name is required.'),
+});
+
+const ptwTypeSchema = z.object({
+  name: z.string().min(1, 'Type name is required.'),
+  authorizedAdminId: z.string().min(1, 'Approver selection is required.'),
 });
 
 export default function AdminSettingsPage() {
@@ -67,9 +75,12 @@ export default function AdminSettingsPage() {
   const departmentsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
   const { data: departments } = useCollection<GenericItem>(departmentsQuery);
 
-  const ptwTypeForm = useForm<z.infer<typeof genericItemSchema>>({
-    resolver: zodResolver(genericItemSchema),
-    defaultValues: { name: '' },
+  const adminsQuery = useMemoFirebase(() => query(collection(firestore, 'users'), where('role', '==', 'Admin')), [firestore]);
+  const { data: admins } = useCollection<UserProfile>(adminsQuery);
+
+  const ptwTypeForm = useForm<z.infer<typeof ptwTypeSchema>>({
+    resolver: zodResolver(ptwTypeSchema),
+    defaultValues: { name: '', authorizedAdminId: '' },
   });
 
   const roleForm = useForm<z.infer<typeof genericItemSchema>>({
@@ -82,9 +93,13 @@ export default function AdminSettingsPage() {
     defaultValues: { name: '' },
   });
 
-  const onPtwTypeSubmit = (values: z.infer<typeof genericItemSchema>) => {
-    addDocumentNonBlocking(collection(firestore, 'ptw_types'), values);
-    toast({ title: 'Success', description: 'New PTW Type added.' });
+  const onPtwTypeSubmit = (values: z.infer<typeof ptwTypeSchema>) => {
+    const admin = admins?.find(a => a.id === values.authorizedAdminId);
+    addDocumentNonBlocking(collection(firestore, 'ptw_types'), {
+      ...values,
+      authorizedAdminName: admin?.username || admin?.email || 'System'
+    });
+    toast({ title: 'Success', description: `New PTW Type "${values.name}" added with authorized approver.` });
     ptwTypeForm.reset();
   };
 
@@ -124,22 +139,22 @@ export default function AdminSettingsPage() {
       </div>
 
       <Tabs defaultValue="org" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-8 rounded-sm max-w-md">
-          <TabsTrigger value="org" className="flex items-center gap-2 rounded-sm"><Building2 className="h-4 w-4" /> Organization</TabsTrigger>
-          <TabsTrigger value="configuration" className="flex items-center gap-2 rounded-sm"><SlidersHorizontal className="h-4 w-4" /> PTW Types</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 mb-8 rounded-sm max-w-md bg-muted/50 border border-primary/10">
+          <TabsTrigger value="org" className="flex items-center gap-2 rounded-sm font-bold text-[10px] uppercase tracking-widest"><Building2 className="h-4 w-4" /> Organization</TabsTrigger>
+          <TabsTrigger value="configuration" className="flex items-center gap-2 rounded-sm font-bold text-[10px] uppercase tracking-widest"><SlidersHorizontal className="h-4 w-4" /> PTW Types</TabsTrigger>
         </TabsList>
 
         <TabsContent value="org" className="space-y-8 animate-in fade-in-50 duration-300">
           <div className="grid gap-8 md:grid-cols-2">
-            <Card className="rounded-sm">
-              <CardHeader>
+            <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+              <CardHeader className="bg-primary/5 border-b">
                 <div className="flex items-center gap-2">
                   <UserCircle2 className="h-5 w-5 text-primary" />
-                  <CardTitle>Manage Roles</CardTitle>
+                  <CardTitle className="text-sm font-bold uppercase tracking-widest">Manage Roles</CardTitle>
                 </div>
-                <CardDescription>Define organizational roles for personnel assignment.</CardDescription>
+                <CardDescription className="text-xs">Define organizational roles for personnel assignment.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 <Form {...roleForm}>
                   <form onSubmit={roleForm.handleSubmit(onRoleSubmit)} className="flex items-start gap-2 mb-4">
                     <FormField
@@ -147,12 +162,12 @@ export default function AdminSettingsPage() {
                       name="name"
                       render={({ field }) => (
                         <FormItem className="flex-grow">
-                          <FormControl><Input placeholder="e.g. Area Manager" {...field} className="rounded-sm" /></FormControl>
+                          <FormControl><Input placeholder="e.g. Area Manager" {...field} className="rounded-sm h-10 text-sm" /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="rounded-sm">Add</Button>
+                    <Button type="submit" className="rounded-sm font-bold h-10">Add</Button>
                   </form>
                 </Form>
                 <div className="rounded-sm border max-h-60 overflow-auto">
@@ -160,10 +175,10 @@ export default function AdminSettingsPage() {
                     <TableBody>
                       {roles?.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell className="font-bold text-sm">{item.name}</TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8" onClick={() => deleteItem('user_roles', item.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                            <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8 text-destructive" onClick={() => deleteItem('user_roles', item.id)}>
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -174,15 +189,15 @@ export default function AdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-sm">
-              <CardHeader>
+            <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+              <CardHeader className="bg-primary/5 border-b">
                 <div className="flex items-center gap-2">
                   <Building2 className="h-5 w-5 text-primary" />
-                  <CardTitle>Manage Departments</CardTitle>
+                  <CardTitle className="text-sm font-bold uppercase tracking-widest">Manage Departments</CardTitle>
                 </div>
-                <CardDescription>Configure organizational departments/verticals.</CardDescription>
+                <CardDescription className="text-xs">Configure organizational departments/verticals.</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 <Form {...departmentForm}>
                   <form onSubmit={departmentForm.handleSubmit(onDepartmentSubmit)} className="flex items-start gap-2 mb-4">
                     <FormField
@@ -190,12 +205,12 @@ export default function AdminSettingsPage() {
                       name="name"
                       render={({ field }) => (
                         <FormItem className="flex-grow">
-                          <FormControl><Input placeholder="e.g. Quality Control" {...field} className="rounded-sm" /></FormControl>
+                          <FormControl><Input placeholder="e.g. Quality Control" {...field} className="rounded-sm h-10 text-sm" /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="rounded-sm">Add</Button>
+                    <Button type="submit" className="rounded-sm font-bold h-10">Add</Button>
                   </form>
                 </Form>
                 <div className="rounded-sm border max-h-60 overflow-auto">
@@ -203,10 +218,10 @@ export default function AdminSettingsPage() {
                     <TableBody>
                       {departments?.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell className="font-bold text-sm">{item.name}</TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8" onClick={() => deleteItem('user_departments', item.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
+                            <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8 text-destructive" onClick={() => deleteItem('user_departments', item.id)}>
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -220,40 +235,84 @@ export default function AdminSettingsPage() {
         </TabsContent>
 
         <TabsContent value="configuration" className="space-y-6 animate-in fade-in-50 duration-300">
-          <Card className="rounded-sm">
-            <CardHeader>
-              <CardTitle>Manage PTW Types</CardTitle>
-              <CardDescription>Define categories for permits.</CardDescription>
+          <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+            <CardHeader className="bg-primary/5 border-b">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-primary" />
+                <CardTitle className="text-sm font-bold uppercase tracking-widest">Manage PTW Types & Authorization</CardTitle>
+              </div>
+              <CardDescription className="text-xs">Define permit categories and assign their final authorized approvers.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <Form {...ptwTypeForm}>
-                <form onSubmit={ptwTypeForm.handleSubmit(onPtwTypeSubmit)} className="flex items-start gap-2 mb-4">
+                <form onSubmit={ptwTypeForm.handleSubmit(onPtwTypeSubmit)} className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8 items-end p-4 bg-muted/20 border rounded-sm">
                   <FormField
                     control={ptwTypeForm.control}
                     name="name"
                     render={({ field }) => (
-                      <FormItem className="flex-grow">
-                        <FormControl><Input placeholder="Enter new PTW type" {...field} className="rounded-sm" /></FormControl>
+                      <FormItem className="md:col-span-5">
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider">Type Name</FormLabel>
+                        <FormControl><Input placeholder="e.g. Hot Work" {...field} className="rounded-sm h-10" /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="rounded-sm">Add</Button>
+                  <FormField
+                    control={ptwTypeForm.control}
+                    name="authorizedAdminId"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-5">
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider">Authorized Approver (Admin)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-10 rounded-sm">
+                              <SelectValue placeholder="Select Admin" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {admins?.map(admin => (
+                              <SelectItem key={admin.id} value={admin.id} className="text-xs font-bold">{admin.username}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="md:col-span-2">
+                    <Button type="submit" className="w-full h-10 rounded-sm font-bold uppercase text-[10px] tracking-widest">Add Type</Button>
+                  </div>
                 </form>
               </Form>
-              <div className="rounded-sm border max-h-96 overflow-auto">
+              
+              <div className="rounded-sm border overflow-hidden">
                 <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="px-6 font-black text-[10px] uppercase tracking-widest">PTW Type Name</TableHead>
+                      <TableHead className="font-black text-[10px] uppercase tracking-widest">Authorized Approver</TableHead>
+                      <TableHead className="text-right px-6 font-black text-[10px] uppercase tracking-widest">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
-                    {ptwTypes?.map((type) => (
-                      <TableRow key={type.id}>
-                        <TableCell className="font-medium">{type.name}</TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" className="rounded-sm" onClick={() => deleteItem('ptw_types', type.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                    {ptwTypes && ptwTypes.length > 0 ? ptwTypes.map((type) => (
+                      <TableRow key={type.id} className="hover:bg-muted/5 transition-colors">
+                        <TableCell className="px-6 py-4 font-bold text-sm">{type.name}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <UserCog className="h-3.5 w-3.5 text-primary opacity-60" />
+                            <span className="text-xs font-semibold">{type.authorizedAdminName || 'Not Assigned'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right px-6">
+                          <Button variant="ghost" size="icon" className="rounded-sm h-8 w-8 text-destructive" onClick={() => deleteItem('ptw_types', type.id)}>
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )) : (
+                      <TableRow><TableCell colSpan={3} className="h-32 text-center text-muted-foreground italic text-xs">No types defined.</TableCell></TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
