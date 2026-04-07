@@ -53,7 +53,9 @@ import {
   Navigation,
   CheckSquare,
   ListTodo,
-  ClipboardCheck
+  ClipboardCheck,
+  ClipboardList,
+  PackagePlus
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -67,7 +69,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase"
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from "@/firebase"
 import { doc, collection } from "firebase/firestore"
 import * as React from "react"
 import { isSuperAdmin } from "@/lib/auth-constants"
@@ -589,6 +591,41 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                         <Link href="/site-visits/history">
                           <History className="h-4 w-4" />
                           <span>Visits Data</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {/* Requirements Sub-Section */}
+          {canShow('requirements') && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/requirements')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Requirements" isActive={pathname.startsWith('/requirements')} className="rounded-sm">
+                    <ClipboardList className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Requirements</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/requirements/submit'} onClick={handleMobileClose}>
+                        <Link href="/requirements/submit">
+                          <PackagePlus className="h-4 w-4" />
+                          <span>Submit a Requirement</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/requirements/list'} onClick={handleMobileClose}>
+                        <Link href="/requirements/list">
+                          <TableIcon className="h-4 w-4" />
+                          <span>Requirement Data</span>
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>

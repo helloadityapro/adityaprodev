@@ -14,6 +14,7 @@ export type PageKey =
   | 'purchase-orders' 
   | 'work-orders' 
   | 'payments' 
+  | 'requirements'
   | 'dpr' 
   | 'tasks' 
   | 'permits' 
@@ -67,6 +68,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'purchase-orders', label: 'Purchase Orders', category: 'Operations', path: '/purchase-orders/manage' },
   { id: 'work-orders', label: 'Work Orders', category: 'Operations', path: '/work-orders/manage' },
   { id: 'payments', label: 'Payments', category: 'Operations', path: '/payments/record' },
+  { id: 'requirements', label: 'Requirements', category: 'Operations', path: '/requirements/submit' },
   { id: 'dpr', label: 'Daily Progress Reports (DPR)', category: 'Operations', path: '/dpr/submit' },
   { id: 'tasks', label: 'Tasks', category: 'Operations', path: '/tasks/list' },
   { id: 'permits', label: 'Permits to Work (PtW)', category: 'Operations', path: '/ptw/list' },
@@ -125,6 +127,7 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/purchase-orders')) return 'purchase-orders';
   if (path.startsWith('/work-orders')) return 'work-orders';
   if (path.startsWith('/payments')) return 'payments';
+  if (path.startsWith('/requirements')) return 'requirements';
   if (path.startsWith('/site-visits')) return 'visits';
   if (path.startsWith('/attendance')) return 'attendance';
   if (path.startsWith('/checklists/mms')) return 'checklists-mms';
