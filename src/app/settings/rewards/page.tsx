@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -632,7 +631,7 @@ export default function AdminRewardsSettingsPage() {
               </div>
               <div className="relative w-full md:w-64">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Search personnel..." className="h-10 pl-9 text-sm rounded-sm" value={userSearch} onChange={e => userSearch(e.target.value)} />
+                  <Input placeholder="Search personnel..." className="h-10 pl-9 text-sm rounded-sm" value={userSearch} onChange={e => setUserSearch(e.target.value)} />
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -712,7 +711,7 @@ export default function AdminRewardsSettingsPage() {
             </div>
             <div className="pt-4 border-t">
               <Button variant="outline" className="w-full rounded-sm font-bold border-destructive text-destructive hover:bg-destructive hover:text-white transition-all h-11" onClick={() => handleInitiateRequest('clear')} disabled={isSubmittingRequest}>
-                {isSubmittingRequest ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
+                {isSubmittingRequest ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
                 Request Total Balance Reset
               </Button>
             </div>
