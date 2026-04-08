@@ -1,8 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, where, serverTimestamp } from 'firebase/firestore';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, writeBatch } from '@/firebase';
+import { collection, query, orderBy, doc, where, serverTimestamp, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -24,7 +24,15 @@ import {
   Save,
   X,
   Clock,
-  AlertCircle
+  AlertCircle,
+  History,
+  Trash2,
+  RotateCcw,
+  User,
+  MapPin,
+  Calendar,
+  Filter,
+  Eye
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
@@ -54,6 +62,18 @@ import {
 } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { format, subWeeks, subMonths, subYears, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, isWithinInterval } from 'date-fns';
 
 const editVehicleSchema = z.object({
   make: z.string().min(1, 'Make is required.'),
@@ -73,6 +93,22 @@ type Vehicle = {
   status: 'Available' | 'Allotted' | 'Ongoing';
   currentReading: number;
   createdAt?: any;
+};
+
+type Assignment = {
+  id: string;
+  vehicleId: string;
+  userId: string;
+  userName: string;
+  pickupLocation: string;
+  dropLocation: string;
+  status: string;
+  tripDate: string;
+  requestDate: any;
+  startTime?: any;
+  endTime?: any;
+  startReading?: number;
+  endReading?: number;
 };
 
 type UserProfile = {
@@ -96,10 +132,16 @@ export default function ManageVehiclesPage() {
   const [vehicleSearch, setVehicleSearch] = React.useState("");
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'plate', direction: 'asc' });
   const [vehicleToEdit, setVehicleToEdit] = React.useState<Vehicle | null>(null);
+  const [vehicleToDelete, setVehicleToDelete] = React.useState<Vehicle | null>(null);
+  const [vehicleToRelease, setVehicleToRelease] = React.useState<Vehicle | null>(null);
+  const [vehicleHistory, setVehicleHistory] = React.useState<Vehicle | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const vehiclesQuery = useMemoFirebase(() => collection(firestore, 'vehicles'), [firestore]);
   const { data: vehicles, isLoading: vehiclesLoading } = useCollection<Vehicle>(vehiclesQuery);
+
+  const assignmentsQuery = useMemoFirebase(() => collection(firestore, 'vehicle_assignments'), [firestore]);
+  const { data: allAssignments } = useCollection<Assignment>(assignmentsQuery);
 
   const form = useForm<z.infer<typeof editVehicleSchema>>({
     resolver: zodResolver(editVehicleSchema),
@@ -154,6 +196,48 @@ export default function ManageVehiclesPage() {
         title: 'Update Failed',
         description: error.message || 'Could not save changes.',
       });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteVehicle = () => {
+    if (!vehicleToDelete) return;
+    deleteDocumentNonBlocking(doc(firestore, 'vehicles', vehicleToDelete.id));
+    toast({ title: 'Vehicle Removed', description: `${vehicleToDelete.plateNumber} deleted from registry.` });
+    setVehicleToDelete(null);
+  };
+
+  const handleReleaseVehicle = async () => {
+    if (!vehicleToRelease || !allAssignments) return;
+    setIsSubmitting(true);
+    try {
+      const batch = writeBatch(firestore);
+      
+      // Find and cancel any active assignments for this vehicle
+      const activeAssignments = allAssignments.filter(a => 
+        a.vehicleId === vehicleToRelease.id && 
+        (a.status === 'Approved' || a.status === 'Ongoing')
+      );
+
+      activeAssignments.forEach(a => {
+        batch.update(doc(firestore, 'vehicle_assignments', a.id), {
+          status: 'Rejected',
+          updatedAt: serverTimestamp(),
+          adminRemarks: 'Vehicle force-released by administration.'
+        });
+      });
+
+      batch.update(doc(firestore, 'vehicles', vehicleToRelease.id), {
+        status: 'Available',
+        updatedAt: serverTimestamp()
+      });
+
+      await batch.commit();
+      toast({ title: 'Vehicle Released', description: `${vehicleToRelease.plateNumber} is now available for allotment.` });
+      setVehicleToRelease(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
       setIsSubmitting(false);
     }
@@ -266,58 +350,124 @@ export default function ManageVehiclesPage() {
             <TableHeader className="bg-muted/30">
               <TableRow>
                 <TableHead className="px-6 cursor-pointer hover:bg-muted/50" onClick={() => handleSort('plate')}>
-                  <div className="flex items-center">Vehicle & Registry <SortIcon column="plate" /></div>
+                  <div className="flex items-center">Vehicle <SortIcon column="plate" /></div>
                 </TableHead>
                 <TableHead>Ownership</TableHead>
-                <TableHead className="text-center cursor-pointer hover:bg-muted/50" onClick={() => handleSort('reading')}>
-                  <div className="flex items-center justify-center">Odometer (KM) <SortIcon column="reading" /></div>
-                </TableHead>
                 <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('status')}>
                   <div className="flex items-center">Status <SortIcon column="status" /></div>
+                </TableHead>
+                <TableHead>Current User</TableHead>
+                <TableHead className="min-w-[200px]">Current Itinerary</TableHead>
+                <TableHead className="text-center cursor-pointer hover:bg-muted/50" onClick={() => handleSort('reading')}>
+                  <div className="flex items-center justify-center">Odometer (KM) <SortIcon column="reading" /></div>
                 </TableHead>
                 <TableHead className="text-right px-6">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredVehicles.length > 0 ? filteredVehicles.map((v) => (
-                <TableRow key={v.id} className="hover:bg-muted/5 transition-colors">
-                  <TableCell className="px-6 py-4">
-                    <div className="flex flex-col">
-                      <span className="font-bold text-sm">{v.make} {v.model}</span>
-                      <span className="text-[10px] font-mono font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm border-primary/20 bg-primary/5 text-primary">
-                      {v.ownership}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center font-mono font-bold text-xs text-primary">
-                    {v.currentReading.toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn(
-                      "text-[9px] font-black uppercase rounded-sm px-2 h-5",
-                      v.status === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                      v.status === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                      "bg-amber-50 text-amber-700 border-amber-200"
-                    )}>
-                      {v.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right px-6">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 rounded-sm text-primary hover:bg-primary/10"
-                      onClick={() => setVehicleToEdit(v)}
-                    >
-                      <Settings2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              )) : (
-                <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">No vehicles found.</TableCell></TableRow>
+              {filteredVehicles.length > 0 ? filteredVehicles.map((v) => {
+                const activeAssignment = allAssignments?.find(a => 
+                  a.vehicleId === v.id && (a.status === 'Approved' || a.status === 'Ongoing')
+                );
+
+                return (
+                  <TableRow key={v.id} className="hover:bg-muted/5 transition-colors">
+                    <TableCell className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-sm">{v.make} {v.model}</span>
+                        <span className="text-[10px] font-mono font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-[9px] font-black uppercase rounded-sm border-primary/20 bg-primary/5 text-primary">
+                        {v.ownership}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={cn(
+                        "text-[9px] font-black uppercase rounded-sm px-2 h-5",
+                        v.status === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                        v.status === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                        "bg-amber-50 text-amber-700 border-amber-200"
+                      )}>
+                        {v.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {activeAssignment ? (
+                        <div className="flex items-center gap-2">
+                          <User className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-xs font-bold">{activeAssignment.userName}</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground/40 italic font-medium uppercase">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {activeAssignment ? (
+                        <div className="flex flex-col gap-0.5 max-w-[200px]">
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground">
+                            <MapPin className="h-3 w-3 text-emerald-600" />
+                            <span className="truncate">{activeAssignment.pickupLocation}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground ml-4">
+                            <ArrowRight className="h-2.5 w-2.5 text-muted-foreground" />
+                            <span className="truncate">{activeAssignment.dropLocation}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground/40 italic font-medium uppercase">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center font-mono font-bold text-xs text-primary">
+                      {v.currentReading.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right px-6">
+                      <div className="flex justify-end gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-sm text-primary hover:bg-primary/10"
+                          onClick={() => setVehicleHistory(v)}
+                          title="View History"
+                        >
+                          <History className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10"
+                          onClick={() => setVehicleToEdit(v)}
+                          title="Settings"
+                        >
+                          <Settings2 className="h-4 w-4" />
+                        </Button>
+                        {(v.status === 'Allotted' || v.status === 'Ongoing') && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-amber-600 rounded-sm hover:bg-amber-50"
+                            onClick={() => setVehicleToRelease(v)}
+                            title="Force Release"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive rounded-sm hover:bg-red-50"
+                          onClick={() => setVehicleToDelete(v)}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              }) : (
+                <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No vehicles found.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -326,7 +476,7 @@ export default function ManageVehiclesPage() {
 
       {/* Edit Vehicle Dialog */}
       <Dialog open={!!vehicleToEdit} onOpenChange={(o) => !o && setVehicleToEdit(null)}>
-      <DialogContent className="sm:max-w-[500px] max-h-[80vh] flex flex-col rounded-sm p-0 border-none shadow-2xl">
+        <DialogContent className="sm:max-w-[500px] max-h-[80vh] flex flex-col rounded-sm p-0 border-none shadow-2xl">
           <DialogHeader className="p-6 bg-primary/5 border-b">
             <DialogTitle className="text-xl font-black uppercase tracking-tight">Edit Vehicle Details</DialogTitle>
             <DialogDescription className="text-xs font-medium">Update registry information for {vehicleToEdit?.plateNumber}.</DialogDescription>
@@ -434,7 +584,198 @@ export default function ManageVehiclesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* History Dialog */}
+      <VehicleHistoryDialog 
+        vehicle={vehicleHistory} 
+        assignments={allAssignments || []} 
+        open={!!vehicleHistory} 
+        onOpenChange={(o) => !o && setVehicleHistory(null)} 
+      />
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!vehicleToDelete} onOpenChange={(o) => !o && setVehicleToDelete(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
+              <Trash2 className="h-5 w-5" /> De-register Vehicle
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+              Are you sure you want to permanently remove <strong>{vehicleToDelete?.plateNumber}</strong> from the organizational fleet registry? This action cannot be reversed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteVehicle} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px]">
+              Confirm Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Release Confirmation */}
+      <AlertDialog open={!!vehicleToRelease} onOpenChange={(o) => !o && setVehicleToRelease(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-700 font-black uppercase tracking-tight">
+              <RotateCcw className="h-5 w-5" /> Force Release Asset
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+              Force-releasing <strong>{vehicleToRelease?.plateNumber}</strong> will immediately cancel any active allotments or ongoing journeys linked to this vehicle. The asset will be marked as <strong>Available</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleReleaseVehicle} disabled={isSubmitting} className="bg-amber-600 text-white hover:bg-amber-700 rounded-sm font-bold uppercase text-[10px]">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Release Vehicle
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
+  );
+}
+
+function VehicleHistoryDialog({ vehicle, assignments, open, onOpenChange }: { vehicle: Vehicle | null, assignments: Assignment[], open: boolean, onOpenChange: (o: boolean) => void }) {
+  const [filter, setFilter] = React.useState<string>("all");
+  const [customStart, setCustomStart] = React.useState("");
+  const [customEnd, setCustomEnd] = React.useState("");
+
+  const filteredHistory = React.useMemo(() => {
+    if (!vehicle || !assignments) return [];
+    
+    let list = assignments.filter(a => a.vehicleId === vehicle.id && a.status === 'Completed');
+    
+    const now = new Date();
+    if (filter === 'week') {
+      const start = startOfWeek(now);
+      const end = endOfWeek(now);
+      list = list.filter(a => {
+        const d = a.endTime?.toDate?.() || new Date(a.endTime);
+        return isWithinInterval(d, { start, end });
+      });
+    } else if (filter === 'month') {
+      const start = startOfMonth(now);
+      const end = endOfMonth(now);
+      list = list.filter(a => {
+        const d = a.endTime?.toDate?.() || new Date(a.endTime);
+        return isWithinInterval(d, { start, end });
+      });
+    } else if (filter === 'year') {
+      const start = startOfYear(now);
+      const end = endOfYear(now);
+      list = list.filter(a => {
+        const d = a.endTime?.toDate?.() || new Date(a.endTime);
+        return isWithinInterval(d, { start, end });
+      });
+    } else if (filter === 'custom' && customStart && customEnd) {
+      const start = new Date(customStart);
+      const end = new Date(customEnd);
+      list = list.filter(a => {
+        const d = a.endTime?.toDate?.() || new Date(a.endTime);
+        return isWithinInterval(d, { start, end });
+      });
+    }
+
+    return list.sort((a, b) => {
+      const da = a.endTime?.toDate?.()?.getTime() || 0;
+      const db = b.endTime?.toDate?.()?.getTime() || 0;
+      return db - da;
+    });
+  }, [vehicle, assignments, filter, customStart, customEnd]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden flex flex-col rounded-sm border-none shadow-2xl bg-background h-[85vh]">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 p-2 rounded-sm"><History className="h-5 w-5 text-primary" /></div>
+            <div>
+              <DialogTitle className="text-xl font-black uppercase tracking-tight">Trip Audit Trail</DialogTitle>
+              <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{vehicle?.plateNumber} — {vehicle?.make} {vehicle?.model}</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="p-4 border-b bg-muted/10 flex flex-col sm:flex-row items-center gap-4 shrink-0">
+          <div className="flex items-center gap-2">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+            <Select value={filter} onValueChange={setFilter}>
+              <SelectTrigger className="w-40 h-9 rounded-sm text-xs font-bold uppercase">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs font-bold uppercase">All Time</SelectItem>
+                <SelectItem value="week" className="text-xs font-bold uppercase">This Week</SelectItem>
+                <SelectItem value="month" className="text-xs font-bold uppercase">This Month</SelectItem>
+                <SelectItem value="year" className="text-xs font-bold uppercase">This Year</SelectItem>
+                <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {filter === 'custom' && (
+            <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+              <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-9 w-36 rounded-sm text-xs" />
+              <span className="text-xs font-black text-muted-foreground">TO</span>
+              <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-9 w-36 rounded-sm text-xs" />
+            </div>
+          )}
+
+          <div className="ml-auto">
+            <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] bg-primary/10 text-primary border-none">{filteredHistory.length} Trip(s)</Badge>
+          </div>
+        </div>
+
+        <ScrollArea className="flex-1 p-0">
+          <Table>
+            <TableHeader className="bg-muted/30 sticky top-0 z-10">
+              <TableRow>
+                <TableHead className="px-6">Timeline</TableHead>
+                <TableHead>User</TableHead>
+                <TableHead className="min-w-[200px]">Itinerary</TableHead>
+                <TableHead className="text-right px-6">Distance (KM)</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredHistory.length > 0 ? filteredHistory.map((a) => (
+                <TableRow key={a.id} className="hover:bg-muted/5 transition-colors">
+                  <TableCell className="px-6 py-4">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-bold text-foreground">{a.tripDate}</span>
+                      <span className="text-[10px] text-muted-foreground font-mono uppercase">{a.startTime ? format(a.startTime.toDate(), 'HH:mm') : '—'} TO {a.endTime ? format(a.endTime.toDate(), 'HH:mm') : '—'}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold">{a.userName}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase font-medium">{a.id.slice(0, 8)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 uppercase">
+                        <MapPin className="h-2.5 w-2.5" /> {a.pickupLocation}
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-red-700 uppercase ml-3">
+                        <ArrowRight className="h-2.5 w-2.5" /> {a.dropLocation}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right px-6 font-mono font-black text-primary">
+                    {a.startReading && a.endReading ? (a.endReading - a.startReading).toFixed(1) : '—'}
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow><TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic text-xs uppercase font-bold opacity-40">No historical records discovered for this range</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+        <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Audit</Button></DialogClose></DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
