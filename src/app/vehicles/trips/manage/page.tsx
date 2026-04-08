@@ -247,8 +247,8 @@ export default function ManageAllTripsPage() {
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
   
   const isSuper = isSuperAdmin(user?.email);
-  const isAdmin = isSuper || userProfile?.role === 'Admin';
-  const isManager = userProfile?.role === 'Site Manager';
+  const isAdmin = isSuper || userProfile?.role === "Admin";
+  const isManager = userProfile?.role === "Site Manager";
   const isHR = userProfile?.role === 'Manager - Human Resources';
   const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
@@ -620,9 +620,6 @@ export default function ManageAllTripsPage() {
                 {stats.pending > 0 && <Badge className="absolute -top-2 -right-2 h-5 min-w-5 flex items-center justify-center p-0 rounded-full bg-red-500 text-[10px] font-black">{stats.pending}</Badge>}
               </TabsTrigger>
             )}
-            {(isAdmin || isHR) && (
-              <TabsTrigger value="fleet" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-4 sm:px-6 h-8">Fleet Status</TabsTrigger>
-            )}
           </TabsList>
 
           <div className="flex items-center gap-2">
@@ -781,108 +778,6 @@ export default function ManageAllTripsPage() {
             </Card>
           </div>
         </TabsContent>
-
-        <TabsContent value="fleet" className="animate-in fade-in-50 duration-300">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 px-1">
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search fleet..." 
-                className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
-                value={fleetSearch} 
-                onChange={e => setFleetSearch(e.target.value)} 
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Select value={fleetStatusFilter} onValueChange={setFleetStatusFilter}>
-                <SelectTrigger className="w-[140px] h-9 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20 bg-background">
-                  <SelectValue placeholder="Fleet Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-[10px] font-bold uppercase">All Status</SelectItem>
-                  <SelectItem value="Available" className="text-[10px] font-bold uppercase text-emerald-600">Available</SelectItem>
-                  <SelectItem value="Allotted" className="text-[10px] font-bold uppercase text-amber-600">Allotted</SelectItem>
-                  <SelectItem value="Ongoing" className="text-[10px] font-bold uppercase text-blue-600">Ongoing</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" onClick={() => { setFleetSearch(""); setFleetStatusFilter("all"); }}>
-                <FilterX className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
-                      <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('plate')}>
-                        <div className="flex items-center">Vehicle <FleetSortIcon column="plate" /></div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('ownership')}>
-                        <div className="flex items-center">Ownership <FleetSortIcon column="ownership" /></div>
-                      </TableHead>
-                      <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleFleetSort('status')}>
-                        <div className="flex items-center">Status <FleetSortIcon column="status" /></div>
-                      </TableHead>
-                      <TableHead className="min-w-[200px]">Current User</TableHead>
-                      <TableHead className="min-w-[250px]">Current Itinerary</TableHead>
-                      <TableHead className="text-right px-6">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSortedFleet.length > 0 ? filteredSortedFleet.map(v => (
-                      <TableRow key={v.id} className="hover:bg-muted/5">
-                        <TableCell className="px-6 py-4">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold">{v.make} {v.model}</span>
-                            <span className="font-mono text-[10px] font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell><Badge variant="secondary" className="rounded-sm text-[9px] font-black uppercase px-1.5 h-5">{v.ownership}</Badge></TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={cn(
-                            "text-[9px] font-black uppercase rounded-sm px-2 h-5",
-                            v.effectiveStatus === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
-                            v.effectiveStatus === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
-                            "bg-amber-50 text-amber-700 border-amber-200"
-                          )}>{v.effectiveStatus}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {v.activeTrip ? (
-                            <div className="flex items-center gap-2">
-                              <UserCircle2 className="h-4 w-4 text-primary" />
-                              <div className="flex flex-col">
-                                <span className="text-xs font-bold">{v.activeTrip.userName}</span>
-                                <span className="text-[9px] text-muted-foreground font-black uppercase">Driver: {v.activeTrip.driverName}</span>
-                              </div>
-                            </div>
-                          ) : <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>}
-                        </TableCell>
-                        <TableCell>
-                          {v.activeTrip ? (
-                            <div className="flex flex-col gap-1.5 text-[10px]">
-                              <div className="flex items-center gap-1.5 font-black text-emerald-700"><MapPin className="h-3 w-3 shrink-0" />{v.activeTrip.pickupLocation}</div>
-                              <div className="flex items-center gap-1.5 font-bold text-emerald-700 ml-4"><MapPin className="h-2.5 w-2.5 shrink-0" />{v.activeTrip.dropLocation}</div>
-                            </div>
-                          ) : <span className="text-[10px] text-muted-foreground/40 italic uppercase font-bold">Awaiting</span>}
-                        </TableCell>
-                        <TableCell className="text-right px-6">
-                          {v.effectiveStatus !== 'Available' && (
-                            <Button variant="outline" size="sm" className="h-8 rounded-sm font-black text-[9px] uppercase border-amber-500/30 text-amber-700" onClick={() => setReleaseTarget(v)}>
-                              <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Release
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )) : <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No fleet records.</TableCell></TableRow>}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       <EditTripDialog assignment={editingAssignment} open={!!editingAssignment} onOpenChange={(o) => !o && setEditingAssignment(null)} sites={sites || []} allUsers={allUsers || []} onSave={handleSaveEdit} />
@@ -1002,7 +897,40 @@ export default function ManageAllTripsPage() {
                 </section>
 
                 {(detailsAssignment.status === 'Ongoing' || detailsAssignment.status === 'Completed') && (
-                  <section className="space-y-6"><div className="flex items-center gap-2 border-b pb-2"><ShieldCheck className="h-4 w-4 text-primary" /><h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em]">Digital Audit Proof</h3></div><div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div className="space-y-4"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><PlayCircle className="h-3 w-3" /> Start</Label><div className="bg-muted/20 border rounded-sm p-4 space-y-4"><div className="flex justify-between items-center"><span className="text-[10px] font-bold uppercase text-muted-foreground">Odometer</span><span className="text-lg font-black text-primary font-mono">{detailsAssignment.startReading} KM</span></div>{detailsAssignment.startReadingPhoto && (<div className="relative aspect-video rounded-sm overflow-hidden border cursor-pointer" onClick={() => openViewer(detailsAssignment.startReadingPhoto!, detailsAssignment)}><img src={detailsAssignment.startReadingPhoto} className="w-full h-full object-cover" alt="Start" /></div>)}</div></div>{detailsAssignment.status === 'Completed' && (<div className="space-y-4"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><Flag className="h-3 w-3" /> Conclusion</Label><div className="bg-emerald-50/50 border border-emerald-100 rounded-sm p-4 space-y-4"><div className="flex justify-between items-center"><span className="text-[10px] font-bold uppercase text-emerald-700">Final Reading</span><span className="text-lg font-black text-emerald-900 font-mono">{detailsAssignment.endReading} KM</span></div>{detailsAssignment.endReadingPhoto && (<div className="relative aspect-video rounded-sm overflow-hidden border border-emerald-100 cursor-pointer" onClick={() => openViewer(detailsAssignment.endReadingPhoto!, detailsAssignment)}><img src={detailsAssignment.endReadingPhoto} className="w-full h-full object-cover" alt="End" /></div>)}</div></div>)}</div></section>
+                  <section className="space-y-6">
+                    <div className="flex items-center gap-2 border-b pb-2"><ShieldCheck className="h-4 w-4 text-primary" /><h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em]">Digital Audit Proof</h3></div>
+                    
+                    {detailsAssignment.status === 'Completed' && (
+                      <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-inner animate-in fade-in slide-in-from-top-1 duration-500">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-primary" />
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Total Travelled Today</span>
+                        </div>
+                        <div className="text-xl font-black text-primary font-mono tabular-nums">
+                          {((detailsAssignment.endReading || 0) - (detailsAssignment.startReading || 0)).toFixed(1)} <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1">KM</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-4">
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><PlayCircle className="h-3 w-3" /> Start</Label>
+                        <div className="bg-muted/20 border rounded-sm p-4 space-y-4">
+                          <div className="flex justify-between items-center"><span className="text-[10px] font-bold uppercase text-muted-foreground">Odometer</span><span className="text-lg font-black text-primary font-mono">{detailsAssignment.startReading} KM</span></div>
+                          {detailsAssignment.startReadingPhoto && (<div className="relative aspect-video rounded-sm overflow-hidden border cursor-pointer" onClick={() => openViewer(detailsAssignment.startReadingPhoto!, detailsAssignment)}><img src={detailsAssignment.startReadingPhoto} className="w-full h-full object-cover" alt="Start" /></div>)}
+                        </div>
+                      </div>
+                      {detailsAssignment.status === 'Completed' && (
+                        <div className="space-y-4">
+                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><Flag className="h-3 w-3" /> Conclusion</Label>
+                          <div className="bg-emerald-50/50 border border-emerald-100 rounded-sm p-4 space-y-4">
+                            <div className="flex justify-between items-center"><span className="text-[10px] font-bold uppercase text-emerald-700">Final Reading</span><span className="text-lg font-black text-emerald-900 font-mono">{detailsAssignment.endReading} KM</span></div>
+                            {detailsAssignment.endReadingPhoto && (<div className="relative aspect-video rounded-sm overflow-hidden border border-emerald-100 cursor-pointer" onClick={() => openViewer(detailsAssignment.endReadingPhoto!, detailsAssignment)}><img src={detailsAssignment.endReadingPhoto} className="w-full h-full object-cover" alt="End" /></div>)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </section>
                 )}
               </>
             )}
