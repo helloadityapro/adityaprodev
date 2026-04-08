@@ -1,13 +1,25 @@
-
 import React from "react";
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { Toaster } from '@/components/ui/toaster';
-import { ClientShell } from '@/components/client-shell';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 import type { Metadata } from "next";
+import dynamic from 'next/dynamic';
+
+// Dynamically import the heavy ClientShell to prevent main layout chunk timeouts and optimize loading.
+const ClientShell = dynamic(() => import('@/components/client-shell').then(mod => mod.ClientShell), {
+  ssr: true,
+  loading: () => (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground animate-pulse">Initializing Shell...</p>
+      </div>
+    </div>
+  )
+});
 
 const inter = Inter({
   subsets: ['latin'],
@@ -39,7 +51,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="antialiased font-sans h-full">
+      <body className="antialiased font-sans h-full" suppressHydrationWarning>
         <FirebaseClientProvider>
           <FirebaseErrorListener />
           <PushNotificationManager />
