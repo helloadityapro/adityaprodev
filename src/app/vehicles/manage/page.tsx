@@ -18,6 +18,7 @@ import {
   ArrowUpDown, 
   ArrowUp, 
   ArrowDown, 
+  ArrowRight,
   Settings2,
   CheckCircle2,
   Loader2,
@@ -375,7 +376,7 @@ export default function ManageVehiclesPage() {
                     <TableCell className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="font-bold text-sm">{v.make} {v.model}</span>
-                        <span className="text-[10px] font-mono font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
+                        <span className="font-mono text-[10px] font-black text-primary uppercase tracking-widest">{v.plateNumber}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -436,7 +437,7 @@ export default function ManageVehiclesPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10"
+                          className="h-8 w-8 rounded-sm text-primary hover:bg-primary/10"
                           onClick={() => setVehicleToEdit(v)}
                           title="Settings"
                         >
@@ -604,7 +605,7 @@ export default function ManageVehiclesPage() {
               Are you sure you want to permanently remove <strong>{vehicleToDelete?.plateNumber}</strong> from the organizational fleet registry? This action cannot be reversed.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
+          <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteVehicle} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px]">
               Confirm Delete
@@ -624,7 +625,7 @@ export default function ManageVehiclesPage() {
               Force-releasing <strong>{vehicleToRelease?.plateNumber}</strong> will immediately cancel any active allotments or ongoing journeys linked to this vehicle. The asset will be marked as <strong>Available</strong>.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
+          <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleReleaseVehicle} disabled={isSubmitting} className="bg-amber-600 text-white hover:bg-amber-700 rounded-sm font-bold uppercase text-[10px]">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -687,7 +688,7 @@ function VehicleHistoryDialog({ vehicle, assignments, open, onOpenChange }: { ve
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden flex flex-col rounded-sm border-none shadow-2xl bg-background h-[85vh]">
+      <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background h-[85vh] flex flex-col">
         <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
           <div className="flex items-center gap-3">
             <div className="bg-primary/10 p-2 rounded-sm"><History className="h-5 w-5 text-primary" /></div>
@@ -773,7 +774,7 @@ function VehicleHistoryDialog({ vehicle, assignments, open, onOpenChange }: { ve
             </TableBody>
           </Table>
         </ScrollArea>
-        <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Audit</Button></DialogClose></DialogFooter>
+        <DialogFooter className="p-4 bg-muted/5 border-t shrink-0"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Audit</Button></DialogClose></DialogFooter>
       </DialogContent>
     </Dialog>
   );
