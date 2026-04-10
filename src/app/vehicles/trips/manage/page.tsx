@@ -523,7 +523,7 @@ export default function ManageAllTripsPage() {
       return matchesSearch && matchesStatus && isQueue;
     }).sort((a, b) => {
       const dateA = a.requestDate?.toDate?.()?.getTime() || 0;
-      const dateB = b.requestDate?.toDate?.()?.getTime() || 0;
+      const dateB = b.createdAt?.toDate?.()?.getTime() || b.requestDate?.toDate?.()?.getTime() || 0;
       return dateB - dateA;
     });
   }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper, userRoleStr]);
@@ -957,10 +957,6 @@ export default function ManageAllTripsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <AlertDialog open={!!releaseTarget} onOpenChange={(o) => !o && setReleaseTarget(null)}>
-        <AlertDialogContent className="rounded-sm max-md w-[95vw]"><AlertDialogHeader><AlertDialogTitle className="text-amber-700 font-black uppercase tracking-tight">Force Release Asset</AlertDialogTitle><AlertDialogDescription>Force-release {releaseTarget?.plateNumber}? This cancels active allotments for this vehicle.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel><AlertDialogAction onClick={handleMarkAvailable} disabled={isProcessing} className="bg-amber-600 text-white hover:bg-amber-700 rounded-sm font-black uppercase text-[10px] h-11">Force Release</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
@@ -1033,9 +1029,7 @@ function TripTableRow({ trip, user, isAdmin, isHR, isManager, allUsers, onDetail
             trip.status === 'Ongoing' ? "bg-primary text-white border-none" :
             trip.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
             "bg-red-50 text-red-700 border-red-200"
-          )}>
-            {trip.status}
-          </Badge>
+          )}>{trip.status}</Badge>
         </TableCell>
       )}
       <TableCell className="text-right px-6 whitespace-nowrap">
