@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, orderBy, where, or, and, getDocs, writeBatch, serverTimestamp, arrayUnion } from 'firebase/firestore';
-import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -220,11 +219,6 @@ export default function ManageAllTripsPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   
-  // Fleet Tab Specific States
-  const [fleetSearch, setFleetSearch] = React.useState("");
-  const [fleetStatusFilter, setFleetStatusFilter] = React.useState("all");
-  const [fleetSortConfig, setFleetSortConfig] = React.useState<{ key: 'plate' | 'ownership' | 'status'; direction: 'asc' | 'desc' }>({ key: 'plate', direction: 'asc' });
-
   // Viewer States
   const [viewUrl, setViewUrl] = React.useState<string | null>(null);
   const [viewUrls, setViewUrls] = React.useState<string[]>([]);
@@ -236,7 +230,8 @@ export default function ManageAllTripsPage() {
   const [detailsAssignment, setDetailsAssignment] = React.useState<Assignment | null>(null);
   const [editingAssignment, setEditingAssignment] = React.useState<Assignment | null>(null);
   const [cancelTarget, setCancelTarget] = React.useState<Assignment | null>(null);
-  const [releaseTarget, setReleaseTarget] = React.useState<Vehicle | null>(null);
+  const [forceEndTarget, setForceEndTarget] = React.useState<Assignment | null>(null);
+  const [forceEndReading, setForceEndReading] = React.useState("");
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isScheduledTripsOpen, setIsScheduledTripsOpen] = React.useState(false);
 
@@ -436,29 +431,42 @@ export default function ManageAllTripsPage() {
     }
   };
 
-  const handleMarkAvailable = async () => {
-    if (!releaseTarget || !assignments) return;
+  const handleForceEnd = async () => {
+    if (!forceEndTarget) return;
     setIsProcessing(true);
 
     try {
-      const activeAssignments = assignments.filter(a => a.vehicleId === releaseTarget.id && (a.status === 'Approved' || a.status === 'Ongoing'));
-      const batch = writeBatch(firestore);
-      activeAssignments.forEach(a => {
-        batch.update(doc(firestore, 'vehicle_assignments', a.id), {
-          status: 'Rejected',
-          updatedAt: serverTimestamp(),
-          adminRemarks: 'Force-released by system administration.'
-        });
-      });
-      batch.update(doc(firestore, 'vehicles', releaseTarget.id), {
-        status: 'Available',
-        updatedAt: serverTimestamp()
-      });
-      await batch.commit();
-      toast({ title: 'Vehicle Released', description: `${releaseTarget.plateNumber} is now available.` });
-      setReleaseTarget(null);
+      const readingValue = forceEndReading.trim() !== "" ? parseFloat(forceEndReading) : null;
+      
+      const updateData: any = {
+        status: 'Completed',
+        endTime: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        adminRemarks: `Trip force-ended by ${userProfile?.username || 'Admin'}.`
+      };
+
+      if (readingValue !== null && !isNaN(readingValue)) {
+        updateData.endReading = readingValue;
+      }
+
+      updateDocumentNonBlocking(doc(firestore, 'vehicle_assignments', forceEndTarget.id), updateData);
+
+      if (forceEndTarget.vehicleId) {
+        const vehicleUpdate: any = {
+          status: 'Available',
+          updatedAt: serverTimestamp()
+        };
+        if (readingValue !== null && !isNaN(readingValue)) {
+          vehicleUpdate.currentReading = readingValue;
+        }
+        updateDocumentNonBlocking(doc(firestore, 'vehicles', forceEndTarget.vehicleId), vehicleUpdate);
+      }
+
+      toast({ title: 'Trip Terminated', description: 'The journey has been closed and the vehicle released.' });
+      setForceEndTarget(null);
+      setForceEndReading("");
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
       setIsProcessing(false);
     }
@@ -519,44 +527,6 @@ export default function ManageAllTripsPage() {
       return dateB - dateA;
     });
   }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper, userRoleStr]);
-
-  const filteredSortedFleet = React.useMemo(() => {
-    if (!vehicles) return [];
-    let result = vehicles.map(v => {
-      const activeTrip = assignments?.find(a => a.vehicleId === v.id && (a.status === 'Approved' || a.status === 'Ongoing'));
-      const effectiveStatus = activeTrip ? (activeTrip.status === 'Approved' ? 'Allotted' : 'Ongoing') : 'Available';
-      return { ...v, effectiveStatus, activeTrip };
-    });
-    result = result.filter(v => {
-      const search = fleetSearch.toLowerCase();
-      const matchesSearch = v.plateNumber.toLowerCase().includes(search) || 
-                           v.make.toLowerCase().includes(search) || 
-                           v.model.toLowerCase().includes(search) ||
-                           v.ownership.toLowerCase().includes(search) ||
-                           v.effectiveStatus.toLowerCase().includes(search) ||
-                           (v.activeTrip?.userName || '').toLowerCase().includes(search);
-      const matchesStatus = fleetStatusFilter === 'all' || v.effectiveStatus === fleetStatusFilter;
-      return matchesSearch && matchesStatus;
-    });
-    result.sort((a, b) => {
-      const { key, direction } = fleetSortConfig;
-      let valA: any = a[key]?.toLowerCase() || '';
-      let valB: any = b[key]?.toLowerCase() || '';
-      if (valA < valB) return direction === 'asc' ? -1 : 1;
-      if (valA > valB) return direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-    return result;
-  }, [vehicles, fleetSearch, fleetStatusFilter, fleetSortConfig, assignments]);
-
-  const handleFleetSort = (key: 'plate' | 'ownership' | 'status') => {
-    setFleetSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
-  };
-
-  const FleetSortIcon = ({ column }: { column: 'plate' | 'ownership' | 'status' }) => {
-    if (fleetSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return fleetSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
-  };
 
   const handleCloseDetail = () => {
     setDetailsAssignment(null);
@@ -662,6 +632,7 @@ export default function ManageAllTripsPage() {
                 onDetails={setDetailsAssignment}
                 onEdit={setEditingAssignment}
                 onCancel={setCancelTarget}
+                onForceEnd={setForceEndTarget}
                 onAllot={setApprovalState}
                 onWhatsApp={handleGlobalWhatsAppShare}
               />
@@ -699,6 +670,7 @@ export default function ManageAllTripsPage() {
                           onDetails={setDetailsAssignment}
                           onEdit={setEditingAssignment}
                           onCancel={setCancelTarget}
+                          onForceEnd={setForceEndTarget}
                           onAllot={setApprovalState}
                           onWhatsApp={handleGlobalWhatsAppShare}
                         />
@@ -727,6 +699,7 @@ export default function ManageAllTripsPage() {
                 onDetails={setDetailsAssignment}
                 onEdit={setEditingAssignment}
                 onCancel={setCancelTarget}
+                onForceEnd={setForceEndTarget}
                 onAllot={setApprovalState}
                 onWhatsApp={handleGlobalWhatsAppShare}
               />
@@ -763,6 +736,7 @@ export default function ManageAllTripsPage() {
                             onDetails={setDetailsAssignment}
                             onEdit={setEditingAssignment}
                             onCancel={setCancelTarget}
+                            onForceEnd={setForceEndTarget}
                             onAllot={setApprovalState}
                             onWhatsApp={handleGlobalWhatsAppShare}
                             isQueueView
@@ -950,6 +924,40 @@ export default function ManageAllTripsPage() {
         <AlertDialogContent className="rounded-sm max-md w-[95vw]"><AlertDialogHeader><AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight"><CircleX className="h-5 w-5" /> Confirm Cancellation</AlertDialogTitle><AlertDialogDescription className="text-sm font-medium">Revoke this trip request? This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel><AlertDialogAction onClick={handleConfirmCancel} disabled={isProcessing} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Cancellation"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog open={!!forceEndTarget} onOpenChange={(o) => !o && setForceEndTarget(null)}>
+        <AlertDialogContent className="rounded-sm max-md w-[95vw]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
+              <Flag className="h-5 w-5" /> Force End Journey
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium">
+              You are terminating the trip for <strong>{forceEndTarget?.userName}</strong>. This will release the vehicle <strong>{forceEndTarget?.vehicleDetails}</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4 space-y-3 text-left">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Final Odometer Reading (Optional)</Label>
+            <Input 
+              type="number" 
+              placeholder="Enter KM reading if known..." 
+              value={forceEndReading}
+              onChange={(e) => setForceEndReading(e.target.value)}
+              className="h-11 rounded-sm font-mono font-bold"
+            />
+            <p className="text-[9px] text-muted-foreground italic">Leaving this blank will preserve the vehicle's current reading.</p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleForceEnd} 
+              disabled={isProcessing} 
+              className="bg-red-600 text-white hover:bg-red-700 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Termination"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={!!releaseTarget} onOpenChange={(o) => !o && setReleaseTarget(null)}>
         <AlertDialogContent className="rounded-sm max-md w-[95vw]"><AlertDialogHeader><AlertDialogTitle className="text-amber-700 font-black uppercase tracking-tight">Force Release Asset</AlertDialogTitle><AlertDialogDescription>Force-release {releaseTarget?.plateNumber}? This cancels active allotments for this vehicle.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Back</AlertDialogCancel><AlertDialogAction onClick={handleMarkAvailable} disabled={isProcessing} className="bg-amber-600 text-white hover:bg-amber-700 rounded-sm font-black uppercase text-[10px] h-11">Force Release</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
@@ -960,12 +968,13 @@ export default function ManageAllTripsPage() {
 /**
  * Functional component for a desktop table row.
  */
-function TripTableRow({ trip, user, isAdmin, isHR, isManager, allUsers, onDetails, onEdit, onCancel, onAllot, onWhatsApp, isQueueView = false }: any) {
+function TripTableRow({ trip, user, isAdmin, isHR, isManager, allUsers, onDetails, onEdit, onCancel, onForceEnd, onAllot, onWhatsApp, isQueueView = false }: any) {
   const isAssignedDriver = trip.driverId === user?.uid;
   const isRequester = trip.userId === user?.uid;
   const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
   const canStartTrip = (trip.status === 'Approved') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
   const canEndTrip = (trip.status === 'Ongoing') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
+  const canForceEnd = (isAdmin || isHR) && trip.status === 'Ongoing';
 
   return (
     <TableRow className="hover:bg-muted/5 transition-colors group">
@@ -1047,6 +1056,9 @@ function TripTableRow({ trip, user, isAdmin, isHR, isManager, allUsers, onDetail
           {canEndTrip && (
             <Button size="sm" className="h-8 rounded-sm bg-red-600 hover:bg-red-700 font-bold px-3 text-[10px] uppercase tracking-tight" asChild><Link href={`/vehicles/trips/${trip.id}/finish`}><Flag className="h-3.5 w-3.5 mr-1" /> End</Link></Button>
           )}
+          {canForceEnd && (
+            <Button size="sm" variant="destructive" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 shadow-sm" onClick={() => onForceEnd(trip)}>Force End</Button>
+          )}
           {canCancel && (
             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => onCancel(trip)} title="Cancel Trip"><CircleX className="h-4 w-4" /></Button>
           )}
@@ -1060,12 +1072,13 @@ function TripTableRow({ trip, user, isAdmin, isHR, isManager, allUsers, onDetail
 /**
  * Functional component for a mobile card.
  */
-function TripMobileCard({ trip, user, isAdmin, isHR, isManager, onDetails, onEdit, onCancel, onAllot, onWhatsApp }: any) {
+function TripMobileCard({ trip, user, isAdmin, isHR, isManager, onDetails, onEdit, onCancel, onForceEnd, onAllot, onWhatsApp }: any) {
   const isAssignedDriver = trip.driverId === user?.uid;
   const isRequester = trip.userId === user?.uid;
   const canCancel = (isAdmin || isRequester) && (trip.status === 'Pending' || trip.status === 'Approved');
   const canStartTrip = (trip.status === 'Approved') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
   const canEndTrip = (trip.status === 'Ongoing') && ((trip.vehicleOwnership === 'Rented' && isRequester) || (trip.vehicleOwnership !== 'Rented' && isAssignedDriver));
+  const canForceEnd = (isAdmin || isHR) && trip.status === 'Ongoing';
 
   return (
     <Card className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => onDetails(trip)}>
@@ -1130,6 +1143,9 @@ function TripMobileCard({ trip, user, isAdmin, isHR, isManager, onDetails, onEdi
           )}
           {canEndTrip && (
             <Button size="sm" className="h-8 rounded-sm bg-red-600 hover:bg-red-700 text-white font-bold px-3 text-[10px] uppercase" asChild><Link href={`/vehicles/trips/${trip.id}/finish`}><Flag className="h-3.5 w-3.5 mr-1" /> End</Link></Button>
+          )}
+          {canForceEnd && (
+            <Button size="sm" variant="destructive" className="h-8 rounded-sm font-black text-[9px] uppercase px-4 shadow-sm" onClick={() => onForceEnd(trip)}>Force End</Button>
           )}
           {canCancel && (
             <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={() => onCancel(trip)}><CircleX className="h-4 w-4" /></Button>
