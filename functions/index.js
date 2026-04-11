@@ -41,6 +41,7 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
     }
 
     // 2. Prepare the FCM payload optimized for background/killed state delivery
+    // We include both 'notification' (for OS handling) and 'data' (for app handling)
     const messagePayload = {
       notification: {
         title: data.title,
@@ -51,12 +52,13 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
         notificationId: String(event.params.notificationId)
       },
       android: {
-        priority: 'high', // Delivery priority
+        priority: 'high', // Critical for background/killed state delivery
         notification: {
           channelId: 'default',
-          priority: 'HIGH', // UI/Heads-up priority
-          visibility: 'PUBLIC',
-          sound: 'default'
+          priority: 'max', // Heads-up priority for Android
+          visibility: 'public',
+          sound: 'default',
+          clickAction: 'FCM_PLUGIN_ACTIVITY' // Ensures intent triggers correctly
         }
       },
       apns: {
@@ -68,12 +70,12 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
             },
             sound: 'default',
             badge: 1,
-            contentAvailable: true // Wake app for data if needed
+            contentAvailable: true // Critical for background "wake up"
           }
         }
       },
       // Target multiple tokens (multicast)
-      tokens: tokens,
+      tokens: Array.from(new Set(tokens)), // Ensure unique tokens
     };
 
     // 3. Send via FCM
@@ -101,7 +103,7 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
       }
     }
 
-    console.log(`Successfully dispatched push to ${response.successCount} devices.`);
+    console.log(`Successfully dispatched push to ${response.successCount} devices for user ${userId}.`);
   } catch (error) {
     console.error("Critical FCM dispatch error:", error);
   }

@@ -22,15 +22,21 @@ export function PushNotificationManager() {
   React.useEffect(() => {
     if (!Capacitor.isNativePlatform() || !user) return;
 
+    let registrationListener: any;
+    let errorListener: any;
+    let receivedListener: any;
+    let actionListener: any;
+
     const initPush = async () => {
-      // 1. Request permissions
-      const perm = await PushNotifications.checkPermissions();
+      // 1. Check/Request permissions
+      let perm = await PushNotifications.checkPermissions();
       if (perm.receive !== 'granted') {
-        const req = await PushNotifications.requestPermissions();
-        if (req.receive !== 'granted') {
-          console.warn("User denied push notification permissions.");
-          return;
-        }
+        perm = await PushNotifications.requestPermissions();
+      }
+
+      if (perm.receive !== 'granted') {
+        console.warn("User denied push notification permissions.");
+        return;
       }
 
       // 2. Create standard notification channel for Android 8+
@@ -38,16 +44,14 @@ export function PushNotificationManager() {
       await PushNotifications.createChannel({
         id: 'default',
         name: 'Aditya Pro Alerts',
-        description: 'Standard notifications for PtW, Trips and Tasks',
+        description: 'Critical organizational alerts for PtW, Trips and Tasks',
         importance: 5,
         visibility: 1,
         vibration: true,
       });
 
-      // 3. Setup Listeners FIRST to avoid race conditions with registration
-      
-      // Token listener: fires when registration completes
-      const regListener = await PushNotifications.addListener('registration', (token: Token) => {
+      // 3. Setup Listeners BEFORE registration to capture the token
+      registrationListener = await PushNotifications.addListener('registration', (token: Token) => {
         console.log('Push registration success, token: ' + token.value);
         const userRef = doc(firestore, 'users', user.uid);
         updateDocumentNonBlocking(userRef, {
@@ -55,13 +59,12 @@ export function PushNotificationManager() {
         });
       });
 
-      // Error listener
-      const errListener = await PushNotifications.addListener('registrationError', (error: any) => {
+      errorListener = await PushNotifications.addListener('registrationError', (error: any) => {
         console.error('Push Registration Error: ', JSON.stringify(error));
       });
 
-      // Foreground listener: fires when a notification arrives while app is open
-      const receivedListener = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+      receivedListener = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+        // Foreground handling: Show an in-app toast
         toast({
           title: notification.title,
           description: notification.body,
@@ -70,7 +73,9 @@ export function PushNotificationManager() {
               variant="default"
               size="sm" 
               className="h-8 rounded-sm font-bold text-[10px] uppercase px-3"
-              onClick={() => router.push(notification.data.link)}
+              onClick={() => {
+                router.push(notification.data.link);
+              }}
             >
               View
             </Button>
@@ -78,8 +83,8 @@ export function PushNotificationManager() {
         });
       });
 
-      // Action listener: fires when user clicks a notification (from background or killed state)
-      const actionListener = await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+      actionListener = await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+        // Handle notification click from background/killed state
         const link = notification.notification.data?.link;
         if (link) {
           router.push(link);
@@ -88,16 +93,16 @@ export function PushNotificationManager() {
 
       // 4. Finally, Register with FCM service
       await PushNotifications.register();
-
-      return () => {
-        regListener.remove();
-        errListener.remove();
-        receivedListener.remove();
-        actionListener.remove();
-      };
     };
 
     initPush();
+
+    return () => {
+      registrationListener?.remove();
+      errorListener?.remove();
+      receivedListener?.remove();
+      actionListener?.remove();
+    };
   }, [user, firestore, router, toast]);
 
   return null; // Invisible component
