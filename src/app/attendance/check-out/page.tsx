@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -14,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 export default function CheckOutPage() {
   const firestore = useFirestore();
@@ -143,6 +145,13 @@ export default function CheckOutPage() {
         status: 'completed',
         updatedAt: serverTimestamp()
       });
+
+      // Subtle haptic feedback for action confirmation
+      try {
+        await Haptics.impact({ style: ImpactStyle.Light });
+      } catch (hapticError) {
+        // Silently ignore if haptics are not supported
+      }
 
       toast({ variant: 'success', title: 'Workday Completed' });
       router.push('/attendance/history');

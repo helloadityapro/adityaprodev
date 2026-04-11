@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 export default function CheckInPage() {
   const firestore = useFirestore();
@@ -144,6 +146,13 @@ export default function CheckInPage() {
         date: format(new Date(), 'yyyy-MM-dd'),
         createdAt: serverTimestamp()
       });
+
+      // Subtle haptic feedback for action confirmation
+      try {
+        await Haptics.impact({ style: ImpactStyle.Light });
+      } catch (hapticError) {
+        // Silently ignore if haptics are not supported
+      }
 
       toast({ variant: 'success', title: 'Check-in Successful' });
       router.push('/attendance/check-out');
