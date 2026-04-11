@@ -51,6 +51,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { sendNotification } from '@/lib/notifications';
 
 type ExpenseItem = {
   category: string;
@@ -133,13 +134,12 @@ export default function ManageExpensesPage() {
       });
 
       // Notify User
-      addDocumentNonBlocking(collection(firestore, 'notifications'), {
+      sendNotification(firestore, {
         userId: decisionState.report.userId,
         title: `Expense Status: ${decisionStatusToTitle(decisionState.targetStatus)}`,
         description: `Your report "${decisionState.report.title}" has been ${decisionState.targetStatus.toLowerCase()}. Remarks: ${remarks}`,
         link: `/expenses/manage`,
-        read: false,
-        createdAt: serverTimestamp(),
+        push: true,
       });
 
       toast({ title: 'Success', description: `Report updated to ${decisionState.targetStatus}.` });
@@ -175,13 +175,15 @@ export default function ManageExpensesPage() {
 
   return (
     <div className="space-y-8 pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-primary" />
-            <h1>{isAdmin ? "Manage All Expenses" : "My Expense History"}</h1>
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-6 w-6 text-primary" />
+              <h1>{isAdmin ? "Manage All Expenses" : "My Expense History"}</h1>
+            </div>
+            <p className="text-muted-foreground text-sm font-medium">Monitoring and authorization of organizational expenditures.</p>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Monitoring and authorization of organizational expenditures.</p>
         </div>
       </div>
 
@@ -190,14 +192,14 @@ export default function ManageExpensesPage() {
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder="Search report, site or user..." 
-            className="pl-10 h-10 text-sm rounded-sm border-primary/20"
+            className="pl-10 h-10 text-sm rounded-sm border-primary/20 bg-background"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px] h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20">
+            <SelectTrigger className="w-[160px] h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 bg-background">
               <SelectValue placeholder="Filter Status" />
             </SelectTrigger>
             <SelectContent>
@@ -405,7 +407,7 @@ export default function ManageExpensesPage() {
 
       {/* Action Confirmation Dialog */}
       <Dialog open={!!decisionState} onOpenChange={() => setDecisionState(null)}>
-        <DialogContent className="rounded-sm max-w-md">
+        <DialogContent className="rounded-sm max-md">
           <DialogHeader>
             <DialogTitle className="uppercase tracking-tight font-black">Confirm {decisionState?.targetStatus}</DialogTitle>
             <DialogDescription>Provide feedback for this organizational expenditure audit.</DialogDescription>

@@ -34,6 +34,7 @@ export function PushNotificationManager() {
       }
 
       // 2. Create standard notification channel for Android 8+
+      // High importance (5) is required for heads-up notifications (banners)
       await PushNotifications.createChannel({
         id: 'default',
         name: 'Aditya Pro Alerts',
@@ -43,23 +44,23 @@ export function PushNotificationManager() {
         vibration: true,
       });
 
-      // 3. Register with FCM
-      await PushNotifications.register();
-
-      // 4. Listen for token and store in Firestore
+      // 3. Setup Listeners FIRST to avoid race conditions with registration
+      
+      // Token listener: fires when registration completes
       const regListener = await PushNotifications.addListener('registration', (token: Token) => {
+        console.log('Push registration success, token: ' + token.value);
         const userRef = doc(firestore, 'users', user.uid);
         updateDocumentNonBlocking(userRef, {
           fcmTokens: arrayUnion(token.value)
         });
       });
 
-      // 5. Handle errors
+      // Error listener
       const errListener = await PushNotifications.addListener('registrationError', (error: any) => {
         console.error('Push Registration Error: ', JSON.stringify(error));
       });
 
-      // 6. Handle foreground notifications
+      // Foreground listener: fires when a notification arrives while app is open
       const receivedListener = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
         toast({
           title: notification.title,
@@ -77,13 +78,16 @@ export function PushNotificationManager() {
         });
       });
 
-      // 7. Handle notification clicks (from background/closed state)
+      // Action listener: fires when user clicks a notification (from background or killed state)
       const actionListener = await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
         const link = notification.notification.data?.link;
         if (link) {
           router.push(link);
         }
       });
+
+      // 4. Finally, Register with FCM service
+      await PushNotifications.register();
 
       return () => {
         regListener.remove();

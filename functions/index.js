@@ -40,29 +40,35 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
       return;
     }
 
-    // 2. Prepare the FCM payload
+    // 2. Prepare the FCM payload optimized for background/killed state delivery
     const messagePayload = {
       notification: {
         title: data.title,
         body: data.description,
       },
       data: {
-        link: data.link || "/",
-        notificationId: event.params.notificationId
+        link: String(data.link || "/"),
+        notificationId: String(event.params.notificationId)
       },
       android: {
-        priority: 'high', // CRITICAL: Ensure instant delivery on Android
+        priority: 'high', // Delivery priority
         notification: {
           channelId: 'default',
-          priority: 'high', // Priority within the system drawer
+          priority: 'HIGH', // UI/Heads-up priority
+          visibility: 'PUBLIC',
           sound: 'default'
         }
       },
       apns: {
         payload: {
           aps: {
-            contentAvailable: true,
-            sound: 'default'
+            alert: {
+              title: data.title,
+              body: data.description
+            },
+            sound: 'default',
+            badge: 1,
+            contentAvailable: true // Wake app for data if needed
           }
         }
       },

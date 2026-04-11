@@ -20,6 +20,7 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { sendNotification } from "@/lib/notifications";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
@@ -140,28 +141,26 @@ export default function SubmitRequirementPage() {
 
       // Notify Manager if Engineer submitted
       if (isEngineer && userProfile.siteManagerId) {
-        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+        sendNotification(firestore, {
           userId: userProfile.siteManagerId,
           title: "New Site Requirement",
           description: `${userProfile.username} has submitted ${values.items.length} new site requirements for "${values.siteName}".`,
           link: "/requirements/list",
-          read: false,
-          createdAt: serverTimestamp(),
+          push: true
         });
       }
 
       // Notify Admins
-      const adminsQuery = query(collection(firestore, 'users'), where('email', '==', 'khalil@adityagreenenergy.com'));
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
         if (adminDoc.id === user.uid) return;
-        addDocumentNonBlocking(collection(firestore, 'notifications'), {
+        sendNotification(firestore, {
           userId: adminDoc.id,
           title: "Site Requirement Logged",
           description: `New requirement (${values.items[0].itemName}...) raised for "${values.siteName}" by ${userProfile.username}.`,
           link: "/requirements/list",
-          read: false,
-          createdAt: serverTimestamp(),
+          push: true
         });
       });
       
@@ -205,7 +204,7 @@ export default function SubmitRequirementPage() {
                         <Button 
                           variant="outline" 
                           role="combobox" 
-                          className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}
+                          className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}
                         >
                           {field.value || "Select a site..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

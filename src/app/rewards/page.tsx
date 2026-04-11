@@ -322,11 +322,12 @@ export default function RewardsPage() {
         title: "Redemption Request Pending",
         description: `Your request to redeem ${pts} points (₹${(pts * pointValue).toFixed(2)}) has been logged.`,
         link: "/rewards",
-        push: false
+        push: true
       });
 
       const usersSnap = await getDocs(query(collection(firestore, 'users'), where('role', '==', 'Admin')));
       usersSnap.forEach(adminDoc => {
+        if (adminDoc.id === user.uid) return;
         sendNotification(firestore, {
           userId: adminDoc.id,
           title: "New Redemption Request",

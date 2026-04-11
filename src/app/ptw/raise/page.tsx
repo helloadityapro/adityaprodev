@@ -28,6 +28,7 @@ import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { sendNotification } from "@/lib/notifications";
 
 const raisePtwSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -351,13 +352,12 @@ export default function RaisePtwPage() {
           managerMobile = managerDoc.data().mobile;
           
           if (targetStatus === 'Pending') {
-            addDocumentNonBlocking(collection(firestore, 'notifications'), {
+            sendNotification(firestore, {
                 userId: effectiveSiteManagerId,
                 title: isCorrectionMode ? "Permit Resubmitted" : "New Permit Request",
                 description: `${userProfile.username} ${isCorrectionMode ? 'resubmitted' : 'raised'} a permit (${serialNumber}) for "${values.siteName}". Please review.`,
                 link: `/ptw/list?view=${permitId}`,
-                read: false,
-                createdAt: serverTimestamp(),
+                push: true
             });
           }
         }

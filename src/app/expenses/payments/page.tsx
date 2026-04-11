@@ -39,6 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { sendNotification } from '@/lib/notifications';
 
 type ExpenseReport = {
   id: string;
@@ -110,13 +111,12 @@ export default function AccountPaymentsPage() {
       });
 
       // Notify User
-      addDocumentNonBlocking(collection(firestore, 'notifications'), {
+      sendNotification(firestore, {
         userId: selectedReport.userId,
         title: "Expense Reimbursed",
         description: `Payment for "${selectedReport.title}" has been processed. Trans ID: ${transactionId}`,
         link: "/rewards",
-        read: false,
-        createdAt: serverTimestamp(),
+        push: true,
       });
 
       toast({ title: 'Payment Recorded', description: 'Transaction details published successfully.' });

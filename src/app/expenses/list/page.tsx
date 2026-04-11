@@ -49,6 +49,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { sendNotification } from '@/lib/notifications';
 
 type ExpenseItem = {
   category: string;
@@ -141,13 +142,12 @@ export default function ExpensesListPage() {
         adminId: user?.uid,
       });
 
-      addDocumentNonBlocking(collection(firestore, 'notifications'), {
+      sendNotification(firestore, {
         userId: actionState.expense.userId,
         title: `Expense ${actionState.type}`,
         description: `Your submission "${actionState.expense.title}" was ${actionState.type.toLowerCase()}. Remarks: ${remarks}`,
         link: `/expenses/list?view=${actionState.expense.id}`,
-        read: false,
-        createdAt: serverTimestamp(),
+        push: true,
       });
 
       toast({ title: `Expense ${actionState.type}`, description: 'Record updated successfully.' });
