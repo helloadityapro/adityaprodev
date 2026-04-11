@@ -20,6 +20,7 @@ export function PushNotificationManager() {
   const { toast } = useToast();
 
   React.useEffect(() => {
+    // Only run on physical native platforms (Android/iOS)
     if (!Capacitor.isNativePlatform() || !user) return;
 
     let registrationListener: any;
@@ -28,76 +29,83 @@ export function PushNotificationManager() {
     let actionListener: any;
 
     const initPush = async () => {
-      // 1. Check/Request permissions
-      let perm = await PushNotifications.checkPermissions();
-      if (perm.receive !== 'granted') {
-        perm = await PushNotifications.requestPermissions();
-      }
-
-      if (perm.receive !== 'granted') {
-        console.warn("User denied push notification permissions.");
-        return;
-      }
-
-      // 2. Create standard notification channel for Android 8+
-      // High importance (5) is required for heads-up notifications (banners)
-      await PushNotifications.createChannel({
-        id: 'default',
-        name: 'Aditya Pro Alerts',
-        description: 'Critical organizational alerts for PtW, Trips and Tasks',
-        importance: 5,
-        visibility: 1,
-        vibration: true,
-      });
-
-      // 3. Setup Listeners BEFORE registration to capture the token
-      registrationListener = await PushNotifications.addListener('registration', (token: Token) => {
-        console.log('Push registration success, token: ' + token.value);
-        const userRef = doc(firestore, 'users', user.uid);
-        updateDocumentNonBlocking(userRef, {
-          fcmTokens: arrayUnion(token.value)
-        });
-      });
-
-      errorListener = await PushNotifications.addListener('registrationError', (error: any) => {
-        console.error('Push Registration Error: ', JSON.stringify(error));
-      });
-
-      receivedListener = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-        // Foreground handling: Show an in-app toast
-        toast({
-          title: notification.title,
-          description: notification.body,
-          action: notification.data?.link ? (
-            <Button 
-              variant="default"
-              size="sm" 
-              className="h-8 rounded-sm font-bold text-[10px] uppercase px-3"
-              onClick={() => {
-                router.push(notification.data.link);
-              }}
-            >
-              View
-            </Button>
-          ) : undefined
-        });
-      });
-
-      actionListener = await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-        // Handle notification click from background/killed state
-        const link = notification.notification.data?.link;
-        if (link) {
-          router.push(link);
+      try {
+        // 1. Check/Request permissions
+        let perm = await PushNotifications.checkPermissions();
+        if (perm.receive !== 'granted') {
+          perm = await PushNotifications.requestPermissions();
         }
-      });
 
-      // 4. Finally, Register with FCM service
-      await PushNotifications.register();
+        if (perm.receive !== 'granted') {
+          console.warn("User denied push notification permissions.");
+          return;
+        }
+
+        // 2. Create standard notification channel for Android 8+
+        // High importance (5) is required for heads-up notifications (banners)
+        await PushNotifications.createChannel({
+          id: 'default',
+          name: 'Aditya Pro Alerts',
+          description: 'Critical organizational alerts for PtW, Trips and Tasks',
+          importance: 5,
+          visibility: 1,
+          vibration: true,
+        });
+
+        // 3. Setup Listeners BEFORE registration to capture the token reliably
+        registrationListener = await PushNotifications.addListener('registration', (token: Token) => {
+          console.log('Push registration success, token: ' + token.value);
+          const userRef = doc(firestore, 'users', user.uid);
+          // Store token in the user's profile for the Cloud Function to find
+          updateDocumentNonBlocking(userRef, {
+            fcmTokens: arrayUnion(token.value)
+          });
+        });
+
+        errorListener = await PushNotifications.addListener('registrationError', (error: any) => {
+          console.error('Push Registration Error: ', JSON.stringify(error));
+        });
+
+        receivedListener = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+          // Foreground handling: The OS won't show a banner, so we show an in-app toast
+          toast({
+            title: notification.title,
+            description: notification.body,
+            variant: notification.title?.includes('Rejected') ? 'destructive' : 'default',
+            action: notification.data?.link ? (
+              <Button 
+                variant="default"
+                size="sm" 
+                className="h-8 rounded-sm font-bold text-[10px] uppercase px-3 shadow-md"
+                onClick={() => {
+                  router.push(notification.data.link);
+                }}
+              >
+                View
+              </Button>
+            ) : undefined
+          });
+        });
+
+        actionListener = await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+          // Handle notification click from background/killed state
+          const link = notification.notification.data?.link;
+          if (link) {
+            router.push(link);
+          }
+        });
+
+        // 4. Finally, Register with FCM service
+        await PushNotifications.register();
+      } catch (e) {
+        console.error("Push initialization failed", e);
+      }
     };
 
     initPush();
 
     return () => {
+      // Cleanup listeners on unmount
       registrationListener?.remove();
       errorListener?.remove();
       receivedListener?.remove();

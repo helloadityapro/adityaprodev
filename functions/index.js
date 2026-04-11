@@ -44,8 +44,8 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
     // We include both 'notification' (for OS handling) and 'data' (for app handling)
     const messagePayload = {
       notification: {
-        title: data.title,
-        body: data.description,
+        title: String(data.title),
+        body: String(data.description),
       },
       data: {
         link: String(data.link || "/"),
@@ -62,11 +62,14 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
         }
       },
       apns: {
+        headers: {
+          'apns-priority': '10', // Critical for immediate delivery on iOS
+        },
         payload: {
           aps: {
             alert: {
-              title: data.title,
-              body: data.description
+              title: String(data.title),
+              body: String(data.description)
             },
             sound: 'default',
             badge: 1,
