@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -62,7 +61,8 @@ import {
   Wallet,
   IndianRupee,
   PieChart,
-  AlertCircle
+  AlertCircle,
+  Calendar
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -614,7 +614,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   }, [workOrders, woSearch, woSortConfig]);
 
   const handlePOSort = (key: POSortKey) => {
-    setSortConfig(prev => ({
+    setPoSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
@@ -1296,7 +1296,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                   "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
                                   po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
                                   po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                                  "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                  po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                                  "bg-muted text-muted-foreground"
                                 )}>{po.status || 'Pending'}</Badge>
                                 {po.processedByName && (po.status === 'Accepted' || po.status === 'Rejected') && (
                                   <span className="text-[8px] font-bold text-muted-foreground uppercase leading-tight">
@@ -1643,6 +1644,74 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </Card>
           </TabsContent>
 
+          <TabsContent value="utilisation" className="mt-6 animate-in fade-in-50 duration-300">
+            <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+              <CardHeader className="bg-muted/5 border-b py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <PieChart className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest">Material Utilisation Logs</CardTitle>
+                  </div>
+                  <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase" asChild><Link href="/inventory/utilisation/record"><Plus className="h-3 w-3 mr-1.5" /> Record Utilisation</Link></Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {filteredUtilisations && filteredUtilisations.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead className="px-6">Date</TableHead>
+                          <TableHead>Material / Component</TableHead>
+                          <TableHead className="text-center">Quantity Consumed</TableHead>
+                          <TableHead>Personnel</TableHead>
+                          <TableHead className="text-right px-6">Audit Remarks</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredUtilisations.map((u: any) => (
+                          <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
+                            <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
+                              <div className="flex items-center gap-1.5">
+                                <Calendar className="h-3 w-3" />
+                                {u.utilisationDate}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-bold text-sm text-foreground">{u.itemName}</span>
+                                <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Inventory Consumption</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="secondary" className="font-mono font-bold rounded-sm px-2 bg-amber-50 text-amber-700 border-amber-200">
+                                {u.quantity} {u.unit}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase">
+                                <User className="h-3 w-3 text-primary" />
+                                {u.userName}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right px-6 text-[10px] font-medium text-muted-foreground italic max-w-[250px] truncate" title={u.remarks}>
+                              "{u.remarks}"
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="p-20 text-center text-muted-foreground italic flex flex-col items-center gap-2 opacity-40">
+                    <PieChart className="h-10 w-10" />
+                    <p className="text-sm font-bold uppercase tracking-widest">No consumption records discovered</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="movements" className="mt-6 animate-in fade-in-50 duration-300">
             <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
               <CardHeader className="bg-muted/5 border-b py-4">
@@ -1710,7 +1779,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <TableCell className="text-sm font-semibold">{permit.ptwType}</TableCell>
                           <TableCell className="text-xs font-medium">{permit.siteEngineerName || '—'}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm h-5 px-1.5", permit.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" : permit.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : permit.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" : "bg-blue-50 text-blue-700 border-blue-200")}>{permit.status}</Badge>
+                            <Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm h-5 px-1.5", permit.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" : permit.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : permit.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" : permit.status === 'ManagerApproved' ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-muted text-muted-foreground")}>{permit.status}</Badge>
                           </TableCell>
                           <TableCell className="text-right px-6"><Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm"><Link href={`/ptw/list?view=${permit.id}`}><Eye className="h-4 w-4" /></Link></Button></TableCell>
                         </TableRow>
