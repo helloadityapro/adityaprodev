@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -21,7 +20,8 @@ import {
   parse, 
   startOfDay,
   addMonths,
-  subMonths
+  subMonths,
+  isSunday
 } from 'date-fns';
 import { 
   ArrowLeft, 
@@ -140,8 +140,8 @@ export default function AttendanceMatrixPage() {
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Attendance Matrix");
-    XLSX.writeFile(wb, `Attendance_Matrix_${format(currentDate, 'MMM_yyyy')}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Attendance Board");
+    XLSX.writeFile(wb, `Attendance_Board_${format(currentDate, 'MMM_yyyy')}.xlsx`);
   };
 
   if (isProfileLoading || isUsersLoading || isAttendanceLoading || isUserLoading) {
@@ -159,7 +159,7 @@ export default function AttendanceMatrixPage() {
           </Button>
           <div className="flex items-center gap-2">
             <LayoutGrid className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-black uppercase tracking-tight">Monthly Attendance Matrix</h1>
+            <h1 className="text-2xl font-black tracking-tight">Monthly Attendance Board</h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">Cross-personnel presence grid for {format(currentDate, 'MMMM yyyy')}.</p>
         </div>
@@ -185,20 +185,9 @@ export default function AttendanceMatrixPage() {
         </div>
       </div>
 
-      {/* Matrix Legend */}
-      <div className="flex flex-wrap items-center gap-6 p-4 bg-muted/20 border border-dashed rounded-sm text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-        <span className="text-foreground">Legends:</span>
-        <div className="flex items-center gap-1.5 text-blue-600"><Check className="h-3.5 w-3.5" /> Present</div>
-        <div className="flex items-center gap-1.5 text-slate-400"><X className="h-3.5 w-3.5" /> Absent</div>
-        <div className="flex items-center gap-1.5 text-amber-500"><Star className="h-3.5 w-3.5 fill-amber-500" /> Holiday</div>
-        <div className="flex items-center gap-1.5 text-blue-500"><AlertCircle className="h-3.5 w-3.5" /> Late</div>
-        <div className="flex items-center gap-1.5 text-red-500"><Plane className="h-3.5 w-3.5" /> On Leave</div>
-        <div className="ml-auto flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-primary/20" /> Current Date</div>
-      </div>
-
       <Card className="rounded-sm border-primary/10 shadow-xl overflow-hidden">
         <CardContent className="p-0">
-          <div className="relative h-[70vh] overflow-auto custom-scrollbar">
+          <div className="relative h-[75vh] overflow-auto custom-scrollbar">
             <table className="w-full border-collapse border-spacing-0 text-[10px]">
               <thead className="sticky top-0 z-30 bg-muted/95 backdrop-blur-md shadow-sm">
                 <tr>
@@ -207,17 +196,19 @@ export default function AttendanceMatrixPage() {
                   </th>
                   {daysInMonth.map(day => {
                     const isToday = isSameDay(day, new Date());
+                    const isSun = isSunday(day);
                     return (
                       <th 
                         key={day.toString()} 
                         className={cn(
                           "px-2 py-3 border-b text-center min-w-[40px] transition-colors",
-                          isToday && "bg-primary/10 ring-1 ring-primary/20"
+                          isToday && "bg-primary/10 ring-1 ring-primary/20",
+                          isSun && "bg-red-50/50"
                         )}
                       >
                         <div className="flex flex-col items-center">
-                          <span className="font-mono text-xs font-black">{format(day, 'dd')}</span>
-                          <span className="text-[8px] font-bold text-muted-foreground uppercase">{format(day, 'EEE')}</span>
+                          <span className={cn("font-mono text-xs font-black", isSun && "text-red-600")}>{format(day, 'dd')}</span>
+                          <span className={cn("text-[8px] font-bold uppercase", isSun ? "text-red-500" : "text-muted-foreground")}>{format(day, 'EEE')}</span>
                         </div>
                       </th>
                     );
@@ -248,6 +239,7 @@ export default function AttendanceMatrixPage() {
                         const record = monthAttendance?.find(a => a.userId === u.id && a.date === dateStr);
                         const isToday = isSameDay(day, new Date());
                         const isFuture = isAfter(day, startOfDay(new Date()));
+                        const isSun = isSunday(day);
                         
                         if (record) presentCount++;
 
@@ -256,7 +248,8 @@ export default function AttendanceMatrixPage() {
                             key={day.toString()} 
                             className={cn(
                               "px-1 py-3 text-center transition-colors",
-                              isToday && "bg-primary/[0.02]"
+                              isToday && "bg-primary/[0.02]",
+                              isSun && "bg-red-50/20"
                             )}
                           >
                             <TooltipProvider delayDuration={0}>

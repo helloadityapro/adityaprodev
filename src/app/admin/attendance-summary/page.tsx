@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -250,9 +249,9 @@ export default function AttendanceSummaryPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <Button asChild variant="outline" className="h-10 rounded-sm font-black text-[10px] uppercase border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
+          <Button asChild variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
             <Link href="/admin/attendance-summary/matrix">
-              <LayoutGrid className="h-4 w-4 mr-2" /> Monthly Matrix View
+              <LayoutGrid className="h-4 w-4 mr-2" /> Monthly Attendance Board
             </Link>
           </Button>
           {isSyncing && (
