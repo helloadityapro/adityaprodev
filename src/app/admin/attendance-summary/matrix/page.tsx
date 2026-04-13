@@ -35,7 +35,8 @@ import {
   Info,
   Search,
   RefreshCw,
-  FileDown
+  FileDown,
+  LayoutGrid
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
