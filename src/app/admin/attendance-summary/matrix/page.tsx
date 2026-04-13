@@ -6,7 +6,7 @@ import { collection, query, where, doc, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -68,6 +68,8 @@ type AttendanceRecord = {
   checkOutTime?: any;
 };
 
+const EXCLUDED_PERSONNEL = ["Khalil Choudhary", "Imtiyaz Kazi", "Jayesh Bajaj", "Vipul Joisher"];
+
 export default function AttendanceMatrixPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -106,6 +108,7 @@ export default function AttendanceMatrixPage() {
   const filteredUsers = React.useMemo(() => {
     if (!allUsers) return [];
     return allUsers
+      .filter(u => !EXCLUDED_PERSONNEL.includes(u.username))
       .filter(u => 
         u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.email?.toLowerCase().includes(searchTerm.toLowerCase())

@@ -45,6 +45,8 @@ type AttendanceRecord = {
 
 type SortKey = 'personnel' | 'status' | 'checkIn' | 'checkOut';
 
+const EXCLUDED_PERSONNEL = ["Khalil Choudhary", "Imtiyaz Kazi", "Jayesh Bajaj", "Vipul Joisher"];
+
 export default function AttendanceSummaryPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -128,6 +130,7 @@ export default function AttendanceSummaryPage() {
     if (!allUsers || !attendanceRecords) return [];
 
     const data = allUsers
+      .filter(u => !EXCLUDED_PERSONNEL.includes(u.username))
       .map(u => {
         const record = attendanceRecords.find(r => r.userId === u.id);
         return {
