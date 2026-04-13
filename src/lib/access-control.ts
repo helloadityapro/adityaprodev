@@ -25,6 +25,7 @@ export type PageKey =
   | 'master-data-tables-add'
   | 'master-data-tables-list'
   | 'admin-attendance-summary'
+  | 'admin-attendance-matrix'
   | 'admin-day-report'
   | 'admin-lms'
   | 'admin-dashboard'
@@ -82,6 +83,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'master-data-tables-list', label: 'Tables Data', category: 'Master Data', path: '/master-data/tables/list' },
   
   { id: 'admin-attendance-summary', label: 'Daily Presence Summary', category: 'Administration', path: '/admin/attendance-summary' },
+  { id: 'admin-attendance-matrix', label: 'Monthly Attendance Matrix', category: 'Administration', path: '/admin/attendance-summary/matrix' },
   { id: 'admin-day-report', label: 'Full Day Audit Report', category: 'Administration', path: '/admin/day-report' },
   { id: 'admin-lms', label: 'LMS Administration', category: 'Administration', path: '/lms/admin' },
   { id: 'admin-dashboard', label: 'Legacy Admin Dashboard', category: 'Administration', path: '/admin/dashboard' },

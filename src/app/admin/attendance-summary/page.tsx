@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -10,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO, differenceInMinutes, endOfDay } from 'date-fns';
-import { CalendarDays, Search, FileDown, User, Clock, MapPin, CheckCircle2, XCircle, Timer, Loader2, ArrowUpDown, ArrowUp, ArrowDown, FilterX, RefreshCw, ShieldCheck } from 'lucide-react';
+import { CalendarDays, Search, FileDown, User, Clock, MapPin, CheckCircle2, XCircle, Timer, Loader2, ArrowUpDown, ArrowUp, ArrowDown, FilterX, RefreshCw, ShieldCheck, LayoutGrid } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
 import { Label } from '@/components/ui/label';
@@ -18,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 type UserProfile = {
   id: string;
@@ -248,6 +250,11 @@ export default function AttendanceSummaryPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
+          <Button asChild variant="outline" className="h-10 rounded-sm font-black text-[10px] uppercase border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
+            <Link href="/admin/attendance-summary/matrix">
+              <LayoutGrid className="h-4 w-4 mr-2" /> Monthly Matrix View
+            </Link>
+          </Button>
           {isSyncing && (
             <Badge variant="outline" className="h-10 px-4 bg-primary/5 border-primary/20 text-primary animate-pulse font-black text-[10px] uppercase rounded-sm">
               <RefreshCw className="mr-2 h-3 w-3 animate-spin" /> Finalizing Logs...
@@ -264,7 +271,7 @@ export default function AttendanceSummaryPage() {
           </div>
           <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
             <FileDown className="h-4 w-4 mr-2" />
-            Export to Excel
+            Export
           </Button>
         </div>
       </div>
