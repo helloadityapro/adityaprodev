@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -73,7 +72,7 @@ import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from "@
 import { doc, collection } from "firebase/firestore"
 import * as React from "react"
 import { isSuperAdmin } from "@/lib/auth-constants"
-import { type PageKey } from "@/lib/access-control"
+import { type PageKey, slugifyRole } from "@/lib/access-control"
 
 type AccessConfig = {
   id: string;
@@ -108,7 +107,9 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
     }
 
     // 2. Check for role default
-    const config = roleConfigs?.find(c => c.id === userRole);
+    // Normalize role string to slug format to match Firestore ID
+    const roleId = slugifyRole(userRole);
+    const config = roleConfigs?.find(c => c.id === roleId);
     if (config) {
       return new Set<string>(config.allowedPageKeys);
     }

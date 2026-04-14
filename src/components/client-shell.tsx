@@ -29,7 +29,7 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
-import { getPageKeyByPath, type PageKey } from "@/lib/access-control";
+import { getPageKeyByPath, type PageKey, slugifyRole } from "@/lib/access-control";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
 
@@ -169,6 +169,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
+  const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
   // Celebration detection
   const isBirthday = React.useMemo(() => {
@@ -195,12 +196,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
     const allowedKeys = userProfile.customPermissions 
       ? new Set(userProfile.customPermissions) 
-      : new Set(roleConfigs?.find(c => c.id === userRole)?.allowedPageKeys || []);
+      : new Set(roleConfigs?.find(c => c.id === userRoleStr)?.allowedPageKeys || []);
 
     if (allowedKeys.size === 0) return true; 
     
     return allowedKeys.has(pageKey);
-  }, [user, userProfile, isUserLoading, isProfileLoading, pathname, isAuthPage, roleConfigs, userRole]);
+  }, [user, userProfile, isUserLoading, isProfileLoading, pathname, isAuthPage, roleConfigs, userRoleStr]);
 
   React.useEffect(() => {
     if (!isUserLoading && !user && !isAuthPage) {
