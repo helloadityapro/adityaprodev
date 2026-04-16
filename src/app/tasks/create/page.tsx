@@ -8,14 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking } from "@/firebase";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, serverTimestamp, query, increment } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, MessageCircle, CheckCircle2 } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, MessageCircle, CheckCircle2, LayoutGrid, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
@@ -23,12 +24,21 @@ import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
 
 const taskSchema = z.object({
-  siteName: z.string().min(1, "Site is required"),
+  taskCategory: z.enum(["Site-related", "Other"], { required_error: "Please select a task category" }),
+  siteName: z.string().optional(),
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().min(5, "Description must be at least 5 characters"),
   assignedToId: z.string().min(1, "Please assign a user"),
   priority: z.enum(["Low", "Medium", "High"], { required_error: "Priority is required" }),
   dueDate: z.string().min(1, "Due date is required"),
+}).refine((data) => {
+  if (data.taskCategory === "Site-related" && (!data.siteName || data.siteName.trim() === "")) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Site selection is mandatory for site-related tasks",
+  path: ["siteName"],
 });
 
 type Site = {
@@ -66,7 +76,7 @@ export default function CreateTaskPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
-  // Users query - Global selection allowed for all users per requirements
+  // Users query - Global selection allowed for all users
   const usersQuery = useMemoFirebase(() => {
     return collection(firestore, 'users');
   }, [firestore]);
@@ -74,7 +84,6 @@ export default function CreateTaskPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites) return [];
-    // Show all sites de-duplicated by name
     return Array.from(new Map(allSites.map(s => [s.name, s])).values())
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [allSites]);
@@ -93,6 +102,7 @@ export default function CreateTaskPage() {
   const form = useForm<z.infer<typeof taskSchema>>({
     resolver: zodResolver(taskSchema),
     defaultValues: { 
+      taskCategory: "Site-related",
       siteName: "", 
       title: "",
       description: "",
@@ -102,6 +112,14 @@ export default function CreateTaskPage() {
     },
   });
 
+  const watchCategory = form.watch('taskCategory');
+
+  React.useEffect(() => {
+    if (watchCategory === 'Other') {
+      form.setValue('siteName', '');
+    }
+  }, [watchCategory, form]);
+
   const triggerWhatsApp = (title: string, site: string, mobile?: string) => {
     if (!mobile) {
       toast({ variant: 'destructive', title: 'No Mobile', description: 'Assigned user does not have a mobile number linked for WhatsApp notifications.' });
@@ -109,7 +127,7 @@ export default function CreateTaskPage() {
     }
     const cleanMobile = mobile.replace(/\D/g, '');
     const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
-    const message = `Hello, a new task has been assigned to you.\n\nTask: ${title}\nSite: ${site}\n\nPlease check your Aditya Pro dashboard for details.\nLink: ${window.location.origin}/tasks/list`;
+    const message = `Hello, a new task has been assigned to you.\n\nTask: ${title}\nContext: ${site || "General"}\n\nPlease check your Aditya Pro dashboard for details.\nLink: ${window.location.origin}/tasks/list`;
     const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -119,11 +137,12 @@ export default function CreateTaskPage() {
     setIsSubmitting(true);
     try {
       const assignedUser = allRegisteredUsers?.find(u => u.id === values.assignedToId);
-      const selectedSiteObj = accessibleSites.find(s => s.name === values.siteName);
+      const selectedSiteObj = values.siteName ? accessibleSites.find(s => s.name === values.siteName) : null;
       
       const taskData = {
         ...values,
         siteId: selectedSiteObj?.id || "",
+        siteName: values.taskCategory === 'Site-related' ? (values.siteName || "Unknown") : "Other",
         assignedToName: assignedUser?.username || assignedUser?.email || "Unknown",
         assignedById: user.uid,
         assignedByName: userProfile.username || user.email || "Unknown",
@@ -145,14 +164,14 @@ export default function CreateTaskPage() {
       sendNotification(firestore, {
         userId: values.assignedToId,
         title: "New Task Assigned",
-        description: `${userProfile.username} assigned you a new task: "${values.title}" for site ${values.siteName}.`,
+        description: `${userProfile.username} assigned you a new task: "${values.title}" for ${taskData.siteName}.`,
         link: "/tasks/list",
         push: true
       });
       
       setSubmittedTask({
         title: values.title,
-        siteName: values.siteName,
+        siteName: taskData.siteName,
         assigneeName: assignedUser?.username || "Personnel",
         assigneeMobile: assignedUser?.mobile
       });
@@ -221,22 +240,60 @@ export default function CreateTaskPage() {
       <Card className="shadow-md border-primary/10 rounded-sm">
         <CardHeader>
           <CardTitle>Task Assignment Form</CardTitle>
-          <CardDescription>Fill in the details to assign a task globally across all sites and personnel.</CardDescription>
+          <CardDescription>Specify the task context and delegate it to the appropriate personnel.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="taskCategory"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Classification</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="flex gap-6 h-11 items-center"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Site-related" id="cat-site" />
+                          <Label htmlFor="cat-site" className="font-bold cursor-pointer flex items-center gap-1.5 text-xs uppercase">
+                            <LayoutGrid className="h-3.5 w-3.5 text-primary" /> Site-related
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="Other" id="cat-other" />
+                          <Label htmlFor="cat-other" className="font-bold cursor-pointer flex items-center gap-1.5 text-xs uppercase">
+                            <Globe className="h-3.5 w-3.5 text-slate-500" /> Other
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="siteName" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Project Site</FormLabel>
+                    <FormLabel className={cn("text-[10px] font-bold uppercase tracking-wider", watchCategory === 'Other' ? "text-muted-foreground/30" : "text-muted-foreground")}>
+                      Project Site
+                    </FormLabel>
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button 
                             variant="outline" 
                             role="combobox" 
-                            className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}
+                            disabled={watchCategory === 'Other'}
+                            className={cn(
+                              "w-full justify-between font-normal rounded-sm h-11", 
+                              !field.value && "text-muted-foreground",
+                              watchCategory === 'Other' && "opacity-50 grayscale bg-muted"
+                            )}
                           >
                             {field.value || "Select any site..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -248,7 +305,7 @@ export default function CreateTaskPage() {
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                           <Input 
                             placeholder="Search sites..." 
-                            className="h-9 w-full border-none focus-visible:ring-0 px-0" 
+                            className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
                             value={siteSearchQuery} 
                             onChange={(e) => setSiteSearchQuery(e.target.value)}
                             onKeyDown={(e) => e.stopPropagation()}
@@ -278,7 +335,7 @@ export default function CreateTaskPage() {
 
                 <FormField control={form.control} name="assignedToId" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Assign To (Any Personnel)</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Assign To</FormLabel>
                     <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -287,7 +344,7 @@ export default function CreateTaskPage() {
                             role="combobox" 
                             className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}
                           >
-                            {field.value ? allRegisteredUsers?.find(u => u.id === field.value)?.username : "Select any personnel..."}
+                            {field.value ? allRegisteredUsers?.find(u => u.id === field.value)?.username : "Select personnel..."}
                             <UserPlus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -297,7 +354,7 @@ export default function CreateTaskPage() {
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                           <Input 
                             placeholder="Search all personnel..." 
-                            className="h-9 w-full border-none focus-visible:ring-0 px-0" 
+                            className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
                             value={userSearchQuery} 
                             onChange={(e) => setUserSearchQuery(e.target.value)}
                             onKeyDown={(e) => e.stopPropagation()}
@@ -331,9 +388,9 @@ export default function CreateTaskPage() {
 
               <FormField control={form.control} name="title" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Task Title</FormLabel>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Task Title</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Conduct module mounting audit" {...field} className="rounded-sm" />
+                    <Input placeholder="e.g., Conduct module mounting audit" {...field} className="rounded-sm h-11" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -341,7 +398,7 @@ export default function CreateTaskPage() {
 
               <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Detailed Instructions</FormLabel>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Detailed Instructions</FormLabel>
                   <FormControl>
                     <Textarea 
                       placeholder="Explain exactly what needs to be done..." 
@@ -357,10 +414,10 @@ export default function CreateTaskPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="priority" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Priority</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Priority</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger className="rounded-sm">
+                        <SelectTrigger className="rounded-sm h-11">
                           <SelectValue placeholder="Select priority" />
                         </SelectTrigger>
                       </FormControl>
@@ -376,11 +433,11 @@ export default function CreateTaskPage() {
 
                 <FormField control={form.control} name="dueDate" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Due Date</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Due Date</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Input type="date" {...field} className="rounded-sm pr-10" />
-                        <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input type="date" {...field} className="rounded-sm pr-10 h-11" />
+                        <Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -389,9 +446,9 @@ export default function CreateTaskPage() {
               </div>
 
               <div className="flex justify-end gap-4 pt-4 border-t">
-                <Button variant="ghost" type="button" onClick={() => router.back()}>Cancel</Button>
-                <Button type="submit" className="min-w-[150px] h-11 rounded-sm text-lg font-semibold" disabled={isSubmitting}>
-                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Assigning...</> : "Assign Task"}
+                <Button variant="ghost" type="button" onClick={() => router.back()} className="rounded-sm font-bold">Cancel</Button>
+                <Button type="submit" className="min-w-[150px] h-12 rounded-sm font-black uppercase tracking-widest shadow-lg" disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> DISPATCHING...</> : "Assign Task"}
                 </Button>
               </div>
             </form>
