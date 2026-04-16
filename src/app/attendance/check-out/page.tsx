@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -16,6 +15,14 @@ import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function CheckOutPage() {
   const firestore = useFirestore();
@@ -25,6 +32,7 @@ export default function CheckOutPage() {
   const { toast } = useToast();
 
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [showSuccess, setShowSuccess] = React.useState(false);
   const [selfie, setSelfie] = React.useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = React.useState(false);
   const [facingMode, setFacingMode] = React.useState<"user" | "environment">("user");
@@ -61,7 +69,6 @@ export default function CheckOutPage() {
     }
   };
 
-  // Automatically start camera on mount if session active and no selfie taken
   React.useEffect(() => {
     if (currentEntry && !selfie && !isCameraActive) {
       startCamera();
@@ -146,15 +153,12 @@ export default function CheckOutPage() {
         updatedAt: serverTimestamp()
       });
 
-      // Subtle haptic feedback for action confirmation
       try {
         await Haptics.impact({ style: ImpactStyle.Light });
-      } catch (hapticError) {
-        // Silently ignore if haptics are not supported
-      }
+      } catch (hapticError) {}
 
-      toast({ variant: 'success', title: 'Workday Completed' });
-      router.push('/attendance/history');
+      setIsProcessing(false);
+      setShowSuccess(true);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
       setIsProcessing(false);
@@ -163,7 +167,7 @@ export default function CheckOutPage() {
 
   if (isLoading) return <div className="p-8 space-y-4 max-w-2xl mx-auto"><Skeleton className="h-64 w-full" /></div>;
 
-  if (!currentEntry) {
+  if (!currentEntry && !showSuccess) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 text-center">
         <CheckCircle2 className="h-16 w-16 text-green-500 opacity-20" />
@@ -185,7 +189,9 @@ export default function CheckOutPage() {
           <CalendarCheck className="h-6 w-6 text-primary" /> Session Active
         </h1>
         <div className="flex items-center gap-2">
-          <p className="text-muted-foreground text-[10px]">Started {formatDistanceToNow(currentEntry.checkInTime?.toDate() || new Date(), { addSuffix: true })}.</p>
+          {currentEntry && (
+            <p className="text-muted-foreground text-[10px]">Started {formatDistanceToNow(currentEntry.checkInTime?.toDate() || new Date(), { addSuffix: true })}.</p>
+          )}
           <Badge variant="outline" className="h-6 px-2 text-[9px] font-black uppercase rounded-sm border-none bg-emerald-600 text-white shadow-md animate-in fade-in zoom-in-95 duration-500">
             Status: Checked-in
           </Badge>
@@ -201,21 +207,11 @@ export default function CheckOutPage() {
           <div className="flex flex-col items-center gap-4">
             <div className={cn("relative w-full h-80 bg-black rounded-sm overflow-hidden shadow-2xl border-4 border-emerald-500/20", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
-              
               <div className="absolute top-4 left-4">
                 <Badge className="bg-emerald-600 animate-pulse border-none rounded-full h-6 px-3 flex items-center gap-1.5 font-black text-[9px] uppercase tracking-widest">
                   <Zap className="h-3 w-3 fill-white" /> Exit Audit Live
                 </Badge>
               </div>
-
-              {facingMode === "user" && (
-                <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-40">
-                  <div className="w-32 h-32 rounded-full border-2 border-white mt-4 shadow-[0_0_50px_rgba(255,255,255,0.2)]" />
-                  <div className="w-48 h-32 rounded-t-full border-2 border-t-2 border-x-2 border-white -mt-2" />
-                  <p className="text-white text-[8px] font-black uppercase mt-4 bg-black/20 px-2 rounded-full tracking-widest text-center">Position face and shoulders</p>
-                </div>
-              )}
-
               <div className="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-6">
                 <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-12 w-12 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg backdrop-blur-md"><SwitchCamera className="h-6 w-6" /></Button>
                 <Button onClick={capturePhoto} className="rounded-full h-16 w-16 p-0 shadow-lg border-4 border-emerald-500/20 bg-white text-black hover:bg-white/90 transition-all active:scale-90 scale-110"><Camera className="h-8 w-8" /></Button>
@@ -226,7 +222,6 @@ export default function CheckOutPage() {
             {selfie && !isCameraActive && (
               <div className="relative w-full h-80 group">
                 <img src={selfie} className="w-full h-full object-cover rounded-sm border-2 border-emerald-200 shadow-md" alt="Checkout Selfie" />
-                <div className="absolute top-4 left-4 bg-black/60 text-white text-[10px] font-bold px-3 py-1 rounded-sm uppercase tracking-widest backdrop-blur-md">Exit Profile Snapshot</div>
                 <Button variant="destructive" size="icon" className="absolute top-2 right-2 rounded-full h-8 w-8 shadow-lg" onClick={() => setSelfie(null)}><Trash2 className="h-4 w-4" /></Button>
               </div>
             )}
@@ -243,7 +238,7 @@ export default function CheckOutPage() {
             <Alert variant="destructive" className="py-2">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle className="text-xs">Camera Required</AlertTitle>
-              <AlertDescription className="text-[10px]">Hardware access is mandatory for site audit. Please enable camera permissions in settings to continue.</AlertDescription>
+              <AlertDescription className="text-[10px]">Hardware access is mandatory for site audit.</AlertDescription>
             </Alert>
           )}
 
@@ -260,6 +255,25 @@ export default function CheckOutPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <Dialog open={showSuccess} onOpenChange={(open) => { if(!open) router.push('/attendance/history'); }}>
+        <DialogContent className="sm:max-w-md rounded-sm border-emerald-500/20 shadow-2xl">
+          <DialogHeader className="pt-4 text-center">
+            <div className="mx-auto bg-emerald-500/10 p-4 rounded-full w-fit mb-4">
+              <CheckCircle2 className="h-12 w-12 text-emerald-600" />
+            </div>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight text-emerald-900">Check-Out Complete</DialogTitle>
+            <DialogDescription className="text-base leading-relaxed text-emerald-800">
+              Your workday has been successfully concluded. Final verification and GPS coordinates have been archived.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center pb-4">
+            <Button onClick={() => router.push('/attendance/history')} className="w-full h-12 text-sm font-black rounded-sm bg-slate-900">
+              View Activity History
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

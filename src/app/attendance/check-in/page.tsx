@@ -6,7 +6,7 @@ import { collection, doc, serverTimestamp, query, where, limit, getDocs } from "
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Loader2, CalendarCheck, Camera, Trash2, SwitchCamera, History, AlertCircle, Zap } from "lucide-react";
+import { MapPin, Loader2, CalendarCheck, Camera, Trash2, SwitchCamera, History, AlertCircle, Zap, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -15,6 +15,14 @@ import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function CheckInPage() {
   const firestore = useFirestore();
@@ -24,6 +32,7 @@ export default function CheckInPage() {
   const { toast } = useToast();
 
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [showSuccess, setShowSuccess] = React.useState(false);
   const [selfie, setSelfie] = React.useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = React.useState(false);
   const [facingMode, setFacingMode] = React.useState<"user" | "environment">("user");
@@ -121,7 +130,6 @@ export default function CheckInPage() {
     if (!user || !userProfile || !selfie) return;
     setIsProcessing(true);
     
-    // Safety check: Prevent double creation if UI lag happens
     const q = query(collection(firestore, 'attendance'), where('userId', '==', user.uid), where('status', '==', 'ongoing'), limit(1));
     const existing = await getDocs(q);
     if (!existing.empty) {
@@ -155,49 +163,47 @@ export default function CheckInPage() {
         createdAt: serverTimestamp()
       };
 
-      await addDocumentNonBlocking(collection(firestore, 'attendance'), checkInData);
+      addDocumentNonBlocking(collection(firestore, 'attendance'), checkInData);
 
       try {
         await Haptics.impact({ style: ImpactStyle.Light });
       } catch {}
 
-      toast({ variant: 'success', title: 'Session Activated' });
-      
-      // Immediate transition
-      router.push('/attendance/check-out');
+      setIsProcessing(false);
+      setShowSuccess(true);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
       setIsProcessing(false);
     }
   };
 
-  if (isCheckedIn && !isProcessing) {
+  if (isCheckedIn && !isProcessing && !showSuccess) {
     router.replace('/attendance/check-out');
     return null;
   }
 
   return (
-    <div className="space-y-3 max-w-2xl mx-auto pb-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2 text-xl font-black uppercase">
-            <CalendarCheck className="h-5 w-5 text-primary" /> Start Workday
-          </h1>
-          <Badge variant="outline" className="h-7 px-3 text-[10px] font-black uppercase rounded-sm border-none bg-amber-600 text-white shadow-md">
-            Status: Initializing Session
+    <div className="space-y-3 max-w-2xl mx-auto py-2 px-4">
+      <div className="flex flex-col gap-1">
+        <h1 className="flex items-center gap-2 text-xl">
+          <CalendarCheck className="h-6 w-6 text-primary" /> Start Workday
+        </h1>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="h-6 px-2 text-[9px] font-black uppercase rounded-sm border-none bg-amber-600 text-white shadow-md">
+            Status: Checked-Out
           </Badge>
+          <Button variant="ghost" size="sm" asChild className="rounded-sm font-bold text-primary h-6 px-2 border border-primary/10 text-[9px]">
+            <Link href="/attendance/history"><History className="mr-1 h-3 w-3" /> History</Link>
+          </Button>
         </div>
-        <Button variant="ghost" size="sm" asChild className="rounded-sm font-bold text-primary h-8 px-3 border border-primary/10">
-          <Link href="/attendance/history"><History className="mr-1.5 h-3.5 w-3.5" /> History</Link>
-        </Button>
       </div>
 
       <Card className="shadow-lg border-primary/10 rounded-sm overflow-hidden">
-        <CardHeader className="bg-primary/5 py-3 border-b">
-          <CardTitle className="text-[10px] font-black uppercase tracking-widest">Mandatory Verification</CardTitle>
-          <CardDescription className="text-[8px] font-bold text-amber-700 uppercase">GPS Sync & Identity Audit</CardDescription>
+        <CardHeader className="bg-primary/5 py-2 border-b">
+          <CardTitle className="text-sm font-black uppercase tracking-widest">Identity Verification</CardTitle>
+          <CardDescription className="text-[8px] font-bold text-muted-foreground uppercase">GPS Sync & Identity Audit</CardDescription>
         </CardHeader>
-        <CardContent className="pt-6 space-y-4">
+        <CardContent className="pt-4 pb-4 space-y-4">
           <div className="flex flex-col items-center gap-4">
             <div className={cn("relative w-full h-80 bg-black rounded-sm overflow-hidden shadow-2xl border-4 border-primary/10", !isCameraActive && "hidden")}>
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
@@ -241,10 +247,29 @@ export default function CheckInPage() {
             onClick={handleCheckIn}
             disabled={isProcessing || !selfie}
           >
-            {isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : 'ACTIVATE SESSION'}
+            {isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : 'START WORKDAY'}
           </Button>
         </CardContent>
       </Card>
+
+      <Dialog open={showSuccess} onOpenChange={(open) => { if(!open) router.push('/attendance/check-out'); }}>
+        <DialogContent className="sm:max-w-md rounded-sm border-emerald-500/20 shadow-2xl">
+          <DialogHeader className="pt-4 text-center">
+            <div className="mx-auto bg-emerald-500/10 p-4 rounded-full w-fit mb-4">
+              <CheckCircle2 className="h-12 w-12 text-emerald-600" />
+            </div>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight text-emerald-900">Check-In Successful</DialogTitle>
+            <DialogDescription className="text-base leading-relaxed text-emerald-800">
+              Your workday has been activated. GPS and time stamps have been recorded for organizational compliance.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center pb-4">
+            <Button onClick={() => router.push('/attendance/check-out')} className="w-full h-12 text-sm font-black rounded-sm bg-emerald-600 hover:bg-emerald-700">
+              Continue to Dashboard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
