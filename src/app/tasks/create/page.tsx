@@ -7,6 +7,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, serverTimestamp, query, increment } from "firebase/firestore";
@@ -307,7 +308,7 @@ export default function CreateTaskPage() {
                             placeholder="Search sites..." 
                             className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
                             value={siteSearchQuery} 
-                            onChange={(e) => setSiteSearchQuery(e.target.value)}
+                            onChange={(e) => setSiteSearchQuery(e.target.value)} 
                             onKeyDown={(e) => e.stopPropagation()}
                           />
                         </div>
