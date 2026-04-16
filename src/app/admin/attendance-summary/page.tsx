@@ -87,44 +87,53 @@ export default function AttendanceSummaryPage() {
   const { data: attendanceRecords, isLoading: isAttendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery);
 
   /**
-   * Automatically close open sessions for dates in the past.
-   * This handles the "even if user doesn't open app" requirement by performing cleanup
-   * when an admin views the summary.
+   * GLOBAL CLEANUP: Automatically close ANY open sessions from past dates.
+   * This handles the requirement that no record remains "Ongoing" beyond the same day.
    */
+  const allOngoingQuery = useMemoFirebase(() => {
+    return query(collection(firestore, 'attendance'), where('status', '==', 'ongoing'));
+  }, [firestore]);
+  const { data: allOngoing } = useCollection<AttendanceRecord>(allOngoingQuery);
+
   React.useEffect(() => {
-    if (!attendanceRecords || isAttendanceLoading || !isAdmin) return;
+    if (!allOngoing || !isAdmin) return;
 
     const today = format(new Date(), 'yyyy-MM-dd');
-    const openStaleSessions = attendanceRecords.filter(r => r.status === 'ongoing' && r.date < today);
+    const staleSessions = allOngoing.filter(r => r.date < today);
 
-    if (openStaleSessions.length > 0) {
+    if (staleSessions.length > 0) {
       const performCleanup = async () => {
         setIsSyncing(true);
         try {
           const batch = writeBatch(firestore);
-          openStaleSessions.forEach(session => {
+          staleSessions.forEach(session => {
             const ref = doc(firestore, 'attendance', session.id);
-            const dayEnd = endOfDay(parseISO(session.date));
+            const sessionDate = parseISO(session.date);
+            const dayEnd = endOfDay(sessionDate);
+            
             batch.update(ref, {
               status: 'completed',
               checkOutTime: Timestamp.fromDate(dayEnd),
               checkOutLat: session.checkInLat || 0,
               checkOutLng: session.checkInLng || 0,
               checkOutType: 'System CheckOut',
-              remarks: 'System CheckOut: Automatically finalized during administrative audit.'
+              remarks: 'System CheckOut: Automatically finalized during organization-wide audit.'
             });
           });
           await batch.commit();
-          toast({ title: 'Workday Finalized', description: `Automatically closed ${openStaleSessions.length} open sessions from ${selectedDate}.` });
+          toast({ 
+            title: 'Registry Reconciled', 
+            description: `Automatically closed ${staleSessions.length} stale sessions from previous workdays.` 
+          });
         } catch (e) {
-          console.error("Cleanup failed", e);
+          console.error("Global cleanup failed", e);
         } finally {
           setIsSyncing(false);
         }
       };
       performCleanup();
     }
-  }, [attendanceRecords, isAttendanceLoading, selectedDate, firestore, isAdmin, toast]);
+  }, [allOngoing, isAdmin, firestore, toast]);
 
   const summaryData = React.useMemo(() => {
     if (!allUsers || !attendanceRecords) return [];
