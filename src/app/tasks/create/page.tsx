@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -9,13 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, query, where, increment, getDoc } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking } from "@/firebase";
+import { collection, doc, serverTimestamp, query, increment } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, MessageCircle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -62,46 +60,23 @@ export default function CreateTaskPage() {
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
-  const isManager = userProfile?.role === 'Site Manager';
 
-  // Sites query
+  // Sites query - Global selection allowed for all users
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
-  // Users query: Admins see all, Managers see team, Engineers see all for collaboration
+  // Users query - Global selection allowed for all users per requirements
   const usersQuery = useMemoFirebase(() => {
-    const colRef = collection(firestore, 'users');
-    if (isAdmin) return colRef;
-    if (isManager) return query(colRef, where('siteManagerId', '==', user?.uid));
-    // Engineers can assign tasks to any registered personnel
-    return colRef;
-  }, [firestore, isAdmin, isManager, user]);
-  const { data: teamUsers } = useCollection<UserProfile>(usersQuery);
-
-  // Fetch team members for managers to aggregate sites
-  const teamQuery = useMemoFirebase(() => {
-    if (!isManager || !user) return null;
-    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
-  }, [firestore, user, isManager]);
-  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
+    return collection(firestore, 'users');
+  }, [firestore]);
+  const { data: allRegisteredUsers } = useCollection<UserProfile>(usersQuery);
 
   const accessibleSites = React.useMemo(() => {
-    if (!allSites || !userProfile) return [];
-    if (isAdmin) {
-        return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-    }
-    
-    // Aggregated site visibility for Managers
-    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
-    if (isManager && teamMembers) {
-      teamMembers.forEach(member => {
-        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
-      });
-    }
-
-    const filtered = allSites.filter(s => assignedIds.has(s.id));
-    return Array.from(new Map(filtered.map(s => [s.name, s])).values());
-  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
+    if (!allSites) return [];
+    // Show all sites de-duplicated by name
+    return Array.from(new Map(allSites.map(s => [s.name, s])).values())
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites]);
 
   const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
   const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
@@ -142,7 +117,7 @@ export default function CreateTaskPage() {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
     try {
-      const assignedUser = teamUsers?.find(u => u.id === values.assignedToId);
+      const assignedUser = allRegisteredUsers?.find(u => u.id === values.assignedToId);
       const selectedSiteObj = accessibleSites.find(s => s.name === values.siteName);
       
       const taskData = {
@@ -156,7 +131,7 @@ export default function CreateTaskPage() {
         updatedAt: serverTimestamp(),
       };
 
-      addDocumentNonBlocking(collection(firestore, 'tasks'), taskData);
+      await addDocumentNonBlocking(collection(firestore, 'tasks'), taskData);
 
       // Reward Points Logic for Assigner
       const rate = rewardSettings?.taskAssignment ?? 0.25;
@@ -190,7 +165,7 @@ export default function CreateTaskPage() {
   };
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
-  const filteredUsers = teamUsers?.filter(u => u.username.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.email.toLowerCase().includes(userSearchQuery.toLowerCase())) || [];
+  const filteredUsers = allRegisteredUsers?.filter(u => u.username.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.email.toLowerCase().includes(userSearchQuery.toLowerCase())) || [];
 
   if (isSubmitted && submittedTask) {
     return (
@@ -239,13 +214,13 @@ export default function CreateTaskPage() {
         <h1 className="flex items-center gap-2">
           <CheckSquare className="h-8 w-8" /> Assign New Task
         </h1>
-        <p className="text-muted-foreground">Create and delegate work items to site personnel.</p>
+        <p className="text-muted-foreground">Create and delegate work items to any site personnel.</p>
       </div>
 
       <Card className="shadow-md border-primary/10 rounded-sm">
         <CardHeader>
           <CardTitle>Task Assignment Form</CardTitle>
-          <CardDescription>Fill in the details to assign a task.</CardDescription>
+          <CardDescription>Fill in the details to assign a task globally across all sites and personnel.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -260,9 +235,9 @@ export default function CreateTaskPage() {
                           <Button 
                             variant="outline" 
                             role="combobox" 
-                            className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}
+                            className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}
                           >
-                            {field.value || "Select site..."}
+                            {field.value || "Select any site..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -302,16 +277,16 @@ export default function CreateTaskPage() {
 
                 <FormField control={form.control} name="assignedToId" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Assign To</FormLabel>
+                    <FormLabel>Assign To (Any Personnel)</FormLabel>
                     <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button 
                             variant="outline" 
                             role="combobox" 
-                            className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}
+                            className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}
                           >
-                            {field.value ? teamUsers?.find(u => u.id === field.value)?.username : "Select personnel..."}
+                            {field.value ? allRegisteredUsers?.find(u => u.id === field.value)?.username : "Select any personnel..."}
                             <UserPlus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -320,7 +295,7 @@ export default function CreateTaskPage() {
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                           <Input 
-                            placeholder="Search personnel..." 
+                            placeholder="Search all personnel..." 
                             className="h-9 w-full border-none focus-visible:ring-0 px-0" 
                             value={userSearchQuery} 
                             onChange={(e) => setUserSearchQuery(e.target.value)}
