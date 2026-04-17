@@ -22,6 +22,9 @@ function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }
  * Robust map component to visualize a personnel's movement route.
  */
 export default function RouteMap({ record }: { record: any }) {
+  // Unique instance key prevents Leaflet "already initialized" errors on remounts
+  const mapInstanceKey = React.useMemo(() => `route-map-instance-${record.id}-${Math.random().toString(36).substr(2, 9)}`, [record.id]);
+
   React.useEffect(() => {
     // Fix default marker icons for Next.js build
     const DefaultIcon = L.Icon.Default.prototype as any;
@@ -58,11 +61,10 @@ export default function RouteMap({ record }: { record: any }) {
     ? [record.checkOutLat, record.checkOutLng] 
     : null;
 
-  // We use a constant key for the MapContainer while viewing the same record
-  // but allow ChangeView to pan the map if data updates.
   return (
     <div className="h-full w-full">
       <MapContainer 
+        key={mapInstanceKey}
         center={checkInPos} 
         zoom={14} 
         className="h-full w-full z-10"

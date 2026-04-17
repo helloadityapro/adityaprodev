@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 
 /**
  * Helper component to handle map viewport updates without re-initializing the container.
- * This prevents the "Map container is already initialized" error.
+ * This prevents the "Map container is already initialized" error by keeping the parent stable.
  */
 function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }) {
   const map = useMap();
@@ -26,6 +26,10 @@ function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }
  * Plotted markers represent live 'ongoing' attendance sessions.
  */
 export default function MapViewComponent({ records }: { records: any[] }) {
+  // Generate a unique, stable key for the map instance to force clean DOM creation on mount.
+  // This is the primary fix for "Map container is already initialized".
+  const mapInstanceKey = React.useMemo(() => `map-instance-${Math.random().toString(36).substr(2, 9)}`, []);
+
   // Fix for default marker icons in Next.js/Webpack environments
   React.useEffect(() => {
     const DefaultIcon = L.Icon.Default.prototype as any;
@@ -46,11 +50,10 @@ export default function MapViewComponent({ records }: { records: any[] }) {
       : [20.5937, 78.9629];
   }, [validPins]);
 
-  // We use a constant key for the MapContainer to prevent Leaflet re-init collisions.
-  // The viewport is updated via the <ChangeView /> component.
   return (
     <div className="h-full w-full">
       <MapContainer 
+        key={mapInstanceKey}
         center={defaultCenter} 
         zoom={5} 
         className="h-full w-full z-10"
