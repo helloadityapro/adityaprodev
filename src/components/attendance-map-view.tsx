@@ -1,37 +1,46 @@
 'use client';
 
 import * as React from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { format } from 'date-fns';
 import { User, Clock, Calendar, MapPin, ExternalLink } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-
-/**
- * Helper component to handle map viewport updates without re-initializing the container.
- * This prevents the "Map container is already initialized" error by keeping the parent stable.
- */
-function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }) {
-  const map = useMap();
-  React.useEffect(() => {
-    map.setView(center, zoom);
-  }, [center, zoom, map]);
-  return null;
-}
 
 /**
  * Interactive Leaflet Map component for visual personnel tracking.
- * Plotted markers represent live 'ongoing' attendance sessions.
+ * Manually manages Leaflet lifecycle to prevent "already initialized" errors.
  */
-export default function MapViewComponent({ records }: { records: any[] }) {
-  // Generate a unique, stable key for the map instance to force clean DOM creation on mount.
-  // This is the primary fix for "Map container is already initialized".
-  const mapInstanceKey = React.useMemo(() => `map-instance-${Math.random().toString(36).substr(2, 9)}`, []);
+export default function MapViewComponent({ records = [] }: { records: any[] }) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const mapRef = React.useRef<L.Map | null>(null);
+  const markersLayerRef = React.useRef<L.LayerGroup | null>(null);
 
-  // Fix for default marker icons in Next.js/Webpack environments
+  // 1. Initial Map Setup (Runs Once)
   React.useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    // Check if the container already has a map instance attached to it
+    // This is the definitive fix for "Map container is already initialized"
+    if ((containerRef.current as any)._leaflet_id) return;
+
+    const validPins = records.filter(r => r.checkInLat && r.checkInLng);
+    const center: [number, number] = validPins.length > 0 
+      ? [validPins[0].checkInLat, validPins[0].checkInLng] 
+      : [20.5937, 78.9629];
+
+    // Initialize map
+    const map = L.map(containerRef.current, {
+      center: center,
+      zoom: 5,
+      scrollWheelZoom: true,
+    });
+
+    // Add Tile Layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Marker Icon Fix for Webpack/Next.js
     const DefaultIcon = L.Icon.Default.prototype as any;
     delete DefaultIcon._getIconUrl;
     L.Icon.Default.mergeOptions({
@@ -39,89 +48,97 @@ export default function MapViewComponent({ records }: { records: any[] }) {
       iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
     });
+
+    // Create a managed layer group for markers
+    const layer = L.layerGroup().addTo(map);
+    
+    markersLayerRef.current = layer;
+    mapRef.current = map;
+
+    // Proper cleanup on unmount
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markersLayerRef.current = null;
+      }
+    };
   }, []);
 
-  const validPins = React.useMemo(() => records.filter(r => r.checkInLat && r.checkInLng), [records]);
-  
-  // Default map position: Center of India or first available personnel
-  const defaultCenter: [number, number] = React.useMemo(() => {
-    return validPins.length > 0 
-      ? [validPins[0].checkInLat, validPins[0].checkInLng] 
-      : [20.5937, 78.9629];
-  }, [validPins]);
+  // 2. Dynamic Marker Updates (Runs whenever records change)
+  React.useEffect(() => {
+    if (!mapRef.current || !markersLayerRef.current) return;
+
+    const layer = markersLayerRef.current;
+    layer.clearLayers();
+
+    const validPins = records.filter(r => r.checkInLat && r.checkInLng);
+
+    validPins.forEach(record => {
+      const marker = L.marker([record.checkInLat, record.checkInLng]);
+      
+      // Name Tooltip
+      marker.bindTooltip(`<span class="font-bold text-xs">${record.userName}</span>`, {
+        direction: 'top',
+        offset: [0, -20],
+        opacity: 0.9
+      });
+
+      // Detailed Info Popup
+      const popupDiv = L.DomUtil.create('div', 'p-1 min-w-[220px] space-y-3 text-left');
+      
+      const headerDiv = L.DomUtil.create('div', 'flex items-center gap-2 border-b pb-2', popupDiv);
+      headerDiv.innerHTML = `
+        <div class="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div class="flex flex-col">
+          <span class="font-black text-xs uppercase tracking-tight text-foreground">${record.userName}</span>
+          <span class="text-[9px] font-bold text-muted-foreground uppercase">Active Session</span>
+        </div>
+      `;
+
+      const bodyDiv = L.DomUtil.create('div', 'space-y-2', popupDiv);
+      bodyDiv.innerHTML = `
+        <div class="flex items-center justify-between gap-4">
+          <span class="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Logged:</span>
+          <span class="text-[10px] font-mono font-black text-blue-600">${record.checkInTime ? format(record.checkInTime.toDate(), 'HH:mm') : '—'}</span>
+        </div>
+        <div class="flex items-center justify-between gap-4">
+          <span class="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Date:</span>
+          <span class="text-[10px] font-mono font-black">${record.date}</span>
+        </div>
+        <div class="flex flex-col gap-1 text-left pt-2 border-t">
+          <span class="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            Audit Stamp:
+          </span>
+          <p class="text-[10px] font-mono font-bold bg-muted/50 p-1.5 rounded-sm">${record.checkInLat.toFixed(6)}, ${record.checkInLng.toFixed(6)}</p>
+        </div>
+      `;
+
+      const btnContainer = L.DomUtil.create('div', 'pt-2', popupDiv);
+      const btn = L.DomUtil.create('a', 'inline-flex items-center justify-center w-full h-8 px-4 text-[9px] font-black uppercase rounded-sm border border-blue-600/20 text-blue-600 bg-white hover:bg-blue-50 shadow-sm no-underline', btnContainer);
+      btn.href = `https://www.google.com/maps/search/?api=1&query=${record.checkInLat},${record.checkInLng}`;
+      btn.target = "_blank";
+      btn.rel = "noopener noreferrer";
+      btn.innerHTML = `View Precise Map`;
+
+      marker.bindPopup(popupDiv);
+      marker.addTo(layer);
+    });
+
+    // Auto-focus if single record
+    if (validPins.length === 1) {
+      mapRef.current.setView([validPins[0].checkInLat, validPins[0].checkInLng], 14);
+    }
+  }, [records]);
 
   return (
-    <div className="h-full w-full">
-      <MapContainer 
-        key={mapInstanceKey}
-        center={defaultCenter} 
-        zoom={5} 
-        className="h-full w-full z-10"
-        scrollWheelZoom={true}
-      >
-        <ChangeView center={defaultCenter} zoom={5} />
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        {validPins.map((record) => (
-          <Marker 
-            key={`marker-${record.id}`} 
-            position={[record.checkInLat, record.checkInLng]}
-          >
-            <Tooltip direction="top" offset={[0, -20]} opacity={0.9}>
-              <span className="font-bold text-xs">{record.userName}</span>
-            </Tooltip>
-            <Popup className="rounded-sm overflow-hidden custom-popup">
-              <div className="p-1 min-w-[200px] space-y-3 text-left">
-                <div className="flex items-center gap-2 border-b pb-2">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                    <User className="h-4 w-4" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="font-black text-xs uppercase tracking-tight text-foreground">{record.userName}</span>
-                    <span className="text-[9px] font-bold text-muted-foreground uppercase">Logged In</span>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> Time:
-                    </span>
-                    <span className="text-[10px] font-mono font-black text-primary">
-                      {record.checkInTime ? format(record.checkInTime.toDate(), 'HH:mm') : '—'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
-                      <Calendar className="h-3 w-3" /> Date:
-                    </span>
-                    <span className="text-[10px] font-mono font-black">
-                      {record.date}
-                    </span>
-                  </div>
-                  <Separator className="opacity-50" />
-                  <div className="flex flex-col gap-1 text-left">
-                    <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
-                      <MapPin className="h-3 w-3" /> Coordinates:
-                    </span>
-                    <p className="text-[10px] font-mono font-bold bg-muted/50 p-1.5 rounded-sm">
-                      {record.checkInLat.toFixed(6)}, {record.checkInLng.toFixed(6)}
-                    </p>
-                  </div>
-                </div>
-                
-                <Button variant="outline" size="sm" className="w-full h-8 text-[9px] font-black uppercase rounded-sm border-primary/20 text-primary shadow-sm hover:bg-primary/5" asChild>
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${record.checkInLat},${record.checkInLng}`} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="h-3 w-3 mr-1" /> View on Maps
-                  </a>
-                </Button>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-    </div>
+    <div 
+      ref={containerRef} 
+      className="h-full w-full z-10 bg-muted/10 rounded-sm"
+      style={{ minHeight: '500px' }}
+    />
   );
 }
