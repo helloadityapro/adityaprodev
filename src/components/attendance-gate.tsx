@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, doc, limit, Timestamp } from 'firebase/firestore';
+import { collection, query, where, doc, limit, Timestamp, arrayUnion, getDoc } from 'firebase/firestore';
 import { format, isAfter, setHours, setMinutes, parseISO, endOfDay, isBefore } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Clock, LogIn } from 'lucide-react';
 
 /**
- * Global component to manage attendance compliance.
+ * Global component to manage attendance compliance and background tracking.
  */
 export function AttendanceGate() {
   const { user } = useUser();
@@ -35,9 +35,7 @@ export function AttendanceGate() {
       const now = new Date();
       const nowStr = format(now, 'yyyy-MM-dd');
       
-      // Handle mid-day to end-of-day transition (23:59 check)
       if (now.getHours() === 23 && now.getMinutes() === 59 && now.getSeconds() >= 45) {
-        // Trigger a force sync for active sessions at the absolute end of day
         window.dispatchEvent(new Event('end-of-day-sync'));
       }
 
@@ -51,7 +49,6 @@ export function AttendanceGate() {
   // Handle celebration sequencing
   React.useEffect(() => {
     if (isProfileLoading || !user) return;
-
     const today = new Date();
     
     let birthdayWaiting = false;
@@ -111,6 +108,54 @@ export function AttendanceGate() {
 
   const { data: todayFinished, isLoading: isFinishedLoading } = useCollection(todayFinishedQuery);
 
+  /**
+   * BACKGROUND TRACKING LOGIC
+   * Captures location every 10 minutes during an active session.
+   */
+  React.useEffect(() => {
+    if (!user || !activeSessions || activeSessions.length === 0) return;
+    const session = activeSessions[0];
+    if (session.date !== todayStr) return;
+
+    const trackLocation = () => {
+      if (!navigator.geolocation) return;
+
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const { latitude: lat, longitude: lng } = position.coords;
+        const sessionRef = doc(firestore, 'attendance', session.id);
+
+        // Fetch fresh data to check if we've moved significantly
+        const snap = await getDoc(sessionRef);
+        const data = snap.data();
+        const lastPoints = data?.trackingPoints || [];
+        const lastPoint = lastPoints[lastPoints.length - 1];
+
+        const hasMoved = !lastPoint || 
+          Math.abs(lastPoint.lat - lat) > 0.0001 || 
+          Math.abs(lastPoint.lng - lng) > 0.0001;
+
+        if (hasMoved) {
+          updateDocumentNonBlocking(sessionRef, {
+            trackingPoints: arrayUnion({
+              lat,
+              lng,
+              timestamp: new Date().toISOString()
+            }),
+            lastUpdated: serverTimestamp()
+          });
+        }
+      }, (err) => console.warn("Background tracking error:", err), {
+        enableHighAccuracy: true,
+        timeout: 15000
+      });
+    };
+
+    // Initial track and then every 10 mins
+    trackLocation();
+    const interval = setInterval(trackLocation, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user, activeSessions, todayStr, firestore]);
+
   React.useEffect(() => {
     if (isActiveLoading || isFinishedLoading || !user || isWaitingForCelebration) return;
     if (pathname.startsWith('/attendance')) return;
@@ -119,27 +164,21 @@ export function AttendanceGate() {
     const activeSession = activeSessions?.[0];
     const hasCompletedToday = todayFinished && todayFinished.length > 0;
 
-    // 1. CYCLE RESET (Force end stale sessions immediately)
     if (activeSession && activeSession.date !== todayStr) {
       const ref = doc(firestore, 'attendance', activeSession.id);
-      try {
-        const sessionDate = parseISO(activeSession.date);
-        const dayEnd = endOfDay(sessionDate);
-        updateDocumentNonBlocking(ref, {
-          status: 'completed',
-          checkOutTime: Timestamp.fromDate(dayEnd),
-          checkOutLat: activeSession.checkInLat || 0, 
-          checkOutLng: activeSession.checkInLng || 0,
-          checkOutType: 'System CheckOut',
-          remarks: 'System CheckOut: Automatic cycle reset at start of new day.'
-        });
-      } catch (e) {
-        console.error("Auto-checkout failed", e);
-      }
+      const sessionDate = parseISO(activeSession.date);
+      const dayEnd = endOfDay(sessionDate);
+      updateDocumentNonBlocking(ref, {
+        status: 'completed',
+        checkOutTime: Timestamp.fromDate(dayEnd),
+        checkOutLat: activeSession.checkInLat || 0, 
+        checkOutLng: activeSession.checkInLng || 0,
+        checkOutType: 'System CheckOut',
+        remarks: 'System CheckOut: Automatic cycle reset at start of new day.'
+      });
       return;
     }
 
-    // 2. END-OF-DAY AUTO CLOSE (If session is still open at 23:59)
     if (activeSession && activeSession.date === todayStr) {
       const isEndOfDay = now.getHours() === 23 && now.getMinutes() >= 59;
       if (isEndOfDay) {
@@ -156,13 +195,11 @@ export function AttendanceGate() {
       }
     }
 
-    // 3. CHECK-IN GATE
-    const isLateNight = now.getHours() >= 19; // No check-in prompt after 7 PM for today
+    const isLateNight = now.getHours() >= 19;
     if (!activeSession && !hasCompletedToday && !isLateNight) {
       setShowCheckIn(true);
     }
 
-    // 4. CHECK-OUT PROMPT (Gentle reminder after 7 PM)
     if (activeSession && activeSession.date === todayStr && now.getHours() >= 19) {
       setShowCheckOut(true);
     }

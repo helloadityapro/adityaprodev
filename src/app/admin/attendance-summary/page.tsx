@@ -10,7 +10,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO, differenceInMinutes, endOfDay } from 'date-fns';
-import { CalendarDays, Search, FileDown, User, Clock, MapPin, CheckCircle2, XCircle, Timer, Loader2, ArrowUpDown, ArrowUp, ArrowDown, FilterX, RefreshCw, ShieldCheck, LayoutGrid } from 'lucide-react';
+import { 
+  CalendarDays, 
+  Search, 
+  FileDown, 
+  User, 
+  Clock, 
+  MapPin, 
+  CheckCircle2, 
+  XCircle, 
+  Timer, 
+  Loader2, 
+  ArrowUpDown, 
+  ArrowUp, 
+  ArrowDown, 
+  FilterX, 
+  RefreshCw, 
+  ShieldCheck, 
+  LayoutGrid,
+  Route
+} from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
 import { Label } from '@/components/ui/label';
@@ -19,6 +38,19 @@ import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+
+// Dynamically import the heavy Map component to prevent SSR errors and improve performance
+const RouteMap = dynamic(() => import('@/components/route-map'), { 
+  ssr: false,
+  loading: () => (
+    <div className="h-[500px] w-full bg-muted/20 animate-pulse flex flex-col items-center justify-center gap-4">
+      <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Warming up engines...</p>
+    </div>
+  )
+});
 
 type UserProfile = {
   id: string;
@@ -26,6 +58,12 @@ type UserProfile = {
   email: string;
   role: string;
   department: string;
+};
+
+type TrackingPoint = {
+  lat: number;
+  lng: number;
+  timestamp: string;
 };
 
 type AttendanceRecord = {
@@ -41,6 +79,7 @@ type AttendanceRecord = {
   checkInLng?: number;
   checkOutLat?: number;
   checkOutLng?: number;
+  trackingPoints?: TrackingPoint[];
 };
 
 type SortKey = 'personnel' | 'status' | 'checkIn' | 'checkOut';
@@ -60,6 +99,7 @@ export default function AttendanceSummaryPage() {
   const [deptFilter, setDeptFilter] = React.useState<string>("all");
   const [isSyncing, setIsSyncing] = React.useState(false);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'personnel', direction: 'asc' });
+  const [viewingRoute, setViewingRoute] = React.useState<AttendanceRecord | null>(null);
 
   const currentUserProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(currentUserProfileRef);
@@ -86,10 +126,6 @@ export default function AttendanceSummaryPage() {
   }, [firestore, selectedDate]);
   const { data: attendanceRecords, isLoading: isAttendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery);
 
-  /**
-   * GLOBAL CLEANUP: Automatically close ANY open sessions from past dates.
-   * This handles the requirement that no record remains "Ongoing" beyond the same day.
-   */
   const allOngoingQuery = useMemoFirebase(() => {
     return query(collection(firestore, 'attendance'), where('status', '==', 'ongoing'));
   }, [firestore]);
@@ -446,7 +482,7 @@ export default function AttendanceSummaryPage() {
                     Check-out <SortIcon column="checkOut" />
                   </div>
                 </TableHead>
-                <TableHead className="text-right px-6">Verification Stamps</TableHead>
+                <TableHead className="text-right px-6">Audit Trail</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -489,17 +525,20 @@ export default function AttendanceSummaryPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right px-6">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-1.5">
+                      {item.record && (item.record.trackingPoints?.length || item.record.checkInLat) && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setViewingRoute(item.record)}
+                          className="h-8 rounded-sm font-black uppercase text-[9px] tracking-widest border-primary/20 text-primary hover:bg-primary/5"
+                        >
+                          <Route className="h-3.5 w-3.5 mr-1.5" /> View Route
+                        </Button>
+                      )}
                       {item.record?.checkInLat && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm text-primary" asChild title="Check-in Location">
                           <a href={`https://www.google.com/maps/search/?api=1&query=${item.record.checkInLat},${item.record.checkInLng}`} target="_blank" rel="noopener noreferrer">
-                            <MapPin className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      )}
-                      {item.record?.checkOutLat && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm text-slate-500" asChild title="Check-out Location">
-                          <a href={`https://www.google.com/maps/search/?api=1&query=${item.record.checkOutLat},${item.record.checkOutLng}`} target="_blank" rel="noopener noreferrer">
                             <MapPin className="h-4 w-4" />
                           </a>
                         </Button>
@@ -518,6 +557,60 @@ export default function AttendanceSummaryPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={!!viewingRoute} onOpenChange={(o) => !o && setViewingRoute(null)}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background h-[80vh] flex flex-col">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><Route className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Movement Audit Log</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Route analysis for {viewingRoute?.userName} on {viewingRoute?.date}</DialogDescription>
+              </div>
+            </div>
+            <DialogClose asChild><Button variant="ghost" size="icon" className="rounded-full"><X className="h-4 w-4" /></Button></DialogClose>
+          </DialogHeader>
+          <div className="flex-1 relative bg-muted/10">
+            {viewingRoute && (
+              <RouteMap 
+                key={viewingRoute.id} 
+                record={viewingRoute} 
+              />
+            )}
+          </div>
+          <div className="p-3 px-6 bg-muted/5 border-t flex items-center justify-between shrink-0">
+            <div className="flex gap-4">
+              <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-emerald-500" /><span className="text-[10px] font-black uppercase">Check-In</span></div>
+              <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-blue-500" /><span className="text-[10px] font-black uppercase">Tracking Logs</span></div>
+              <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-red-500" /><span className="text-[10px] font-black uppercase">Check-Out</span></div>
+            </div>
+            <Badge variant="outline" className="rounded-sm font-black text-[9px] uppercase tracking-tighter">
+              {viewingRoute?.trackingPoints?.length || 0} Breadcrumbs Captured
+            </Badge>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
+  const colors = {
+    primary: "bg-primary/5 border-primary/10 text-primary",
+    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
+    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
+  };
+
+  return (
+    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
+        <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
+      </CardHeader>
+      <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+        <div className="text-xl sm:text-2xl font-bold">{value}</div>
+      </CardContent>
+    </Card>
   );
 }

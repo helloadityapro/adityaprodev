@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -14,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 /**
  * Interactive Leaflet Map component for visual personnel tracking.
  * Plotted markers represent live 'ongoing' attendance sessions.
+ * Fixes "already initialized" errors by using a stable React key strategy.
  */
 export default function MapViewComponent({ records }: { records: any[] }) {
   // Fix for default marker icons in Next.js/Webpack environments
@@ -36,6 +36,7 @@ export default function MapViewComponent({ records }: { records: any[] }) {
 
   return (
     <MapContainer 
+      key={`live-map-${records.length}-${validPins.length}`}
       center={defaultCenter} 
       zoom={5} 
       className="h-full w-full z-10"
