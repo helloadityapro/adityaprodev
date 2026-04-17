@@ -200,7 +200,7 @@ export default function CheckInPage() {
 
       <Card className="shadow-lg border-primary/10 rounded-sm overflow-hidden">
         <CardHeader className="bg-primary/5 py-2 border-b">
-          <CardTitle className="text-sm font-black uppercase tracking-widest">Identity Verification</CardTitle>
+          <CardTitle className="text-sm font-black uppercase tracking-widest">Check-in Verification</CardTitle>
           <CardDescription className="text-[8px] font-bold text-muted-foreground uppercase">GPS Sync & Identity Audit</CardDescription>
         </CardHeader>
         <CardContent className="pt-4 pb-4 space-y-4">
@@ -265,7 +265,7 @@ export default function CheckInPage() {
           </DialogHeader>
           <DialogFooter className="sm:justify-center pb-4">
             <Button onClick={() => router.push('/attendance/check-out')} className="w-full h-12 text-sm font-black rounded-sm bg-emerald-600 hover:bg-emerald-700">
-              Continue to Dashboard
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,8 +1,10 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @import url('https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap');
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
 
 @layer base {
   :root {
@@ -112,6 +114,17 @@
   }
   .pt-safe {
     padding-top: env(safe-area-inset-top);
+  }
+
+  /* Leaflet Popup customization */
+  .leaflet-popup-content-wrapper {
+    @apply rounded-sm shadow-2xl p-0 overflow-hidden border-none;
+  }
+  .leaflet-popup-content {
+    @apply m-0 p-0;
+  }
+  .leaflet-popup-tip {
+    @apply bg-background;
   }
 }
 

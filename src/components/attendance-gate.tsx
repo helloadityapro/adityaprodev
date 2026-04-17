@@ -176,14 +176,14 @@ export function AttendanceGate() {
             <div className="mx-auto bg-primary/10 p-4 rounded-full w-fit mb-4">
               <LogIn className="h-8 w-8 text-primary" />
             </div>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight">Workday Check-in</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight">Check-in Reminder!</DialogTitle>
             <DialogDescription className="text-base leading-relaxed">
-              Mandatory verification required to log site operations.
+              Please capture verification to start your workday.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center pb-4">
             <Button onClick={() => { setShowCheckIn(false); router.push('/attendance/check-in'); }} className="w-full h-14 text-lg font-black rounded-sm">
-              Start Verification
+              Proceed to Check-in
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -195,14 +195,14 @@ export function AttendanceGate() {
             <div className="mx-auto bg-amber-500/10 p-4 rounded-full w-fit mb-4">
               <Clock className="h-8 w-8 text-amber-600" />
             </div>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight">Conclusion Reminder</DialogTitle>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight">Check-Out Reminder!</DialogTitle>
             <DialogDescription className="text-base leading-relaxed text-amber-800">
               Your session is still active. Please capture final verification to conclude your workday.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center pb-4">
             <Button onClick={() => { setShowCheckOut(false); router.push('/attendance/check-out'); }} className="w-full h-14 text-lg font-black rounded-sm bg-slate-900">
-              Conclude Workday
+              Proceed to Check-Out
             </Button>
           </DialogFooter>
         </DialogContent>

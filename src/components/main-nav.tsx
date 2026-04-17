@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -700,6 +701,14 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/attendance/map-view'} onClick={handleMobileClose}>
+                        <Link href="/attendance/map-view">
+                          <MapPin className="h-4 w-4" />
+                          <span>Live Map</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>
@@ -792,6 +801,16 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                 <Link href="/admin/attendance-summary">
                   <FileBarChart className="h-4 w-4 text-emerald-600" />
                   <span className="font-bold text-emerald-700">Attendance Summary</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-attendance-matrix') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Attendance Board" isActive={pathname === '/admin/attendance-summary/matrix'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/admin/attendance-summary/matrix">
+                  <LayoutGrid className="h-4 w-4 text-emerald-600" />
+                  <span className="font-bold text-emerald-700">Attendance Board</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

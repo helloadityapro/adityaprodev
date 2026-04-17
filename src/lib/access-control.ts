@@ -21,6 +21,7 @@ export type PageKey =
   | 'visits' 
   | 'trips' 
   | 'attendance'
+  | 'attendance-map'
   | 'checklists-mms'
   | 'master-data-tables-add'
   | 'master-data-tables-list'
@@ -76,6 +77,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'visits', label: 'Site Visits', category: 'Operations', path: '/site-visits/active' },
   { id: 'trips', label: 'Vehicle Trips', category: 'Operations', path: '/vehicles/trips/manage' },
   { id: 'attendance', label: 'Personnel Attendance', category: 'Operations', path: '/attendance' },
+  { id: 'attendance-map', label: 'Personnel Live Map', category: 'Operations', path: '/attendance/map-view' },
 
   { id: 'checklists-mms', label: 'Table Level MMS Checklist', category: 'Checklists', path: '/checklists/mms' },
 
