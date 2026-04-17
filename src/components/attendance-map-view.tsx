@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 /**
  * Interactive Leaflet Map component for visual personnel tracking.
  * Plotted markers represent live 'ongoing' attendance sessions.
- * Fixes "already initialized" errors by using a stable React key strategy.
+ * Fixes "already initialized" errors by using a stable unique key.
  */
 export default function MapViewComponent({ records }: { records: any[] }) {
   // Fix for default marker icons in Next.js/Webpack environments
@@ -27,7 +27,7 @@ export default function MapViewComponent({ records }: { records: any[] }) {
     });
   }, []);
 
-  const validPins = records.filter(r => r.checkInLat && r.checkInLng);
+  const validPins = React.useMemo(() => records.filter(r => r.checkInLat && r.checkInLng), [records]);
   
   // Default map position: Center of India or first available personnel
   const defaultCenter: [number, number] = validPins.length > 0 
@@ -36,7 +36,7 @@ export default function MapViewComponent({ records }: { records: any[] }) {
 
   return (
     <MapContainer 
-      key={`live-map-${records.length}-${validPins.length}`}
+      key={`live-map-registry-${validPins.length}-${validPins[0]?.id || 'initial'}`}
       center={defaultCenter} 
       zoom={5} 
       className="h-full w-full z-10"
@@ -48,7 +48,7 @@ export default function MapViewComponent({ records }: { records: any[] }) {
       />
       {validPins.map((record) => (
         <Marker 
-          key={record.id} 
+          key={`marker-${record.id}`} 
           position={[record.checkInLat, record.checkInLng]}
         >
           <Tooltip direction="top" offset={[0, -20]} opacity={0.9}>

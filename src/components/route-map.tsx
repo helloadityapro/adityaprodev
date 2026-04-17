@@ -9,7 +9,7 @@ import { Clock, MapPin, Navigation } from 'lucide-react';
 
 /**
  * Robust map component to visualize a personnel's movement route.
- * Fixes "already initialized" errors by using a stable React key strategy.
+ * Fixes "already initialized" errors by using a stable unique key.
  */
 export default function RouteMap({ record }: { record: any }) {
   React.useEffect(() => {
@@ -25,24 +25,32 @@ export default function RouteMap({ record }: { record: any }) {
 
   const points = React.useMemo(() => {
     const list: [number, number][] = [];
-    if (record.checkInLat) list.push([record.checkInLat, record.checkInLng]);
-    
-    if (record.trackingPoints) {
-      record.trackingPoints.forEach((p: any) => list.push([p.lat, p.lng]));
+    if (record.checkInLat && record.checkInLng) {
+      list.push([record.checkInLat, record.checkInLng]);
     }
     
-    if (record.checkOutLat) list.push([record.checkOutLat, record.checkOutLng]);
+    if (record.trackingPoints) {
+      record.trackingPoints.forEach((p: any) => {
+        if (p.lat && p.lng) list.push([p.lat, p.lng]);
+      });
+    }
+    
+    if (record.checkOutLat && record.checkOutLng) {
+      list.push([record.checkOutLat, record.checkOutLng]);
+    }
     return list;
   }, [record]);
 
   if (points.length === 0) return null;
 
   const checkInPos: [number, number] = [record.checkInLat, record.checkInLng];
-  const checkOutPos: [number, number] = record.checkOutLat ? [record.checkOutLat, record.checkOutLng] : null;
+  const checkOutPos: [number, number] | null = record.checkOutLat && record.checkOutLng 
+    ? [record.checkOutLat, record.checkOutLng] 
+    : null;
 
   return (
     <MapContainer 
-      key={`map-container-${record.id}`}
+      key={`map-instance-${record.id}-${points.length}`}
       center={checkInPos} 
       zoom={14} 
       className="h-full w-full z-10"
@@ -54,7 +62,9 @@ export default function RouteMap({ record }: { record: any }) {
       />
       
       {/* Route Path */}
-      <Polyline positions={points} color="#3b82f6" weight={4} opacity={0.6} dashArray="10, 10" />
+      {points.length > 1 && (
+        <Polyline positions={points} color="#3b82f6" weight={4} opacity={0.6} dashArray="10, 10" />
+      )}
 
       {/* Check-In Marker */}
       <Marker position={checkInPos} icon={new L.Icon({
@@ -70,15 +80,15 @@ export default function RouteMap({ record }: { record: any }) {
         </Tooltip>
         <Popup>
           <div className="p-1 space-y-1">
-            <p className="font-bold text-xs uppercase">Check-In Point</p>
-            <p className="text-[10px] font-mono">{format(record.checkInTime.toDate(), 'HH:mm')}</p>
+            <p className="font-bold text-xs uppercase text-emerald-700">Check-In Point</p>
+            <p className="text-[10px] font-mono">{record.checkInTime ? format(record.checkInTime.toDate(), 'HH:mm') : '—'}</p>
           </div>
         </Popup>
       </Marker>
 
       {/* Tracking Breadcrumbs */}
       {record.trackingPoints?.map((p: any, idx: number) => (
-        <Marker key={idx} position={[p.lat, p.lng]} icon={new L.DivIcon({
+        <Marker key={`breadcrumb-${idx}`} position={[p.lat, p.lng]} icon={new L.DivIcon({
           className: 'custom-div-icon',
           html: `<div style="background-color: #3b82f6; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3);"></div>`,
           iconSize: [10, 10],
@@ -86,8 +96,8 @@ export default function RouteMap({ record }: { record: any }) {
         })}>
           <Popup>
             <div className="p-1 space-y-1">
-              <p className="font-bold text-[10px] uppercase">Tracking Log</p>
-              <p className="text-[10px] font-mono">{format(new Date(p.timestamp), 'HH:mm')}</p>
+              <p className="font-bold text-[10px] uppercase text-primary">Tracking Log</p>
+              <p className="text-[10px] font-mono">{p.timestamp ? format(new Date(p.timestamp), 'HH:mm') : '—'}</p>
             </div>
           </Popup>
         </Marker>
@@ -108,8 +118,8 @@ export default function RouteMap({ record }: { record: any }) {
           </Tooltip>
           <Popup>
             <div className="p-1 space-y-1">
-              <p className="font-bold text-xs uppercase">Check-Out Point</p>
-              <p className="text-[10px] font-mono">{format(record.checkOutTime.toDate(), 'HH:mm')}</p>
+              <p className="font-bold text-xs uppercase text-red-700">Check-Out Point</p>
+              <p className="text-[10px] font-mono">{record.checkOutTime ? format(record.checkOutTime.toDate(), 'HH:mm') : '—'}</p>
             </div>
           </Popup>
         </Marker>
