@@ -4,7 +4,6 @@ import * as React from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { format } from 'date-fns';
-import { User, Clock, Calendar, MapPin, ExternalLink, Activity } from 'lucide-react';
 
 /**
  * Interactive Leaflet Map component for visual personnel tracking.
@@ -85,13 +84,13 @@ export default function MapViewComponent({
     validPins.forEach(record => {
       const marker = L.marker([record.checkInLat, record.checkInLng]);
       
-      // Name Tooltip - Displayed permanent directly on pin
+      // Minimalist Name Tooltip - Displayed permanent directly on pin
       marker.bindTooltip(
-        `<div class="bg-primary text-white text-[10px] font-black px-1.5 py-0.5 rounded shadow-md border border-white/20 uppercase tracking-tighter">${record.userName}</div>`, 
+        `<div class="bg-primary text-primary-foreground text-[11px] font-medium px-2 py-0.5 rounded-sm shadow-sm border border-primary/20">${record.userName}</div>`, 
         {
           direction: 'top',
           offset: [0, -32],
-          opacity: 1,
+          opacity: 0.95,
           permanent: true,
           className: 'bg-transparent border-none shadow-none p-0'
         }
