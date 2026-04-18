@@ -18,6 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
 // Dynamically import the Map component to avoid SSR errors
 const MapViewComponent = dynamic(() => import('@/components/attendance-map-view'), { 
@@ -54,7 +55,7 @@ export default function AttendanceMapPage() {
 
   // Site filter states
   const [siteFilter, setSiteFilter] = React.useState<string>("All Sites");
-  const [isSiteSearchOpen, setIsSiteSearchOpen] = React.useState(false);
+  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchInput, setSiteSearchInput] = React.useState("");
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -95,7 +96,7 @@ export default function AttendanceMapPage() {
     
     const assignedIds = new Set(userProfile.assignedProjectIds || []);
     return allSites.filter((s: any) => assignedIds.has(s.id));
-  }, [allSites, userProfile, canViewAll]);
+  }, [allSites, userProfile]);
 
   function isAdminOrHR() {
     return isSuperAdmin(user?.email) || userProfile?.role === 'Admin' || userProfile?.role === 'Manager - Human Resources';
@@ -161,7 +162,7 @@ export default function AttendanceMapPage() {
         lng: site.longitude
       });
     }
-    setIsSiteSearchOpen(false);
+    setIsSitePopoverOpen(false);
     setFocusedId(null);
   };
 
@@ -306,7 +307,7 @@ export default function AttendanceMapPage() {
                   <Button
                     variant="ghost"
                     className="w-full justify-start h-10 text-xs rounded-sm px-3 mb-0.5"
-                    onClick={() => { setSiteFilter("All Sites"); setIsSiteSearchOpen(false); }}
+                    onClick={() => { setSiteFilter("All Sites"); setIsSitePopoverOpen(false); }}
                   >
                     <Check className={cn("mr-2 h-4 w-4 text-primary", siteFilter === "All Sites" ? "opacity-100" : "opacity-0")} />
                     All Sites
