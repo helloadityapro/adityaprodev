@@ -805,16 +805,6 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
               </SidebarMenuButton>
             </SidebarMenuItem>
           )}
-          {canShow('admin-attendance-matrix') && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Attendance Board" isActive={pathname === '/admin/attendance-summary/matrix'} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/admin/attendance-summary/matrix">
-                  <LayoutGrid className="h-4 w-4 text-emerald-600" />
-                  <span className="font-bold text-emerald-700">Attendance Board</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
           {canShow('admin-day-report') && (
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Day Report" isActive={pathname === '/admin/day-report'} className="rounded-sm" onClick={handleMobileClose}>
