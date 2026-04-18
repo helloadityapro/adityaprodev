@@ -1,48 +1,50 @@
+
 'use client';
 
 import * as React from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { format } from 'date-fns';
-import { User, Clock, Calendar, MapPin, ExternalLink } from 'lucide-react';
+import { User, Clock, Calendar, MapPin, ExternalLink, Activity } from 'lucide-react';
 
 /**
  * Interactive Leaflet Map component for visual personnel tracking.
  * Manually manages Leaflet lifecycle to prevent "already initialized" errors.
+ * Optimized with preferCanvas and manual marker management for high performance.
  */
-export default function MapViewComponent({ records = [] }: { records: any[] }) {
+export default function MapViewComponent({ 
+  records = [], 
+  focusedId = null 
+}: { 
+  records: any[], 
+  focusedId?: string | null 
+}) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<L.Map | null>(null);
   const markersLayerRef = React.useRef<L.LayerGroup | null>(null);
+  const markersMapRef = React.useRef<Map<string, L.Marker>>(new Map());
 
   // 1. Initial Map Setup (Runs Once)
   React.useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-
-    // Check if the container already has a map instance attached to it
-    // This is the definitive fix for "Map container is already initialized"
     if ((containerRef.current as any)._leaflet_id) return;
 
-    const validPins = records.filter(r => r.checkInLat && r.checkInLng);
-    const center: [number, number] = validPins.length > 0 
-      ? [validPins[0].checkInLat, validPins[0].checkInLng] 
-      : [20.5937, 78.9629];
-
-    // Initialize map
+    // Initialize map with performance optimizations
     const map = L.map(containerRef.current, {
-      center: center,
+      center: [20.5937, 78.9629],
       zoom: 5,
       scrollWheelZoom: true,
+      preferCanvas: true // Significant performance boost for marker rendering
     });
 
-    // Add Tile Layer
+    // Add Tile Layer with caching optimization
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      updateWhenIdle: true,
+      keepBuffer: 2
     }).addTo(map);
 
-    // Marker Icon Fix for Webpack/Next.js
-    const DefaultIcon = L.Icon.Default.prototype as any;
-    delete DefaultIcon._getIconUrl;
+    // Marker Icon Fix for Webpack/Next.js using high-performance CDN
     L.Icon.Default.mergeOptions({
       iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
       iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -61,6 +63,7 @@ export default function MapViewComponent({ records = [] }: { records: any[] }) {
         mapRef.current.remove();
         mapRef.current = null;
         markersLayerRef.current = null;
+        markersMapRef.current.clear();
       }
     };
   }, []);
@@ -71,6 +74,7 @@ export default function MapViewComponent({ records = [] }: { records: any[] }) {
 
     const layer = markersLayerRef.current;
     layer.clearLayers();
+    markersMapRef.current.clear();
 
     const validPins = records.filter(r => r.checkInLat && r.checkInLng);
 
@@ -94,19 +98,19 @@ export default function MapViewComponent({ records = [] }: { records: any[] }) {
         </div>
         <div class="flex flex-col">
           <span class="font-black text-xs uppercase tracking-tight text-foreground">${record.userName}</span>
-          <span class="text-[9px] font-bold text-muted-foreground uppercase">Active Session</span>
+          <span class="text-[9px] font-bold text-muted-foreground uppercase">${record.status || 'Active'} Log</span>
         </div>
       `;
 
       const bodyDiv = L.DomUtil.create('div', 'space-y-2', popupDiv);
       bodyDiv.innerHTML = `
         <div class="flex items-center justify-between gap-4">
-          <span class="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Logged:</span>
+          <span class="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Entry:</span>
           <span class="text-[10px] font-mono font-black text-blue-600">${record.checkInTime ? format(record.checkInTime.toDate(), 'HH:mm') : '—'}</span>
         </div>
         <div class="flex items-center justify-between gap-4">
-          <span class="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Date:</span>
-          <span class="text-[10px] font-mono font-black">${record.date}</span>
+          <span class="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Status:</span>
+          <span class="text-[9px] font-black uppercase ${record.status === 'ongoing' ? 'text-blue-600' : 'text-emerald-600'}">${record.status === 'ongoing' ? 'In Session' : 'Completed'}</span>
         </div>
         <div class="flex flex-col gap-1 text-left pt-2 border-t">
           <span class="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
@@ -126,13 +130,28 @@ export default function MapViewComponent({ records = [] }: { records: any[] }) {
 
       marker.bindPopup(popupDiv);
       marker.addTo(layer);
+      
+      // Index marker for focus lookup
+      markersMapRef.current.set(record.id, marker);
     });
 
-    // Auto-focus if single record
-    if (validPins.length === 1) {
-      mapRef.current.setView([validPins[0].checkInLat, validPins[0].checkInLng], 14);
+    // Center map on initial load if records exist
+    if (validPins.length > 0 && !focusedId) {
+      const bounds = L.latLngBounds(validPins.map(p => [p.checkInLat, p.checkInLng]));
+      mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
     }
   }, [records]);
+
+  // 3. Handle External Focus Requests
+  React.useEffect(() => {
+    if (!focusedId || !mapRef.current) return;
+
+    const marker = markersMapRef.current.get(focusedId);
+    if (marker) {
+      mapRef.current.setView(marker.getLatLng(), 16, { animate: true });
+      marker.openPopup();
+    }
+  }, [focusedId]);
 
   return (
     <div 
