@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -9,17 +8,30 @@ import { format } from 'date-fns';
 /**
  * Interactive Leaflet Map component for visual personnel tracking and site overview.
  * Optimized with preferCanvas and manual marker management.
+ * Supports dynamic visibility toggles for layers and labels.
  */
 export default function MapViewComponent({ 
   records = [], 
   focusedId = null,
   flyToLocation = null,
-  sites = []
+  sites = [],
+  visibility = {
+    showUsers: true,
+    showUserNames: true,
+    showSites: true,
+    showSiteNames: true
+  }
 }: { 
   records: any[], 
   focusedId?: string | null,
   flyToLocation?: { lat: number, lng: number } | null,
-  sites?: any[]
+  sites?: any[],
+  visibility?: {
+    showUsers: boolean;
+    showUserNames: boolean;
+    showSites: boolean;
+    showSiteNames: boolean;
+  }
 }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<L.Map | null>(null);
@@ -79,21 +91,25 @@ export default function MapViewComponent({
     layer.clearLayers();
     markersMapRef.current.clear();
 
+    if (!visibility.showUsers) return;
+
     const validPins = records.filter(r => r.checkInLat && r.checkInLng);
 
     validPins.forEach(record => {
       const marker = L.marker([record.checkInLat, record.checkInLng]);
       
-      marker.bindTooltip(
-        `<div class="bg-primary text-primary-foreground text-[10px] font-medium px-2 py-0.5 rounded-sm shadow-sm border border-primary/20">${record.userName}</div>`, 
-        {
-          direction: 'top',
-          offset: [0, -32],
-          opacity: 0.95,
-          permanent: true,
-          className: 'bg-transparent border-none shadow-none p-0'
-        }
-      );
+      if (visibility.showUserNames) {
+        marker.bindTooltip(
+          `<div class="bg-primary text-primary-foreground text-[10px] font-medium px-2 py-0.5 rounded-sm shadow-sm border border-primary/20">${record.userName}</div>`, 
+          {
+            direction: 'top',
+            offset: [0, -32],
+            opacity: 0.95,
+            permanent: true,
+            className: 'bg-transparent border-none shadow-none p-0'
+          }
+        );
+      }
 
       const popupDiv = L.DomUtil.create('div', 'p-1 min-w-[220px] space-y-3 text-left');
       const headerDiv = L.DomUtil.create('div', 'flex items-center gap-2 border-b pb-2', popupDiv);
@@ -136,7 +152,7 @@ export default function MapViewComponent({
       mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
       hasInitialCentered.current = true;
     }
-  }, [records]);
+  }, [records, visibility.showUsers, visibility.showUserNames]);
 
   // 3. Dynamic Site Marker Updates
   React.useEffect(() => {
@@ -144,6 +160,8 @@ export default function MapViewComponent({
 
     const layer = sitesLayerRef.current;
     layer.clearLayers();
+
+    if (!visibility.showSites) return;
 
     const siteIcon = L.divIcon({
       className: 'custom-site-icon',
@@ -155,18 +173,20 @@ export default function MapViewComponent({
     sites.filter(s => s.latitude && s.longitude).forEach(site => {
       const marker = L.marker([site.latitude, site.longitude], { icon: siteIcon });
       
-      marker.bindTooltip(
-        `<div class="bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-sm shadow-sm uppercase tracking-tighter">${site.name}</div>`, 
-        {
-          direction: 'bottom',
-          offset: [0, 16],
-          opacity: 0.9,
-          permanent: false
-        }
-      );
+      if (visibility.showSiteNames) {
+        marker.bindTooltip(
+          `<div class="bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-sm shadow-sm uppercase tracking-tighter">${site.name}</div>`, 
+          {
+            direction: 'bottom',
+            offset: [0, 16],
+            opacity: 0.9,
+            permanent: true
+          }
+        );
+      }
 
       marker.bindPopup(`
-        <div class="p-2 space-y-1">
+        <div class="p-2 space-y-1 text-left">
           <p class="font-black text-xs text-emerald-700 uppercase tracking-tight">${site.name}</p>
           <p class="text-[10px] font-medium text-muted-foreground">${site.projectCompany}</p>
           <div class="pt-1 mt-1 border-t flex flex-col gap-0.5">
@@ -178,7 +198,7 @@ export default function MapViewComponent({
 
       marker.addTo(layer);
     });
-  }, [sites]);
+  }, [sites, visibility.showSites, visibility.showSiteNames]);
 
   // 4. Interaction Handlers
   React.useEffect(() => {

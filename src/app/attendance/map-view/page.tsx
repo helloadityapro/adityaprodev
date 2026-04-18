@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -6,7 +5,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@
 import { collection, query, where, doc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Navigation, Loader2, AlertCircle, Search, Check, ChevronsUpDown, FilterX, MapPin, Building2, Filter } from 'lucide-react';
+import { Navigation, Loader2, AlertCircle, Search, Check, ChevronsUpDown, FilterX, MapPin, Building2, Filter, Layers } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Badge } from '@/components/ui/badge';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -17,6 +16,8 @@ import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 // Dynamically import the Map component to avoid SSR errors
 const MapViewComponent = dynamic(() => import('@/components/attendance-map-view'), { 
@@ -37,6 +38,12 @@ export default function AttendanceMapPage() {
   const [searchQuery, setSearchTerm] = React.useState("");
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [focusedId, setFocusedId] = React.useState<string | null>(null);
+
+  // Visibility states
+  const [showUsers, setShowUsers] = React.useState(true);
+  const [showUserNames, setShowUserNames] = React.useState(true);
+  const [showSites, setShowSites] = React.useState(true);
+  const [showSiteNames, setShowSiteNames] = React.useState(true);
 
   // Location search states
   const [locSearchQuery, setLocSearchQuery] = React.useState("");
@@ -193,13 +200,46 @@ export default function AttendanceMapPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3 pb-1 sm:pb-0">
+          {/* Layer Visibility Toggles */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" className="h-10 w-10 rounded-sm border-primary/20 text-primary bg-background shadow-sm shrink-0">
+                <Layers className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-4 rounded-sm border-primary/10 shadow-2xl">
+              <div className="space-y-4">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Display Layers</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox id="toggle-users" checked={showUsers} onCheckedChange={(val) => setShowUsers(!!val)} />
+                    <Label htmlFor="toggle-users" className="text-xs font-bold uppercase tracking-tight cursor-pointer">Show User Pins</Label>
+                  </div>
+                  <div className="flex items-center space-x-2 pl-6">
+                    <Checkbox id="toggle-user-names" checked={showUserNames} onCheckedChange={(val) => setShowUserNames(!!val)} disabled={!showUsers} />
+                    <Label htmlFor="toggle-user-names" className={cn("text-[10px] font-bold uppercase tracking-tight cursor-pointer", !showUsers && "opacity-40")}>Show User Names</Label>
+                  </div>
+                  <Separator className="my-2" />
+                  <div className="flex items-center space-x-2">
+                    <Checkbox id="toggle-sites" checked={showSites} onCheckedChange={(val) => setShowSites(!!val)} />
+                    <Label htmlFor="toggle-sites" className="text-xs font-bold uppercase tracking-tight cursor-pointer">Show Site Pins</Label>
+                  </div>
+                  <div className="flex items-center space-x-2 pl-6">
+                    <Checkbox id="toggle-site-names" checked={showSiteNames} onCheckedChange={(val) => setShowSiteNames(!!val)} disabled={!showSites} />
+                    <Label htmlFor="toggle-site-names" className={cn("text-[10px] font-bold uppercase tracking-tight cursor-pointer", !showSites && "opacity-40")}>Show Site Names</Label>
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
           {/* Location Search Popover */}
           <Popover open={isLocSearchOpen} onOpenChange={setIsLocSearchOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-10 w-[200px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
+              <Button variant="outline" className="h-10 w-[180px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
                 <div className="flex items-center gap-2 truncate">
                   <MapPin className="h-4 w-4 text-primary" />
-                  <span className="truncate">{locSearchQuery || "Search Places..."}</span>
+                  <span className="truncate">{locSearchQuery || "Places..."}</span>
                 </div>
                 <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
               </Button>
@@ -241,12 +281,12 @@ export default function AttendanceMapPage() {
           </Popover>
 
           {/* Site Search Popover */}
-          <Popover open={isSiteSearchOpen} onOpenChange={setIsSiteSearchOpen}>
+          <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-10 w-[200px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
+              <Button variant="outline" className="h-10 w-[180px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
                 <div className="flex items-center gap-2 truncate">
                   <Building2 className="h-4 w-4 text-primary" />
-                  <span className="truncate">{siteFilter === "All Sites" ? "Search Sites..." : siteFilter}</span>
+                  <span className="truncate">{siteFilter === "All Sites" ? "Sites..." : siteFilter}</span>
                 </div>
                 <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
               </Button>
@@ -279,7 +319,7 @@ export default function AttendanceMapPage() {
                       onClick={() => handleSelectSite(s)}
                     >
                       <Check className={cn("mr-2 h-4 w-4 text-primary", siteFilter === s.name ? "opacity-100" : "opacity-0")} />
-                      <div className="flex flex-col items-start overflow-hidden">
+                      <div className="flex flex-col items-start overflow-hidden text-left">
                         <span className="font-bold truncate w-full">{s.name}</span>
                         <span className="text-[9px] text-muted-foreground uppercase">{s.projectCompany}</span>
                       </div>
@@ -294,10 +334,10 @@ export default function AttendanceMapPage() {
           {canViewAll && (
             <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="h-10 w-[200px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
+                <Button variant="outline" className="h-10 w-[180px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
                   <div className="flex items-center gap-2 truncate">
                     <Search className="h-4 w-4 text-muted-foreground" />
-                    <span className="truncate">{focusedId ? todayRecords?.find((r: any) => r.id === focusedId)?.userName : "Search Personnel..."}</span>
+                    <span className="truncate">{focusedId ? todayRecords?.find((r: any) => r.id === focusedId)?.userName : "Personnel..."}</span>
                   </div>
                   <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
                 </Button>
@@ -358,6 +398,12 @@ export default function AttendanceMapPage() {
             focusedId={focusedId} 
             flyToLocation={flyToLocation}
             sites={accessibleSites || []}
+            visibility={{
+              showUsers,
+              showUserNames,
+              showSites,
+              showSiteNames
+            }}
           />
         </CardContent>
       </Card>
