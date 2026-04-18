@@ -85,12 +85,17 @@ export default function MapViewComponent({
     validPins.forEach(record => {
       const marker = L.marker([record.checkInLat, record.checkInLng]);
       
-      // Name Tooltip
-      marker.bindTooltip(`<span class="font-bold text-xs">${record.userName}</span>`, {
-        direction: 'top',
-        offset: [0, -20],
-        opacity: 0.9
-      });
+      // Name Tooltip - Displayed permanent directly on pin
+      marker.bindTooltip(
+        `<div class="bg-primary text-white text-[10px] font-black px-1.5 py-0.5 rounded shadow-md border border-white/20 uppercase tracking-tighter">${record.userName}</div>`, 
+        {
+          direction: 'top',
+          offset: [0, -32],
+          opacity: 1,
+          permanent: true,
+          className: 'bg-transparent border-none shadow-none p-0'
+        }
+      );
 
       // Detailed Info Popup
       const popupDiv = L.DomUtil.create('div', 'p-1 min-w-[220px] space-y-3 text-left');
@@ -140,7 +145,7 @@ export default function MapViewComponent({
     });
 
     // ONLY center map on initial load or when first set of valid records arrives
-    // This prevents "continuous zoom out" glitches when Firestore listener updates frequently
+    // This prevents "zoom looping" on data updates
     if (validPins.length > 0 && !focusedId && !flyToLocation && !hasInitialCentered.current) {
       const bounds = L.latLngBounds(validPins.map(p => [p.checkInLat, p.checkInLng]));
       mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });

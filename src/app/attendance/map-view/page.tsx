@@ -146,11 +146,11 @@ export default function AttendanceMapPage() {
           </p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3 overflow-x-auto sm:overflow-x-visible pb-1 sm:pb-0 no-scrollbar">
           {/* Location Search Popover */}
           <Popover open={isLocSearchOpen} onOpenChange={setIsLocSearchOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-10 w-[240px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm">
+              <Button variant="outline" className="h-10 w-[240px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
                 <div className="flex items-center gap-2 truncate">
                   <MapPin className="h-4 w-4 text-primary" />
                   <span className="truncate">{locSearchQuery || "Search Places..."}</span>
@@ -198,7 +198,7 @@ export default function AttendanceMapPage() {
           {canViewAll && (
             <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="h-10 w-[240px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm">
+                <Button variant="outline" className="h-10 w-[240px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
                   <div className="flex items-center gap-2 truncate">
                     <Search className="h-4 w-4 text-muted-foreground" />
                     <span className="truncate">{focusedId ? todayRecords?.find(r => r.id === focusedId)?.userName : "Search Personnel..."}</span>
@@ -213,7 +213,7 @@ export default function AttendanceMapPage() {
                     placeholder="Filter by name..." 
                     className="h-8 border-none focus-visible:ring-0 px-0 text-sm"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 <ScrollArea className="h-[250px]">
@@ -244,7 +244,7 @@ export default function AttendanceMapPage() {
             </Popover>
           )}
 
-          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 h-10 px-4 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-sm">
+          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 h-10 px-4 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-sm shrink-0">
             <div className="h-1.5 w-1.5 rounded-full bg-primary mr-2 animate-pulse" />
             {canViewAll ? `${todayRecords?.length || 0} Logs for Today` : "Private Identity Verified"}
           </Badge>
