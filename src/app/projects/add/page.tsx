@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -16,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
-import { Trash2, Search, MapPin, Plus, FileDown, FileUp, Download, Check, ListFilter, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { Trash2, Search, MapPin, Plus, FileDown, FileUp, Download, Check, ListFilter, AlertCircle, Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -172,10 +171,12 @@ export default function AddNewProjectPage() {
 
         if (json.length === 0) {
           toast({ variant: 'destructive', title: 'Import Failed', description: 'The file is empty.' });
+          setIsImporting(false);
           return;
         }
 
-        let count = 0;
+        let createdCount = 0;
+        let updatedCount = 0;
         const batchSize = 400;
         
         for (let i = 0; i < json.length; i += batchSize) {
@@ -183,32 +184,56 @@ export default function AddNewProjectPage() {
           const chunk = json.slice(i, i + batchSize);
           
           chunk.forEach((row) => {
-            const name = row['Site Name'] || row['name'] || row['Name'];
+            const rawName = row['Site Name'] || row['name'] || row['Name'];
+            const name = rawName ? String(rawName).trim() : null;
             const company = row['Project Company'] || row['projectCompany'] || row['Company'];
             const ac = row['AC Capacity'] || row['acCapacity'] || row['AC'];
             const dc = row['DC Capacity'] || row['dcCapacity'] || row['DC'];
             const lat = row['Latitude'] || row['latitude'] || row['Lat'];
             const lng = row['Longitude'] || row['longitude'] || row['Lng'] || row['Long'];
 
-            if (name && company) {
-              const newDocRef = doc(collection(firestore, 'sites'));
-              batch.set(newDocRef, {
-                name: String(name),
-                projectCompany: String(company),
-                acCapacity: parseFloat(String(ac || "0")),
-                dcCapacity: parseFloat(String(dc || "0")),
-                latitude: lat ? parseFloat(String(lat)) : 0,
-                longitude: lng ? parseFloat(String(lng)) : 0,
-                createdAt: serverTimestamp(),
-              });
-              count++;
+            if (name) {
+              const existingSite = sites?.find(s => s.name.toLowerCase() === name.toLowerCase());
+              
+              if (existingSite) {
+                // Update Logic
+                const existingRef = doc(firestore, 'sites', existingSite.id);
+                batch.update(existingRef, {
+                  projectCompany: company ? String(company) : existingSite.projectCompany,
+                  acCapacity: ac !== undefined ? parseFloat(String(ac)) : existingSite.acCapacity,
+                  dcCapacity: dc !== undefined ? parseFloat(String(dc)) : existingSite.dcCapacity,
+                  latitude: lat !== undefined ? parseFloat(String(lat)) : (existingSite.latitude || 0),
+                  longitude: lng !== undefined ? parseFloat(String(lng)) : (existingSite.longitude || 0),
+                  updatedAt: serverTimestamp(),
+                });
+                updatedCount++;
+              } else {
+                // Create Logic
+                if (company) {
+                  const newDocRef = doc(collection(firestore, 'sites'));
+                  batch.set(newDocRef, {
+                    name: String(name),
+                    projectCompany: String(company),
+                    acCapacity: parseFloat(String(ac || "0")),
+                    dcCapacity: parseFloat(String(dc || "0")),
+                    latitude: lat ? parseFloat(String(lat)) : 0,
+                    longitude: lng ? parseFloat(String(lng)) : 0,
+                    createdAt: serverTimestamp(),
+                  });
+                  createdCount++;
+                }
+              }
             }
           });
           
           await batch.commit();
         }
 
-        toast({ variant: 'success', title: 'Import Successful', description: `Successfully imported ${count} sites.` });
+        toast({ 
+          variant: 'success', 
+          title: 'Sync Successful', 
+          description: `Processed ${createdCount + updatedCount} sites. (${createdCount} added, ${updatedCount} updated with coordinates/details).` 
+        });
       } catch (err: any) {
         toast({ variant: 'destructive', title: 'Import Error', description: err.message });
       } finally {
@@ -295,9 +320,9 @@ export default function AddNewProjectPage() {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Projects
           </Button>
           <h1 className="flex items-center gap-2 text-primary">
-            <Plus className="h-8 w-8" /> Add New Project
+            <Plus className="h-8 w-8" /> Add or Update Project
           </h1>
-          <p className="text-muted-foreground">Define and organize project locations for organizational operations.</p>
+          <p className="text-muted-foreground">Define project locations or update coordinates for existing sites via bulk upload.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2 mt-4">
@@ -322,7 +347,7 @@ export default function AddNewProjectPage() {
                   </Button>
                 </div>
               </TooltipTrigger>
-              <TooltipContent>Bulk Import Sites (Excel/CSV)</TooltipContent>
+              <TooltipContent>Bulk Upload / Sync Sites (Existing names will be updated)</TooltipContent>
             </Tooltip>
           </TooltipProvider>
 
@@ -387,7 +412,9 @@ export default function AddNewProjectPage() {
         <CardHeader className="bg-muted/5 border-b py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <CardTitle className="text-sm font-bold uppercase tracking-widest">Site Registry</CardTitle>
-            <CardDescription className="text-xs uppercase font-black text-primary">{sites?.length || 0} Locations Active</CardDescription>
+            <CardDescription className="text-[10px] font-black uppercase text-primary">
+              Tip: Re-import sites with existing names to update coordinates in bulk.
+            </CardDescription>
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
