@@ -29,6 +29,21 @@
       },
       "required": ["id", "username", "email", "mobile", "role"]
     },
+    "Site": {
+      "title": "Project Site",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "projectCompany": { "type": "string" },
+        "acCapacity": { "type": "number" },
+        "dcCapacity": { "type": "number" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "projectCompany"]
+    },
     "Notification": {
       "title": "Notification",
       "type": "object",
@@ -294,6 +309,10 @@
     "/users/{userId}": {
       "schema": { "$ref": "#/backend/entities/User" },
       "description": "User profiles and performance data."
+    },
+    "/sites/{siteId}": {
+      "schema": { "$ref": "#/backend/entities/Site" },
+      "description": "Project site locations and capacities."
     },
     "/system_settings/access/roles/{roleId}": {
       "schema": { "$ref": "#/backend/entities/AccessRule" },

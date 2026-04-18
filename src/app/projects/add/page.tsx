@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -62,6 +63,8 @@ const siteSchema = z.object({
   projectCompany: z.string().min(1, 'Project company is required.'),
   acCapacity: z.coerce.number({ invalid_type_error: "Must be a valid number" }).min(0, "Capacity cannot be negative"),
   dcCapacity: z.coerce.number({ invalid_type_error: "Must be a valid number" }).min(0, "Capacity cannot be negative"),
+  latitude: z.coerce.number().optional().or(z.literal(0)),
+  longitude: z.coerce.number().optional().or(z.literal(0)),
 });
 
 type SortOrder = 'name' | 'newest' | 'oldest';
@@ -97,7 +100,7 @@ export default function AddNewProjectPage() {
 
   const siteForm = useForm<z.infer<typeof siteSchema>>({
     resolver: zodResolver(siteSchema),
-    defaultValues: { name: '', projectCompany: '', acCapacity: 0, dcCapacity: 0 },
+    defaultValues: { name: '', projectCompany: '', acCapacity: 0, dcCapacity: 0, latitude: 0, longitude: 0 },
   });
 
   const onSiteSubmit = (values: z.infer<typeof siteSchema>) => {
@@ -146,7 +149,7 @@ export default function AddNewProjectPage() {
 
   const handleDownloadTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([
-      { 'Site Name': 'Sample Site A', 'Project Company': 'ABC Energies', 'AC Capacity': 5.000, 'DC Capacity': 6.250 }
+      { 'Site Name': 'Sample Site A', 'Project Company': 'ABC Energies', 'AC Capacity': 5.000, 'DC Capacity': 6.250, 'Latitude': 19.0760, 'Longitude': 72.8777 }
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
@@ -184,6 +187,8 @@ export default function AddNewProjectPage() {
             const company = row['Project Company'] || row['projectCompany'] || row['Company'];
             const ac = row['AC Capacity'] || row['acCapacity'] || row['AC'];
             const dc = row['DC Capacity'] || row['dcCapacity'] || row['DC'];
+            const lat = row['Latitude'] || row['latitude'] || row['Lat'];
+            const lng = row['Longitude'] || row['longitude'] || row['Lng'] || row['Long'];
 
             if (name && company) {
               const newDocRef = doc(collection(firestore, 'sites'));
@@ -192,6 +197,8 @@ export default function AddNewProjectPage() {
                 projectCompany: String(company),
                 acCapacity: parseFloat(String(ac || "0")),
                 dcCapacity: parseFloat(String(dc || "0")),
+                latitude: lat ? parseFloat(String(lat)) : 0,
+                longitude: lng ? parseFloat(String(lng)) : 0,
                 createdAt: serverTimestamp(),
               });
               count++;
@@ -220,6 +227,8 @@ export default function AddNewProjectPage() {
       'Project Company': s.projectCompany,
       'AC Capacity': formatCapacity(s.acCapacity),
       'DC Capacity': formatCapacity(s.dcCapacity),
+      'Latitude': s.latitude || 0,
+      'Longitude': s.longitude || 0,
       'Date Added': s.createdAt ? format(s.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : 'N/A'
     })));
     
@@ -355,6 +364,14 @@ export default function AddNewProjectPage() {
                       <FormItem><FormLabel>DC Capacity (MWp)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="5.174" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                     )} />
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={siteForm.control} name="latitude" render={({ field }) => (
+                      <FormItem><FormLabel>Latitude</FormLabel><FormControl><Input type="number" step="0.000001" placeholder="19.0760" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={siteForm.control} name="longitude" render={({ field }) => (
+                      <FormItem><FormLabel>Longitude</FormLabel><FormControl><Input type="number" step="0.000001" placeholder="72.8777" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  </div>
                   <DialogFooter className="pt-4 gap-2">
                     <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
                     <Button type="submit" className="rounded-sm font-bold">Add Project Site</Button>
@@ -430,6 +447,7 @@ export default function AddNewProjectPage() {
                   <TableHead className="text-[10px] uppercase font-bold">Company</TableHead>
                   <TableHead className="text-[10px] uppercase font-bold text-center">AC Capacity</TableHead>
                   <TableHead className="text-[10px] uppercase font-bold text-center">DC Capacity</TableHead>
+                  <TableHead className="text-[10px] uppercase font-bold text-center">Coordinates</TableHead>
                   <TableHead className="text-right px-6"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -451,6 +469,13 @@ export default function AddNewProjectPage() {
                       <TableCell className="text-center font-mono text-[10px] font-bold text-amber-600">
                         {formatCapacity(site.dcCapacity)}
                       </TableCell>
+                      <TableCell className="text-center">
+                        {site.latitude ? (
+                          <span className="text-[9px] font-mono text-muted-foreground">{site.latitude.toFixed(4)}, {site.longitude?.toFixed(4)}</span>
+                        ) : (
+                          <span className="text-[9px] text-muted-foreground italic opacity-50">Not Set</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right px-6">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteSite(site.id)}>
                           <Trash2 className="h-4 w-4" />
@@ -460,7 +485,7 @@ export default function AddNewProjectPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">
+                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">
                       {searchTerm ? `No sites found matching "${searchTerm}"` : "Registry empty. Add sites to start."}
                     </TableCell>
                   </TableRow>

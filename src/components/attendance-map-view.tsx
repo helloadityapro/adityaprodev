@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -6,25 +7,26 @@ import 'leaflet/dist/leaflet.css';
 import { format } from 'date-fns';
 
 /**
- * Interactive Leaflet Map component for visual personnel tracking.
- * Manually manages Leaflet lifecycle to prevent "already initialized" errors.
- * Optimized with preferCanvas and manual marker management for high performance.
+ * Interactive Leaflet Map component for visual personnel tracking and site overview.
+ * Optimized with preferCanvas and manual marker management.
  */
 export default function MapViewComponent({ 
   records = [], 
   focusedId = null,
-  flyToLocation = null
+  flyToLocation = null,
+  sites = []
 }: { 
   records: any[], 
   focusedId?: string | null,
-  flyToLocation?: { lat: number, lng: number } | null
+  flyToLocation?: { lat: number, lng: number } | null,
+  sites?: any[]
 }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<L.Map | null>(null);
   const markersLayerRef = React.useRef<L.LayerGroup | null>(null);
+  const sitesLayerRef = React.useRef<L.LayerGroup | null>(null);
   const markersMapRef = React.useRef<Map<string, L.Marker>>(new Map());
   
-  // Track if we have already performed the initial auto-center to prevent "zoom looping" on data updates
   const hasInitialCentered = React.useRef(false);
 
   // 1. Initial Map Setup (Runs Once)
@@ -32,46 +34,44 @@ export default function MapViewComponent({
     if (!containerRef.current || mapRef.current) return;
     if ((containerRef.current as any)._leaflet_id) return;
 
-    // Initialize map with performance optimizations
     const map = L.map(containerRef.current, {
       center: [20.5937, 78.9629],
       zoom: 5,
       scrollWheelZoom: true,
-      preferCanvas: true // Significant performance boost for marker rendering
+      preferCanvas: true
     });
 
-    // Add Tile Layer with caching optimization
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       updateWhenIdle: true,
       keepBuffer: 2
     }).addTo(map);
 
-    // Marker Icon Fix for Webpack/Next.js using high-performance CDN
     L.Icon.Default.mergeOptions({
       iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
       iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
     });
 
-    // Create a managed layer group for markers
-    const layer = L.layerGroup().addTo(map);
+    const markersLayer = L.layerGroup().addTo(map);
+    const sitesLayer = L.layerGroup().addTo(map);
     
-    markersLayerRef.current = layer;
+    markersLayerRef.current = markersLayer;
+    sitesLayerRef.current = sitesLayer;
     mapRef.current = map;
 
-    // Proper cleanup on unmount
     return () => {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
         markersLayerRef.current = null;
+        sitesLayerRef.current = null;
         markersMapRef.current.clear();
       }
     };
   }, []);
 
-  // 2. Dynamic Marker Updates (Runs whenever records change)
+  // 2. Dynamic Personnel Marker Updates
   React.useEffect(() => {
     if (!mapRef.current || !markersLayerRef.current) return;
 
@@ -84,9 +84,8 @@ export default function MapViewComponent({
     validPins.forEach(record => {
       const marker = L.marker([record.checkInLat, record.checkInLng]);
       
-      // Minimalist Name Tooltip - Displayed permanent directly on pin
       marker.bindTooltip(
-        `<div class="bg-primary text-primary-foreground text-[11px] font-medium px-2 py-0.5 rounded-sm shadow-sm border border-primary/20">${record.userName}</div>`, 
+        `<div class="bg-primary text-primary-foreground text-[10px] font-medium px-2 py-0.5 rounded-sm shadow-sm border border-primary/20">${record.userName}</div>`, 
         {
           direction: 'top',
           offset: [0, -32],
@@ -96,9 +95,7 @@ export default function MapViewComponent({
         }
       );
 
-      // Detailed Info Popup
       const popupDiv = L.DomUtil.create('div', 'p-1 min-w-[220px] space-y-3 text-left');
-      
       const headerDiv = L.DomUtil.create('div', 'flex items-center gap-2 border-b pb-2', popupDiv);
       headerDiv.innerHTML = `
         <div class="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600">
@@ -120,13 +117,6 @@ export default function MapViewComponent({
           <span class="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Status:</span>
           <span class="text-[9px] font-black uppercase ${record.status === 'ongoing' ? 'text-blue-600' : 'text-emerald-600'}">${record.status === 'ongoing' ? 'In Session' : 'Completed'}</span>
         </div>
-        <div class="flex flex-col gap-1 text-left pt-2 border-t">
-          <span class="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-            Audit Stamp:
-          </span>
-          <p class="text-[10px] font-mono font-bold bg-muted/50 p-1.5 rounded-sm">${record.checkInLat.toFixed(6)}, ${record.checkInLng.toFixed(6)}</p>
-        </div>
       `;
 
       const btnContainer = L.DomUtil.create('div', 'pt-2', popupDiv);
@@ -138,13 +128,9 @@ export default function MapViewComponent({
 
       marker.bindPopup(popupDiv);
       marker.addTo(layer);
-      
-      // Index marker for focus lookup
       markersMapRef.current.set(record.id, marker);
     });
 
-    // ONLY center map on initial load or when first set of valid records arrives
-    // This prevents "zoom looping" on data updates
     if (validPins.length > 0 && !focusedId && !flyToLocation && !hasInitialCentered.current) {
       const bounds = L.latLngBounds(validPins.map(p => [p.checkInLat, p.checkInLng]));
       mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
@@ -152,10 +138,51 @@ export default function MapViewComponent({
     }
   }, [records]);
 
-  // 3. Handle External Focus Requests (Personnel)
+  // 3. Dynamic Site Marker Updates
+  React.useEffect(() => {
+    if (!mapRef.current || !sitesLayerRef.current) return;
+
+    const layer = sitesLayerRef.current;
+    layer.clearLayers();
+
+    const siteIcon = L.divIcon({
+      className: 'custom-site-icon',
+      html: `<div class="bg-emerald-600 text-white p-1 rounded-sm shadow-md border border-white"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+
+    sites.filter(s => s.latitude && s.longitude).forEach(site => {
+      const marker = L.marker([site.latitude, site.longitude], { icon: siteIcon });
+      
+      marker.bindTooltip(
+        `<div class="bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-sm shadow-sm uppercase tracking-tighter">${site.name}</div>`, 
+        {
+          direction: 'bottom',
+          offset: [0, 16],
+          opacity: 0.9,
+          permanent: false
+        }
+      );
+
+      marker.bindPopup(`
+        <div class="p-2 space-y-1">
+          <p class="font-black text-xs text-emerald-700 uppercase tracking-tight">${site.name}</p>
+          <p class="text-[10px] font-medium text-muted-foreground">${site.projectCompany}</p>
+          <div class="pt-1 mt-1 border-t flex flex-col gap-0.5">
+            <span class="text-[8px] font-bold uppercase opacity-50">Capacity</span>
+            <span class="text-[10px] font-black">${site.dcCapacity || '0'} MWp</span>
+          </div>
+        </div>
+      `);
+
+      marker.addTo(layer);
+    });
+  }, [sites]);
+
+  // 4. Interaction Handlers
   React.useEffect(() => {
     if (!focusedId || !mapRef.current) return;
-
     const marker = markersMapRef.current.get(focusedId);
     if (marker) {
       mapRef.current.setView(marker.getLatLng(), 16, { animate: true });
@@ -163,10 +190,8 @@ export default function MapViewComponent({
     }
   }, [focusedId]);
 
-  // 4. Handle External Focus Requests (Locations)
   React.useEffect(() => {
     if (!flyToLocation || !mapRef.current) return;
-
     mapRef.current.flyTo([flyToLocation.lat, flyToLocation.lng], 14, {
       animate: true,
       duration: 1.5
