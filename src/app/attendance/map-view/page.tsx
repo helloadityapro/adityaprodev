@@ -41,16 +41,29 @@ export default function AttendanceMapPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin' || userProfile?.role === 'Site Manager' || userProfile?.role === 'Manager - Human Resources';
+  // Authority check: Only Admin and HR can view everyone.
+  const canViewAll = isSuperAdmin(user?.email) || userProfile?.role === 'Admin' || userProfile?.role === 'Manager - Human Resources';
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   const attendanceQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    const colRef = collection(firestore, 'attendance');
+    
+    if (canViewAll) {
+      return query(
+        colRef,
+        where('date', '==', todayStr)
+      );
+    }
+    
+    // Non-Admin/HR users only see their own log for today
     return query(
-      collection(firestore, 'attendance'),
-      where('date', '==', todayStr)
+      colRef,
+      where('date', '==', todayStr),
+      where('userId', '==', user.uid)
     );
-  }, [firestore, todayStr]);
+  }, [firestore, todayStr, canViewAll, user]);
 
   const { data: todayRecords, isLoading: isAttendanceLoading } = useCollection<any>(attendanceQuery);
 
@@ -70,80 +83,75 @@ export default function AttendanceMapPage() {
     );
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-        <AlertCircle className="h-12 w-12 text-destructive opacity-50" />
-        <h2 className="text-xl font-bold uppercase">Restricted Access</h2>
-        <p className="text-muted-foreground max-w-xs mx-auto italic font-medium leading-relaxed">
-          The Personnel Live Map is a management-level visualization tool. Individual accounts are restricted to history and logging views only.
-        </p>
-        <Button onClick={() => router.push('/attendance')} variant="outline" className="rounded-sm font-bold border-primary text-primary">Return to Attendance Hub</Button>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 h-full flex flex-col min-h-[calc(100vh-10rem)]">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Navigation className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-black uppercase tracking-tight">Personnel Live Map</h1>
+            <h1 className="text-2xl font-black uppercase tracking-tight">
+              {canViewAll ? "Personnel Live Map" : "My Location Audit"}
+            </h1>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Real-time GPS visibility for today's recorded site presence.</p>
+          <p className="text-muted-foreground text-sm font-medium">
+            {canViewAll 
+              ? "Real-time GPS visibility for today's recorded site presence across the organization." 
+              : "View your verified GPS check-in location and tracking for today."}
+          </p>
         </div>
         
         <div className="flex items-center gap-3">
-          <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="h-10 w-[240px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm">
-                <div className="flex items-center gap-2 truncate">
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                  <span className="truncate">{focusedId ? todayRecords?.find(r => r.id === focusedId)?.userName : "Search Personnel..."}</span>
+          {canViewAll && (
+            <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="h-10 w-[240px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm">
+                  <div className="flex items-center gap-2 truncate">
+                    <Search className="h-4 w-4 text-muted-foreground" />
+                    <span className="truncate">{focusedId ? todayRecords?.find(r => r.id === focusedId)?.userName : "Search Personnel..."}</span>
+                  </div>
+                  <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[240px] p-0" align="end">
+                <div className="flex items-center border-b px-3 py-2">
+                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Input 
+                    placeholder="Filter by name..." 
+                    className="h-8 border-none focus-visible:ring-0 px-0 text-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
                 </div>
-                <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[240px] p-0" align="end">
-              <div className="flex items-center border-b px-3 py-2">
-                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                <Input 
-                  placeholder="Filter by name..." 
-                  className="h-8 border-none focus-visible:ring-0 px-0 text-sm"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <ScrollArea className="h-[250px]">
-                <div className="p-1">
-                  {filteredPersonnel.length > 0 ? filteredPersonnel.map(person => (
-                    <Button
-                      key={person.id}
-                      variant="ghost"
-                      className="w-full justify-start h-10 text-xs rounded-sm px-3 mb-0.5"
-                      onClick={() => {
-                        setFocusedId(person.id);
-                        setIsSearchOpen(false);
-                      }}
-                    >
-                      <Check className={cn("mr-2 h-4 w-4 text-primary", focusedId === person.id ? "opacity-100" : "opacity-0")} />
-                      <div className="flex flex-col items-start min-w-0">
-                        <span className="font-bold truncate">{person.userName}</span>
-                        <span className="text-[9px] font-medium text-muted-foreground uppercase">{person.status}</span>
-                      </div>
-                    </Button>
-                  )) : (
-                    <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic">No matches for today</div>
-                  )}
-                </div>
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
+                <ScrollArea className="h-[250px]">
+                  <div className="p-1">
+                    {filteredPersonnel.length > 0 ? filteredPersonnel.map(person => (
+                      <Button
+                        key={person.id}
+                        variant="ghost"
+                        className="w-full justify-start h-10 text-xs rounded-sm px-3 mb-0.5"
+                        onClick={() => {
+                          setFocusedId(person.id);
+                          setIsSearchOpen(false);
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4 text-primary", focusedId === person.id ? "opacity-100" : "opacity-0")} />
+                        <div className="flex flex-col items-start min-w-0">
+                          <span className="font-bold truncate">{person.userName}</span>
+                          <span className="text-[9px] font-medium text-muted-foreground uppercase">{person.status}</span>
+                        </div>
+                      </Button>
+                    )) : (
+                      <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic">No matches for today</div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+          )}
 
           <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 h-10 px-4 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-sm">
             <div className="h-1.5 w-1.5 rounded-full bg-primary mr-2 animate-pulse" />
-            {todayRecords?.length || 0} Logs for Today
+            {canViewAll ? `${todayRecords?.length || 0} Logs for Today` : "Private Identity Verified"}
           </Badge>
         </div>
       </div>
