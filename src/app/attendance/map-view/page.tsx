@@ -40,11 +40,11 @@ export default function AttendanceMapPage() {
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [focusedId, setFocusedId] = React.useState<string | null>(null);
 
-  // Visibility states
+  // Visibility states - Only show users by default
   const [showUsers, setShowUsers] = React.useState(true);
-  const [showUserNames, setShowUserNames] = React.useState(true);
-  const [showSites, setShowSites] = React.useState(true);
-  const [showSiteNames, setShowSiteNames] = React.useState(true);
+  const [showUserNames, setShowUserNames] = React.useState(false);
+  const [showSites, setShowSites] = React.useState(false);
+  const [showSiteNames, setShowSiteNames] = React.useState(false);
 
   // Location search states
   const [locSearchQuery, setLocSearchQuery] = React.useState("");
