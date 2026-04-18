@@ -24,6 +24,9 @@ export default function MapViewComponent({
   const mapRef = React.useRef<L.Map | null>(null);
   const markersLayerRef = React.useRef<L.LayerGroup | null>(null);
   const markersMapRef = React.useRef<Map<string, L.Marker>>(new Map());
+  
+  // Track if we have already performed the initial auto-center to prevent "zoom looping" on data updates
+  const hasInitialCentered = React.useRef(false);
 
   // 1. Initial Map Setup (Runs Once)
   React.useEffect(() => {
@@ -136,10 +139,12 @@ export default function MapViewComponent({
       markersMapRef.current.set(record.id, marker);
     });
 
-    // Center map on initial load if records exist
-    if (validPins.length > 0 && !focusedId && !flyToLocation) {
+    // ONLY center map on initial load or when first set of valid records arrives
+    // This prevents "continuous zoom out" glitches when Firestore listener updates frequently
+    if (validPins.length > 0 && !focusedId && !flyToLocation && !hasInitialCentered.current) {
       const bounds = L.latLngBounds(validPins.map(p => [p.checkInLat, p.checkInLng]));
       mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+      hasInitialCentered.current = true;
     }
   }, [records]);
 
