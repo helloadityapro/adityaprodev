@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -6,7 +5,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@
 import { collection, query, where, doc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Navigation, Loader2, AlertCircle, Search, Check, ChevronsUpDown, FilterX } from 'lucide-react';
+import { Navigation, Loader2, AlertCircle, Search, Check, ChevronsUpDown, FilterX, MapPin } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Badge } from '@/components/ui/badge';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -37,6 +36,13 @@ export default function AttendanceMapPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [focusedId, setFocusedId] = React.useState<string | null>(null);
+
+  // Location search states
+  const [locSearchQuery, setLocSearchQuery] = React.useState("");
+  const [isLocSearchOpen, setIsLocSearchOpen] = React.useState(false);
+  const [locResults, setLocResults] = React.useState<any[]>([]);
+  const [isLocSearching, setIsLocSearching] = React.useState(false);
+  const [flyToLocation, setFlyToLocation] = React.useState<{ lat: number, lng: number } | null>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -74,6 +80,46 @@ export default function AttendanceMapPage() {
     ).sort((a, b) => (a.userName || "").localeCompare(b.userName || ""));
   }, [todayRecords, searchQuery]);
 
+  // Location search function
+  const handleLocationSearch = async (query: string) => {
+    setLocSearchQuery(query);
+    if (query.trim().length < 3) {
+      setLocResults([]);
+      return;
+    }
+
+    setIsLocSearching(true);
+    try {
+      // Using OSM Nominatim API for free geocoding
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
+        {
+          headers: {
+            'Accept-Language': 'en-US,en;q=0.9',
+            'User-Agent': 'AdityaPro-MapSearch/1.0'
+          }
+        }
+      );
+      const data = await response.json();
+      setLocResults(data);
+    } catch (error) {
+      console.error("Location search failed", error);
+    } finally {
+      setIsLocSearching(false);
+    }
+  };
+
+  const handleSelectLocation = (loc: any) => {
+    setFlyToLocation({
+      lat: parseFloat(loc.lat),
+      lng: parseFloat(loc.lon)
+    });
+    setLocSearchQuery(loc.display_name);
+    setIsLocSearchOpen(false);
+    // Reset focused personnel to avoid map confusion
+    setFocusedId(null);
+  };
+
   if (isProfileLoading || isAttendanceLoading) {
     return (
       <div className="space-y-6 h-[calc(100vh-12rem)]">
@@ -100,7 +146,55 @@ export default function AttendanceMapPage() {
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Location Search Popover */}
+          <Popover open={isLocSearchOpen} onOpenChange={setIsLocSearchOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-10 w-[240px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm">
+                <div className="flex items-center gap-2 truncate">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  <span className="truncate">{locSearchQuery || "Search Places..."}</span>
+                </div>
+                <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[300px] p-0" align="end">
+              <div className="flex items-center border-b px-3 py-2">
+                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                <Input 
+                  placeholder="Enter city, village, etc..." 
+                  className="h-8 border-none focus-visible:ring-0 px-0 text-sm"
+                  value={locSearchQuery}
+                  onChange={(e) => handleLocationSearch(e.target.value)}
+                />
+              </div>
+              <ScrollArea className="h-[250px]">
+                <div className="p-1">
+                  {isLocSearching ? (
+                    <div className="p-8 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-primary opacity-20" /></div>
+                  ) : locResults.length > 0 ? locResults.map((loc, idx) => (
+                    <Button
+                      key={idx}
+                      variant="ghost"
+                      className="w-full justify-start h-auto text-xs rounded-sm px-3 py-2 mb-0.5"
+                      onClick={() => handleSelectLocation(loc)}
+                    >
+                      <div className="flex flex-col items-start min-w-0 text-left">
+                        <span className="font-bold truncate w-full">{loc.display_name.split(',')[0]}</span>
+                        <span className="text-[9px] font-medium text-muted-foreground line-clamp-1">{loc.display_name}</span>
+                      </div>
+                    </Button>
+                  )) : (
+                    <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic">
+                      {locSearchQuery.length >= 3 ? "No places found" : "Type 3+ chars to search"}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+
+          {/* Personnel Search Popover */}
           {canViewAll && (
             <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
               <PopoverTrigger asChild>
@@ -119,7 +213,7 @@ export default function AttendanceMapPage() {
                     placeholder="Filter by name..." 
                     className="h-8 border-none focus-visible:ring-0 px-0 text-sm"
                     value={searchQuery}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
                 <ScrollArea className="h-[250px]">
@@ -132,6 +226,7 @@ export default function AttendanceMapPage() {
                         onClick={() => {
                           setFocusedId(person.id);
                           setIsSearchOpen(false);
+                          setFlyToLocation(null); // Reset location search focus
                         }}
                       >
                         <Check className={cn("mr-2 h-4 w-4 text-primary", focusedId === person.id ? "opacity-100" : "opacity-0")} />
@@ -158,7 +253,11 @@ export default function AttendanceMapPage() {
 
       <Card className="flex-1 rounded-sm border-primary/10 shadow-xl overflow-hidden min-h-[500px]">
         <CardContent className="p-0 h-full relative">
-          <MapViewComponent records={todayRecords || []} focusedId={focusedId} />
+          <MapViewComponent 
+            records={todayRecords || []} 
+            focusedId={focusedId} 
+            flyToLocation={flyToLocation}
+          />
         </CardContent>
       </Card>
     </div>

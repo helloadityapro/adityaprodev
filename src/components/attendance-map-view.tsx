@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -14,10 +13,12 @@ import { User, Clock, Calendar, MapPin, ExternalLink, Activity } from 'lucide-re
  */
 export default function MapViewComponent({ 
   records = [], 
-  focusedId = null 
+  focusedId = null,
+  flyToLocation = null
 }: { 
   records: any[], 
-  focusedId?: string | null 
+  focusedId?: string | null,
+  flyToLocation?: { lat: number, lng: number } | null
 }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<L.Map | null>(null);
@@ -136,13 +137,13 @@ export default function MapViewComponent({
     });
 
     // Center map on initial load if records exist
-    if (validPins.length > 0 && !focusedId) {
+    if (validPins.length > 0 && !focusedId && !flyToLocation) {
       const bounds = L.latLngBounds(validPins.map(p => [p.checkInLat, p.checkInLng]));
       mapRef.current.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
     }
   }, [records]);
 
-  // 3. Handle External Focus Requests
+  // 3. Handle External Focus Requests (Personnel)
   React.useEffect(() => {
     if (!focusedId || !mapRef.current) return;
 
@@ -152,6 +153,16 @@ export default function MapViewComponent({
       marker.openPopup();
     }
   }, [focusedId]);
+
+  // 4. Handle External Focus Requests (Locations)
+  React.useEffect(() => {
+    if (!flyToLocation || !mapRef.current) return;
+
+    mapRef.current.flyTo([flyToLocation.lat, flyToLocation.lng], 14, {
+      animate: true,
+      duration: 1.5
+    });
+  }, [flyToLocation]);
 
   return (
     <div 
