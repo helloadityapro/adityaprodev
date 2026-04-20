@@ -90,10 +90,14 @@ export function CertificateDialog({
             <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-tr-full" />
             
             {/* Header */}
-            <div className="space-y-4 pt-10">
+            <div className="space-y-4 pt-6">
               <div className="flex justify-center mb-2">
-                <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center">
-                  <ShieldCheck className="h-10 w-10 text-primary" />
+                <div className="relative h-20 w-48">
+                   <img 
+                    src="/assets/icon.png" 
+                    alt="Aditya Green Energy Logo" 
+                    className="h-full w-full object-contain"
+                   />
                 </div>
               </div>
               <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-primary">Certificate of Completion</h4>
