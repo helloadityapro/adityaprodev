@@ -1,9 +1,10 @@
+
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { doc, collection, query, where, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { doc, collection, query, where, serverTimestamp, arrayUnion, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,7 @@ type Quiz = {
 type ProgressData = {
   completedModuleIds: string[];
   quizResults?: Record<string, number>;
+  quizAttempts?: Record<string, number>;
 };
 
 /**
@@ -104,6 +106,13 @@ export default function ModuleLearningPage({ params }: { params: Promise<{ cours
     const finalScore = (correctCount / quiz.questions.length) * 100;
     setScore(finalScore);
     setIsQuizSubmitted(true);
+
+    // Track attempt in progress data
+    const pRef = doc(firestore, 'lms_progress', `${user.uid}_${courseId}`);
+    updateDocumentNonBlocking(pRef, {
+      [`quizAttempts.${moduleId}`]: increment(1),
+      lastAccessed: serverTimestamp()
+    });
 
     if (finalScore >= 80) {
       toast({ title: 'Assessment Passed!', description: `You scored ${finalScore}%. Module marked as complete.` });

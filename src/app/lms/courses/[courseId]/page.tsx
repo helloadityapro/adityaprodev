@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -8,13 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { GraduationCap, Clock, CheckCircle2, BookOpen, ArrowLeft, ChevronRight, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { GraduationCap, Clock, CheckCircle2, BookOpen, ArrowLeft, ChevronRight, Lock, Loader2, AlertCircle, Award } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { CertificateDialog } from '@/components/certificate-dialog';
 
 type Course = {
   id: string;
@@ -33,6 +35,7 @@ type Module = {
 
 type ProgressData = {
   completedModuleIds: string[];
+  quizAttempts?: Record<string, number>;
 };
 
 export default function CourseDetailsPage({ params }: { params: Promise<{ courseId: string }> }) {
@@ -43,9 +46,13 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ course
   const { toast } = useToast();
 
   const [isStarting, setIsStarting] = React.useState(false);
+  const [isCertificateOpen, setIsCertificateOpen] = React.useState(false);
 
   const courseRef = useMemoFirebase(() => doc(firestore, 'lms_courses', courseId), [firestore, courseId]);
   const { data: course, isLoading: courseLoading, error: courseError } = useDoc<Course>(courseRef);
+
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile } = useDoc<any>(userProfileRef);
 
   // Use simple query to avoid composite index requirements
   const modulesQuery = useMemoFirebase(() => query(
@@ -61,6 +68,11 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ course
 
   const progressRef = useMemoFirebase(() => user ? doc(firestore, 'lms_progress', `${user.uid}_${courseId}`) : null, [firestore, user, courseId]);
   const { data: progress } = useDoc<ProgressData>(progressRef);
+
+  const totalAttempts = React.useMemo(() => {
+    if (!progress?.quizAttempts) return 0;
+    return Object.values(progress.quizAttempts).reduce((sum, val) => sum + (Number(val) || 0), 0);
+  }, [progress]);
 
   const startCourse = async () => {
     if (!user || !course) return;
@@ -132,6 +144,7 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ course
   const totalModules = sortedModules?.length || 0;
   const completedCount = progress?.completedModuleIds?.length || 0;
   const progressPercent = totalModules > 0 ? (completedCount / totalModules) * 100 : 0;
+  const isCourseComplete = totalModules > 0 && completedCount === totalModules;
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto p-4 md:p-8">
@@ -244,26 +257,52 @@ export default function CourseDetailsPage({ params }: { params: Promise<{ course
 
               <Separator />
 
-              <Button 
-                size="lg" 
-                className="w-full h-12 text-lg font-black rounded-sm shadow-md" 
-                onClick={startCourse}
-                disabled={isStarting}
-              >
-                {isStarting ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting...</>
-                ) : (
-                  progress ? 'Continue Learning' : 'Enroll Now'
-                )}
-              </Button>
+              {isCourseComplete ? (
+                <div className="space-y-3">
+                  <div className="p-4 bg-green-50 border border-green-100 rounded-sm flex items-center gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                    <p className="text-xs font-bold text-green-700 uppercase">You have successfully completed this course.</p>
+                  </div>
+                  <Button 
+                    variant="default"
+                    size="lg" 
+                    className="w-full h-12 text-lg font-black rounded-sm shadow-md bg-green-600 hover:bg-green-700" 
+                    onClick={() => setIsCertificateOpen(true)}
+                  >
+                    <Award className="mr-2 h-5 w-5" />
+                    Download Certificate
+                  </Button>
+                </div>
+              ) : (
+                <Button 
+                  size="lg" 
+                  className="w-full h-12 text-lg font-black rounded-sm shadow-md" 
+                  onClick={startCourse}
+                  disabled={isStarting}
+                >
+                  {isStarting ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting...</>
+                  ) : (
+                    progress ? 'Continue Learning' : 'Enroll Now'
+                  )}
+                </Button>
+              )}
               
               <p className="text-[10px] text-center text-muted-foreground uppercase font-bold tracking-tighter">
-                {progress ? 'Resume where you left off' : 'Free enrollment for Aditya personnel'}
+                {isCourseComplete ? 'Certificate earned' : (progress ? 'Resume where you left off' : 'Free enrollment for Aditya personnel')}
               </p>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      <CertificateDialog 
+        open={isCertificateOpen} 
+        onOpenChange={setIsCertificateOpen}
+        courseTitle={course.title}
+        userName={userProfile?.username || user?.email || 'Valued Employee'}
+        attempts={totalAttempts}
+      />
     </div>
   );
 }
