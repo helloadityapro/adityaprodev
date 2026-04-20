@@ -221,8 +221,7 @@ export default function MapViewComponent({
   return (
     <div 
       ref={containerRef} 
-      className="h-full w-full z-10 bg-muted/10 rounded-sm"
-      style={{ minHeight: '500px' }}
+      className="h-full w-full z-10 bg-muted/10"
     />
   );
 }

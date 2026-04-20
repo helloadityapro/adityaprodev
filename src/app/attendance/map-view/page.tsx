@@ -3,9 +3,9 @@
 import * as React from 'react';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, query, where, doc } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Navigation, Loader2, AlertCircle, Search, Check, ChevronsUpDown, FilterX, MapPin, Building2, Filter, Layers } from 'lucide-react';
+import { Navigation, Loader2, Search, Check, ChevronsUpDown, FilterX, MapPin, Building2, Filter, Layers } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { Badge } from '@/components/ui/badge';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -24,7 +24,7 @@ import { Separator } from '@/components/ui/separator';
 const MapViewComponent = dynamic(() => import('@/components/attendance-map-view'), { 
   ssr: false,
   loading: () => (
-    <div className="h-full w-full bg-muted/20 animate-pulse rounded-sm flex flex-col items-center justify-center gap-4 min-h-[500px]">
+    <div className="h-full w-full bg-muted/20 animate-pulse rounded-sm flex flex-col items-center justify-center gap-4">
       <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
       <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">Initializing Map Engine...</p>
     </div>
@@ -104,12 +104,12 @@ export default function AttendanceMapPage() {
 
   const filteredPersonnel = React.useMemo(() => {
     if (!todayRecords) return [];
+    // We removed the siteFilter check here so pins don't disappear when a site is searched
     return todayRecords.filter(r => {
       const matchesSearch = r.userName?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesSite = siteFilter === "All Sites" || r.siteName === siteFilter;
-      return matchesSearch && matchesSite;
+      return matchesSearch;
     }).sort((a, b) => (a.userName || "").localeCompare(b.userName || ""));
-  }, [todayRecords, searchQuery, siteFilter]);
+  }, [todayRecords, searchQuery]);
 
   const filteredSitesForDropdown = React.useMemo(() => {
     if (!accessibleSites) return [];
@@ -176,16 +176,16 @@ export default function AttendanceMapPage() {
 
   if (isProfileLoading || isAttendanceLoading) {
     return (
-      <div className="space-y-6 h-[calc(100vh-12rem)]">
-        <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-full w-full rounded-sm" />
+      <div className="flex flex-col h-full space-y-6">
+        <Skeleton className="h-10 w-48 shrink-0" />
+        <Skeleton className="flex-1 w-full rounded-sm" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 h-full flex flex-col min-h-[calc(100vh-10rem)]">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="flex flex-col h-[calc(100vh-theme(spacing.14)-theme(spacing.16)-4rem)] md:h-[calc(100vh-theme(spacing.14)-2rem)] space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Navigation className="h-6 w-6 text-primary" />
@@ -200,7 +200,7 @@ export default function AttendanceMapPage() {
           </p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3 pb-1 sm:pb-0">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Layer Visibility Toggles */}
           <Popover>
             <PopoverTrigger asChild>
@@ -237,7 +237,7 @@ export default function AttendanceMapPage() {
           {/* Location Search Popover */}
           <Popover open={isLocSearchOpen} onOpenChange={setIsLocSearchOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-10 w-[180px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
+              <Button variant="outline" className="h-10 w-[160px] sm:w-[180px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
                 <div className="flex items-center gap-2 truncate">
                   <MapPin className="h-4 w-4 text-primary" />
                   <span className="truncate">{locSearchQuery || "Places..."}</span>
@@ -284,7 +284,7 @@ export default function AttendanceMapPage() {
           {/* Site Search Popover */}
           <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-10 w-[180px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
+              <Button variant="outline" className="h-10 w-[160px] sm:w-[180px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
                 <div className="flex items-center gap-2 truncate">
                   <Building2 className="h-4 w-4 text-primary" />
                   <span className="truncate">{siteFilter === "All Sites" ? "Sites..." : siteFilter}</span>
@@ -335,7 +335,7 @@ export default function AttendanceMapPage() {
           {canViewAll && (
             <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="h-10 w-[180px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
+                <Button variant="outline" className="h-10 w-[160px] sm:w-[180px] justify-between font-bold rounded-sm border-primary/20 bg-background shadow-sm shrink-0">
                   <div className="flex items-center gap-2 truncate">
                     <Search className="h-4 w-4 text-muted-foreground" />
                     <span className="truncate">{focusedId ? todayRecords?.find((r: any) => r.id === focusedId)?.userName : "Personnel..."}</span>
@@ -381,7 +381,7 @@ export default function AttendanceMapPage() {
             </Popover>
           )}
 
-          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 h-10 px-4 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-sm shrink-0">
+          <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 h-10 px-4 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-sm shrink-0 hidden lg:flex">
             <div className="h-1.5 w-1.5 rounded-full bg-primary mr-2 animate-pulse" />
             {canViewAll ? `${filteredPersonnel.length} Logs` : "Identity Verified"}
           </Badge>
@@ -392,7 +392,7 @@ export default function AttendanceMapPage() {
         </div>
       </div>
 
-      <Card className="flex-1 rounded-sm border-primary/10 shadow-xl overflow-hidden min-h-[500px]">
+      <Card className="flex-1 rounded-sm border-primary/10 shadow-xl overflow-hidden min-h-0">
         <CardContent className="p-0 h-full relative">
           <MapViewComponent 
             records={filteredPersonnel} 
