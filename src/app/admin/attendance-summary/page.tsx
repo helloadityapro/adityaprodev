@@ -336,15 +336,12 @@ export default function AttendanceSummaryPage() {
               <RefreshCw className="mr-2 h-3 w-3 animate-spin" /> Finalizing Logs...
             </Badge>
           )}
-          <div className="space-y-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Select Date</Label>
-            <Input 
-              type="date" 
-              className="h-10 rounded-sm font-bold border-primary/20 w-[160px]" 
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-            />
-          </div>
+          <Input 
+            type="date" 
+            className="h-10 rounded-sm font-bold border-primary/20 w-[160px]" 
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
           <Button onClick={handleWhatsAppShare} variant="outline" className="h-10 rounded-sm font-bold border-green-600 text-green-600 hover:bg-green-50 shadow-sm px-6">
             <MessageCircle className="h-4 w-4 mr-2" />
             WhatsApp
@@ -616,7 +613,7 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
         <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">{title}</CardTitle>
         <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
       </CardHeader>
-      <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+      <CardContent className="p-3 sm:p-4 pt-0 sm:p-6 sm:pt-0">
         <div className="text-xl sm:text-2xl font-bold">{value}</div>
       </CardContent>
     </Card>
