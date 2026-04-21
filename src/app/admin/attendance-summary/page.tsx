@@ -29,7 +29,8 @@ import {
   ShieldCheck, 
   LayoutGrid,
   Route,
-  X
+  X,
+  MessageCircle
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
@@ -269,6 +270,35 @@ export default function AttendanceSummaryPage() {
     XLSX.writeFile(wb, `Attendance_Summary_${selectedDate}.xlsx`);
   };
 
+  const handleWhatsAppShare = () => {
+    if (summaryData.length === 0) return;
+
+    const formattedDate = format(parseISO(selectedDate), 'dd MMMM yyyy');
+    let message = `*Aditya Pro - Daily Attendance Summary*\n`;
+    message += `*Date:* ${formattedDate}\n\n`;
+    message += `*Summary Stats:*\n`;
+    message += `Total Staff: ${stats.total}\n`;
+    message += `Present: ${stats.present}\n`;
+    message += `In Session: ${stats.ongoing}\n`;
+    message += `Absent: ${stats.absent}\n\n`;
+    message += `*Personnel Presence Log:*\n`;
+
+    summaryData.forEach((item, index) => {
+      const statusLabel = item.status === 'absent' ? 'Absent' : (item.status === 'ongoing' ? 'Ongoing' : 'Completed');
+      const inTime = item.record?.checkInTime ? format(item.record.checkInTime.toDate(), 'HH:mm') : '—';
+      const outTime = item.record?.checkOutTime ? format(item.record.checkOutTime.toDate(), 'HH:mm') : (item.status === 'ongoing' ? 'Active' : '—');
+      
+      message += `${index + 1}. *${item.user.username}* - ${statusLabel}`;
+      if (item.status !== 'absent') {
+        message += ` (${inTime} - ${outTime})`;
+      }
+      message += `\n`;
+    });
+
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   if (isProfileLoading || isUsersLoading || isAttendanceLoading || isUserLoading) {
     return (
       <div className="space-y-8 p-4">
@@ -317,6 +347,10 @@ export default function AttendanceSummaryPage() {
               onChange={(e) => setSelectedDate(e.target.value)}
             />
           </div>
+          <Button onClick={handleWhatsAppShare} variant="outline" className="h-10 rounded-sm font-bold border-green-600 text-green-600 hover:bg-green-50 shadow-sm px-6">
+            <MessageCircle className="h-4 w-4 mr-2" />
+            WhatsApp
+          </Button>
           <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
             <FileDown className="h-4 w-4 mr-2" />
             Export

@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -12,11 +11,10 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Download, Award, ShieldCheck, Loader2, Share2, FileText, CheckCircle2 } from 'lucide-react';
+import { Download, Award, ShieldCheck, Loader2, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 
@@ -38,7 +36,7 @@ export function CertificateDialog({
   const certificateRef = React.useRef<HTMLDivElement>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
   const { toast } = useToast();
-  const [logoSrc, setLogoSrc] = React.useState('/assets/icon.png');
+  const [logoSrc, setLogoSrc] = React.useState('/icon.png');
 
   const handleDownload = async () => {
     if (!certificateRef.current) return;
@@ -46,7 +44,7 @@ export function CertificateDialog({
     setIsProcessing(true);
     try {
       const canvas = await html2canvas(certificateRef.current, {
-        scale: 2, // High-res capture
+        scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff'
@@ -59,7 +57,7 @@ export function CertificateDialog({
         format: 'a4'
       });
       
-      const imgWidth = 297; // A4 Landscape width
+      const imgWidth = 297;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
       pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
@@ -83,7 +81,6 @@ export function CertificateDialog({
         if (!blob) return;
         const file = new File([blob], `AdityaPro_Certificate.png`, { type: 'image/png' });
         
-        // Use native share sheet if available (Mobile), otherwise fallback to image download
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
@@ -123,47 +120,58 @@ export function CertificateDialog({
         <div className="flex-1 overflow-hidden bg-muted/20 flex flex-col">
           <ScrollArea className="h-full w-full">
             <div className="p-4 sm:p-10 flex justify-center min-w-max sm:min-w-0">
-               {/* Fixed size container for consistent high-res export regardless of screen size */}
                <div 
                   ref={certificateRef}
                   className="w-[800px] h-[565px] bg-white border-[12px] border-double border-primary/20 p-8 relative flex flex-col items-center justify-between text-center shadow-2xl shrink-0"
                >
-                {/* Decorative backgrounds */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full" />
                 <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-tr-full" />
                 
-                {/* Certificate Header with Logo */}
+                {/* ✅ FIXED LOGO */}
                 <div className="space-y-4 pt-4">
                   <div className="flex justify-center mb-2">
-                    <div className="relative h-16 w-48">
-                       <img 
-                        src={logoSrc} 
-                        alt="Aditya Pro" 
-                        crossOrigin="anonymous"
-                        onError={() => setLogoSrc('https://placehold.co/240x80?text=ADITYA+PRO')}
-                        className="h-full w-full object-contain"
-                       />
-                    </div>
+                    <img 
+                      src={logoSrc} 
+                      alt="Aditya Pro" 
+                      crossOrigin="anonymous"
+                      onError={() => setLogoSrc('https://placehold.co/240x80?text=ADITYA+PRO')}
+                      className="h-24 w-auto object-contain"
+                    />
                   </div>
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.6em] text-primary">Certificate of Achievement</h4>
+
+                  {/* ✅ FIXED LETTER SPACING */}
+                  <h4 
+                    className="text-[10px] font-black uppercase text-primary"
+                    style={{ letterSpacing: "0.4em" }}
+                  >
+                    Certificate of Completion
+                  </h4>
+
                   <div className="h-0.5 w-64 bg-primary/20 mx-auto" />
                 </div>
 
-                {/* Main Identity Section */}
-                <div className="space-y-8 flex-1 flex flex-col justify-center">
-                  <p className="text-sm font-medium italic text-muted-foreground">This is to officially certify that</p>
+                <div className="space-y-4 flex-1 flex flex-col justify-center">
+                  <p className="text-sm font-medium italic text-muted-foreground">
+                    This is to officially certify that
+                  </p>
+
                   <h2 className="text-4xl font-black tracking-tight text-foreground underline decoration-primary/10 underline-offset-8">
                     {userName}
                   </h2>
-                  <p className="text-sm font-medium text-muted-foreground max-w-lg mx-auto">
-                    has successfully satisfied all training requirements and demonstrated comprehensive knowledge in the subject of
+
+                  {/* ✅ FIXED WORD SPACING */}
+                  <p 
+                    className="text-sm font-medium text-muted-foreground max-w-lg mx-auto"
+                    style={{ wordSpacing: "0.15em" }}
+                  >
+                    has successfully completed the course with proficiency
                   </p>
-                  <h3 className="text-2xl font-black text-primary uppercase tracking-tight leading-tight max-w-2xl">
+
+                  <h3 className="text-2xl font-black text-primary propercase tracking-tight leading-tight max-w-2xl">
                     {courseTitle}
                   </h3>
                 </div>
 
-                {/* Verification Footer */}
                 <div className="w-full grid grid-cols-3 items-end pb-8 border-t border-border/10 pt-8">
                   <div className="text-left space-y-1">
                     <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Date Issued</p>
@@ -182,8 +190,7 @@ export function CertificateDialog({
                     <p className="text-xs font-bold uppercase text-foreground">{attempts} {attempts === 1 ? 'Attempt' : 'Attempts'}</p>
                   </div>
                 </div>
-                
-                {/* Audit Reference */}
+
                 <div className="absolute bottom-4 right-4 opacity-30 pointer-events-none">
                   <p className="text-[7px] font-black uppercase tracking-[0.2em] -rotate-12">
                     Verification Ref: LMS-{Math.random().toString(36).substring(7).toUpperCase()}
@@ -197,11 +204,6 @@ export function CertificateDialog({
         </div>
 
         <DialogFooter className="p-4 sm:p-6 bg-muted/5 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
-          <div className="hidden md:flex flex-col mr-auto">
-            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">Authenticated Document</p>
-            <p className="text-[8px] text-muted-foreground/60 font-mono italic">Aditya Green Energy learning hub verification.</p>
-          </div>
-          
           <div className="grid grid-cols-2 sm:flex gap-3 w-full sm:w-auto">
             <Button 
               variant="outline" 
