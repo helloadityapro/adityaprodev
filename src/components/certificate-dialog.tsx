@@ -128,14 +128,14 @@ export function CertificateDialog({
                 <div className="absolute bottom-0 left-0 w-32 h-32 bg-primary/5 rounded-tr-full" />
                 
                 {/* ✅ FIXED LOGO */}
-                <div className="space-y-4 pt-4">
+                <div className="space-y-2 pt-2">
                   <div className="flex justify-center mb-2">
                     <img 
                       src={logoSrc} 
                       alt="Aditya Pro" 
                       crossOrigin="anonymous"
                       onError={() => setLogoSrc('https://placehold.co/240x80?text=ADITYA+PRO')}
-                      className="h-24 w-auto object-contain"
+                      className="h-26 w-40 object-contain"
                     />
                   </div>
 
@@ -151,7 +151,7 @@ export function CertificateDialog({
                 </div>
 
                 <div className="space-y-4 flex-1 flex flex-col justify-center">
-                  <p className="text-sm font-medium italic text-muted-foreground">
+                  <p className="text-sm font-medium text-muted-foreground">
                     This is to officially certify that
                   </p>
 
@@ -164,7 +164,7 @@ export function CertificateDialog({
                     className="text-sm font-medium text-muted-foreground max-w-lg mx-auto"
                     style={{ wordSpacing: "0.15em" }}
                   >
-                    has successfully completed the course with proficiency
+                    has successfully completed the course
                   </p>
 
                   <h3 className="text-2xl font-black text-primary propercase tracking-tight leading-tight max-w-2xl">

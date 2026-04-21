@@ -86,7 +86,7 @@ type AttendanceRecord = {
 
 type SortKey = 'personnel' | 'status' | 'checkIn' | 'checkOut';
 
-const EXCLUDED_PERSONNEL = ["Khalil Choudhary", "Imtiyaz Kazi", "Jayesh Bajaj", "Vipul Joisher"];
+const EXCLUDED_PERSONNEL = ["Khalil Choudhary", "Imtiyaz Kazi", "Jayesh Bajaj", "Vipul Joisher", "Demo Admin", "Demo Manager", "Demo User"];
 
 export default function AttendanceSummaryPage() {
   const firestore = useFirestore();
@@ -277,9 +277,7 @@ export default function AttendanceSummaryPage() {
     let message = `*Aditya Pro - Daily Attendance Summary*\n`;
     message += `*Date:* ${formattedDate}\n\n`;
     message += `*Summary Stats:*\n`;
-    message += `Total Staff: ${stats.total}\n`;
     message += `Present: ${stats.present}\n`;
-    message += `In Session: ${stats.ongoing}\n`;
     message += `Absent: ${stats.absent}\n\n`;
     message += `*Personnel Presence Log:*\n`;
 
@@ -542,6 +540,13 @@ export default function AttendanceSummaryPage() {
                       {item.record?.checkInLat && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm text-primary" asChild title="Check-in Location">
                           <a href={`https://www.google.com/maps/search/?api=1&query=${item.record.checkInLat},${item.record.checkInLng}`} target="_blank" rel="noopener noreferrer">
+                            <MapPin className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      )}
+                      {item.record?.checkOutLat && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm text-destructive" asChild title="Check-out Location">
+                          <a href={`https://www.google.com/maps/search/?api=1&query=${item.record.checkOutLat},${item.record.checkOutLng}`} target="_blank" rel="noopener noreferrer">
                             <MapPin className="h-4 w-4" />
                           </a>
                         </Button>
