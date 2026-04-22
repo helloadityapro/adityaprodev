@@ -277,7 +277,6 @@ export default function AttendanceSummaryPage() {
     let message = `*Aditya Pro - Daily Attendance Summary*\n`;
     message += `*Date:* ${formattedDate}\n\n`;
     message += `*Summary Stats:*\n`;
-    message += `Present: ${stats.present}\n`;
     message += `Absent: ${stats.absent}\n\n`;
     message += `*Personnel Presence Log:*\n`;
 

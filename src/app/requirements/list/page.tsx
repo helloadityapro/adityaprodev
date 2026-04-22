@@ -120,17 +120,18 @@ export default function RequirementListPage() {
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
+  const isProcurement = userProfile?.department === 'Procurement and Supply-chain';
 
   const requirementsQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
     const colRef = collection(firestore, 'requirements');
     
-    if (isAdmin) return colRef;
+    if (isAdmin || isProcurement) return colRef;
     if (isManager) {
         return query(colRef, or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid)));
     }
     return query(colRef, where('userId', '==', user.uid));
-  }, [firestore, user, userProfile, isAdmin, isManager]);
+  }, [firestore, user, userProfile, isAdmin, isManager, isProcurement]);
 
   const { data: requirements, isLoading: reqsLoading } = useCollection<Requirement>(requirementsQuery);
 
@@ -143,7 +144,8 @@ export default function RequirementListPage() {
 
     let result = requirements;
 
-    if (isOwnDataOnly && !isSuper) {
+    // PROCUREMENT USERS HAVE FULL ACCESS: Bypass ownDataOnly restriction
+    if (isOwnDataOnly && !isSuper && !isProcurement) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
       result = result.filter(req => assignedIds.has(req.siteId));
     }
@@ -165,7 +167,7 @@ export default function RequirementListPage() {
         const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
     });
-  }, [requirements, searchTerm, startDate, endDate, userProfile, roleConfigs, isSuper]);
+  }, [requirements, searchTerm, startDate, endDate, userProfile, roleConfigs, isSuper, isProcurement]);
 
   const stats = React.useMemo(() => {
     return {
@@ -376,8 +378,9 @@ export default function RequirementListPage() {
                 {sortedAndFilteredReqs.map((req) => {
                   const isOwner = req.userId === user?.uid;
                   const canManagerAct = isManager && req.siteManagerId === user?.uid && req.status === 'Pending';
-                  const canAdminAct = isAdmin && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
-                  const canLogisticsAct = (isAdmin || isManager) && (["Approved", "Ordered", "Dispatched", "In-transit"].includes(req.status));
+                  // PROC PERMISSION: Procurement or Admin can act on ManagerApproved status
+                  const canAdminAct = (isAdmin || isProcurement) && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
+                  const canLogisticsAct = (isAdmin || isManager || isProcurement) && (["Approved", "Ordered", "Dispatched", "In-transit"].includes(req.status));
 
                   return (
                     <TableRow key={req.id} className="hover:bg-muted/5 transition-colors">
