@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp, arrayUnion, limit } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
+import { collection, doc, query, where, or, serverTimestamp, arrayUnion, limit, getDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,16 +16,13 @@ import {
   Clock, 
   Calendar, 
   FilterX, 
-  TrendingUp, 
-  AlertCircle, 
   CheckCircle2, 
-  History, 
-  User, 
   CircleCheck, 
   CircleX, 
   Building2, 
   MessageCircle,
-  X,
+  History,
+  User,
   Eye,
   ArrowUpDown,
   ArrowUp,
@@ -100,6 +97,12 @@ type AccessConfig = {
 
 const LOGISTICS_STATUSES = ["Ordered", "Dispatched", "In-transit", "Delivered"] as const;
 
+const formatTimestamp = (ts: any) => {
+  if (!ts) return '—';
+  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
+  return format(date, 'dd MMM, HH:mm');
+};
+
 function StatusBadge({ status, className }: { status: string, className?: string }) {
   const config: Record<string, { label: string, color: string }> = {
     Pending: { label: "Pending Manager", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
@@ -129,14 +132,16 @@ export default function RequirementListPage() {
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
+  const [activeTab, setActiveTab] = React.useState("all");
+  const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
+  
   const [editingReq, setEditingReq] = React.useState<Requirement | null>(null);
   const [deletingReq, setDeletingReq] = React.useState<Requirement | null>(null);
   const [historyReq, setHistoryReq] = React.useState<Requirement | null>(null);
   const [actionState, setActionState] = React.useState<{ req: Requirement, targetStatus: string } | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
-  const [dateFilter, setDateFilter] = React.useState<string>("7days");
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -214,23 +219,6 @@ export default function RequirementListPage() {
         return dateB - dateA;
     });
   }, [requirements, searchTerm, statusFilter, queryDateRange, userProfile, roleConfigs, isSuper, isProcurement]);
-
-  const stats = React.useMemo(() => {
-    return {
-      total: sortedAndFilteredReqs.length,
-      high: sortedAndFilteredReqs.filter(r => r.urgency === 'High').length,
-      pending: sortedAndFilteredReqs.filter(r => r.status === 'Pending' || r.status === 'ManagerApproved').length,
-      delivered: sortedAndFilteredReqs.filter(r => r.status === 'Delivered').length,
-    };
-  }, [sortedAndFilteredReqs]);
-
-  const clearFilters = () => {
-    setSearchTerm("");
-    setStartDate("");
-    setEndDate("");
-    setStatusFilter("all");
-    setDateFilter("7days");
-  };
 
   const handleAction = async (remarks: string) => {
     if (!actionState || !user || !userProfile) return;
@@ -310,17 +298,17 @@ export default function RequirementListPage() {
     window.open(url, '_blank');
   };
 
-  const urgencyConfig = {
-    High: "bg-red-100 text-red-800 border-red-200",
-    Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    Low: "bg-blue-100 text-blue-800 border-blue-200",
-  };
-
   const handleDelete = async () => {
     if (!deletingReq || !firestore) return;
     deleteDocumentNonBlocking(doc(firestore, 'requirements', deletingReq.id));
     toast({ title: "Request Removed", description: "Requirement record deleted." });
     setDeletingReq(null);
+  };
+
+  const urgencyConfig = {
+    High: "bg-red-100 text-red-800 border-red-200",
+    Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
+    Low: "bg-blue-100 text-blue-800 border-blue-200",
   };
 
   if (isProfileLoading || reqsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
@@ -332,21 +320,6 @@ export default function RequirementListPage() {
           <ClipboardList className="h-6 w-6" /> Requirement Logs
         </h1>
         <p className="text-muted-foreground text-sm font-medium">Monitoring site material demands across all authorized locations.</p>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3 sm:gap-4 no-print">
-        <Card className="bg-primary/5 border-primary/10 rounded-sm">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-bold uppercase text-muted-foreground">Total Requests</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 font-black text-2xl">{stats.total}</CardContent>
-        </Card>
-        <Card className="bg-amber-500/5 border-amber-500/10 rounded-sm">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-bold uppercase text-amber-600">Pending</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 font-black text-2xl text-amber-700">{stats.pending}</CardContent>
-        </Card>
-        <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
-          <CardHeader className="p-4 pb-2"><CardTitle className="text-[10px] font-bold uppercase text-green-600">Completed</CardTitle></CardHeader>
-          <CardContent className="p-4 pt-0 font-black text-2xl text-green-700">{stats.delivered}</CardContent>
-        </Card>
       </div>
 
       <div className="flex flex-col gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
@@ -417,14 +390,16 @@ export default function RequirementListPage() {
           const canAdminAct = (isAdmin || isProcurement) && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
           const canLogisticsAct = (isAdmin || isManager || isProcurement) && (["Approved", "Ordered", "Dispatched", "In-transit"].includes(req.status));
 
+          const lastTimeline = req.timeline && req.timeline.length > 0 ? req.timeline[req.timeline.length - 1] : null;
+
           return (
             <Card key={req.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
               <CardContent className="p-4 space-y-4">
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex flex-col gap-1 min-w-0">
                     <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-1.5">
-                      <Clock className="h-3 w-3" />
-                      Expected {req.expectedDate ? format(new Date(req.expectedDate), 'dd MMM yy') : '—'}
+                      <Calendar className="h-3 w-3" />
+                      Requested {formatTimestamp(req.createdAt)}
                     </span>
                     <h3 className="font-bold text-sm leading-tight text-foreground truncate">{req.itemName}</h3>
                   </div>
@@ -441,51 +416,61 @@ export default function RequirementListPage() {
                     </div>
                     <StatusBadge status={req.status} />
                   </div>
-                  <div className="flex items-center justify-between py-2 border-y border-primary/5">
-                    <span className="text-sm font-black text-primary">{req.quantity} {req.unit}</span>
-                    <div className="flex items-center gap-1.5 text-[9px] font-black text-muted-foreground uppercase">
-                      <User className="h-3 w-3 text-primary/40" /> {req.userName}
+
+                  {lastTimeline && (
+                    <div className="bg-primary/[0.03] p-2 rounded-sm border border-primary/5 space-y-1">
+                      <p className="text-[8px] font-black uppercase text-primary/60 tracking-wider">Latest Action</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-foreground">{lastTimeline.userName}</span>
+                        <span className="text-[9px] font-mono text-muted-foreground">{formatTimestamp(lastTimeline.timestamp)}</span>
+                      </div>
                     </div>
+                  )}
+
+                  <div className="flex items-center justify-between py-2 border-y border-primary/5">
+                    <div className="flex flex-col">
+                      <span className="text-[8px] font-black text-muted-foreground uppercase">Target Date</span>
+                      <span className="text-xs font-bold">{req.expectedDate}</span>
+                    </div>
+                    <span className="text-sm font-black text-primary">{req.quantity} {req.unit}</span>
                   </div>
                 </div>
 
-                {canLogisticsAct && (
-                  <div className="pt-1">
-                    <Label className="text-[8px] font-black uppercase text-muted-foreground mb-1 block">Update Lifecycle</Label>
-                    <Select defaultValue={req.status} onValueChange={(val) => setActionState({ req, targetStatus: val })}>
-                      <SelectTrigger className="w-full h-10 text-xs font-bold rounded-sm border-primary/20 bg-muted/20"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="Approved" className="text-xs font-bold">Approved</SelectItem>
-                          {LOGISTICS_STATUSES.map(opt => (<SelectItem key={opt} value={opt} className="text-xs font-medium">{opt}</SelectItem>))}
-                      </SelectContent>
-                    </Select>
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex gap-1.5">
+                    {(canManagerAct || canAdminAct) && (
+                      <>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve">
+                          <CircleCheck className="h-5 w-5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: 'Rejected' })} title="Reject">
+                          <CircleX className="h-5 w-5" />
+                        </Button>
+                      </>
+                    )}
+                    {canLogisticsAct && (
+                      <Select defaultValue={req.status} onValueChange={(val) => setActionState({ req, targetStatus: val })}>
+                        <SelectTrigger className="w-[120px] h-9 text-[10px] font-bold rounded-sm border-primary/20"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Approved" className="text-[10px] font-bold">Approved</SelectItem>
+                            {LOGISTICS_STATUSES.map(opt => (<SelectItem key={opt} value={opt} className="text-[10px] font-medium">{opt}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
-                )}
-
-                <div className="pt-4 flex flex-col gap-3">
-                  {(canManagerAct || canAdminAct) && (
-                    <div className="grid grid-cols-2 gap-2 w-full">
-                      <Button size="sm" className="h-10 rounded-sm bg-green-600 hover:bg-green-700 font-bold text-[10px] uppercase flex-1 shadow-md" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })}>
-                        <CircleCheck className="h-4 w-4 mr-1.5" /> Approve
-                      </Button>
-                      <Button size="sm" variant="destructive" className="h-10 rounded-sm font-bold text-[10px] uppercase flex-1 shadow-md" onClick={() => setActionState({ req, targetStatus: 'Rejected' })}>
-                        <CircleX className="h-4 w-4 mr-1.5" /> Reject
-                      </Button>
-                    </div>
-                  )}
-                  <div className="flex justify-end items-center gap-2">
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleWhatsAppShare(req)} title="Share WA">
+                  <div className="flex gap-1.5">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(req)} title="WhatsApp">
                       <MessageCircle className="h-4.5 w-4.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground rounded-sm hover:bg-muted/50" onClick={() => setHistoryReq(req)} title="Timeline">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground rounded-sm" onClick={() => setHistoryReq(req)} title="Timeline">
                       <History className="h-4.5 w-4.5" />
                     </Button>
                     {isOwner && req.status === 'Pending' && (
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-primary rounded-sm hover:bg-primary/5" onClick={() => setEditingReq(req)}>
+                      <div className="flex gap-1.5">
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-primary rounded-sm" onClick={() => setEditingReq(req)} title="Edit">
                           <Pencil className="h-4.5 w-4.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive rounded-sm hover:bg-destructive/5" onClick={() => setDeletingReq(req)}>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive rounded-sm" onClick={() => setDeletingReq(req)} title="Delete">
                           <Trash2 className="h-4.5 w-4.5" />
                         </Button>
                       </div>
@@ -496,9 +481,8 @@ export default function RequirementListPage() {
             </Card>
           );
         }) : (
-          <div className="text-center py-20 text-muted-foreground italic bg-muted/10 rounded-sm border border-dashed border-primary/20">
-            <ClipboardList className="h-10 w-10 mx-auto mb-4 opacity-20" />
-            <p className="text-xs font-bold uppercase tracking-widest">No matching requirements discovered</p>
+          <div className="text-center py-20 text-muted-foreground italic bg-muted/10 rounded-sm border border-dashed">
+            No matching requirements discovered
           </div>
         )}
       </div>
@@ -510,13 +494,14 @@ export default function RequirementListPage() {
               <Table>
                 <TableHeader className="bg-muted/30">
                   <TableRow>
-                    <TableHead className="px-6">Log Info</TableHead>
+                    <TableHead className="px-6">Request Date</TableHead>
+                    <TableHead>Log Info</TableHead>
                     <TableHead className="min-w-[200px]">Item Details</TableHead>
                     <TableHead>Urgency</TableHead>
                     <TableHead className="text-center">Quantity</TableHead>
                     <TableHead>Target Date</TableHead>
-                    <TableHead className="min-w-[150px]">Lifecycle Status</TableHead>
-                    <TableHead className="text-right px-6">Audit Actions</TableHead>
+                    <TableHead className="min-w-[180px]">Lifecycle Status</TableHead>
+                    <TableHead className="text-right px-6">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -526,9 +511,14 @@ export default function RequirementListPage() {
                     const canAdminAct = (isAdmin || isProcurement) && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
                     const canLogisticsAct = (isAdmin || isManager || isProcurement) && (["Approved", "Ordered", "Dispatched", "In-transit"].includes(req.status));
 
+                    const lastTimeline = req.timeline && req.timeline.length > 0 ? req.timeline[req.timeline.length - 1] : null;
+
                     return (
                       <TableRow key={req.id} className="hover:bg-muted/5 transition-colors">
-                        <TableCell className="px-6 py-4">
+                        <TableCell className="px-6 font-mono text-[10px] font-bold text-muted-foreground whitespace-nowrap">
+                            {formatTimestamp(req.createdAt)}
+                        </TableCell>
+                        <TableCell>
                             <div className="font-bold text-sm text-foreground">{req.siteName}</div>
                             <div className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter mt-0.5">{req.userName}</div>
                         </TableCell>
@@ -544,15 +534,21 @@ export default function RequirementListPage() {
                             <div className="font-mono font-black text-sm text-primary">{req.quantity}</div>
                             <div className="text-[10px] text-muted-foreground uppercase font-bold">{req.unit}</div>
                         </TableCell>
-                        <TableCell>
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-                                <Clock className="h-3 w-3" />
-                                {req.expectedDate ? format(new Date(req.expectedDate), 'dd MMM yy') : '—'}
-                            </div>
+                        <TableCell className="text-xs font-bold text-muted-foreground">
+                            {req.expectedDate}
                         </TableCell>
                         <TableCell>
                             <div className="flex flex-col gap-1.5">
                               <StatusBadge status={req.status} />
+                              {lastTimeline && (
+                                <div className="flex flex-col gap-0.5 px-1">
+                                  <span className="text-[8px] font-black uppercase text-primary/60 tracking-tight">{lastTimeline.action}</span>
+                                  <div className="flex items-center gap-1.5 text-[8px] font-bold text-muted-foreground uppercase">
+                                    <User className="h-2 w-2" /> {lastTimeline.userName}
+                                    <Clock className="h-2 w-2 ml-1" /> {formatTimestamp(lastTimeline.timestamp)}
+                                  </div>
+                                </div>
+                              )}
                               {canLogisticsAct && (
                                 <Select defaultValue={req.status} onValueChange={(val) => setActionState({ req, targetStatus: val })}>
                                     <SelectTrigger className="w-[120px] h-7 text-[10px] font-bold rounded-sm border-primary/20 bg-muted/10"><SelectValue /></SelectTrigger>
@@ -566,16 +562,20 @@ export default function RequirementListPage() {
                         </TableCell>
                         <TableCell className="text-right px-6">
                             <div className="flex justify-end items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => handleWhatsAppShare(req)} title="Broadcast WA">
-                                  <MessageCircle className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted rounded-sm" onClick={() => setHistoryReq(req)} title="Lifecycle Trace"><History className="h-4 w-4" /></Button>
                                 {(canManagerAct || canAdminAct) && (
                                   <>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve Request"><CircleCheck className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: 'Rejected' })} title="Deny Request"><CircleX className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve">
+                                      <CircleCheck className="h-5 w-5" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: 'Rejected' })} title="Reject">
+                                      <CircleX className="h-5 w-5" />
+                                    </Button>
                                   </>
                                 )}
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => handleWhatsAppShare(req)} title="WhatsApp">
+                                  <MessageCircle className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted rounded-sm" onClick={() => setHistoryReq(req)} title="Timeline"><History className="h-4 w-4" /></Button>
                                 {isOwner && req.status === 'Pending' && (
                                     <>
                                       <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/5 rounded-sm" onClick={() => setEditingReq(req)} title="Edit"><Pencil className="h-4 w-4" /></Button>
@@ -587,7 +587,7 @@ export default function RequirementListPage() {
                       </TableRow>
                     );
                   }) : (
-                    <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic font-medium opacity-30 uppercase tracking-widest">Zero requirements logged</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic">No requirements logged</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -596,7 +596,6 @@ export default function RequirementListPage() {
         </Card>
       </div>
 
-      {/* Decision Dialog */}
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent className="rounded-sm max-w-md">
           <DialogHeader>
@@ -606,7 +605,6 @@ export default function RequirementListPage() {
           <div className="py-6 space-y-3">
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Feedback / Remarks</Label>
             <Textarea id="action-remarks-input" placeholder="Explain the rationale for this status update..." className="min-h-[120px] rounded-sm focus-visible:ring-primary/20" />
-            <p className="text-[9px] text-muted-foreground italic leading-relaxed">This update will be logged in the permanent audit trail for this asset requirement.</p>
           </div>
           <DialogFooter className="gap-2">
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold h-11 px-6 uppercase text-[10px]">Cancel</Button></DialogClose>
@@ -620,7 +618,6 @@ export default function RequirementListPage() {
         </DialogContent>
       </Dialog>
 
-      {/* History Dialog */}
       <Dialog open={!!historyReq} onOpenChange={(o) => !o && setHistoryReq(null)}>
         <DialogContent className="rounded-sm max-w-lg p-0 overflow-hidden border-none shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b">
@@ -645,16 +642,12 @@ export default function RequirementListPage() {
                   </div>
                 </div>
               ))}
-              {(!historyReq?.timeline || historyReq.timeline.length === 0) && (
-                <div className="text-center py-20 opacity-20 italic font-black uppercase text-sm">Trace log empty</div>
-              )}
             </div>
           </ScrollArea>
           <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 w-full">Close Audit</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
       <Dialog open={!!editingReq} onOpenChange={(o) => !o && setEditingReq(null)}>
         <DialogContent className="rounded-sm max-w-md p-0 overflow-hidden border-none shadow-2xl bg-background">
             <DialogHeader className="p-6 bg-primary/5 border-b">
@@ -693,14 +686,11 @@ export default function RequirementListPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deletingReq} onOpenChange={(o) => !o && setDeletingReq(null)}>
         <AlertDialogContent className="rounded-sm max-md">
             <AlertDialogHeader>
               <AlertDialogTitle className="uppercase font-black tracking-tight text-destructive flex items-center gap-2"><Trash2 className="h-5 w-5" /> Confirm Removal</AlertDialogTitle>
-              <AlertDialogDescription className="text-sm font-medium leading-relaxed">
-                Permanently withdraw this material request? This action cannot be reversed and will remove the record from all audit logs.
-              </AlertDialogDescription>
+              <AlertDialogDescription className="text-sm font-medium leading-relaxed">Permanently withdraw this material request?</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Back</AlertDialogCancel>

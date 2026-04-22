@@ -14,13 +14,21 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, PackagePlus, Calendar, Plus, Trash2, ListPlus } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, PackagePlus, Calendar, Plus, Trash2, ListPlus, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { sendNotification } from "@/lib/notifications";
+
+const COMMON_MATERIALS = [
+  "Solar Module", "Solar Panel", "Inverter", "DC Cable", "AC Cable", "MC4 Connector",
+  "Structure Post", "Rafter", "Purlin", "Sag Rod", "Mid Clamp", "End Clamp",
+  "Earthing Strip", "Chemical Earthing", "Lightening Arrestor", "DCDB", "ACDB",
+  "Nylon Cable Tie", "PVC Conduit", "UPVC Pipe", "Module Mounting Structure",
+  "Lugs", "Ferrules", "Glands", "Isolator", "Fuse", "Breaker"
+];
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item name is required"),
@@ -62,7 +70,6 @@ export default function SubmitRequirementPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
-  // Fetch team members for managers to aggregate sites
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
     return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
@@ -74,15 +81,12 @@ export default function SubmitRequirementPage() {
     if (isAdmin) {
         return Array.from(new Map(allSites.map(s => [s.name, s])).values());
     }
-    
-    // Aggregated site visibility for Managers
     const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
     if (isManager && teamMembers) {
       teamMembers.forEach(member => {
         (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
       });
     }
-
     const filtered = allSites.filter(s => assignedIds.has(s.id));
     return Array.from(new Map(filtered.map(s => [s.name, s])).values());
   }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
@@ -139,7 +143,6 @@ export default function SubmitRequirementPage() {
 
       await Promise.all(promises);
 
-      // Notify Manager if Engineer submitted
       if (isEngineer && userProfile.siteManagerId) {
         sendNotification(firestore, {
           userId: userProfile.siteManagerId,
@@ -150,7 +153,6 @@ export default function SubmitRequirementPage() {
         });
       }
 
-      // Notify Admins
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
@@ -174,6 +176,16 @@ export default function SubmitRequirementPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const getSpellingSuggestion = (val: string) => {
+    if (!val || val.length < 3) return null;
+    const lowerVal = val.toLowerCase();
+    return COMMON_MATERIALS.find(m => {
+      const lowerM = m.toLowerCase();
+      // Simple logic: if input is a partial match or highly similar
+      return (lowerM.includes(lowerVal) || lowerVal.includes(lowerM)) && lowerM !== lowerVal;
+    });
   };
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
@@ -219,7 +231,6 @@ export default function SubmitRequirementPage() {
                           className="h-9 w-full border-none focus-visible:ring-0 px-0" 
                           value={siteSearchQuery} 
                           onChange={(e) => setSiteSearchQuery(e.target.value)}
-                          onKeyDown={(e) => e.stopPropagation()}
                         />
                       </div>
                       <ScrollArea className="h-[200px]">
@@ -262,108 +273,130 @@ export default function SubmitRequirementPage() {
                     </Button>
                 </div>
 
-                {fields.map((field, index) => (
-                  <Card key={field.id} className="relative bg-muted/10 border-dashed rounded-sm overflow-hidden">
-                    {fields.length > 1 && (
-                        <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="icon" 
-                            className="absolute top-2 right-2 h-8 w-8 text-destructive hover:bg-destructive/10"
-                            onClick={() => remove(index)}
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    )}
-                    <CardContent className="pt-6 space-y-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Badge variant="outline" className="rounded-sm font-mono text-[10px]">Item #{index + 1}</Badge>
-                        </div>
-                        
-                        <FormField control={form.control} name={`items.${index}.itemName`} render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Item Name</FormLabel>
-                                <FormControl>
-                                    <Input 
-                                        placeholder="Name of the material needed..." 
-                                        {...field} 
-                                        className="rounded-sm bg-background" 
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Quantity</FormLabel>
+                {fields.map((field, index) => {
+                  const currentName = form.watch(`items.${index}.itemName`);
+                  const suggestion = getSpellingSuggestion(currentName);
+                  
+                  return (
+                    <Card key={field.id} className="relative bg-muted/10 border-dashed rounded-sm overflow-hidden animate-in fade-in">
+                      {fields.length > 1 && (
+                          <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="absolute top-2 right-2 h-8 w-8 text-destructive hover:bg-destructive/10"
+                              onClick={() => remove(index)}
+                          >
+                              <Trash2 className="h-4 w-4" />
+                          </Button>
+                      )}
+                      <CardContent className="pt-6 space-y-4">
+                          <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline" className="rounded-sm font-mono text-[10px]">Item #{index + 1}</Badge>
+                          </div>
+                          
+                          <FormField control={form.control} name={`items.${index}.itemName`} render={({ field: nameField }) => (
+                              <FormItem>
+                                  <FormLabel>Item Name</FormLabel>
+                                  <div className="space-y-2">
                                     <FormControl>
-                                        <Input type="number" step="0.01" placeholder="0.00" {...field} className="rounded-sm bg-background" />
+                                        <Input 
+                                            placeholder="e.g. Solar Module 540Wp..." 
+                                            {...nameField} 
+                                            className="rounded-sm bg-background" 
+                                        />
                                     </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
+                                    {suggestion && (
+                                      <div className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-300">
+                                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 py-1.5 px-3 rounded-sm flex items-center gap-2">
+                                          <Sparkles className="h-3 w-3" />
+                                          <span className="text-[10px] font-bold uppercase tracking-tight">Did you mean:</span>
+                                          <Button 
+                                            variant="link" 
+                                            className="p-0 h-auto text-[11px] font-black underline decoration-dashed underline-offset-4"
+                                            onClick={() => form.setValue(`items.${index}.itemName`, suggestion)}
+                                          >
+                                            {suggestion}
+                                          </Button>
+                                        </Badge>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <FormMessage />
+                              </FormItem>
+                          )} />
 
-                            <FormField control={form.control} name={`items.${index}.unit`} render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Unit</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger className="rounded-sm bg-background">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {["Numbers", "Kilograms", "Liters", "Meters", "Sets"].map(u => (
-                                                <SelectItem key={u} value={u}>{u}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                              <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
+                                  <FormItem>
+                                      <FormLabel>Quantity</FormLabel>
+                                      <FormControl>
+                                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="rounded-sm bg-background" />
+                                      </FormControl>
+                                      <FormMessage />
+                                  </FormItem>
+                              )} />
 
-                            <FormField control={form.control} name={`items.${index}.urgency`} render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Urgency</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger className="rounded-sm bg-background">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {["High", "Medium", "Low"].map(u => (
-                                                <SelectItem key={u} value={u}>{u}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
+                              <FormField control={form.control} name={`items.${index}.unit`} render={({ field }) => (
+                                  <FormItem>
+                                      <FormLabel>Unit</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                          <FormControl>
+                                              <SelectTrigger className="rounded-sm bg-background">
+                                                  <SelectValue />
+                                              </SelectTrigger>
+                                          </FormControl>
+                                          <SelectContent>
+                                              {["Numbers", "Kilograms", "Liters", "Meters", "Sets"].map(u => (
+                                                  <SelectItem key={u} value={u}>{u}</SelectItem>
+                                              ))}
+                                          </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                  </FormItem>
+                              )} />
 
-                            <FormField control={form.control} name={`items.${index}.expectedDate`} render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Expected Date</FormLabel>
-                                    <FormControl>
-                                        <div className="relative">
-                                            <Input type="date" {...field} className="rounded-sm pr-10 bg-background" />
-                                            <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                                        </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                              <FormField control={form.control} name={`items.${index}.urgency`} render={({ field }) => (
+                                  <FormItem>
+                                      <FormLabel>Urgency</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                          <FormControl>
+                                              <SelectTrigger className="rounded-sm bg-background">
+                                                  <SelectValue />
+                                              </SelectTrigger>
+                                          </FormControl>
+                                          <SelectContent>
+                                              {["High", "Medium", "Low"].map(u => (
+                                                  <SelectItem key={u} value={u}>{u}</SelectItem>
+                                              ))}
+                                          </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                  </FormItem>
+                              )} />
+
+                              <FormField control={form.control} name={`items.${index}.expectedDate`} render={({ field }) => (
+                                  <FormItem>
+                                      <FormLabel>Expected Date</FormLabel>
+                                      <FormControl>
+                                          <div className="relative">
+                                              <Input type="date" {...field} className="rounded-sm pr-10 bg-background" />
+                                              <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                                          </div>
+                                      </FormControl>
+                                      <FormMessage />
+                                  </FormItem>
+                              )} />
+                          </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
 
               <div className="flex justify-end gap-4 pt-6 border-t">
                 <Button type="submit" className="min-w-[200px] h-12 rounded-sm text-lg font-semibold" disabled={isSubmitting}>
-                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting Request...</> : "Submit All Items"}
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : "Submit All Items"}
                 </Button>
               </div>
             </form>
