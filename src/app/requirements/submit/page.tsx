@@ -183,7 +183,6 @@ export default function SubmitRequirementPage() {
     const lowerVal = val.toLowerCase();
     return COMMON_MATERIALS.find(m => {
       const lowerM = m.toLowerCase();
-      // Simple logic: if input is a partial match or highly similar
       return (lowerM.includes(lowerVal) || lowerVal.includes(lowerM)) && lowerM !== lowerVal;
     });
   };
@@ -193,10 +192,10 @@ export default function SubmitRequirementPage() {
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center gap-2">
+        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <PackagePlus className="h-8 w-8" /> Submit Requirement
         </h1>
-        <p className="text-muted-foreground">Request materials or resources for your site. You can add multiple items.</p>
+        <p className="text-muted-foreground font-medium">Request materials or resources for your site. You can add multiple items.</p>
       </div>
 
       <Card className="shadow-md border-primary/10 rounded-sm">
@@ -259,7 +258,7 @@ export default function SubmitRequirementPage() {
 
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <h3 className="text-lg font-black uppercase tracking-widest flex items-center gap-2">
                         <ListPlus className="h-5 w-5 text-primary" /> Item List
                     </h3>
                     <Button 
@@ -267,9 +266,9 @@ export default function SubmitRequirementPage() {
                         variant="outline" 
                         size="sm" 
                         onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers", urgency: "Medium", expectedDate: format(new Date(), 'yyyy-MM-dd') })}
-                        className="rounded-sm border-primary text-primary hover:bg-primary/5"
+                        className="rounded-sm border-primary text-primary hover:bg-primary/5 font-bold"
                     >
-                        <Plus className="mr-2 h-4 w-4" /> Add Another Item
+                        <Plus className="mr-1.5 h-4 w-4" /> Add Item
                     </Button>
                 </div>
 
@@ -292,18 +291,18 @@ export default function SubmitRequirementPage() {
                       )}
                       <CardContent className="pt-6 space-y-4">
                           <div className="flex items-center gap-2 mb-2">
-                              <Badge variant="outline" className="rounded-sm font-mono text-[10px]">Item #{index + 1}</Badge>
+                              <Badge variant="outline" className="rounded-sm font-mono text-[10px] font-black uppercase">Item #{index + 1}</Badge>
                           </div>
                           
                           <FormField control={form.control} name={`items.${index}.itemName`} render={({ field: nameField }) => (
                               <FormItem>
-                                  <FormLabel>Item Name</FormLabel>
+                                  <FormLabel className="text-[10px] font-bold uppercase">Item Name / Description</FormLabel>
                                   <div className="space-y-2">
                                     <FormControl>
                                         <Input 
                                             placeholder="e.g. Solar Module 540Wp..." 
                                             {...nameField} 
-                                            className="rounded-sm bg-background" 
+                                            className="rounded-sm bg-background h-11" 
                                         />
                                     </FormControl>
                                     {suggestion && (
@@ -313,6 +312,7 @@ export default function SubmitRequirementPage() {
                                           <span className="text-[10px] font-bold uppercase tracking-tight">Did you mean:</span>
                                           <Button 
                                             variant="link" 
+                                            type="button"
                                             className="p-0 h-auto text-[11px] font-black underline decoration-dashed underline-offset-4"
                                             onClick={() => form.setValue(`items.${index}.itemName`, suggestion)}
                                           >
@@ -329,9 +329,9 @@ export default function SubmitRequirementPage() {
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                               <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
                                   <FormItem>
-                                      <FormLabel>Quantity</FormLabel>
+                                      <FormLabel className="text-[10px] font-bold uppercase">Qty</FormLabel>
                                       <FormControl>
-                                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="rounded-sm bg-background" />
+                                          <Input type="number" step="0.01" placeholder="0.00" {...field} className="rounded-sm bg-background font-mono font-bold" />
                                       </FormControl>
                                       <FormMessage />
                                   </FormItem>
@@ -339,16 +339,16 @@ export default function SubmitRequirementPage() {
 
                               <FormField control={form.control} name={`items.${index}.unit`} render={({ field }) => (
                                   <FormItem>
-                                      <FormLabel>Unit</FormLabel>
+                                      <FormLabel className="text-[10px] font-bold uppercase">Unit</FormLabel>
                                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                                           <FormControl>
-                                              <SelectTrigger className="rounded-sm bg-background">
+                                              <SelectTrigger className="rounded-sm bg-background h-11">
                                                   <SelectValue />
                                               </SelectTrigger>
                                           </FormControl>
                                           <SelectContent>
                                               {["Numbers", "Kilograms", "Liters", "Meters", "Sets"].map(u => (
-                                                  <SelectItem key={u} value={u}>{u}</SelectItem>
+                                                  <SelectItem key={u} value={u} className="text-sm font-medium">{u}</SelectItem>
                                               ))}
                                           </SelectContent>
                                       </Select>
@@ -358,16 +358,16 @@ export default function SubmitRequirementPage() {
 
                               <FormField control={form.control} name={`items.${index}.urgency`} render={({ field }) => (
                                   <FormItem>
-                                      <FormLabel>Urgency</FormLabel>
+                                      <FormLabel className="text-[10px] font-bold uppercase">Urgency</FormLabel>
                                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                                           <FormControl>
-                                              <SelectTrigger className="rounded-sm bg-background">
+                                              <SelectTrigger className="rounded-sm bg-background h-11">
                                                   <SelectValue />
                                               </SelectTrigger>
                                           </FormControl>
                                           <SelectContent>
                                               {["High", "Medium", "Low"].map(u => (
-                                                  <SelectItem key={u} value={u}>{u}</SelectItem>
+                                                  <SelectItem key={u} value={u} className="text-sm font-medium">{u}</SelectItem>
                                               ))}
                                           </SelectContent>
                                       </Select>
@@ -377,11 +377,11 @@ export default function SubmitRequirementPage() {
 
                               <FormField control={form.control} name={`items.${index}.expectedDate`} render={({ field }) => (
                                   <FormItem>
-                                      <FormLabel>Expected Date</FormLabel>
+                                      <FormLabel className="text-[10px] font-bold uppercase">Target Date</FormLabel>
                                       <FormControl>
                                           <div className="relative">
-                                              <Input type="date" {...field} className="rounded-sm pr-10 bg-background" />
-                                              <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                                              <Input type="date" {...field} className="rounded-sm pr-10 bg-background h-11" />
+                                              <Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
                                           </div>
                                       </FormControl>
                                       <FormMessage />
@@ -395,8 +395,8 @@ export default function SubmitRequirementPage() {
               </div>
 
               <div className="flex justify-end gap-4 pt-6 border-t">
-                <Button type="submit" className="min-w-[200px] h-12 rounded-sm text-lg font-semibold" disabled={isSubmitting}>
-                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : "Submit All Items"}
+                <Button type="submit" className="min-w-[220px] h-14 rounded-sm text-base font-black uppercase tracking-tight shadow-xl" disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> DISPATCHING...</> : "Submit Requirements"}
                 </Button>
               </div>
             </form>

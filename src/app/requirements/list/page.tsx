@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp, arrayUnion, limit, getDoc } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp, arrayUnion, limit, getDoc, and } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,7 +16,6 @@ import {
   Clock, 
   Calendar, 
   FilterX, 
-  CheckCircle2, 
   CircleCheck, 
   CircleX, 
   Building2, 
@@ -26,7 +25,8 @@ import {
   Eye,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  ListFilter
 } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
@@ -305,6 +305,14 @@ export default function RequirementListPage() {
     setDeletingReq(null);
   };
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setDateFilter("7days");
+    setStartDate("");
+    setEndDate("");
+  };
+
   const urgencyConfig = {
     High: "bg-red-100 text-red-800 border-red-200",
     Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -437,20 +445,20 @@ export default function RequirementListPage() {
                 </div>
 
                 <div className="flex items-center justify-between pt-2">
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-2 items-center">
                     {(canManagerAct || canAdminAct) && (
-                      <>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve">
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve">
                           <CircleCheck className="h-5 w-5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: 'Rejected' })} title="Reject">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: 'Rejected' })} title="Reject">
                           <CircleX className="h-5 w-5" />
                         </Button>
-                      </>
+                      </div>
                     )}
                     {canLogisticsAct && (
                       <Select defaultValue={req.status} onValueChange={(val) => setActionState({ req, targetStatus: val })}>
-                        <SelectTrigger className="w-[120px] h-9 text-[10px] font-bold rounded-sm border-primary/20"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="w-[120px] h-8 text-[10px] font-bold rounded-sm border-primary/20"><SelectValue /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="Approved" className="text-[10px] font-bold">Approved</SelectItem>
                             {LOGISTICS_STATUSES.map(opt => (<SelectItem key={opt} value={opt} className="text-[10px] font-medium">{opt}</SelectItem>))}
@@ -458,22 +466,22 @@ export default function RequirementListPage() {
                       </Select>
                     )}
                   </div>
-                  <div className="flex gap-1.5">
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(req)} title="WhatsApp">
-                      <MessageCircle className="h-4.5 w-4.5" />
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(req)} title="WhatsApp">
+                      <MessageCircle className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground rounded-sm" onClick={() => setHistoryReq(req)} title="Timeline">
-                      <History className="h-4.5 w-4.5" />
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm" onClick={() => setHistoryReq(req)} title="Timeline">
+                      <History className="h-4 w-4" />
                     </Button>
                     {isOwner && req.status === 'Pending' && (
-                      <div className="flex gap-1.5">
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-primary rounded-sm" onClick={() => setEditingReq(req)} title="Edit">
-                          <Pencil className="h-4.5 w-4.5" />
+                      <>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingReq(req)} title="Edit">
+                          <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive rounded-sm" onClick={() => setDeletingReq(req)} title="Delete">
-                          <Trash2 className="h-4.5 w-4.5" />
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingReq(req)} title="Delete">
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -563,24 +571,24 @@ export default function RequirementListPage() {
                         <TableCell className="text-right px-6">
                             <div className="flex justify-end items-center gap-1">
                                 {(canManagerAct || canAdminAct) && (
-                                  <>
+                                  <div className="flex gap-1">
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve">
                                       <CircleCheck className="h-5 w-5" />
                                     </Button>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: 'Rejected' })} title="Reject">
                                       <CircleX className="h-5 w-5" />
                                     </Button>
-                                  </>
+                                  </div>
                                 )}
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => handleWhatsAppShare(req)} title="WhatsApp">
                                   <MessageCircle className="h-4 w-4" />
                                 </Button>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted rounded-sm" onClick={() => setHistoryReq(req)} title="Timeline"><History className="h-4 w-4" /></Button>
                                 {isOwner && req.status === 'Pending' && (
-                                    <>
+                                    <div className="flex gap-1">
                                       <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/5 rounded-sm" onClick={() => setEditingReq(req)} title="Edit"><Pencil className="h-4 w-4" /></Button>
                                       <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/5 rounded-sm" onClick={() => setDeletingReq(req)} title="Delete"><Trash2 className="h-4 w-4" /></Button>
-                                    </>
+                                    </div>
                                 )}
                             </div>
                         </TableCell>
