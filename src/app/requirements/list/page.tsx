@@ -8,7 +8,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ClipboardList, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, TrendingUp, AlertCircle, CheckCircle2, History, User, MoreHorizontal, CircleCheck, CircleX, Building2, Eye } from "lucide-react";
+import { 
+  ClipboardList, 
+  Search, 
+  Pencil, 
+  Trash2, 
+  Loader2, 
+  Clock, 
+  Calendar, 
+  FilterX, 
+  TrendingUp, 
+  AlertCircle, 
+  CheckCircle2, 
+  History, 
+  User, 
+  MoreHorizontal, 
+  CircleCheck, 
+  CircleX, 
+  Building2, 
+  Eye,
+  MessageCircle,
+  X
+} from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +60,7 @@ import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { sendNotification } from "@/lib/notifications";
 
 type TimelineEntry = {
   action: string;
@@ -140,13 +162,13 @@ export default function RequirementListPage() {
   const sortedAndFilteredReqs = React.useMemo(() => {
     if (!requirements || !userProfile) return [];
     
+    const roleId = userProfile.role ? userProfile.role.toLowerCase().replace(/\s+/g, '-') : 'none';
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
 
     let result = requirements;
 
-    // PROCUREMENT USERS HAVE FULL ACCESS: Bypass ownDataOnly restriction
     if (isOwnDataOnly && !isSuper && !isProcurement) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
       result = result.filter(req => assignedIds.has(req.siteId));
@@ -229,6 +251,49 @@ export default function RequirementListPage() {
     setActionState(null);
   };
 
+  const handleEditSave = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingReq || !user || !userProfile) return;
+    setIsSaving(true);
+    
+    const formData = new FormData(e.currentTarget);
+    const quantity = parseFloat(formData.get('quantity') as string);
+    const urgency = formData.get('urgency') as any;
+    const expectedDate = formData.get('expectedDate') as string;
+
+    const timelineEntry: TimelineEntry = {
+      action: "Modified",
+      status: editingReq.status,
+      remarks: `Details updated by requester.`,
+      userName: userProfile.username || user.email || 'System',
+      userId: user.uid,
+      timestamp: new Date().toISOString()
+    };
+
+    try {
+      updateDocumentNonBlocking(doc(firestore, 'requirements', editingReq.id), {
+        quantity,
+        urgency,
+        expectedDate,
+        editedBy: userProfile.username || user.email || 'Unknown',
+        editedAt: serverTimestamp(),
+        timeline: arrayUnion(timelineEntry)
+      });
+      toast({ title: "Updated", description: "Requirement details modified." });
+      setEditingReq(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleWhatsAppShare = (req: Requirement) => {
+    const message = `*Aditya Pro - Material Requirement*\n\n*Site:* ${req.siteName}\n*Item:* ${req.itemName}\n*Qty:* ${req.quantity} ${req.unit}\n*Urgency:* ${req.urgency}\n*Expected:* ${format(new Date(req.expectedDate), 'dd MMM yyyy')}\n*Status:* ${req.status}\n*Requested By:* ${req.userName}\n\n*Review Link:* ${window.location.origin}/requirements/list`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   const urgencyConfig = {
     High: "bg-red-100 text-red-800 border-red-200",
     Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -243,11 +308,11 @@ export default function RequirementListPage() {
         <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <ClipboardList className="h-8 w-8" /> Requirement Data
         </h1>
-        <p className="text-muted-foreground">Monitor and track site material requests from authorized projects.</p>
+        <p className="text-muted-foreground font-medium">Monitor and track site material requests from authorized projects.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
-        <Card className="bg-primary/5 border-primary/10 rounded-sm">
+        <Card className="bg-primary/5 border-primary/10 rounded-sm shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Active Requests</CardTitle>
             <TrendingUp className="h-4 w-4 text-primary" />
@@ -256,7 +321,7 @@ export default function RequirementListPage() {
             <div className="text-2xl font-bold">{stats.total}</div>
           </CardContent>
         </Card>
-        <Card className="bg-yellow-500/5 border-yellow-500/10 rounded-sm">
+        <Card className="bg-yellow-500/5 border-yellow-500/10 rounded-sm shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-yellow-600">Pending Action</CardTitle>
             <AlertCircle className="h-4 w-4 text-yellow-600" />
@@ -265,7 +330,7 @@ export default function RequirementListPage() {
             <div className="text-2xl font-bold text-yellow-700">{stats.pending}</div>
           </CardContent>
         </Card>
-        <Card className="bg-green-500/5 border-green-500/10 rounded-sm">
+        <Card className="bg-green-500/5 border-green-500/10 rounded-sm shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold uppercase text-green-600">Fulfilled</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -316,49 +381,92 @@ export default function RequirementListPage() {
               </div>
             </div>
             <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
-              <FilterX className="h-3.5 w-3.5 md:h-4 w-4" />
+              <FilterX className="h-3.5 w-3.5 md:h-4 md:w-4" />
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="md:hidden space-y-4">
-        {sortedAndFilteredReqs.length > 0 ? sortedAndFilteredReqs.map((req) => (
-          <Card key={req.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => setHistoryReq(req)}>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex flex-col gap-1 min-w-0">
-                  <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">Expected {req.expectedDate ? format(new Date(req.expectedDate), 'dd MMM yy') : '—'}</span>
-                  <h3 className="font-bold text-sm leading-tight text-foreground truncate">{req.itemName}</h3>
+      <div className="md:hidden space-y-4 pb-20">
+        {sortedAndFilteredReqs.length > 0 ? sortedAndFilteredReqs.map((req) => {
+          const isOwner = req.userId === user?.uid;
+          const canManagerAct = isManager && req.siteManagerId === user?.uid && req.status === 'Pending';
+          const canAdminAct = (isAdmin || isProcurement) && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
+          const canLogisticsAct = (isAdmin || isManager || isProcurement) && (["Approved", "Ordered", "Dispatched", "In-transit"].includes(req.status));
+
+          return (
+            <Card key={req.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">Expected {req.expectedDate ? format(new Date(req.expectedDate), 'dd MMM yy') : '—'}</span>
+                    <h3 className="font-bold text-sm leading-tight text-foreground truncate">{req.itemName}</h3>
+                  </div>
+                  <Badge variant="outline" className={cn("rounded-sm text-[9px] font-bold uppercase", (urgencyConfig as any)[req.urgency] || urgencyConfig.Medium)}>
+                    {req.urgency}
+                  </Badge>
                 </div>
-                <Badge variant="outline" className={cn("rounded-sm text-[9px] font-bold uppercase", (urgencyConfig as any)[req.urgency] || urgencyConfig.Medium)}>
-                  {req.urgency}
-                </Badge>
-              </div>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
-                  <Building2 className="h-3 w-3 text-primary/60" />
-                  <span>{req.siteName}</span>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
+                    <Building2 className="h-3 w-3 text-primary/60" />
+                    <span>{req.siteName}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-primary">{req.quantity} {req.unit}</span>
+                    <StatusBadge status={req.status} />
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-primary">{req.quantity} {req.unit}</span>
-                  <StatusBadge status={req.status} />
-                </div>
-              </div>
-              <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
-                <div className="flex items-center gap-2">
+
+                <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase py-1">
                   <User className="h-3 w-3 text-primary" />
-                  <span className="text-[10px] font-bold text-muted-foreground">{req.userName}</span>
+                  <span>{req.userName}</span>
                 </div>
-                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setHistoryReq(req)}>
-                    <History className="h-4 w-4" />
-                  </Button>
+
+                {canLogisticsAct && (
+                  <div className="pt-2">
+                    <Select defaultValue={req.status} onValueChange={(val) => setActionState({ req, targetStatus: val })}>
+                      <SelectTrigger className="w-full h-10 text-xs font-bold rounded-sm border-primary/20"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="Approved">Approved</SelectItem>
+                          {LOGISTICS_STATUSES.map(opt => (<SelectItem key={opt} value={opt} className="text-xs font-medium">{opt}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-primary/5 grid grid-cols-2 gap-2">
+                  {(canManagerAct || canAdminAct) && (
+                    <>
+                      <Button size="sm" className="h-10 rounded-sm bg-green-600 hover:bg-green-700 font-bold text-[10px] uppercase" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })}>
+                        <CircleCheck className="h-4 w-4 mr-1.5" /> Approve
+                      </Button>
+                      <Button size="sm" variant="destructive" className="h-10 rounded-sm font-bold text-[10px] uppercase" onClick={() => setActionState({ req, targetStatus: 'Rejected' })}>
+                        <CircleX className="h-4 w-4 mr-1.5" /> Reject
+                      </Button>
+                    </>
+                  )}
+                  <div className={cn("col-span-2 flex justify-end gap-2", (canManagerAct || canAdminAct) && "mt-2")}>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 text-green-600" onClick={() => handleWhatsAppShare(req)} title="Share on WhatsApp">
+                      <MessageCircle className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" onClick={() => setHistoryReq(req)} title="View Timeline">
+                      <History className="h-4 w-4" />
+                    </Button>
+                    {isOwner && req.status === 'Pending' && (
+                      <>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-primary" onClick={() => setEditingReq(req)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => setDeletingReq(req)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        )) : <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No requirements found.</div>}
+              </CardContent>
+            </Card>
+          )) : <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No requirements found.</div>}
       </div>
 
       <div className="hidden md:block">
@@ -380,7 +488,6 @@ export default function RequirementListPage() {
                 {sortedAndFilteredReqs.map((req) => {
                   const isOwner = req.userId === user?.uid;
                   const canManagerAct = isManager && req.siteManagerId === user?.uid && req.status === 'Pending';
-                  // PROC PERMISSION: Procurement or Admin can act on ManagerApproved status
                   const canAdminAct = (isAdmin || isProcurement) && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
                   const canLogisticsAct = (isAdmin || isManager || isProcurement) && (["Approved", "Ordered", "Dispatched", "In-transit"].includes(req.status));
 
@@ -426,6 +533,9 @@ export default function RequirementListPage() {
                       </TableCell>
                       <TableCell className="text-right px-6 no-print">
                           <div className="flex justify-end items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => handleWhatsAppShare(req)} title="Share on WhatsApp">
+                                <MessageCircle className="h-4 w-4" />
+                              </Button>
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setHistoryReq(req)} title="View Timeline"><History className="h-4 w-4" /></Button>
                               {(canManagerAct || canAdminAct) && (
                                 <>
@@ -434,7 +544,10 @@ export default function RequirementListPage() {
                                 </>
                               )}
                               {isOwner && req.status === 'Pending' && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingReq(req)}><Trash2 className="h-4 w-4" /></Button>
+                                  <>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setEditingReq(req)} title="Edit"><Pencil className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingReq(req)} title="Delete"><Trash2 className="h-4 w-4" /></Button>
+                                  </>
                               )}
                           </div>
                       </TableCell>
@@ -467,11 +580,54 @@ export default function RequirementListPage() {
                     <span className="text-xs font-bold text-primary">{entry.action} — {entry.userName}</span>
                     <p className="text-sm italic">{entry.remarks}</p>
                     <StatusBadge status={entry.status} className="w-fit" />
+                    <p className="text-[10px] text-muted-foreground font-mono">
+                      {format(new Date(entry.timestamp), 'dd MMM yyyy HH:mm')}
+                    </p>
                   </div>
                 </div>
               ))}
+              {(!historyReq?.timeline || historyReq.timeline.length === 0) && (
+                <div className="text-center py-10 opacity-30 italic text-sm">No timeline history recorded.</div>
+              )}
             </div>
           </ScrollArea>
+          <DialogFooter><DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Close</Button></DialogClose></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingReq} onOpenChange={(o) => !o && setEditingReq(null)}>
+        <DialogContent className="rounded-sm max-w-md">
+            <DialogHeader>
+                <DialogTitle>Edit Requirement</DialogTitle>
+                <DialogDescription>Modify request details for <strong>{editingReq?.itemName}</strong>.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleEditSave} className="space-y-4 py-4">
+                <div className="space-y-2">
+                    <Label>Quantity ({editingReq?.unit})</Label>
+                    <Input name="quantity" type="number" step="0.01" defaultValue={editingReq?.quantity} required className="rounded-sm" />
+                </div>
+                <div className="space-y-2">
+                    <Label>Urgency</Label>
+                    <Select name="urgency" defaultValue={editingReq?.urgency}>
+                        <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="High">High</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="Low">Low</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label>Expected Date</Label>
+                    <Input name="expectedDate" type="date" defaultValue={editingReq?.expectedDate} required className="rounded-sm" />
+                </div>
+                <DialogFooter className="pt-4 gap-2">
+                    <Button type="button" variant="outline" onClick={() => setEditingReq(null)} disabled={isSaving}>Cancel</Button>
+                    <Button type="submit" disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Changes"}
+                    </Button>
+                </DialogFooter>
+            </form>
         </DialogContent>
       </Dialog>
 
