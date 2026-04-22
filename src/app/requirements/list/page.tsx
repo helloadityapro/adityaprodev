@@ -120,7 +120,9 @@ export default function RequirementListPage() {
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
-  const isProcurement = userProfile?.department === 'Procurement and Supply-chain';
+  const isProcurementRole = userProfile?.role === "Assistant Manager - Purchase & Supply Chain";
+  const isProcurementDept = userProfile?.department === 'Procurement and Supply-chain';
+  const isProcurement = isProcurementDept || isProcurementRole;
 
   const requirementsQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
@@ -314,7 +316,7 @@ export default function RequirementListPage() {
               </div>
             </div>
             <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
-              <FilterX className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <FilterX className="h-3.5 w-3.5 md:h-4 w-4" />
             </Button>
           </div>
         </div>
