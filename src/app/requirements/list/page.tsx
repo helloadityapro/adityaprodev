@@ -60,6 +60,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
 
 type TimelineEntry = {
@@ -135,6 +136,7 @@ export default function RequirementListPage() {
   const [historyReq, setHistoryReq] = React.useState<Requirement | null>(null);
   const [actionState, setActionState] = React.useState<{ req: Requirement, targetStatus: string } | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [dateFilter, setDateFilter] = React.useState<string>("7days");
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -175,8 +177,6 @@ export default function RequirementListPage() {
       default: return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
     }
   }, [dateFilter, startDate, endDate]);
-
-  const [dateFilter, setDateFilter] = React.useState<string>("7days");
 
   const sortedAndFilteredReqs = React.useMemo(() => {
     if (!requirements || !userProfile) return [];
@@ -316,6 +316,13 @@ export default function RequirementListPage() {
     Low: "bg-blue-100 text-blue-800 border-blue-200",
   };
 
+  const handleDelete = async () => {
+    if (!deletingReq || !firestore) return;
+    deleteDocumentNonBlocking(doc(firestore, 'requirements', deletingReq.id));
+    toast({ title: "Request Removed", description: "Requirement record deleted." });
+    setDeletingReq(null);
+  };
+
   if (isProfileLoading || reqsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   return (
@@ -366,6 +373,7 @@ export default function RequirementListPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+                <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
                 <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
                 <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
                 <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom</SelectItem>
@@ -375,7 +383,7 @@ export default function RequirementListPage() {
 
           <div className="flex items-end gap-2">
             {dateFilter === 'custom' && (
-              <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95">
+              <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95 duration-200">
                 <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-11 rounded-sm border-primary/20 text-xs" />
                 <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-11 rounded-sm border-primary/20 text-xs" />
               </div>
@@ -402,7 +410,6 @@ export default function RequirementListPage() {
         </div>
       </div>
 
-      {/* Mobile Card List */}
       <div className="md:hidden space-y-4">
         {sortedAndFilteredReqs.length > 0 ? sortedAndFilteredReqs.map((req) => {
           const isOwner = req.userId === user?.uid;
@@ -589,6 +596,7 @@ export default function RequirementListPage() {
         </Card>
       </div>
 
+      {/* Decision Dialog */}
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent className="rounded-sm max-w-md">
           <DialogHeader>
@@ -612,8 +620,9 @@ export default function RequirementListPage() {
         </DialogContent>
       </Dialog>
 
+      {/* History Dialog */}
       <Dialog open={!!historyReq} onOpenChange={(o) => !o && setHistoryReq(null)}>
-        <DialogContent className="rounded-sm max-w-lg p-0 overflow-hidden border-none shadow-2xl">
+        <DialogContent className="rounded-sm max-w-lg p-0 overflow-hidden border-none shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><History className="h-5 w-5 text-primary" /></div>
@@ -645,8 +654,9 @@ export default function RequirementListPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Dialog */}
       <Dialog open={!!editingReq} onOpenChange={(o) => !o && setEditingReq(null)}>
-        <DialogContent className="rounded-sm max-w-md p-0 overflow-hidden border-none shadow-2xl">
+        <DialogContent className="rounded-sm max-w-md p-0 overflow-hidden border-none shadow-2xl bg-background">
             <DialogHeader className="p-6 bg-primary/5 border-b">
                 <DialogTitle className="text-xl font-black uppercase tracking-tight">Modify Requirement</DialogTitle>
                 <DialogDescription className="text-xs font-medium">Refining request for <strong>{editingReq?.itemName}</strong>.</DialogDescription>
@@ -683,6 +693,7 @@ export default function RequirementListPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation */}
       <AlertDialog open={!!deletingReq} onOpenChange={(o) => !o && setDeletingReq(null)}>
         <AlertDialogContent className="rounded-sm max-md">
             <AlertDialogHeader>
@@ -691,7 +702,7 @@ export default function RequirementListPage() {
                 Permanently withdraw this material request? This action cannot be reversed and will remove the record from all audit logs.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter className="gap-2">
+            <AlertDialogFooter>
                 <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Back</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDelete} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] h-10 px-6 shadow-md">Confirm Deletion</AlertDialogAction>
             </AlertDialogFooter>
