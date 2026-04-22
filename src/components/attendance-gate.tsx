@@ -23,11 +23,23 @@ export function AttendanceGate() {
   const [currentDate, setCurrentDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
   const [isWaitingForCelebration, setIsWaitingForCelebration] = React.useState(false);
 
+  // Reminder Tracking State
+  const [checkInReminderCount, setCheckInReminderCount] = React.useState(0);
+  const [checkOutReminderCount, setCheckOutReminderCount] = React.useState(0);
+  const [lastReminderTime, setLastReminderTime] = React.useState(0);
+
   const userProfileRef = useMemoFirebase(() => {
     if (!user) return null;
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
   const { data: profile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+
+  // Reset reminders on date rollover
+  React.useEffect(() => {
+    setCheckInReminderCount(0);
+    checkOutReminderCount;
+    setLastReminderTime(0);
+  }, [currentDate]);
 
   // Periodic check for date rollover (every 30 seconds)
   React.useEffect(() => {
@@ -186,7 +198,7 @@ export function AttendanceGate() {
         updateDocumentNonBlocking(ref, {
           status: 'completed',
           checkOutTime: serverTimestamp(),
-          checkOutLat: activeSession.checkInLat || 0,
+          checkOutLat: activeSession.checkInLat || 0, 
           checkOutLng: activeSession.checkInLng || 0,
           checkOutType: 'System CheckOut',
           remarks: 'System CheckOut: Automatically closed at end of day.'
@@ -195,15 +207,37 @@ export function AttendanceGate() {
       }
     }
 
+    // Reminder Interval Logic
+    const timeSinceLast = Date.now() - lastReminderTime;
+    const isIntervalPassed = timeSinceLast > 2 * 60 * 1000; // 2 minutes
+
     const isLateNight = now.getHours() >= 19;
+
+    // Check-in Trigger
     if (!activeSession && !hasCompletedToday && !isLateNight) {
-      setShowCheckIn(true);
+      if (checkInReminderCount < 3 && isIntervalPassed && !showCheckIn) {
+        setShowCheckIn(true);
+      }
     }
 
-    if (activeSession && activeSession.date === todayStr && now.getHours() >= 19) {
-      setShowCheckOut(true);
+    // Check-out Trigger
+    if (activeSession && activeSession.date === todayStr && isLateNight) {
+      if (checkOutReminderCount < 3 && isIntervalPassed && !showCheckOut) {
+        setShowCheckOut(true);
+      }
     }
-  }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, user, todayStr, pathname, firestore, isWaitingForCelebration]);
+  }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, user, todayStr, pathname, firestore, isWaitingForCelebration, checkInReminderCount, checkOutReminderCount, lastReminderTime, showCheckIn, showCheckOut]);
+
+  const handleLater = (type: 'in' | 'out') => {
+    if (type === 'in') {
+      setCheckInReminderCount(prev => prev + 1);
+      setShowCheckIn(false);
+    } else {
+      setCheckOutReminderCount(prev => prev + 1);
+      setShowCheckOut(false);
+    }
+    setLastReminderTime(Date.now());
+  };
 
   return (
     <>
@@ -218,9 +252,12 @@ export function AttendanceGate() {
               Please capture verification to start your workday.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="sm:justify-center pb-4">
+          <DialogFooter className="sm:justify-center flex-col sm:flex-row gap-2 pb-4">
             <Button onClick={() => { setShowCheckIn(false); router.push('/attendance/check-in'); }} className="w-full h-14 text-lg font-black rounded-sm">
               Proceed to Check-in
+            </Button>
+            <Button variant="ghost" onClick={() => handleLater('in')} className="w-full h-10 text-xs font-bold uppercase text-muted-foreground">
+              I'll do it Later
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -237,9 +274,12 @@ export function AttendanceGate() {
               Your session is still active. Please capture final verification to conclude your workday.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="sm:justify-center pb-4">
+          <DialogFooter className="sm:justify-center flex-col sm:flex-row gap-2 pb-4">
             <Button onClick={() => { setShowCheckOut(false); router.push('/attendance/check-out'); }} className="w-full h-14 text-lg font-black rounded-sm bg-slate-900">
               Proceed to Check-Out
+            </Button>
+            <Button variant="ghost" onClick={() => handleLater('out')} className="w-full h-10 text-xs font-bold uppercase text-amber-700">
+              I'll do it Later
             </Button>
           </DialogFooter>
         </DialogContent>

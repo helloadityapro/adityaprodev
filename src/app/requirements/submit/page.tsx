@@ -23,11 +23,11 @@ import { format } from "date-fns";
 import { sendNotification } from "@/lib/notifications";
 
 const COMMON_MATERIALS = [
-  "Solar Module", "Solar Panel", "Inverter", "DC Cable", "AC Cable", "MC4 Connector",
-  "Structure Post", "Rafter", "Purlin", "Sag Rod", "Mid Clamp", "End Clamp",
-  "Earthing Strip", "Chemical Earthing", "Lightening Arrestor", "DCDB", "ACDB",
+  "Solar Module", "Solar Panel", "Inverter", "Wiring Harness", "DC Cable", "AC Cable", "MC4 Connector",
+  "Column Post", "Rafter", "Purlin", "Back Bracing", "Bracing Connector", "Front Bracing", "Sag Rod", "Mid Clamp", "End Clamp",
+  "Earthing Strip", "Chemical Earthing", "Lightening Arrestor", "Labelling Stickers", "ACDB",
   "Nylon Cable Tie", "PVC Conduit", "UPVC Pipe", "Module Mounting Structure",
-  "Lugs", "Ferrules", "Glands", "Isolator", "Fuse", "Breaker"
+  "Lugs", "Ferrules", "Glands", "Isolator", "Fuse", "Breaker", "LT Panel", "VCB", "RMU", "Balance of System (BoS)"
 ];
 
 const itemSchema = z.object({
