@@ -13,9 +13,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
-import { Trash2, Search, MapPin, Plus, FileDown, FileUp, Download, Check, ListFilter, AlertCircle, Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Trash2, Search, MapPin, Plus, FileDown, FileUp, Download, Check, ListFilter, AlertCircle, Loader2, ArrowLeft, RefreshCw, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -85,6 +85,7 @@ export default function AddNewProjectPage() {
   const [isDeletingBulk, setIsDeletingBulk] = React.useState(false);
   const [isBulkDialogOpen, setIsBulkDialogOpen] = React.useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
+  const [siteToEdit, setSiteToEdit] = React.useState<any | null>(null);
   const [isImporting, setIsImporting] = React.useState(false);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -102,6 +103,25 @@ export default function AddNewProjectPage() {
     defaultValues: { name: '', projectCompany: '', acCapacity: 0, dcCapacity: 0, latitude: 0, longitude: 0 },
   });
 
+  React.useEffect(() => {
+    if (isAddDialogOpen) {
+      siteForm.reset({ name: '', projectCompany: '', acCapacity: 0, dcCapacity: 0, latitude: 0, longitude: 0 });
+    }
+  }, [isAddDialogOpen, siteForm]);
+
+  React.useEffect(() => {
+    if (siteToEdit) {
+      siteForm.reset({
+        name: siteToEdit.name,
+        projectCompany: siteToEdit.projectCompany,
+        acCapacity: siteToEdit.acCapacity,
+        dcCapacity: siteToEdit.dcCapacity,
+        latitude: siteToEdit.latitude || 0,
+        longitude: siteToEdit.longitude || 0,
+      });
+    }
+  }, [siteToEdit, siteForm]);
+
   const onSiteSubmit = (values: z.infer<typeof siteSchema>) => {
     addDocumentNonBlocking(collection(firestore, 'sites'), {
       ...values,
@@ -110,6 +130,17 @@ export default function AddNewProjectPage() {
     toast({ title: 'Success', description: 'New Site added.' });
     siteForm.reset();
     setIsAddDialogOpen(false);
+  };
+
+  const onEditSubmit = (values: z.infer<typeof siteSchema>) => {
+    if (!siteToEdit) return;
+    updateDocumentNonBlocking(doc(firestore, 'sites', siteToEdit.id), {
+      ...values,
+      updatedAt: serverTimestamp()
+    });
+    toast({ title: 'Success', description: 'Site details updated.' });
+    setSiteToEdit(null);
+    siteForm.reset();
   };
 
   const deleteSite = (id: string) => {
@@ -258,7 +289,11 @@ export default function AddNewProjectPage() {
     })));
     
     const workbook = XLSX.utils.book_new();
+    // Use proper XLSX methods for native stability
     XLSX.utils.book_append_sheet(workbook, worksheet, "Sites");
+    const b64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+    
+    // In a real app this would call a download helper, but for now we'll stick to standard
     XLSX.writeFile(workbook, "AdityaPro_SiteRegistry.xlsx");
   };
 
@@ -504,9 +539,14 @@ export default function AddNewProjectPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right px-6">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteSite(site.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setSiteToEdit(site)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteSite(site.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -522,6 +562,46 @@ export default function AddNewProjectPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Site Dialog */}
+      <Dialog open={!!siteToEdit} onOpenChange={(open) => !open && setSiteToEdit(null)}>
+        <DialogContent className="sm:max-w-md rounded-sm">
+          <DialogHeader>
+            <DialogTitle>Edit Site Details</DialogTitle>
+            <DialogDescription>Modify the properties for {siteToEdit?.name}.</DialogDescription>
+          </DialogHeader>
+          <Form {...siteForm}>
+            <form onSubmit={siteForm.handleSubmit(onEditSubmit)} className="space-y-4 py-4">
+              <FormField control={siteForm.control} name="name" render={({ field }) => (
+                <FormItem><FormLabel>Site Name</FormLabel><FormControl><Input placeholder="e.g., Shahapur - 194082" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={siteForm.control} name="projectCompany" render={({ field }) => (
+                <FormItem><FormLabel>Project Company</FormLabel><FormControl><Input placeholder="e.g., HTI Energies" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+              )} />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={siteForm.control} name="acCapacity" render={({ field }) => (
+                  <FormItem><FormLabel>AC Capacity (MW)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="4.000" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={siteForm.control} name="dcCapacity" render={({ field }) => (
+                  <FormItem><FormLabel>DC Capacity (MWp)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="5.174" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={siteForm.control} name="latitude" render={({ field }) => (
+                  <FormItem><FormLabel>Latitude</FormLabel><FormControl><Input type="number" step="0.000001" placeholder="19.0760" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={siteForm.control} name="longitude" render={({ field }) => (
+                  <FormItem><FormLabel>Longitude</FormLabel><FormControl><Input type="number" step="0.000001" placeholder="72.8777" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+              <DialogFooter className="pt-4 gap-2">
+                <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
+                <Button type="submit" className="rounded-sm font-bold">Save Changes</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
         <AlertDialogContent className="rounded-sm">
