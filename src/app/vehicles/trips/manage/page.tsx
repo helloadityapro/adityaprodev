@@ -64,7 +64,7 @@ import {
   IndianRupee,
   PieChart
 } from 'lucide-react';
-import { format, parse } from 'date-fns';
+import { format, parse, subDays, subMonths, subYears, startOfDay, endOfDay } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -218,6 +218,10 @@ export default function ManageAllTripsPage() {
   const [activeTab, setActiveTab] = React.useState("registry");
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
+
+  const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   
   // Viewer States
   const [viewUrl, setViewUrl] = React.useState<string | null>(null);
@@ -277,6 +281,60 @@ export default function ManageAllTripsPage() {
   const { data: sites } = useCollection<Site>(sitesQuery);
 
   const driversList = React.useMemo(() => allUsers?.filter(u => u.role === 'Driver') || [], [allUsers]);
+
+  const queryDateRange = React.useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    switch (dateFilter) {
+      case 'today': return { start: todayStr, end: todayStr };
+      case 'yesterday': return { start: format(subDays(today, 1), 'yyyy-MM-dd'), end: format(subDays(today, 1), 'yyyy-MM-dd') };
+      case '7days': return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastMonth': return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastYear': return { start: format(subYears(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime': return { start: '1970-01-01', end: '2099-12-31' };
+      case 'custom': return { start: customStart, end: customEnd };
+      default: return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+    }
+  }, [dateFilter, customStart, customEnd]);
+
+  const filteredAssignments = React.useMemo(() => {
+    if (!assignments || !userProfile) return [];
+    
+    const { start, end } = queryDateRange;
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userRoleStr)?.ownDataOnly ?? false;
+
+    let result = assignments;
+
+    if (isOwnDataOnly && !isSuper) {
+      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+      result = result.filter(trip => {
+        if (trip.siteId) return assignedIds.has(trip.siteId);
+        return true; 
+      });
+    }
+
+    return result.filter(trip => {
+      const tripDate = trip.tripDate;
+      const matchesDate = tripDate >= start && tripDate <= end;
+
+      const matchesSearch = trip.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        trip.pickupLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (trip.vehicleDetails || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (trip.driverName || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || trip.status === statusFilter;
+      const isQueue = activeTab === 'queue' ? trip.status === 'Pending' : true;
+      
+      return matchesSearch && matchesStatus && isQueue && matchesDate;
+    }).sort((a, b) => {
+      const dateA = a.requestDate?.toDate?.()?.getTime() || 0;
+      const dateB = b.createdAt?.toDate?.()?.getTime() || b.requestDate?.toDate?.()?.getTime() || 0;
+      return dateB - dateA;
+    });
+  }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper, userRoleStr, queryDateRange]);
 
   const stats = React.useMemo(() => {
     if (!assignments) return { total: 0, pending: 0, ongoing: 0, completed: 0 };
@@ -494,40 +552,6 @@ export default function ManageAllTripsPage() {
     }
   };
 
-  const filteredAssignments = React.useMemo(() => {
-    if (!assignments || !userProfile) return [];
-    
-    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
-      ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userRoleStr)?.ownDataOnly ?? false;
-
-    let result = assignments;
-
-    if (isOwnDataOnly && !isSuper) {
-      const assignedIds = new Set(userProfile.assignedProjectIds || []);
-      result = result.filter(trip => {
-        if (trip.siteId) return assignedIds.has(trip.siteId);
-        return true; 
-      });
-    }
-
-    return result.filter(trip => {
-      const matchesSearch = trip.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trip.pickupLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (trip.vehicleDetails || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (trip.driverName || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesStatus = statusFilter === 'all' || trip.status === statusFilter;
-      const isQueue = activeTab === 'queue' ? trip.status === 'Pending' : true;
-      
-      return matchesSearch && matchesStatus && isQueue;
-    }).sort((a, b) => {
-      const dateA = a.requestDate?.toDate?.()?.getTime() || 0;
-      const dateB = b.createdAt?.toDate?.()?.getTime() || b.requestDate?.toDate?.()?.getTime() || 0;
-      return dateB - dateA;
-    });
-  }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper, userRoleStr]);
-
   const handleCloseDetail = () => {
     setDetailsAssignment(null);
     const params = new URLSearchParams(searchParams.toString());
@@ -542,6 +566,12 @@ export default function ManageAllTripsPage() {
     setCurrentUrlIndex(index >= 0 ? index : 0);
     setViewUrl(url);
     setZoom(1);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setDateFilter("7days");
   };
 
   return (
@@ -580,31 +610,72 @@ export default function ManageAllTripsPage() {
         <SummaryCard title="Completed" value={stats.completed} icon={CheckCircle2} color="emerald" />
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-10">
-            <TabsTrigger value="registry" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-4 sm:px-6 h-8">Trip History</TabsTrigger>
-            {(isAdmin || isManager) && (
-              <TabsTrigger value="queue" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-4 sm:px-6 h-8 relative">
-                Allotment Queue
-                {stats.pending > 0 && <Badge className="absolute -top-2 -right-2 h-5 min-w-5 flex items-center justify-center p-0 rounded-full bg-red-500 text-[10px] font-black">{stats.pending}</Badge>}
-              </TabsTrigger>
-            )}
-          </TabsList>
-
-          <div className="flex items-center gap-2">
-            <div className="relative w-full md:w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      <div className="flex flex-col gap-4 bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Logs</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Search..." 
-                className="pl-8 h-9 text-xs rounded-sm border-primary/20" 
+                placeholder="Search personnel, plate, site..." 
+                className="pl-10 h-11 rounded-sm bg-background border-primary/10 text-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Time Range</Label>
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+                <Calendar className="h-4 w-4 mr-2 opacity-50" />
+                <SelectValue placeholder="Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+                <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
+                <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+                <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+                <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
+                <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
+                <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-end gap-2">
+            {dateFilter === 'custom' ? (
+              <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95 duration-200">
+                <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-11 rounded-sm border-primary/20 text-xs" />
+                <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-11 rounded-sm border-primary/20 text-xs" />
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
+            <Button variant="ghost" size="icon" className="h-11 w-11 rounded-sm text-muted-foreground border border-transparent hover:border-primary/10" onClick={clearFilters}>
+              <FilterX className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-2">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
+            <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-10">
+              <TabsTrigger value="registry" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-4 sm:px-6 h-8">Trip History</TabsTrigger>
+              {(isAdmin || isManager) && (
+                <TabsTrigger value="queue" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-4 sm:px-6 h-8 relative">
+                  Allotment Queue
+                  {stats.pending > 0 && <Badge className="absolute -top-2 -right-2 h-5 min-w-5 flex items-center justify-center p-0 rounded-full bg-red-500 text-[10px] font-black">{stats.pending}</Badge>}
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </Tabs>
+
+          <div className="flex items-center gap-2">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[120px] sm:w-[150px] h-9 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20">
-                <SelectValue placeholder="Filter" />
+              <SelectTrigger className="w-[140px] h-9 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20">
+                <SelectValue placeholder="Status Filter" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all" className="text-[10px] font-bold uppercase">All Status</SelectItem>
@@ -616,115 +687,52 @@ export default function ManageAllTripsPage() {
             </Select>
           </div>
         </div>
+      </div>
 
-        <TabsContent value="registry" className="animate-in fade-in-50 duration-300">
-          {/* Mobile Card View */}
-          <div className="md:hidden space-y-4">
-            {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => (
-              <TripMobileCard 
-                key={trip.id} 
-                trip={trip} 
-                user={user} 
-                isAdmin={isAdmin} 
-                isHR={isHR} 
-                isManager={isManager}
-                allUsers={allUsers}
-                onDetails={setDetailsAssignment}
-                onEdit={setEditingAssignment}
-                onCancel={setCancelTarget}
-                onForceEnd={setForceEndTarget}
-                onAllot={setApprovalState}
-                onWhatsApp={handleGlobalWhatsAppShare}
-              />
-            )) : (
-              <div className="text-center py-12 text-muted-foreground italic text-xs bg-card border border-dashed rounded-sm">No trip records found.</div>
-            )}
-          </div>
+      <div className="mt-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsContent value="registry" className="animate-in fade-in-50 duration-300 m-0">
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+              {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => (
+                <TripMobileCard 
+                  key={trip.id} 
+                  trip={trip} 
+                  user={user} 
+                  isAdmin={isAdmin} 
+                  isHR={isHR} 
+                  isManager={isManager}
+                  allUsers={allUsers}
+                  onDetails={setDetailsAssignment}
+                  onEdit={setEditingAssignment}
+                  onCancel={setCancelTarget}
+                  onForceEnd={setForceEndTarget}
+                  onAllot={setApprovalState}
+                  onWhatsApp={handleGlobalWhatsAppShare}
+                />
+              )) : (
+                <div className="text-center py-12 text-muted-foreground italic text-xs bg-card border border-dashed rounded-sm">No trip records found for this period.</div>
+              )}
+            </div>
 
-          {/* Desktop Table View */}
-          <div className="hidden md:block">
-            <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-muted/30">
-                      <TableRow>
-                        <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
-                        <TableHead className="min-w-[250px]">Itinerary</TableHead>
-                        <TableHead>Trip Date</TableHead>
-                        <TableHead>Fleet Resource</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => (
-                        <TripTableRow 
-                          key={trip.id} 
-                          trip={trip} 
-                          user={user} 
-                          isAdmin={isAdmin} 
-                          isHR={isHR} 
-                          isManager={isManager}
-                          allUsers={allUsers}
-                          onDetails={setDetailsAssignment}
-                          onEdit={setEditingAssignment}
-                          onCancel={setCancelTarget}
-                          onForceEnd={setForceEndTarget}
-                          onAllot={setApprovalState}
-                          onWhatsApp={handleGlobalWhatsAppShare}
-                        />
-                      )) : (
-                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No logs discovered.</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="queue" className="animate-in fade-in-50 duration-300">
-          <div className="md:hidden space-y-4">
-            {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
-              <TripMobileCard 
-                key={trip.id} 
-                trip={trip} 
-                user={user} 
-                isAdmin={isAdmin} 
-                isHR={isHR} 
-                isManager={isManager}
-                allUsers={allUsers}
-                onDetails={setDetailsAssignment}
-                onEdit={setEditingAssignment}
-                onCancel={setCancelTarget}
-                onForceEnd={setForceEndTarget}
-                onAllot={setApprovalState}
-                onWhatsApp={handleGlobalWhatsAppShare}
-              />
-            )) : (
-              <div className="text-center py-12 text-muted-foreground italic text-xs bg-card border border-dashed rounded-sm">Queue empty.</div>
-            )}
-          </div>
-
-          <div className="hidden md:block">
-            <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-muted/30">
-                      <TableRow>
-                        <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
-                        <TableHead className="min-w-[250px]">Itinerary</TableHead>
-                        <TableHead>Trip Date</TableHead>
-                        <TableHead>Request Date</TableHead>
-                        <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? (
-                        filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
+            {/* Desktop Table View */}
+            <div className="hidden md:block">
+              <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
+                          <TableHead className="min-w-[250px]">Itinerary</TableHead>
+                          <TableHead>Trip Date</TableHead>
+                          <TableHead>Fleet Resource</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => (
                           <TripTableRow 
                             key={trip.id} 
                             trip={trip} 
@@ -739,20 +747,87 @@ export default function ManageAllTripsPage() {
                             onForceEnd={setForceEndTarget}
                             onAllot={setApprovalState}
                             onWhatsApp={handleGlobalWhatsAppShare}
-                            isQueueView
                           />
-                        ))
-                      ) : (
-                        <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">Queue empty.</TableCell></TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+                        )) : (
+                          <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No records found for this period.</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="queue" className="animate-in fade-in-50 duration-300 m-0">
+            <div className="md:hidden space-y-4">
+              {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
+                <TripMobileCard 
+                  key={trip.id} 
+                  trip={trip} 
+                  user={user} 
+                  isAdmin={isAdmin} 
+                  isHR={isHR} 
+                  isManager={isManager}
+                  allUsers={allUsers}
+                  onDetails={setDetailsAssignment}
+                  onEdit={setEditingAssignment}
+                  onCancel={setCancelTarget}
+                  onForceEnd={setForceEndTarget}
+                  onAllot={setApprovalState}
+                  onWhatsApp={handleGlobalWhatsAppShare}
+                />
+              )) : (
+                <div className="text-center py-12 text-muted-foreground italic text-xs bg-card border border-dashed rounded-sm">Queue empty for this period.</div>
+              )}
+            </div>
+
+            <div className="hidden md:block">
+              <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead className="px-6 min-w-[180px]">Requester</TableHead>
+                          <TableHead className="min-w-[250px]">Itinerary</TableHead>
+                          <TableHead>Trip Date</TableHead>
+                          <TableHead>Request Date</TableHead>
+                          <TableHead className="text-right px-6 min-w-[220px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? (
+                          filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
+                            <TripTableRow 
+                              key={trip.id} 
+                              trip={trip} 
+                              user={user} 
+                              isAdmin={isAdmin} 
+                              isHR={isHR} 
+                              isManager={isManager}
+                              allUsers={allUsers}
+                              onDetails={setDetailsAssignment}
+                              onEdit={setEditingAssignment}
+                              onCancel={setCancelTarget}
+                              onForceEnd={setForceEndTarget}
+                              onAllot={setApprovalState}
+                              onWhatsApp={handleGlobalWhatsAppShare}
+                              isQueueView
+                            />
+                          ))
+                        ) : (
+                          <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">Queue empty for this period.</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
 
       <EditTripDialog assignment={editingAssignment} open={!!editingAssignment} onOpenChange={(o) => !o && setEditingAssignment(null)} sites={sites || []} allUsers={allUsers || []} onSave={handleSaveEdit} />
       <ScheduledTripsDialog assignments={assignments || []} allUsers={allUsers || []} open={isScheduledTripsOpen} onOpenChange={setIsScheduledTripsOpen} />
@@ -1723,3 +1798,4 @@ function ScheduledTripsDialog({
     </Dialog>
   );
 }
+
