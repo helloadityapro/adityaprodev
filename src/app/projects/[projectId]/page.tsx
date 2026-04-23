@@ -111,6 +111,8 @@ type Project = {
   projectCompany: string;
   acCapacity: number;
   dcCapacity: number;
+  latitude?: number;
+  longitude?: number;
 };
 
 type UserProfile = {
@@ -1023,7 +1025,45 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
 
               <div className="space-y-6">
-                <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-full">
+                <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-fit">
+                  <CardHeader className="py-4 border-b bg-primary/5">
+                    <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" /> Site Geolocation
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <p className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Latitude</p>
+                        <p className="font-mono font-bold text-sm">{project.latitude || "Not Recorded"}</p>
+                      </div>
+                      <div className="space-y-1 text-right">
+                        <p className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Longitude</p>
+                        <p className="font-mono font-bold text-sm">{project.longitude || "Not Recorded"}</p>
+                      </div>
+                    </div>
+                    {project.latitude && project.longitude ? (
+                      <Button 
+                        asChild 
+                        className="w-full rounded-sm font-black uppercase text-[10px] tracking-widest h-12 shadow-lg"
+                      >
+                        <a 
+                          href={`https://www.google.com/maps/search/?api=1&query=${project.latitude},${project.longitude}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                        >
+                          <Navigation className="mr-2 h-4 w-4" /> View on Maps
+                        </a>
+                      </Button>
+                    ) : (
+                      <div className="p-4 bg-muted/20 border border-dashed rounded-sm text-center">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase italic">Coordinates not assigned to this site</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-fit">
                   <CardHeader className="py-4 border-b bg-muted/5">
                     <CardTitle className="text-xs font-bold uppercase tracking-widest">Compliance Health</CardTitle>
                   </CardHeader>
