@@ -44,6 +44,19 @@
       },
       "required": ["name", "projectCompany"]
     },
+    "SiteGroup": {
+      "title": "Site Group",
+      "type": "object",
+      "description": "Custom grouping of project sites for filtering and reporting.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "siteIds": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdById": { "type": "string" }
+      },
+      "required": ["name", "siteIds"]
+    },
     "Notification": {
       "title": "Notification",
       "type": "object",
@@ -313,6 +326,10 @@
     "/sites/{siteId}": {
       "schema": { "$ref": "#/backend/entities/Site" },
       "description": "Project site locations and capacities."
+    },
+    "/site_groups/{groupId}": {
+      "schema": { "$ref": "#/backend/entities/SiteGroup" },
+      "description": "Categorization of sites for filtering."
     },
     "/system_settings/access/roles/{roleId}": {
       "schema": { "$ref": "#/backend/entities/AccessRule" },

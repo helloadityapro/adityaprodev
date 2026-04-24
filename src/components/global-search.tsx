@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -14,7 +15,10 @@ import {
   X,
   FileCheck,
   Table as TableIcon,
-  TrendingUp
+  TrendingUp,
+  Tags,
+  Check,
+  ChevronDown
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
@@ -31,6 +35,9 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { ViewUserDialog } from './view-user-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
 
 type SearchResult = {
   id: string;
@@ -38,6 +45,7 @@ type SearchResult = {
   title: string;
   subtitle: string;
   link: string;
+  siteId?: string;
   userData?: any;
 };
 
@@ -61,6 +69,9 @@ export function GlobalSearch() {
   const [results, setResults] = React.useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = React.useState(false);
   const [selectedUserForView, setSelectedUserForView] = React.useState<any>(null);
+  
+  // Group Filtering in Search
+  const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
@@ -68,10 +79,11 @@ export function GlobalSearch() {
   const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
-  // Pre-fetch all sites for instant searching and guaranteed visibility
-  // We use a high limit to ensure "all sites" are indeed captured in the index
   const sitesQuery = useMemoFirebase(() => query(collection(firestore, 'sites'), limit(1000)), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
+
+  const groupsQuery = useMemoFirebase(() => collection(firestore, 'site_groups'), [firestore]);
+  const { data: groups } = useCollection<any>(groupsQuery);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
@@ -96,7 +108,7 @@ export function GlobalSearch() {
     }
 
     const timer = setTimeout(() => {
-      if (searchQuery.trim().length >= 2) {
+      if (searchQuery.trim().length >= 2 || selectedGroupIds.length > 0) {
         performSearch(searchQuery.trim().toLowerCase());
       } else {
         setResults([]);
@@ -104,15 +116,21 @@ export function GlobalSearch() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, isOpen]);
+  }, [searchQuery, isOpen, selectedGroupIds]);
 
-  /**
-   * Perform search across local index (Sites) and remote collections (Permits, Tasks, etc.)
-   */
   const performSearch = async (term: string) => {
     setIsSearching(true);
     
-    // 1. Instant local search for Sites (Guarantees visibility of all authorized sites)
+    // Calculate effective site filters based on selected groups
+    let allowedSiteIdsFromGroups: Set<string> | null = null;
+    if (selectedGroupIds.length > 0 && groups) {
+      allowedSiteIdsFromGroups = new Set();
+      groups.filter(g => selectedGroupIds.includes(g.id)).forEach(g => {
+        g.siteIds?.forEach((id: string) => allowedSiteIdsFromGroups!.add(id));
+      });
+    }
+
+    // 1. Sites search (Local)
     const siteResults: SearchResult[] = [];
     if (allSites && userProfile) {
       const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
@@ -122,11 +140,11 @@ export function GlobalSearch() {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
 
       allSites.forEach(s => {
-        // Apply Data Sovereignty Access Control
         const isAuthorized = isAdmin || !isOwnDataOnly || assignedIds.has(s.id);
-        if (!isAuthorized) return;
+        const matchesGroup = !allowedSiteIdsFromGroups || allowedSiteIdsFromGroups.has(s.id);
+        if (!isAuthorized || !matchesGroup) return;
 
-        if (s.name.toLowerCase().includes(term) || s.projectCompany.toLowerCase().includes(term)) {
+        if (!term || s.name.toLowerCase().includes(term) || s.projectCompany.toLowerCase().includes(term)) {
           siteResults.push({
             id: s.id,
             type: 'Site',
@@ -140,7 +158,6 @@ export function GlobalSearch() {
 
     setResults(siteResults);
 
-    // 2. Fetch results from more dynamic/growing collections
     const searchCollection = async (
       collName: string, 
       type: SearchResult['type'], 
@@ -154,21 +171,24 @@ export function GlobalSearch() {
         const matches: SearchResult[] = [];
         snap.docs.forEach(d => {
           const data = d.data();
-          
-          // Apply Access Control for non-admins if data sovereignty is active
+          const siteId = data.siteId;
+
+          // Access Control
           if (!isAdmin && userProfile) {
             const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
               ? userProfile.ownDataOnly 
               : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
 
             if (isOwnDataOnly) {
-              const siteId = data.siteId;
               const assignedIds = new Set(userProfile.assignedProjectIds || []);
               if (siteId && !assignedIds.has(siteId)) return;
             }
           }
 
-          const isMatch = fields.some(field => {
+          // Group Filter
+          if (allowedSiteIdsFromGroups && siteId && !allowedSiteIdsFromGroups.has(siteId)) return;
+
+          const isMatch = !term || fields.some(field => {
             const val = data[field];
             return typeof val === 'string' && val.toLowerCase().includes(term);
           }) || d.id.toLowerCase().includes(term);
@@ -182,7 +202,7 @@ export function GlobalSearch() {
             switch (type) {
               case 'Permit':
                 title = data.serialNumber || `Permit ${d.id.slice(0, 8)}`;
-                subtitle = `${data.siteName} • ${data.ptwType} • ${data.status}`;
+                subtitle = `${data.siteName} • ${data.ptwType}`;
                 link = `/ptw/list?view=${d.id}`;
                 break;
               case 'Task':
@@ -192,12 +212,12 @@ export function GlobalSearch() {
                 break;
               case 'DPR':
                 title = `DPR: ${data.siteName}`;
-                subtitle = `By: ${data.userName} • Date: ${data.reportDate || 'N/A'}`;
+                subtitle = `By: ${data.userName} • ${data.reportDate}`;
                 link = `/dpr/list`;
                 break;
               case 'Movement':
                 title = data.itemName;
-                subtitle = `${data.movementType} at ${data.siteName} • ${data.quantity} ${data.unit}`;
+                subtitle = `${data.movementType} at ${data.siteName}`;
                 link = `/movements/list`;
                 break;
               case 'User':
@@ -220,17 +240,16 @@ export function GlobalSearch() {
           });
         }
       } catch (e) {
-        console.error(`Search failed in ${collName}:`, e);
+        console.error(`Search failed:`, e);
       }
     };
 
-    // Parallel search for speed
     Promise.allSettled([
-      searchCollection('permits_to_work', 'Permit', ['serialNumber', 'siteName', 'ptwType'], 150),
+      searchCollection('permits_to_work', 'Permit', ['serialNumber', 'siteName', 'ptwType'], 100),
       searchCollection('tasks', 'Task', ['title', 'siteName', 'assignedToName'], 100),
       searchCollection('dprs', 'DPR', ['siteName', 'description', 'userName'], 50),
       searchCollection('material_movements', 'Movement', ['itemName', 'siteName', 'sourceOrDestination'], 50),
-      isAdmin ? searchCollection('users', 'User', ['username', 'email'], 200) : Promise.resolve()
+      isAdmin && !allowedSiteIdsFromGroups ? searchCollection('users', 'User', ['username', 'email'], 100) : Promise.resolve()
     ]).finally(() => {
       setIsSearching(false);
     });
@@ -240,12 +259,8 @@ export function GlobalSearch() {
     setIsOpen(false);
     setSearchQuery('');
     setResults([]);
-    
-    if (result.type === 'User') {
-      setSelectedUserForView(result.userData);
-    } else {
-      router.push(result.link);
-    }
+    if (result.type === 'User') setSelectedUserForView(result.userData);
+    else router.push(result.link);
   };
 
   const getTypeIcon = (type: SearchResult['type']) => {
@@ -280,18 +295,56 @@ export function GlobalSearch() {
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-2xl p-0 overflow-hidden border-none shadow-2xl rounded-sm">
-          <DialogHeader className="p-4 border-b bg-muted/5">
+          <DialogHeader className="p-4 border-b bg-muted/5 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-2">
               <Search className="h-5 w-5 text-primary" />
-              <DialogTitle className="text-sm font-bold uppercase tracking-widest text-primary">Global Search</DialogTitle>
+              <DialogTitle className="text-sm font-bold uppercase tracking-widest text-primary">Command Center</DialogTitle>
             </div>
+            
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 rounded-sm font-black uppercase text-[9px] tracking-widest gap-1.5 border border-primary/10">
+                  <Tags className="h-3 w-3" />
+                  {selectedGroupIds.length === 0 ? "Global Scope" : `${selectedGroupIds.length} Groups Active`}
+                  <ChevronDown className="h-3 w-3 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-56 p-0 rounded-sm border-primary/10 shadow-2xl">
+                <div className="bg-primary/5 p-3 border-b">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Filter results by group</h3>
+                </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="p-2 space-y-1">
+                    {groups?.map(group => (
+                      <div 
+                        key={group.id} 
+                        className={cn(
+                          "flex items-center space-x-2 p-2 rounded-sm hover:bg-muted/50 transition-colors cursor-pointer",
+                          selectedGroupIds.includes(group.id) && "bg-primary/10"
+                        )}
+                        onClick={() => setSelectedGroupIds(prev => prev.includes(group.id) ? prev.filter(id => id !== group.id) : [...prev, group.id])}
+                      >
+                        <Checkbox checked={selectedGroupIds.includes(group.id)} />
+                        <span className="text-[11px] font-bold uppercase truncate">{group.name}</span>
+                      </div>
+                    ))}
+                    {(!groups || groups.length === 0) && (
+                      <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground opacity-30">No groups registered</p>
+                    )}
+                  </div>
+                </ScrollArea>
+                {selectedGroupIds.length > 0 && (
+                  <Button variant="ghost" onClick={() => setSelectedGroupIds([])} className="w-full rounded-none h-8 text-[9px] font-black uppercase text-primary border-t">Reset Filter</Button>
+                )}
+              </PopoverContent>
+            </Popover>
           </DialogHeader>
           
           <div className="p-4 bg-background">
             <div className="relative">
               <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
               <Input 
-                placeholder="Type to find anything..." 
+                placeholder={selectedGroupIds.length > 0 ? "Searching within selected groups..." : "Type to find anything..."} 
                 className="pl-10 h-12 text-base rounded-sm border-primary/20 focus-visible:ring-primary/30"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -340,10 +393,11 @@ export function GlobalSearch() {
                   );
                 })}
               </div>
-            ) : searchQuery.length >= 2 && !isSearching ? (
+            ) : (searchQuery.length >= 2 || selectedGroupIds.length > 0) && !isSearching ? (
               <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
                 <Search className="h-12 w-12 opacity-10 mb-4" />
                 <p className="text-sm font-medium">No results found</p>
+                <p className="text-[10px] font-bold uppercase mt-2 opacity-50">Try adjusting your keyword or group filter</p>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground/40">

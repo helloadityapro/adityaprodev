@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -15,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
-import { Trash2, Search, MapPin, Plus, FileDown, FileUp, Download, Check, ListFilter, AlertCircle, Loader2, ArrowLeft, RefreshCw, Pencil } from 'lucide-react';
+import { Trash2, Search, MapPin, Plus, FileDown, FileUp, Download, Check, ListFilter, AlertCircle, Loader2, ArrowLeft, RefreshCw, Pencil, LayoutGrid, Tags, X, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -56,6 +57,8 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const siteSchema = z.object({
   name: z.string().min(1, 'Site name is required.'),
@@ -87,8 +90,13 @@ export default function AddNewProjectPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [siteToEdit, setSiteToEdit] = React.useState<any | null>(null);
   const [isImporting, setIsImporting] = React.useState(false);
-
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  
+  // Group States
+  const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
+  const [isGroupManageOpen, setIsGroupManageOpen] = React.useState(false);
+  const [newGroupName, setNewGroupName] = React.useState("");
+  const [groupSiteIds, setGroupSiteIds] = React.useState<string[]>([]);
+  const [groupSiteSearch, setGroupSiteSearch] = React.useState("");
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -97,6 +105,9 @@ export default function AddNewProjectPage() {
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: sites, isLoading: sitesLoading } = useCollection<any>(sitesQuery);
+
+  const groupsQuery = useMemoFirebase(() => collection(firestore, 'site_groups'), [firestore]);
+  const { data: groups, isLoading: groupsLoading } = useCollection<any>(groupsQuery);
 
   const siteForm = useForm<z.infer<typeof siteSchema>>({
     resolver: zodResolver(siteSchema),
@@ -177,124 +188,27 @@ export default function AddNewProjectPage() {
     }
   };
 
-  const handleDownloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([
-      { 'Site Name': 'Sample Site A', 'Project Company': 'ABC Energies', 'AC Capacity': 5.000, 'DC Capacity': 6.250, 'Latitude': 19.0760, 'Longitude': 72.8777 }
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "AdityaPro_Site_Import_Template.xlsx");
+  // Group Management
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim() || groupSiteIds.length === 0 || !user) return;
+    try {
+      await addDocumentNonBlocking(collection(firestore, 'site_groups'), {
+        name: newGroupName.trim(),
+        siteIds: groupSiteIds,
+        createdById: user.uid,
+        createdAt: serverTimestamp(),
+      });
+      toast({ title: 'Group Created', description: `Site group "${newGroupName}" is now available.` });
+      setNewGroupName("");
+      setGroupSiteIds([]);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Failed to create group', description: e.message });
+    }
   };
 
-  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-        if (json.length === 0) {
-          toast({ variant: 'destructive', title: 'Import Failed', description: 'The file is empty.' });
-          setIsImporting(false);
-          return;
-        }
-
-        let createdCount = 0;
-        let updatedCount = 0;
-        const batchSize = 400;
-        
-        for (let i = 0; i < json.length; i += batchSize) {
-          const batch = writeBatch(firestore);
-          const chunk = json.slice(i, i + batchSize);
-          
-          chunk.forEach((row) => {
-            const rawName = row['Site Name'] || row['name'] || row['Name'];
-            const name = rawName ? String(rawName).trim() : null;
-            const company = row['Project Company'] || row['projectCompany'] || row['Company'];
-            const ac = row['AC Capacity'] || row['acCapacity'] || row['AC'];
-            const dc = row['DC Capacity'] || row['dcCapacity'] || row['DC'];
-            const lat = row['Latitude'] || row['latitude'] || row['Lat'];
-            const lng = row['Longitude'] || row['longitude'] || row['Lng'] || row['Long'];
-
-            if (name) {
-              const existingSite = sites?.find(s => s.name.toLowerCase() === name.toLowerCase());
-              
-              if (existingSite) {
-                // Update Logic
-                const existingRef = doc(firestore, 'sites', existingSite.id);
-                batch.update(existingRef, {
-                  projectCompany: company ? String(company) : existingSite.projectCompany,
-                  acCapacity: ac !== undefined ? parseFloat(String(ac)) : existingSite.acCapacity,
-                  dcCapacity: dc !== undefined ? parseFloat(String(dc)) : existingSite.dcCapacity,
-                  latitude: lat !== undefined ? parseFloat(String(lat)) : (existingSite.latitude || 0),
-                  longitude: lng !== undefined ? parseFloat(String(lng)) : (existingSite.longitude || 0),
-                  updatedAt: serverTimestamp(),
-                });
-                updatedCount++;
-              } else {
-                // Create Logic
-                if (company) {
-                  const newDocRef = doc(collection(firestore, 'sites'));
-                  batch.set(newDocRef, {
-                    name: String(name),
-                    projectCompany: String(company),
-                    acCapacity: parseFloat(String(ac || "0")),
-                    dcCapacity: parseFloat(String(dc || "0")),
-                    latitude: lat ? parseFloat(String(lat)) : 0,
-                    longitude: lng ? parseFloat(String(lng)) : 0,
-                    createdAt: serverTimestamp(),
-                  });
-                  createdCount++;
-                }
-              }
-            }
-          });
-          
-          await batch.commit();
-        }
-
-        toast({ 
-          variant: 'success', 
-          title: 'Sync Successful', 
-          description: `Processed ${createdCount + updatedCount} sites. (${createdCount} added, ${updatedCount} updated with coordinates/details).` 
-        });
-      } catch (err: any) {
-        toast({ variant: 'destructive', title: 'Import Error', description: err.message });
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
-  const handleExportRegistry = () => {
-    if (!sites || sites.length === 0) return;
-    
-    const worksheet = XLSX.utils.json_to_sheet(sites.map(s => ({
-      'Site Name': s.name,
-      'Project Company': s.projectCompany,
-      'AC Capacity': formatCapacity(s.acCapacity),
-      'DC Capacity': formatCapacity(s.dcCapacity),
-      'Latitude': s.latitude || 0,
-      'Longitude': s.longitude || 0,
-      'Date Added': s.createdAt ? format(s.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : 'N/A'
-    })));
-    
-    const workbook = XLSX.utils.book_new();
-    // Use proper XLSX methods for native stability
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Sites");
-    const b64 = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
-    
-    // In a real app this would call a download helper, but for now we'll stick to standard
-    XLSX.writeFile(workbook, "AdityaPro_SiteRegistry.xlsx");
+  const handleDeleteGroup = (id: string) => {
+    deleteDocumentNonBlocking(doc(firestore, 'site_groups', id));
+    toast({ title: 'Group Removed' });
   };
 
   const filteredSitesList = React.useMemo(() => {
@@ -304,6 +218,15 @@ export default function AddNewProjectPage() {
       s.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
       s.projectCompany?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    // Apply Group Filtering
+    if (selectedGroupIds.length > 0) {
+      const allowedSiteIds = new Set<string>();
+      groups?.filter(g => selectedGroupIds.includes(g.id)).forEach(g => {
+        g.siteIds?.forEach((id: string) => allowedSiteIds.add(id));
+      });
+      result = result.filter(s => allowedSiteIds.has(s.id));
+    }
 
     if (sortOrder === 'name') {
       result.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -322,7 +245,15 @@ export default function AddNewProjectPage() {
     }
 
     return result;
-  }, [sites, searchTerm, sortOrder]);
+  }, [sites, groups, searchTerm, selectedGroupIds, sortOrder]);
+
+  const summaryStats = React.useMemo(() => {
+    return {
+      count: filteredSitesList.length,
+      ac: filteredSitesList.reduce((sum, s) => sum + (parseFloat(String(s.acCapacity || 0)) || 0), 0),
+      dc: filteredSitesList.reduce((sum, s) => sum + (parseFloat(String(s.dcCapacity || 0)) || 0), 0),
+    };
+  }, [filteredSitesList]);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredSitesList.length) {
@@ -332,13 +263,7 @@ export default function AddNewProjectPage() {
     }
   };
 
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  if (isUserLoading || isProfileLoading || sitesLoading) {
+  if (isUserLoading || isProfileLoading || sitesLoading || groupsLoading) {
     return (
       <div className="space-y-6 animate-pulse">
         <Skeleton className="h-9 w-64" />
@@ -357,49 +282,13 @@ export default function AddNewProjectPage() {
           <h1 className="flex items-center gap-2 text-primary">
             <Plus className="h-8 w-8" /> Add or Update Project
           </h1>
-          <p className="text-muted-foreground">Define project locations or update coordinates for existing sites via bulk upload.</p>
+          <p className="text-muted-foreground">Manage specific site records or organize them into clusters via groups.</p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2 mt-4">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={handleDownloadTemplate} className="rounded-sm border-primary/20 text-primary">
-                  <FileDown className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Download Import Template</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="relative">
-                  <input type="file" accept=".xlsx,.xls,.csv" className="hidden" ref={fileInputRef} onChange={handleBulkImport} />
-                  <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="rounded-sm border-primary/20 text-primary">
-                    {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Bulk Upload / Sync Sites (Existing names will be updated)</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={handleExportRegistry} className="rounded-sm border-primary/20 text-primary">
-                  <Download className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Export Site Registry to Excel</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="rounded-sm font-bold h-11 shadow-md ml-2">
+              <Button className="rounded-sm font-bold h-11 shadow-md">
                 <Plus className="h-4 w-4 mr-2" /> Add New Site
               </Button>
             </DialogTrigger>
@@ -440,23 +329,196 @@ export default function AddNewProjectPage() {
               </Form>
             </DialogContent>
           </Dialog>
+
+          <Dialog open={isGroupManageOpen} onOpenChange={setIsGroupManageOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="rounded-sm font-bold h-11 border-primary/20 text-primary hover:bg-primary/5">
+                <Tags className="h-4 w-4 mr-2" /> Manage Groups
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl rounded-sm p-0 overflow-hidden border-none shadow-2xl flex flex-col h-[80vh]">
+              <DialogHeader className="p-6 bg-primary/5 border-b">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 p-2 rounded-sm"><Tags className="h-5 w-5 text-primary" /></div>
+                  <div>
+                    <DialogTitle className="text-xl font-black uppercase tracking-tight">Site Grouping Hub</DialogTitle>
+                    <DialogDescription className="text-xs font-medium">Categorize project locations for cluster reports and filtering.</DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+              
+              <Tabs defaultValue="create" className="flex-1 flex flex-col min-h-0">
+                <TabsList className="bg-muted/50 rounded-none border-b h-12 p-1 px-6 gap-4">
+                  <TabsTrigger value="create" className="rounded-sm font-bold text-[10px] uppercase tracking-widest">New Group</TabsTrigger>
+                  <TabsTrigger value="list" className="rounded-sm font-bold text-[10px] uppercase tracking-widest">Active Groups</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="create" className="flex-1 p-6 space-y-6 overflow-y-auto m-0">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Group Name</Label>
+                      <Input 
+                        placeholder="e.g. Cluster North, Phase 2, etc..." 
+                        className="h-12 rounded-sm text-lg font-black tracking-tight"
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Select Sites ({groupSiteIds.length})</Label>
+                        <div className="relative w-48">
+                          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                          <Input 
+                            placeholder="Filter sites..." 
+                            className="pl-8 h-8 rounded-sm text-[10px]" 
+                            value={groupSiteSearch}
+                            onChange={(e) => setGroupSiteSearch(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="border rounded-sm bg-muted/10">
+                        <ScrollArea className="h-64">
+                          <div className="p-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {sites?.filter(s => s.name.toLowerCase().includes(groupSiteSearch.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map(site => (
+                              <div 
+                                key={site.id} 
+                                className={cn(
+                                  "flex items-center space-x-2 p-2 rounded-sm border transition-all cursor-pointer",
+                                  groupSiteIds.includes(site.id) ? "bg-primary/5 border-primary/30" : "bg-background border-transparent hover:border-border"
+                                )}
+                                onClick={() => {
+                                  setGroupSiteIds(prev => prev.includes(site.id) ? prev.filter(id => id !== site.id) : [...prev, site.id]);
+                                }}
+                              >
+                                <Checkbox checked={groupSiteIds.includes(site.id)} />
+                                <span className="text-[11px] font-bold truncate leading-none">{site.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    </div>
+                  </div>
+                  <Button 
+                    className="w-full h-12 font-black uppercase text-xs tracking-widest shadow-lg"
+                    disabled={!newGroupName.trim() || groupSiteIds.length === 0}
+                    onClick={handleCreateGroup}
+                  >
+                    Confirm Group Creation
+                  </Button>
+                </TabsContent>
+
+                <TabsContent value="list" className="flex-1 p-0 m-0 overflow-hidden flex flex-col">
+                  <ScrollArea className="flex-1">
+                    <div className="divide-y">
+                      {groups && groups.length > 0 ? groups.map(g => (
+                        <div key={g.id} className="p-4 px-6 flex items-center justify-between hover:bg-muted/5 transition-colors">
+                          <div className="space-y-1 min-w-0">
+                            <p className="font-black text-sm uppercase tracking-tight text-primary">{g.name}</p>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase">{g.siteIds?.length || 0} Projects Assigned</p>
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleDeleteGroup(g.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )) : (
+                        <div className="p-20 text-center text-muted-foreground italic text-xs uppercase font-bold opacity-30">No groups defined</div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+              </Tabs>
+              <div className="p-4 bg-muted/5 border-t">
+                <DialogClose asChild><Button variant="outline" className="w-full h-11 font-black uppercase text-[10px] tracking-widest rounded-sm">Close Dashboard</Button></DialogClose>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Aggregate Analytics Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">Filtered Registry</p>
+            <p className="text-2xl font-black text-primary leading-none">{summaryStats.count}</p>
+            <p className="text-[8px] font-bold text-primary/60 uppercase">Project Sites</p>
+          </div>
+          <Building2 className="h-8 w-8 text-primary/10" />
+        </div>
+        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">Agg. AC Capacity</p>
+            <p className="text-2xl font-black text-primary leading-none">{formatCapacity(summaryStats.ac)}</p>
+            <p className="text-[8px] font-bold text-primary/60 uppercase">Megawatts (MW)</p>
+          </div>
+          <Zap className="h-8 w-8 text-primary/10" />
+        </div>
+        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">Agg. DC Capacity</p>
+            <p className="text-2xl font-black text-primary leading-none">{formatCapacity(summaryStats.dc)}</p>
+            <p className="text-[8px] font-bold text-primary/60 uppercase">Megawatts Peak (MWp)</p>
+          </div>
+          <ShieldCheck className="h-8 w-8 text-primary/10" />
         </div>
       </div>
 
       <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
         <CardHeader className="bg-muted/5 border-b py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <CardTitle className="text-sm font-bold uppercase tracking-widest">Site Registry</CardTitle>
+            <CardTitle className="text-sm font-bold uppercase tracking-widest">Operational Registry</CardTitle>
             <CardDescription className="text-[10px] font-black uppercase text-primary">
-              Tip: Re-import sites with existing names to update coordinates in bulk.
+              Management & Bulk Operations
             </CardDescription>
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative w-full md:w-64">
+            {/* Group Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 rounded-sm border-primary/20 text-primary font-bold text-[10px] uppercase gap-1.5 min-w-[140px]">
+                  <Tags className="h-3.5 w-3.5" />
+                  {selectedGroupIds.length === 0 ? "Filter Groups" : `${selectedGroupIds.length} Groups Active`}
+                  <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-56 p-0 rounded-sm border-primary/10 shadow-2xl overflow-hidden">
+                <div className="bg-primary/5 p-3 border-b">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Filter results by group</h3>
+                </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="p-2 space-y-1">
+                    {groups?.map(group => (
+                      <div 
+                        key={group.id} 
+                        className={cn(
+                          "flex items-center space-x-2 p-2 rounded-sm hover:bg-muted/50 transition-colors cursor-pointer",
+                          selectedGroupIds.includes(group.id) && "bg-primary/10"
+                        )}
+                        onClick={() => setSelectedGroupIds(prev => prev.includes(group.id) ? prev.filter(id => id !== group.id) : [...prev, group.id])}
+                      >
+                        <Checkbox checked={selectedGroupIds.includes(group.id)} />
+                        <span className="text-[11px] font-bold uppercase truncate">{group.name}</span>
+                      </div>
+                    ))}
+                    {(!groups || groups.length === 0) && (
+                      <p className="p-4 text-center text-[10px] text-muted-foreground font-bold uppercase italic">No groups defined</p>
+                    )}
+                  </div>
+                </ScrollArea>
+                {selectedGroupIds.length > 0 && (
+                  <Button variant="ghost" onClick={() => setSelectedGroupIds([])} className="w-full rounded-none h-8 text-[9px] font-black uppercase text-primary border-t">Clear Selection</Button>
+                )}
+              </PopoverContent>
+            </Popover>
+
+            <div className="relative w-full md:w-48">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Search registry..." 
+                placeholder="Search..." 
                 className="pl-8 rounded-sm h-9 border-primary/20 text-xs" 
                 value={searchTerm} 
                 onChange={(e) => setSearchTerm(e.target.value)} 
@@ -464,14 +526,13 @@ export default function AddNewProjectPage() {
             </div>
             
             <Select value={sortOrder} onValueChange={(val: SortOrder) => setSortOrder(val)}>
-              <SelectTrigger className="w-40 h-9 text-xs rounded-sm border-primary/20">
-                <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="Sort by" />
+              <SelectTrigger className="w-32 h-9 text-[10px] font-bold uppercase rounded-sm border-primary/20">
+                <SelectValue placeholder="Sort" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="name" className="text-xs">Alphabetical</SelectItem>
-                <SelectItem value="newest" className="text-xs">Recently Added</SelectItem>
-                <SelectItem value="oldest" className="text-xs">Oldest Added</SelectItem>
+                <SelectItem value="name" className="text-[10px] font-bold">ALPHA</SelectItem>
+                <SelectItem value="newest" className="text-[10px] font-bold">NEWEST</SelectItem>
+                <SelectItem value="oldest" className="text-[10px] font-bold">OLDEST</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -482,7 +543,7 @@ export default function AddNewProjectPage() {
             <div className="bg-primary/5 border-b p-3 flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center gap-2">
                 <Badge className="bg-primary h-5 text-[10px] uppercase font-black">{selectedIds.length} Selected</Badge>
-                <span className="text-xs font-medium text-muted-foreground">Perform action on selected records</span>
+                <span className="text-xs font-medium text-muted-foreground">Perform bulk action on selected sites</span>
               </div>
               <Button 
                 variant="destructive" 
@@ -490,14 +551,14 @@ export default function AddNewProjectPage() {
                 className="h-8 rounded-sm font-bold text-[10px] uppercase"
                 onClick={() => setIsBulkDialogOpen(true)}
               >
-                <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete Selected
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove Bulk
               </Button>
             </div>
           )}
 
           <div className="max-h-[600px] overflow-auto custom-scrollbar">
             <Table>
-              <TableHeader className="bg-muted/30 sticky top-0 z-10">
+              <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
                 <TableRow>
                   <TableHead className="w-12 text-center">
                     <Checkbox 
@@ -505,55 +566,62 @@ export default function AddNewProjectPage() {
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <TableHead className="text-[10px] uppercase font-bold">Site Name</TableHead>
-                  <TableHead className="text-[10px] uppercase font-bold">Company</TableHead>
-                  <TableHead className="text-[10px] uppercase font-bold text-center">AC Capacity</TableHead>
-                  <TableHead className="text-[10px] uppercase font-bold text-center">DC Capacity</TableHead>
-                  <TableHead className="text-[10px] uppercase font-bold text-center">Coordinates</TableHead>
-                  <TableHead className="text-right px-6"></TableHead>
+                  <TableHead className="text-[10px] uppercase font-black tracking-widest">Site Name</TableHead>
+                  <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">AC Capacity</TableHead>
+                  <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">DC Capacity</TableHead>
+                  <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">Groups</TableHead>
+                  <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Manage</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredSitesList.length > 0 ? (
-                  filteredSitesList.map((site) => (
-                    <TableRow key={site.id} className={cn("hover:bg-muted/5 group", selectedIds.includes(site.id) && "bg-primary/[0.02]")}>
-                      <TableCell className="text-center">
-                        <Checkbox 
-                          checked={selectedIds.includes(site.id)} 
-                          onCheckedChange={() => toggleSelectOne(site.id)}
-                        />
-                      </TableCell>
-                      <TableCell className="font-bold text-sm">{site.name}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground font-medium">{site.projectCompany}</TableCell>
-                      <TableCell className="text-center font-mono text-[10px] font-bold text-blue-600">
-                        {formatCapacity(site.acCapacity)}
-                      </TableCell>
-                      <TableCell className="text-center font-mono text-[10px] font-bold text-amber-600">
-                        {formatCapacity(site.dcCapacity)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {site.latitude ? (
-                          <span className="text-[9px] font-mono text-muted-foreground">{site.latitude.toFixed(4)}, {site.longitude?.toFixed(4)}</span>
-                        ) : (
-                          <span className="text-[9px] text-muted-foreground italic opacity-50">Not Set</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setSiteToEdit(site)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteSite(site.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filteredSitesList.map((site) => {
+                    const siteGroups = groups?.filter(g => g.siteIds?.includes(site.id)) || [];
+                    return (
+                      <TableRow key={site.id} className={cn("hover:bg-muted/5 transition-colors group", selectedIds.includes(site.id) && "bg-primary/[0.02]")}>
+                        <TableCell className="text-center">
+                          <Checkbox 
+                            checked={selectedIds.includes(site.id)} 
+                            onCheckedChange={() => setSelectedIds(prev => prev.includes(site.id) ? prev.filter(i => i !== site.id) : [...prev, site.id])}
+                          />
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm text-foreground">{site.name}</span>
+                            <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter mt-0.5">{site.projectCompany}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center font-mono text-[10px] font-black text-primary">
+                          {formatCapacity(site.acCapacity)} MW
+                        </TableCell>
+                        <TableCell className="text-center font-mono text-[10px] font-black text-amber-600">
+                          {formatCapacity(site.dcCapacity)} MWp
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex flex-wrap justify-center gap-1">
+                            {siteGroups.slice(0, 2).map(g => (
+                              <Badge key={g.id} variant="secondary" className="h-4 px-1.5 text-[7px] font-black uppercase border-none bg-primary/5 text-primary/60">{g.name}</Badge>
+                            ))}
+                            {siteGroups.length > 2 && <span className="text-[8px] font-black text-muted-foreground">+{siteGroups.length - 2}</span>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right px-6">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setSiteToEdit(site)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteSite(site.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">
-                      {searchTerm ? `No sites found matching "${searchTerm}"` : "Registry empty. Add sites to start."}
+                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">
+                      No records discovered matching your filters.
                     </TableCell>
                   </TableRow>
                 )}
@@ -595,8 +663,8 @@ export default function AddNewProjectPage() {
                 )} />
               </div>
               <DialogFooter className="pt-4 gap-2">
-                <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
-                <Button type="submit" className="rounded-sm font-bold">Save Changes</Button>
+                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
+                <Button type="submit" className="rounded-sm font-black uppercase text-[10px]">Save Changes</Button>
               </DialogFooter>
             </form>
           </Form>
@@ -616,10 +684,10 @@ export default function AddNewProjectPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleBulkDelete} 
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-bold"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px]"
               disabled={isDeletingBulk}
             >
               {isDeletingBulk ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -629,5 +697,36 @@ export default function AddNewProjectPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function SummaryCard({ title, value, icon: Icon, description, color }: { 
+  title: string, 
+  value: number | string, 
+  icon: any, 
+  description: string,
+  color: 'primary' | 'amber' | 'emerald' | 'purple' | 'slate'
+}) {
+  const colors = {
+    primary: 'bg-primary/5 text-primary border-primary/10',
+    amber: 'bg-amber-500/10 text-amber-600 border-amber-200',
+    emerald: 'bg-emerald-500/10 text-emerald-600 border-emerald-200',
+    purple: 'bg-purple-500/10 text-purple-600 border-purple-200',
+    slate: 'bg-slate-500/10 text-slate-600 border-slate-200',
+  };
+
+  return (
+    <Card className="rounded-sm border-primary/10 shadow-sm hover:shadow-md transition-all group overflow-hidden">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
+        <CardTitle className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">{title}</CardTitle>
+        <div className={cn("p-1.5 rounded-sm border transition-transform group-hover:scale-110", colors[color])}>
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+      </CardHeader>
+      <CardContent className="p-4 pt-0">
+        <div className="text-2xl font-black tracking-tight tabular-nums">{value}</div>
+        <p className="text-[9px] text-muted-foreground mt-1 font-bold uppercase tracking-tight">{description}</p>
+      </CardContent>
+    </Card>
   );
 }
