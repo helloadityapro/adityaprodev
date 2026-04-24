@@ -317,8 +317,10 @@ export default function ManageAllTripsPage() {
     }
 
     return result.filter(trip => {
-      const tripDate = trip.tripDate;
-      const matchesDate = tripDate >= start && tripDate <= end;
+      // Filter by Requested Date as per requirements
+      const rDate = trip.requestDate?.toDate?.() || new Date(trip.requestDate);
+      const rDateStr = format(rDate, 'yyyy-MM-dd');
+      const matchesDate = rDateStr >= start && rDateStr <= end;
 
       const matchesSearch = trip.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         trip.pickupLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -331,7 +333,7 @@ export default function ManageAllTripsPage() {
       return matchesSearch && matchesStatus && isQueue && matchesDate;
     }).sort((a, b) => {
       const dateA = a.requestDate?.toDate?.()?.getTime() || 0;
-      const dateB = b.createdAt?.toDate?.()?.getTime() || b.requestDate?.toDate?.()?.getTime() || 0;
+      const dateB = b.requestDate?.toDate?.()?.getTime() || 0;
       return dateB - dateA;
     });
   }, [assignments, searchTerm, statusFilter, activeTab, userProfile, roleConfigs, isSuper, userRoleStr, queryDateRange]);
@@ -613,7 +615,7 @@ export default function ManageAllTripsPage() {
       <div className="flex flex-col gap-4 bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Logs</Label>
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Logs (Filters by Request Date)</Label>
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input 
@@ -626,7 +628,7 @@ export default function ManageAllTripsPage() {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Time Range</Label>
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Request Window</Label>
             <Select value={dateFilter} onValueChange={setDateFilter}>
               <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
                 <Calendar className="h-4 w-4 mr-2 opacity-50" />
@@ -1495,8 +1497,8 @@ function EditTripDialog({
                               name={`intermediateStops.${idx}.type`}
                               render={({ field: typeField }) => (
                                 <RadioGroup onValueChange={typeField.onChange} value={typeField.value} className="flex gap-4 mb-2">
-                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id={`stop-${idx}-site`} /><Label htmlFor={`stop-${idx}-site`} className="text-[10px] font-bold">Site</Label></div>
-                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id={`stop-${idx}-other`} /><Label htmlFor={`stop-${idx}-other`} className="text-[10px] font-bold">Other</Label></div>
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id={`stop-${index}-site`} /><Label htmlFor={`stop-${index}-site`} className="text-[10px] font-bold">Site</Label></div>
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id={`stop-${index}-other`} /><Label htmlFor={`stop-${index}-other`} className="text-[10px] font-bold">Other</Label></div>
                                 </RadioGroup>
                               )}
                             />
@@ -1798,4 +1800,3 @@ function ScheduledTripsDialog({
     </Dialog>
   );
 }
-
