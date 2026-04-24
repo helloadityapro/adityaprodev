@@ -151,10 +151,10 @@ export default function ProjectsListPage() {
             onClick={() => setShowStarredOnly(!showStarredOnly)}
             className={cn(
               "h-10 rounded-sm font-bold uppercase text-[10px] tracking-widest px-4",
-              showStarredOnly ? "bg-amber-500 hover:bg-amber-600 text-white" : "text-amber-600 border-amber-200 hover:bg-amber-50"
+              showStarredOnly ? "" : "text-primary border-primary/20 hover:bg-primary/5"
             )}
           >
-            <Star className={cn("h-3.5 w-3.5 mr-1.5", showStarredOnly && "fill-white")} />
+            <Star className={cn("h-3.5 w-3.5 mr-1.5", showStarredOnly && "fill-current")} />
             {showStarredOnly ? "Starred Only" : "View Starred"}
           </Button>
         </div>
@@ -193,7 +193,7 @@ export default function ProjectsListPage() {
                       className="h-8 w-8 rounded-sm" 
                       onClick={(e) => toggleStar(e, site.id)}
                     >
-                      <Star className={cn("h-5 w-5 transition-all", isStarred ? "fill-amber-500 text-amber-500 scale-110" : "text-muted-foreground/30")} />
+                      <Star className={cn("h-5 w-5 transition-all", isStarred ? "fill-primary text-primary scale-110" : "text-muted-foreground/30")} />
                     </Button>
                     <ArrowRight className="h-4 w-4 text-primary shrink-0" />
                   </div>
@@ -244,11 +244,11 @@ export default function ProjectsListPage() {
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-8 w-8 rounded-sm hover:bg-amber-50" 
+                            className="h-8 w-8 rounded-sm hover:bg-primary/5" 
                             onClick={(e) => toggleStar(e, site.id)}
                             title={isStarred ? "Unstar" : "Star"}
                           >
-                            <Star className={cn("h-4 w-4 transition-all", isStarred ? "fill-amber-500 text-amber-500 scale-110" : "text-muted-foreground/30 group-hover:text-amber-300")} />
+                            <Star className={cn("h-4 w-4 transition-all", isStarred ? "fill-primary text-primary scale-110" : "text-muted-foreground/30 group-hover:text-primary/40")} />
                           </Button>
                         </TableCell>
                         <TableCell className="px-6 py-4">
