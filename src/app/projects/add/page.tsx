@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -16,7 +15,28 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
-import { Trash2, Search, MapPin, Plus, FileDown, FileUp, Download, Check, ListFilter, AlertCircle, Loader2, ArrowLeft, RefreshCw, Pencil, LayoutGrid, Tags, X, ShieldCheck } from 'lucide-react';
+import { 
+  Trash2, 
+  Search, 
+  MapPin, 
+  Plus, 
+  FileDown, 
+  FileUp, 
+  Download, 
+  Check, 
+  ListFilter, 
+  AlertCircle, 
+  Loader2, 
+  ArrowLeft, 
+  RefreshCw, 
+  Pencil, 
+  LayoutGrid, 
+  Tags, 
+  X, 
+  ShieldCheck,
+  Building2,
+  Zap 
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -697,36 +717,5 @@ export default function AddNewProjectPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, description, color }: { 
-  title: string, 
-  value: number | string, 
-  icon: any, 
-  description: string,
-  color: 'primary' | 'amber' | 'emerald' | 'purple' | 'slate'
-}) {
-  const colors = {
-    primary: 'bg-primary/5 text-primary border-primary/10',
-    amber: 'bg-amber-500/10 text-amber-600 border-amber-200',
-    emerald: 'bg-emerald-500/10 text-emerald-600 border-emerald-200',
-    purple: 'bg-purple-500/10 text-purple-600 border-purple-200',
-    slate: 'bg-slate-500/10 text-slate-600 border-slate-200',
-  };
-
-  return (
-    <Card className="rounded-sm border-primary/10 shadow-sm hover:shadow-md transition-all group overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-        <CardTitle className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">{title}</CardTitle>
-        <div className={cn("p-1.5 rounded-sm border transition-transform group-hover:scale-110", colors[color])}>
-          <Icon className="h-3.5 w-3.5" />
-        </div>
-      </CardHeader>
-      <CardContent className="p-4 pt-0">
-        <div className="text-2xl font-black tracking-tight tabular-nums">{value}</div>
-        <p className="text-[9px] text-muted-foreground mt-1 font-bold uppercase tracking-tight">{description}</p>
-      </CardContent>
-    </Card>
   );
 }
