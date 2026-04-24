@@ -161,7 +161,7 @@ export default function ProjectsListPage() {
         
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-8 border-none">
-            {accessibleSites.length} Projects Authorized
+            {filteredSites.length} {showStarredOnly ? 'Starred Projects' : 'Projects Authorized'}
           </Badge>
           <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setShowStarredOnly(false); }} className="h-10 w-10 text-muted-foreground rounded-sm">
             <FilterX className="h-4 w-4" />
