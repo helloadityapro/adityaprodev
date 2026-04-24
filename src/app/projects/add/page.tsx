@@ -36,7 +36,8 @@ import {
   ShieldCheck,
   Building2,
   Zap,
-  ChevronDown
+  ChevronDown,
+  CheckCircle2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -214,7 +215,7 @@ export default function AddNewProjectPage() {
   // Group Management
   const handleSaveGroup = async () => {
     if (!newGroupName.trim() || groupSiteIds.length === 0 || !user) return;
-    setIsSubmitting(true);
+    setIsSubmittingAction(true);
     try {
       if (editingGroupId) {
         await updateDocumentNonBlocking(doc(firestore, 'site_groups', editingGroupId), {
@@ -237,7 +238,7 @@ export default function AddNewProjectPage() {
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingAction(false);
     }
   };
 
@@ -294,7 +295,7 @@ export default function AddNewProjectPage() {
     };
   }, [filteredSitesList]);
 
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSubmittingAction, setIsSubmittingAction] = React.useState(false);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredSitesList.length) {
@@ -451,10 +452,10 @@ export default function AddNewProjectPage() {
                   <div className="p-4 bg-muted/20 border-t mt-auto sticky bottom-0 z-10">
                     <Button 
                       className="w-full h-12 font-black uppercase text-xs tracking-widest shadow-lg"
-                      disabled={!newGroupName.trim() || groupSiteIds.length === 0 || isSubmitting}
+                      disabled={!newGroupName.trim() || groupSiteIds.length === 0 || isSubmittingAction}
                       onClick={handleSaveGroup}
                     >
-                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                      {isSubmittingAction ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
                       {editingGroupId ? "Update Group Configuration" : "Initialize Site Group"}
                     </Button>
                   </div>
