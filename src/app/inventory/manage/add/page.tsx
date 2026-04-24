@@ -1,12 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
-import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, getDocs, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,8 @@ import {
   Boxes,
   AlertCircle,
   Save,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 import { 
   Form, 
@@ -33,6 +34,7 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"];
 
@@ -50,6 +52,11 @@ const itemSchema = z.object({
   description: z.string().optional(),
   subItems: z.array(subItemSchema).optional(),
 });
+
+type MasterItem = {
+  id: string;
+  name: string;
+};
 
 export default function AddMasterItemPage() {
   const firestore = useFirestore();
@@ -70,6 +77,9 @@ export default function AddMasterItemPage() {
   );
   const { data: categories } = useCollection<{ name: string }>(categoriesQuery);
 
+  const masterItemsQuery = useMemoFirebase(() => collection(firestore, 'master_inventory'), [firestore]);
+  const { data: existingItems } = useCollection<MasterItem>(masterItemsQuery);
+
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
     defaultValues: { 
@@ -88,9 +98,28 @@ export default function AddMasterItemPage() {
   });
 
   const watchUnit = form.watch('unit');
+  const watchName = form.watch('name');
+
+  const suggestion = React.useMemo(() => {
+    if (!watchName || watchName.length < 3 || !existingItems) return null;
+    const lowerName = watchName.toLowerCase();
+    return existingItems.find(item => {
+      const lowerExisting = item.name.toLowerCase();
+      return (lowerExisting.includes(lowerName) || lowerName.includes(lowerExisting)) && lowerExisting !== lowerName;
+    });
+  }, [watchName, existingItems]);
 
   const onSubmit = async (values: z.infer<typeof itemSchema>) => {
     if (!isAdmin) return;
+    
+    // Duplicate check
+    const isDuplicate = existingItems?.some(item => item.name.toLowerCase() === values.name.toLowerCase());
+    if (isDuplicate) {
+      form.setError('name', { type: 'manual', message: 'A material with this exact name already exists in the registry.' });
+      toast({ variant: 'destructive', title: 'Duplicate Item', description: 'This material name is already in use.' });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await addDocumentNonBlocking(collection(firestore, 'master_inventory'), {
@@ -140,8 +169,17 @@ export default function AddMasterItemPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="name" render={({ field }) => (
                   <FormItem className="md:col-span-2">
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Item Name</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Item Name / Description</FormLabel>
                     <FormControl><Input placeholder="e.g. Solar Module 540Wp" {...field} className="h-11 rounded-sm" /></FormControl>
+                    {suggestion && (
+                      <div className="flex items-center gap-2 mt-2 animate-in slide-in-from-left-2 duration-300">
+                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 py-1.5 px-3 rounded-sm flex items-center gap-2">
+                          <Sparkles className="h-3 w-3" />
+                          <span className="text-[10px] font-bold uppercase tracking-tight">Similar existing item:</span>
+                          <span className="text-[11px] font-black">{suggestion.name}</span>
+                        </Badge>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -260,3 +298,4 @@ export default function AddMasterItemPage() {
     </div>
   );
 }
+

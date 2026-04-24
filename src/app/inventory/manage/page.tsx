@@ -2,11 +2,11 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -27,7 +27,8 @@ import {
   Pencil,
   Loader2,
   Save,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -133,6 +134,18 @@ export default function ManageMasterInventoryPage() {
     name: "subItems"
   });
 
+  const watchName = form.watch('name');
+
+  const suggestion = React.useMemo(() => {
+    if (!watchName || watchName.length < 3 || !items || !editingItem) return null;
+    const lowerName = watchName.toLowerCase();
+    return items.find(item => {
+      if (item.id === editingItem.id) return false;
+      const lowerExisting = item.name.toLowerCase();
+      return (lowerExisting.includes(lowerName) || lowerName.includes(lowerExisting)) && lowerExisting !== lowerName;
+    });
+  }, [watchName, items, editingItem]);
+
   React.useEffect(() => {
     if (editingItem) {
       form.reset({
@@ -148,6 +161,18 @@ export default function ManageMasterInventoryPage() {
 
   const onEditSubmit = async (values: z.infer<typeof itemSchema>) => {
     if (!editingItem) return;
+    
+    // Duplicate check for edit
+    const isDuplicate = items?.some(item => 
+      item.id !== editingItem.id && item.name.toLowerCase() === values.name.toLowerCase()
+    );
+    
+    if (isDuplicate) {
+      form.setError('name', { type: 'manual', message: 'Another material already uses this exact name.' });
+      toast({ variant: 'destructive', title: 'Rename Conflict', description: 'Item name must be unique.' });
+      return;
+    }
+
     setIsUpdating(true);
     try {
       const itemRef = doc(firestore, 'master_inventory', editingItem.id);
@@ -172,8 +197,8 @@ export default function ManageMasterInventoryPage() {
   };
 
   const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const filteredItems = React.useMemo(() => {
@@ -406,8 +431,17 @@ export default function ManageMasterInventoryPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField control={form.control} name="name" render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Item Name</FormLabel>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Item Name / Description</FormLabel>
                         <FormControl><Input placeholder="e.g. Solar Module 540Wp" {...field} className="h-11 rounded-sm" /></FormControl>
+                        {suggestion && (
+                          <div className="flex items-center gap-2 mt-2 animate-in slide-in-from-left-2 duration-300">
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 py-1.5 px-3 rounded-sm flex items-center gap-2">
+                              <Sparkles className="h-3 w-3" />
+                              <span className="text-[10px] font-bold uppercase tracking-tight">Similar existing item:</span>
+                              <span className="text-[11px] font-black">{suggestion.name}</span>
+                            </Badge>
+                          </div>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -519,7 +553,7 @@ export default function ManageMasterInventoryPage() {
             </div>
           </ScrollArea>
 
-          <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0">
+          <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
             <Button onClick={form.handleSubmit(onEditSubmit)} disabled={isUpdating} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
