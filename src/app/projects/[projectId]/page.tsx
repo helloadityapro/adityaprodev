@@ -271,7 +271,7 @@ type MaterialUtilisation = {
 
 type POSortKey = 'poNumber' | 'supplier' | 'status' | 'date' | 'total';
 type WOSortKey = 'woNumber' | 'contractor' | 'status' | 'date' | 'total';
-type BoMSortKey = 'itemName' | 'category' | 'status' | 'plannedQuantity' | 'approvedQuantity';
+type BoMSortKey = 'itemName' | 'category' | 'make' | 'status' | 'plannedQuantity' | 'approvedQuantity';
 type PaymentSortKey = 'date' | 'payee' | 'amount' | 'reference';
 
 const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"];
@@ -369,16 +369,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     const userRole = userProfile.role || "none";
     const allowedKeys = userProfile.customPermissions 
       ? new Set(userProfile.customPermissions) 
-      : new Set(roleConfigs?.find(c => c.id === userRole)?.allowedPageKeys || []);
+      : new Set(roleConfigs?.find(c => c.id === slugifyRole(userRole))?.allowedPageKeys || []);
 
-    // If no specific tab config exists, default to all if user has basic access
     if (allowedKeys.size === 0) return ALL_TABS;
 
     return ALL_TABS.filter(tab => {
-      // Primary check: Direct tab authorization
       if (allowedKeys.has(tab.key as PageKey)) return true;
-      
-      // Secondary check: Inclusive module authorization
       if (tab.id === 'po' && allowedKeys.has('purchase-orders')) return true;
       if (tab.id === 'wo' && allowedKeys.has('work-orders')) return true;
       if (tab.id === 'bom' && allowedKeys.has('projects')) return true;
@@ -395,7 +391,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     });
   }, [user, userProfile, isProfileLoading, roleConfigs, ALL_TABS]);
 
-  // Handle active tab authorization redirect
   React.useEffect(() => {
     if (authorizedTabs.length > 0) {
       const isAuthorized = authorizedTabs.some(t => t.id === activeTab);
@@ -422,7 +417,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     let result = bomItems.filter(item => {
       const matchesSearch = item.itemName.toLowerCase().includes(bomTableSearch.toLowerCase()) || 
                            (item.specification || "").toLowerCase().includes(bomTableSearch.toLowerCase()) ||
-                           (item.category || "").toLowerCase().includes(bomTableSearch.toLowerCase());
+                           (item.category || "").toLowerCase().includes(bomTableSearch.toLowerCase()) ||
+                           (item.make || "").toLowerCase().includes(bomTableSearch.toLowerCase());
       const matchesStatus = bomStatusFilter === 'all' || item.status === bomStatusFilter;
       const matchesCategory = bomCategoryFilter === 'all' || item.category === bomCategoryFilter;
       
@@ -869,6 +865,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     }
   };
 
+  const slugifyRole = (role: string) => role.toLowerCase().replace(/\s+/g, '-');
+
   if (projectLoading || isProfileLoading) return (
     <div className="space-y-8 p-6 animate-pulse">
       <Skeleton className="h-12 w-1/3" />
@@ -890,7 +888,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1 min-w-0">
             <Button variant="ghost" size="sm" onClick={() => router.push('/projects/list')} className="h-7 mb-1 -ml-2 text-muted-foreground hover:text-primary transition-colors">
-              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Back to Projects Management
+              <ArrowLeft className="mr-2 h-3.5 w-3.5" /> Back to Projects Management
             </Button>
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm shrink-0">
@@ -1210,6 +1208,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleBoMSort('category')}>
                           <div className="flex items-center">Category <BoMSortIcon column="category" /></div>
                         </TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleBoMSort('make')}>
+                          <div className="flex items-center">Make <BoMSortIcon column="make" /></div>
+                        </TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleBoMSort('status')}>
                           <div className="flex items-center">Status <BoMSortIcon column="status" /></div>
                         </TableHead>
@@ -1240,6 +1241,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               </div>
                             </TableCell>
                             <TableCell><Badge variant="secondary" className="rounded-sm font-bold text-[9px] uppercase tracking-wider">{item.category || "Uncategorized"}</Badge></TableCell>
+                            <TableCell><Badge variant="outline" className="rounded-sm font-black text-[9px] uppercase border-primary/10 text-primary/70">{item.make || "Standard"}</Badge></TableCell>
                             <TableCell>
                               <div className="flex flex-col gap-1">
                                 <Badge variant="outline" className={cn(
@@ -1248,7 +1250,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                   item.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
                                   "bg-yellow-50 text-yellow-700 border-yellow-200"
                                 )}>{item.status || 'Pending'}</Badge>
-                                {item.processedByName && (
+                                {item.processedByName && (item.status === 'Approved' || item.status === 'Rejected') && (
                                   <span className="text-[8px] font-bold text-muted-foreground uppercase">By: {item.processedByName}</span>
                                 )}
                               </div>
@@ -1272,7 +1274,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm" onClick={() => setViewingBomLog(item)} title="View Log"><History className="h-4 w-4" /></Button>
                                 {isAdmin && (<Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingBomItem(item)} title="Edit Item"><Pencil className="h-4 w-4" /></Button>)}
                                 {isAdmin && item.status === 'Pending' && (
-                                  <><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Approved' })} title="Approve"><CheckCircle2 className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setBomActionState({ item, type: 'Rejected' })} title="Reject"><XCircle className="h-4 w-4" /></Button></>
+                                  <><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setBomActionState({ item, type: 'Approved' })} title="Approve"><CheckCircle2 className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setBomActionState({ item, type: 'Rejected' })} title="Reject"><XCircle className="h-4 w-4" /></Button></>
                                 )}
                                 {(isAdmin || (isManager && item.status === 'Pending')) && (<Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'project_boms', item.id))} title="Delete"><Trash2 className="h-4 w-4" /></Button>)}
                               </div>
@@ -1280,7 +1282,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           </TableRow>
                           {expandedBomRows.has(item.id) && item.subItems && (
                             <TableRow className="bg-primary/[0.02]">
-                              <TableCell colSpan={6} className="p-0 border-b">
+                              <TableCell colSpan={7} className="p-0 border-b">
                                 <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200">
                                   <div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Component Breakdown for {item.itemName}</span></div>
                                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -1294,7 +1296,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           )}
                         </React.Fragment>
                       )) : (
-                        <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No records found matching filters.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic text-xs">No records found matching filters.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1418,7 +1420,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                   "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
                                   wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
                                   wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                                  "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                  wo.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                                  "bg-muted text-muted-foreground"
                                 )}>{wo.status || 'Pending'}</Badge>
                                 {wo.processedByName && (wo.status === 'Accepted' || wo.status === 'Rejected') && (
                                   <span className="text-[8px] font-bold text-muted-foreground uppercase leading-tight">
@@ -1720,7 +1723,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell>
                               <div className="flex flex-col">
                                 <span className="font-bold text-sm text-foreground">{u.itemName}</span>
-                                <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Inventory Consumption</span>
+                                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Inventory Consumption</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-center">
