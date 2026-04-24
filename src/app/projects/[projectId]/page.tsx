@@ -103,7 +103,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
-import type { PageKey } from '@/lib/access-control';
+import { type PageKey, slugifyRole } from '@/lib/access-control';
 
 type Project = {
   id: string;
@@ -343,6 +343,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
   const isManager = userProfile?.role === 'Site Manager';
 
   // Define All Tabs
@@ -366,10 +367,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     if (!user || isProfileLoading || !userProfile) return [];
     if (isSuperAdmin(user.email)) return ALL_TABS;
 
-    const userRole = userProfile.role || "none";
+    const roleName = userProfile.role || "none";
     const allowedKeys = userProfile.customPermissions 
       ? new Set(userProfile.customPermissions) 
-      : new Set(roleConfigs?.find(c => c.id === slugifyRole(userRole))?.allowedPageKeys || []);
+      : new Set(roleConfigs?.find(c => c.id === slugifyRole(roleName))?.allowedPageKeys || []);
 
     if (allowedKeys.size === 0) return ALL_TABS;
 
@@ -612,7 +613,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   }, [workOrders, woSearch, woSortConfig]);
 
   const handlePOSort = (key: POSortKey) => {
-    setPoSortConfig(prev => ({
+    setSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
@@ -864,8 +865,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
     }
   };
-
-  const slugifyRole = (role: string) => role.toLowerCase().replace(/\s+/g, '-');
 
   if (projectLoading || isProfileLoading) return (
     <div className="space-y-8 p-6 animate-pulse">
@@ -2117,7 +2116,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       </Dialog>
 
       <Dialog open={!!viewingPayment} onOpenChange={(o) => !o && setViewingPayment(null)}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><IndianRupee className="h-5 w-5 text-primary" /></div>
