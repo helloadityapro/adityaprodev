@@ -26,7 +26,7 @@ service cloud.firestore {
       allow update: if isSignedIn() && (
         request.auth.uid == userId || 
         isAdmin() || 
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints', 'hiddenPermitIds']))
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints', 'hiddenPermitIds', 'starredProjectIds']))
       );
       allow delete: if isAdmin();
     }
@@ -206,6 +206,7 @@ service cloud.firestore {
 
     match /projects/{projectId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /sites/{siteId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /site_groups/{groupId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /notifications/{notifId} { allow read, write: if isSignedIn(); }
     match /point_adjustment_requests/{requestId} { allow read, write: if isAdmin(); }
     match /cleanup_requests/{requestId} { allow read, write: if isAdmin(); }
