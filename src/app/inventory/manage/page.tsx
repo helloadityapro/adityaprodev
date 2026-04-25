@@ -418,7 +418,7 @@ export default function ManageMasterInventoryPage() {
 
       {/* Edit Dialog */}
       <Dialog open={!!editingItem} onOpenChange={(o) => !o && setEditingItem(null)}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 rounded-sm overflow-hidden border-none shadow-2xl">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 rounded-sm overflow-hidden border-none shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <DialogTitle className="text-xl font-black uppercase tracking-tight">Edit Material Registry</DialogTitle>
             <DialogDescription className="text-xs font-medium">Modify properties for {editingItem?.name}.</DialogDescription>
@@ -427,7 +427,7 @@ export default function ManageMasterInventoryPage() {
           <ScrollArea className="flex-1">
             <div className="p-6">
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-8">
+                <form id="edit-material-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField control={form.control} name="name" render={({ field }) => (
                       <FormItem className="md:col-span-2">
@@ -555,7 +555,7 @@ export default function ManageMasterInventoryPage() {
 
           <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
-            <Button onClick={form.handleSubmit(onEditSubmit)} disabled={isUpdating} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
+            <Button type="submit" form="edit-material-form" disabled={isUpdating} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               Save Changes
             </Button>
@@ -576,12 +576,12 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
 
   return (
     <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
+        <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-3.5 sm:h-4 sm:w-4" />
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-black">{value}</div>
+      <CardContent className="p-3 sm:p-4 pt-0">
+        <div className="text-xl sm:text-2xl font-black">{value}</div>
       </CardContent>
     </Card>
   );
