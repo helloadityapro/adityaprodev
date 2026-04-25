@@ -265,7 +265,10 @@ export default function SiteGroupsManagementPage() {
                 <div className="border rounded-sm bg-muted/5 shadow-inner">
                   <ScrollArea className="h-[450px]">
                     <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {allSites?.filter(s => s.name.toLowerCase().includes(groupSiteSearch.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map(site => (
+                      {allSites?.filter(s => 
+                        s.name.toLowerCase().includes(groupSiteSearch.toLowerCase()) ||
+                        s.projectCompany.toLowerCase().includes(groupSiteSearch.toLowerCase())
+                      ).sort((a, b) => a.name.localeCompare(b.name)).map(site => (
                         <div 
                           key={site.id} 
                           className={cn(
@@ -309,7 +312,7 @@ export default function SiteGroupsManagementPage() {
                   onClick={handleSaveGroup}
                 >
                   {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <CheckCircle2 className="h-5 w-5 mr-2" />}
-                  {editingGroupId ? "Update Configuration" : "Finalize Site Group"}
+                  {editingGroupId ? "Update Group Configuration" : "Finalize Site Group"}
                 </Button>
               </div>
             </CardContent>
