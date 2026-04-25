@@ -77,7 +77,7 @@ export default function ProjectsListPage() {
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const isSuper = isSuperAdmin(user?.email);
-  const isAdmin = isSuper || userProfile?.role === 'Admin';
+  const isAdmin = isSuper || userProfile?.role === "Admin";
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
@@ -250,7 +250,7 @@ export default function ProjectsListPage() {
               size="sm" 
               onClick={() => setShowStarredOnly(!showStarredOnly)}
               className={cn(
-                "h-11 rounded-sm font-bold uppercase text-[10px] tracking-widest px-6",
+                "h-11 rounded-sm font-bold px-6",
                 showStarredOnly ? "" : "text-primary border-primary/20 hover:bg-primary/5"
               )}
             >
@@ -385,3 +385,4 @@ export default function ProjectsListPage() {
     </div>
   );
 }
+
