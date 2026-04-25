@@ -18,26 +18,18 @@ import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } f
 import { 
   Trash2, 
   Search, 
-  MapPin, 
   Plus, 
   FileDown, 
-  FileUp, 
-  Download, 
   Check, 
-  ListFilter, 
   AlertCircle, 
   Loader2, 
   ArrowLeft, 
-  RefreshCw, 
   Pencil, 
-  LayoutGrid, 
   Tags, 
-  X, 
-  ShieldCheck,
   Building2,
   Zap,
-  ChevronDown,
-  CheckCircle2
+  ShieldCheck,
+  ChevronDown
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -71,17 +63,10 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from 'next/link';
 
 const siteSchema = z.object({
   name: z.string().min(1, 'Site name is required.'),
@@ -113,14 +98,7 @@ export default function AddNewProjectPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [siteToEdit, setSiteToEdit] = React.useState<any | null>(null);
   
-  // Group Management States
   const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
-  const [isGroupManageOpen, setIsGroupManageOpen] = React.useState(false);
-  const [newGroupName, setNewGroupName] = React.useState("");
-  const [groupSiteIds, setGroupSiteIds] = React.useState<string[]>([]);
-  const [groupSiteSearch, setGroupSiteSearch] = React.useState("");
-  const [editingGroupId, setEditingGroupId] = React.useState<string | null>(null);
-  const [groupTab, setGroupTab] = React.useState("create");
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -212,54 +190,6 @@ export default function AddNewProjectPage() {
     }
   };
 
-  // Group Management
-  const handleSaveGroup = async () => {
-    if (!newGroupName.trim() || groupSiteIds.length === 0 || !user) return;
-    setIsSubmittingAction(true);
-    try {
-      if (editingGroupId) {
-        await updateDocumentNonBlocking(doc(firestore, 'site_groups', editingGroupId), {
-          name: newGroupName.trim(),
-          siteIds: groupSiteIds,
-          updatedAt: serverTimestamp(),
-        });
-        toast({ title: 'Group Updated', description: `Modifications to "${newGroupName}" saved.` });
-      } else {
-        await addDocumentNonBlocking(collection(firestore, 'site_groups'), {
-          name: newGroupName.trim(),
-          siteIds: groupSiteIds,
-          createdById: user.uid,
-          createdAt: serverTimestamp(),
-        });
-        toast({ title: 'Group Created', description: `Site group "${newGroupName}" initialized.` });
-      }
-      resetGroupForm();
-      setGroupTab("list");
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Operation Failed', description: e.message });
-    } finally {
-      setIsSubmittingAction(false);
-    }
-  };
-
-  const resetGroupForm = () => {
-    setNewGroupName("");
-    setGroupSiteIds([]);
-    setEditingGroupId(null);
-  };
-
-  const handleEditGroup = (group: any) => {
-    setEditingGroupId(group.id);
-    setNewGroupName(group.name);
-    setGroupSiteIds(group.siteIds || []);
-    setGroupTab("create");
-  };
-
-  const handleDeleteGroup = (id: string) => {
-    deleteDocumentNonBlocking(doc(firestore, 'site_groups', id));
-    toast({ title: 'Group Removed' });
-  };
-
   const filteredSitesList = React.useMemo(() => {
     if (!sites) return [];
     
@@ -295,8 +225,6 @@ export default function AddNewProjectPage() {
     };
   }, [filteredSitesList]);
 
-  const [isSubmittingAction, setIsSubmittingAction] = React.useState(false);
-
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredSitesList.length) {
       setSelectedIds([]);
@@ -313,6 +241,8 @@ export default function AddNewProjectPage() {
       </div>
     );
   }
+
+  if (!isAdmin) return null;
 
   return (
     <div className="space-y-6">
@@ -372,128 +302,11 @@ export default function AddNewProjectPage() {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={isGroupManageOpen} onOpenChange={(o) => { setIsGroupManageOpen(o); if(!o) resetGroupForm(); }}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="rounded-sm font-bold h-11 border-primary/20 text-primary hover:bg-primary/5">
-                <Tags className="h-4 w-4 mr-2" /> Manage Groups
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-3xl rounded-sm p-0 overflow-hidden border-none shadow-2xl flex flex-col h-[85vh] sm:h-[80vh]">
-              <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="bg-primary/10 p-2 rounded-sm"><Tags className="h-5 w-5 text-primary" /></div>
-                  <div>
-                    <DialogTitle className="text-xl font-black uppercase tracking-tight">Site Grouping Hub</DialogTitle>
-                    <DialogDescription className="text-xs font-medium">Categorize project locations for cluster reports and filtering.</DialogDescription>
-                  </div>
-                </div>
-              </DialogHeader>
-              
-              <Tabs value={groupTab} onValueChange={setGroupTab} className="flex-1 flex flex-col min-h-0">
-                <TabsList className="bg-muted/50 rounded-none border-b h-12 p-1 px-6 gap-4">
-                  <TabsTrigger value="create" className="rounded-sm font-bold text-[10px] uppercase tracking-widest">{editingGroupId ? "Modify Group" : "Create New"}</TabsTrigger>
-                  <TabsTrigger value="list" className="rounded-sm font-bold text-[10px] uppercase tracking-widest">Active Groups</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="create" className="flex-1 flex flex-col min-h-0 m-0 relative">
-                  <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Group Label</Label>
-                        <Input 
-                          placeholder="e.g. Cluster North, Phase 2, etc..." 
-                          className="h-12 rounded-sm text-lg font-black tracking-tight"
-                          value={newGroupName}
-                          onChange={(e) => setNewGroupName(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Select Sites ({groupSiteIds.length})</Label>
-                          <div className="relative w-48">
-                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                            <Input 
-                              placeholder="Filter..." 
-                              className="pl-8 h-8 rounded-sm text-[10px]" 
-                              value={groupSiteSearch}
-                              onChange={(e) => setGroupSiteSearch(e.target.value)}
-                            />
-                          </div>
-                        </div>
-                        <div className="border rounded-sm bg-muted/10">
-                          <ScrollArea className="h-64 sm:h-80">
-                            <div className="p-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              {sites?.filter(s => s.name.toLowerCase().includes(groupSiteSearch.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map(site => (
-                                <div 
-                                  key={site.id} 
-                                  className={cn(
-                                    "flex items-center space-x-3 p-3 rounded-sm border transition-all cursor-pointer shadow-sm",
-                                    groupSiteIds.includes(site.id) ? "bg-primary/5 border-primary/30" : "bg-background border-transparent hover:border-border"
-                                  )}
-                                  onClick={() => {
-                                    setGroupSiteIds(prev => prev.includes(site.id) ? prev.filter(id => id !== site.id) : [...prev, site.id]);
-                                  }}
-                                >
-                                  <Checkbox checked={groupSiteIds.includes(site.id)} className="h-5 w-5" />
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="text-[11px] font-black truncate leading-none mb-1">{site.name}</span>
-                                    <span className="text-[9px] font-bold text-muted-foreground uppercase truncate opacity-60">{site.projectCompany}</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 bg-muted/20 border-t mt-auto sticky bottom-0 z-10">
-                    <Button 
-                      className="w-full h-12 font-black uppercase text-xs tracking-widest shadow-lg"
-                      disabled={!newGroupName.trim() || groupSiteIds.length === 0 || isSubmittingAction}
-                      onClick={handleSaveGroup}
-                    >
-                      {isSubmittingAction ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                      {editingGroupId ? "Update Group Configuration" : "Initialize Site Group"}
-                    </Button>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="list" className="flex-1 p-0 m-0 overflow-hidden flex flex-col">
-                  <ScrollArea className="flex-1">
-                    <div className="divide-y">
-                      {groups && groups.length > 0 ? groups.sort((a, b) => a.name.localeCompare(b.name)).map(g => (
-                        <div key={g.id} className="p-4 px-6 flex items-center justify-between hover:bg-muted/5 transition-colors group">
-                          <div className="space-y-1 min-w-0">
-                            <p className="font-black text-sm uppercase tracking-tight text-primary">{g.name}</p>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase">{g.siteIds?.length || 0} Sites Linked</p>
-                          </div>
-                          <div className="flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-9 w-9 text-primary rounded-sm" onClick={() => handleEditGroup(g)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive rounded-sm" onClick={() => handleDeleteGroup(g.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      )) : (
-                        <div className="p-24 text-center flex flex-col items-center gap-4 opacity-30">
-                          <Tags className="h-12 w-12" />
-                          <p className="font-black uppercase tracking-widest text-xs">No active groups</p>
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </TabsContent>
-              </Tabs>
-              <div className="p-4 bg-muted/5 border-t shrink-0">
-                <DialogClose asChild><Button variant="outline" className="w-full h-11 font-black uppercase text-[10px] tracking-widest rounded-sm">Exit Hub</Button></DialogClose>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button variant="outline" asChild className="rounded-sm font-bold h-11 border-primary/20 text-primary hover:bg-primary/5">
+            <Link href="/projects/groups">
+              <Tags className="h-4 w-4 mr-2" /> Manage Groups
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -757,7 +570,13 @@ export default function AddNewProjectPage() {
   );
 }
 
-function SummaryCard({ title, value, icon: Icon, color, description }: { title: string, value: number | string, icon: any, color: 'primary', description: string }) {
+function SummaryCard({ title, value, icon: Icon, description, color }: { 
+  title: string, 
+  value: number | string, 
+  icon: any, 
+  description: string,
+  color: 'primary'
+}) {
   const colors = {
     primary: "bg-primary/5 border-primary/10 text-primary",
   };
