@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -166,29 +165,32 @@ export default function ProjectsListPage() {
         <p className="text-muted-foreground text-sm font-medium">Monitoring site assets, Bill of Materials, and inventory compliance.</p>
       </div>
 
-      {/* Analytics Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <SummaryCard 
-          title={countLabel} 
-          value={summaryStats.count} 
-          icon={Building2} 
-          color="primary" 
-          description="Active Locations"
-        />
-        <SummaryCard 
-          title="Agg. AC Capacity" 
-          value={formatCapacity(summaryStats.ac)} 
-          icon={Zap} 
-          color="primary" 
-          description="Megawatts (MW)"
-        />
-        <SummaryCard 
-          title="Agg. DC Capacity" 
-          value={formatCapacity(summaryStats.dc)} 
-          icon={ShieldCheck} 
-          color="primary" 
-          description="Megawatts Peak (MWp)"
-        />
+      {/* Analytics Bar - Synchronized with /projects/add layout */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in slide-in-from-top-2 duration-300">
+        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">{countLabel}</p>
+            <p className="text-2xl font-black text-primary leading-none">{summaryStats.count}</p>
+            <p className="text-[8px] font-bold text-primary/60 uppercase">Active Locations</p>
+          </div>
+          <Building2 className="h-8 w-8 text-primary/10" />
+        </div>
+        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">Agg. AC Capacity</p>
+            <p className="text-2xl font-black text-primary leading-none">{formatCapacity(summaryStats.ac)}</p>
+            <p className="text-[8px] font-bold text-primary/60 uppercase">Megawatts (MW)</p>
+          </div>
+          <Zap className="h-8 w-8 text-primary/10" />
+        </div>
+        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
+          <div className="space-y-0.5">
+            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">Agg. DC Capacity</p>
+            <p className="text-2xl font-black text-primary leading-none">{formatCapacity(summaryStats.dc)}</p>
+            <p className="text-[8px] font-bold text-primary/60 uppercase">Megawatts Peak (MWp)</p>
+          </div>
+          <ShieldCheck className="h-8 w-8 text-primary/10" />
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
@@ -381,28 +383,5 @@ export default function ProjectsListPage() {
         )}
       </div>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, description, color }: { 
-  title: string, 
-  value: number | string, 
-  icon: any, 
-  description: string,
-  color: 'primary'
-}) {
-  return (
-    <Card className="rounded-sm border-primary/10 shadow-sm hover:shadow-md transition-all group overflow-hidden">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-        <CardTitle className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">{title}</CardTitle>
-        <div className="p-1.5 rounded-sm border border-primary/10 bg-primary/5 text-primary transition-transform group-hover:scale-110">
-          <Icon className="h-3.5 w-3.5" />
-        </div>
-      </CardHeader>
-      <CardContent className="p-4 pt-0">
-        <div className="text-2xl font-black tracking-tight tabular-nums">{value}</div>
-        <p className="text-[9px] text-muted-foreground mt-1 font-bold uppercase tracking-tight">{description}</p>
-      </CardContent>
-    </Card>
   );
 }
