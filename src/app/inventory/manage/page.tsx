@@ -164,14 +164,16 @@ export default function ManageMasterInventoryPage() {
     
     const oldName = editingItem.name;
 
-    // Duplicate check for edit
+    // Duplicate check for edit: Check if another item (different ID) has identical name AND make
     const isDuplicate = items?.some(item => 
-      item.id !== editingItem.id && item.name.toLowerCase() === values.name.toLowerCase()
+      item.id !== editingItem.id && 
+      item.name.toLowerCase() === values.name.toLowerCase() &&
+      item.make.toLowerCase() === values.make.toLowerCase()
     );
     
     if (isDuplicate) {
-      form.setError('name', { type: 'manual', message: 'Another material already uses this exact name.' });
-      toast({ variant: 'destructive', title: 'Rename Conflict', description: 'Item name must be unique.' });
+      form.setError('name', { type: 'manual', message: 'Another material already uses this exact name and make combination.' });
+      toast({ variant: 'destructive', title: 'Update Conflict', description: 'Item name and make combination must be unique across the registry.' });
       return;
     }
 
@@ -205,7 +207,6 @@ export default function ManageMasterInventoryPage() {
       }
 
       // 3. Cascade Update to project_pos
-      // We check all POs (capped at 500 for safety) to see if they contain this item in their array
       const posSnap = await getDocs(query(collection(firestore, 'project_pos'), limit(500)));
       if (!posSnap.empty) {
         const poBatch = writeBatch(firestore);
@@ -234,7 +235,7 @@ export default function ManageMasterInventoryPage() {
 
       toast({ 
         title: 'Item Updated', 
-        description: `${values.name} and all dependent BoM/PO records synchronized.` 
+        description: `${values.name} and all dependent records synchronized.` 
       });
       setEditingItem(null);
     } catch (e: any) {
@@ -611,8 +612,7 @@ export default function ManageMasterInventoryPage() {
           <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
             <Button onClick={form.handleSubmit(onEditSubmit)} disabled={isUpdating} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
-              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              Save Changes
+              {isUpdating ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Applying...</> : <><Save className="h-4 w-4 mr-2" /> Save Changes</>}
             </Button>
           </DialogFooter>
         </DialogContent>

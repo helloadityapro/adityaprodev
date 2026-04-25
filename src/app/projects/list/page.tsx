@@ -255,7 +255,7 @@ export default function ProjectsListPage() {
               )}
             >
               <Star className={cn("h-4 w-4 mr-2", showStarredOnly && "fill-current")} />
-              {showStarredOnly ? "Starred View Active" : "View Starred"}
+              {showStarredOnly ? "Starred Projects" : "View Starred"}
             </Button>
             
             <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setShowStarredOnly(false); setSelectedGroupIds([]); }} className="h-11 w-11 text-muted-foreground rounded-sm">
