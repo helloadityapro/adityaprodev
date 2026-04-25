@@ -239,24 +239,6 @@ export default function RecordMovementPage() {
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
   const filteredSuppliers = allSuppliers?.filter(s => s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())) || [];
 
-  if (isSubmitted && submittedData) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4"><div className="bg-primary/10 p-4 rounded-full"><CheckCircle2 className="h-12 w-12 text-primary" /></div></div>
-            <CardTitle className="text-2xl font-bold">Movement Logged</CardTitle>
-            <CardDescription className="text-base">Movement recorded for <strong>{submittedData.siteName}</strong>. Available quantities updated.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button variant="outline" className="w-full h-11" onClick={() => router.push('/inventory/data')}>View History</Button>
-            <Button className="w-full h-11" onClick={() => { setIsSubmitted(false); form.reset(); setInvoiceFiles([]); }}>Record New Entry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       <div className="flex flex-col gap-1">
@@ -404,7 +386,7 @@ export default function RecordMovementPage() {
                           <FormLabel>Authorized Item</FormLabel>
                           <Popover open={openItemPopoverIndex === index} onOpenChange={o => setOpenItemPopoverIndex(o ? index : null)}>
                             <PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-10 bg-background", !itemField.value && "text-muted-foreground")}><span className="truncate">{itemField.value || "Search approved BoM items..."}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
-                            <PopoverContent className="w-[400px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} />{lookup.name}</Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No approved items found for this site.</div>)}</div></ScrollArea></PopoverContent>
+                            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-10 text-xs py-2 px-3 text-left whitespace-normal flex items-start gap-2" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} /><span className="flex-1 break-words leading-relaxed">{lookup.name}</span></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No approved items found for this site.</div>)}</div></ScrollArea></PopoverContent>
                           </Popover>
                           <FormMessage />
                         </FormItem>
