@@ -36,7 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 
-const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"];
+const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Pairs", "Drums"];
 
 const subItemSchema = z.object({
   name: z.string().min(1, 'Part name is required.'),
@@ -56,6 +56,7 @@ const itemSchema = z.object({
 type MasterItem = {
   id: string;
   name: string;
+  make: string;
 };
 
 export default function AddMasterItemPage() {
@@ -112,11 +113,15 @@ export default function AddMasterItemPage() {
   const onSubmit = async (values: z.infer<typeof itemSchema>) => {
     if (!isAdmin) return;
     
-    // Duplicate check
-    const isDuplicate = existingItems?.some(item => item.name.toLowerCase() === values.name.toLowerCase());
+    // Duplicate check: Verify if Name AND Make match an existing item
+    const isDuplicate = existingItems?.some(item => 
+      item.name.toLowerCase() === values.name.toLowerCase() &&
+      item.make?.toLowerCase() === values.make.toLowerCase()
+    );
+    
     if (isDuplicate) {
-      form.setError('name', { type: 'manual', message: 'A material with this exact name already exists in the registry.' });
-      toast({ variant: 'destructive', title: 'Duplicate Item', description: 'This material name is already in use.' });
+      form.setError('name', { type: 'manual', message: 'A material with this exact name and make already exists.' });
+      toast({ variant: 'destructive', title: 'Duplicate Item', description: 'This combination of name and make is already in use.' });
       return;
     }
 
@@ -298,4 +303,3 @@ export default function AddMasterItemPage() {
     </div>
   );
 }
-
