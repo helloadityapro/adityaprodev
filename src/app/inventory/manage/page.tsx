@@ -6,7 +6,7 @@ import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, orderBy, where, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, serverTimestamp, getDocs, writeBatch, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -162,6 +162,8 @@ export default function ManageMasterInventoryPage() {
   const onEditSubmit = async (values: z.infer<typeof itemSchema>) => {
     if (!editingItem) return;
     
+    const oldName = editingItem.name;
+
     // Duplicate check for edit
     const isDuplicate = items?.some(item => 
       item.id !== editingItem.id && item.name.toLowerCase() === values.name.toLowerCase()
@@ -175,12 +177,65 @@ export default function ManageMasterInventoryPage() {
 
     setIsUpdating(true);
     try {
+      // 1. Update the Master Inventory Item
       const itemRef = doc(firestore, 'master_inventory', editingItem.id);
-      updateDocumentNonBlocking(itemRef, {
+      await updateDocumentNonBlocking(itemRef, {
         ...values,
         updatedAt: serverTimestamp(),
       });
-      toast({ title: 'Item Updated', description: `${values.name} has been modified successfully.` });
+
+      // 2. Cascade Update to project_boms
+      const bomsQuery = query(collection(firestore, 'project_boms'), where('itemName', '==', oldName));
+      const bomsSnap = await getDocs(bomsQuery);
+      
+      if (!bomsSnap.empty) {
+        const bomBatch = writeBatch(firestore);
+        bomsSnap.docs.forEach(bomDoc => {
+          bomBatch.update(bomDoc.ref, {
+            itemName: values.name,
+            category: values.category,
+            unit: values.unit,
+            make: values.make,
+            specification: values.description || "",
+            subItems: values.subItems || [],
+            updatedAt: serverTimestamp()
+          });
+        });
+        await bomBatch.commit();
+      }
+
+      // 3. Cascade Update to project_pos
+      // We check all POs (capped at 500 for safety) to see if they contain this item in their array
+      const posSnap = await getDocs(query(collection(firestore, 'project_pos'), limit(500)));
+      if (!posSnap.empty) {
+        const poBatch = writeBatch(firestore);
+        let poUpdatedCount = 0;
+        posSnap.docs.forEach(poDoc => {
+          const poData = poDoc.data();
+          let hasMatch = false;
+          const newItems = (poData.items || []).map((it: any) => {
+            if (it.itemName === oldName) {
+              hasMatch = true;
+              return { ...it, itemName: values.name };
+            }
+            return it;
+          });
+
+          if (hasMatch) {
+            poBatch.update(poDoc.ref, { 
+              items: newItems,
+              updatedAt: serverTimestamp()
+            });
+            poUpdatedCount++;
+          }
+        });
+        if (poUpdatedCount > 0) await poBatch.commit();
+      }
+
+      toast({ 
+        title: 'Item Updated', 
+        description: `${values.name} and all dependent BoM/PO records synchronized.` 
+      });
       setEditingItem(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
@@ -421,7 +476,7 @@ export default function ManageMasterInventoryPage() {
         <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0 rounded-sm overflow-hidden border-none shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <DialogTitle className="text-xl font-black uppercase tracking-tight">Edit Material Registry</DialogTitle>
-            <DialogDescription className="text-xs font-medium">Modify properties for {editingItem?.name}.</DialogDescription>
+            <DialogDescription className="text-xs font-medium">Modify properties for {editingItem?.name}. Updates will cascade to BoM and PO records.</DialogDescription>
           </DialogHeader>
           
           <ScrollArea className="flex-1">
@@ -555,7 +610,7 @@ export default function ManageMasterInventoryPage() {
 
           <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
-            <Button type="submit" form="edit-material-form" disabled={isUpdating} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
+            <Button onClick={form.handleSubmit(onEditSubmit)} disabled={isUpdating} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
               {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               Save Changes
             </Button>
