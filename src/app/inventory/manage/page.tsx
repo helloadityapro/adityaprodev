@@ -480,7 +480,7 @@ export default function ManageMasterInventoryPage() {
             <DialogDescription className="text-xs font-medium">Modify properties for {editingItem?.name}. Updates will cascade to BoM and PO records.</DialogDescription>
           </DialogHeader>
           
-          <ScrollArea className="flex-1">
+          <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="p-6">
               <Form {...form}>
                 <form id="edit-material-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-8">
@@ -488,7 +488,7 @@ export default function ManageMasterInventoryPage() {
                     <FormField control={form.control} name="name" render={({ field }) => (
                       <FormItem className="md:col-span-2">
                         <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Item Name / Description</FormLabel>
-                        <FormControl><Input placeholder="e.g. Solar Module 540Wp" {...field} className="h-11 rounded-sm" /></FormControl>
+                        <FormControl><Input placeholder="e.g. Solar Module 540Wp" {...field} className="rounded-sm" /></FormControl>
                         {suggestion && (
                           <div className="flex items-center gap-2 mt-2 animate-in slide-in-from-left-2 duration-300">
                             <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 py-1.5 px-3 rounded-sm flex items-center gap-2">
@@ -564,7 +564,7 @@ export default function ManageMasterInventoryPage() {
                           onClick={() => append({ name: '', quantityPerSet: 1, unit: 'Numbers' })}
                           className="h-7 text-[9px] font-black uppercase border border-primary/20 hover:bg-primary/10"
                         >
-                          <Plus className="h-3 w-3 mr-1" /> Add Part
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Add Part
                         </Button>
                       </div>
                       <div className="space-y-3">
@@ -607,7 +607,7 @@ export default function ManageMasterInventoryPage() {
                 </form>
               </Form>
             </div>
-          </ScrollArea>
+          </div>
 
           <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
