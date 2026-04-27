@@ -34,6 +34,7 @@ export type PageKey =
   | 'admin-vehicles'
   | 'admin-rewards'
   | 'admin-suppliers'
+  | 'admin-makes'
   | 'admin-contractors'
   | 'admin-users'
   | 'admin-teams'
@@ -93,6 +94,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'admin-vehicles', label: 'Fleet Registry', category: 'Administration', path: '/vehicles/manage' },
   { id: 'admin-rewards', label: 'Rewards & Rates Setup', category: 'Administration', path: '/settings/rewards' },
   { id: 'admin-suppliers', label: 'Supplier Registry', category: 'Administration', path: '/settings/suppliers' },
+  { id: 'admin-makes', label: 'Makes Registry', category: 'Administration', path: '/settings/makes' },
   { id: 'admin-contractors', label: 'Contractor Registry', category: 'Administration', path: '/settings/contractors' },
   { id: 'admin-users', label: 'Personnel Directory', category: 'Administration', path: '/settings/users' },
   { id: 'admin-teams', label: 'Reporting & Teams', category: 'Administration', path: '/settings/teams' },
@@ -143,6 +145,7 @@ export function getPageKeyByPath(path: string): PageKey | null {
   // 3. Vehicles specific (Handling both management and requests under 'trips' key)
   if (path.startsWith('/vehicles/trips') || path.startsWith('/vehicles/request')) return 'trips';
   if (path.startsWith('/vehicles/manage')) return 'admin-vehicles';
+  if (path.startsWith('/settings/makes')) return 'admin-makes';
   
   return null;
 }

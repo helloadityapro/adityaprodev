@@ -1,0 +1,290 @@
+
+'use client';
+
+import * as React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
+
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
+import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, CheckCircle2, FileDown, FileUp, ArrowLeft, RefreshCcw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { isSuperAdmin } from '@/lib/auth-constants';
+import { cn } from '@/lib/utils';
+
+type Make = {
+  id: string;
+  name: string;
+  gstin: string;
+  address: string;
+  mobile: string;
+  email: string;
+  createdAt: any;
+};
+
+const makeSchema = z.object({
+  name: z.string().min(1, 'Name is required.'),
+  gstin: z.string().optional().or(z.literal('')).refine(val => !val || val.length === 15, "GSTIN must be exactly 15 characters if provided."),
+  address: z.string().optional().or(z.literal('')),
+  mobile: z.string().optional().or(z.literal('')),
+  email: z.string().email('Invalid email address.').optional().or(z.literal('')),
+});
+
+export default function MakesManagementPage() {
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  const router = useRouter();
+  const { user, isUserLoading } = useUser();
+
+  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
+  const [makeToEdit, setMakeToEdit] = React.useState<Make | null>(null);
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [isImporting, setIsImporting] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+
+  const makesQuery = useMemoFirebase(() => collection(firestore, 'makes'), [firestore]);
+  const { data: makes, isLoading: makesLoading } = useCollection<Make>(makesQuery);
+
+  const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
+  const { data: allSuppliers } = useCollection<any>(suppliersQuery);
+
+  const filteredMakes = React.useMemo(() => {
+    if (!makes) return [];
+    return makes.filter(m => 
+      m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (m.gstin || "").toLowerCase().includes(searchTerm.toLowerCase())
+    ).sort((a, b) => a.name.localeCompare(b.name));
+  }, [makes, searchTerm]);
+
+  const form = useForm<z.infer<typeof makeSchema>>({
+    resolver: zodResolver(makeSchema),
+    defaultValues: { name: '', gstin: '', address: '', mobile: '', email: '' },
+  });
+
+  React.useEffect(() => {
+    if (makeToEdit) {
+      form.reset({
+        name: makeToEdit.name,
+        gstin: makeToEdit.gstin || '',
+        address: makeToEdit.address || '',
+        mobile: makeToEdit.mobile || '',
+        email: makeToEdit.email || '',
+      });
+    } else if (!isAddDialogOpen) {
+      form.reset({ name: '', gstin: '', address: '', mobile: '', email: '' });
+    }
+  }, [makeToEdit, isAddDialogOpen, form]);
+
+  const onAddSubmit = async (values: z.infer<typeof makeSchema>) => {
+    setIsSubmitting(true);
+    try {
+      await addDocumentNonBlocking(collection(firestore, 'makes'), {
+        ...values,
+        gstin: values.gstin?.toUpperCase() || "",
+        createdAt: serverTimestamp(),
+      });
+      toast({ title: 'Make Registered', description: `${values.name} added to registry.` });
+      form.reset();
+      setIsAddDialogOpen(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const onEditSubmit = async (values: z.infer<typeof makeSchema>) => {
+    if (!makeToEdit) return;
+    setIsSubmitting(true);
+    try {
+      updateDocumentNonBlocking(doc(firestore, 'makes', makeToEdit.id), {
+        ...values,
+        gstin: values.gstin?.toUpperCase() || ""
+      });
+      toast({ title: 'Make Updated', description: 'Record modified successfully.' });
+      setMakeToEdit(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddAsSupplier = async (make: Make) => {
+    try {
+      await addDocumentNonBlocking(collection(firestore, 'suppliers'), {
+        name: make.name,
+        gstin: make.gstin || "",
+        address: make.address || "",
+        mobile: make.mobile || "",
+        email: make.email || "",
+        createdAt: serverTimestamp(),
+      });
+      toast({ title: 'Cross-Linked', description: `${make.name} now registered as Supplier.` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    deleteDocumentNonBlocking(doc(firestore, 'makes', id));
+    toast({ title: 'Make Removed' });
+  };
+
+  if (isUserLoading || isProfileLoading || makesLoading) {
+    return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
+  }
+
+  if (!isAdmin) return null;
+
+  return (
+    <div className="space-y-6 md:space-y-8 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <Button variant="ghost" size="sm" onClick={() => router.push('/settings')} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Settings
+          </Button>
+          <h1 className="flex items-center gap-2 text-primary">
+            <Truck className="h-6 w-6 md:h-8 md:w-8" /> Makes / Brands Registry
+          </h1>
+          <p className="text-muted-foreground text-sm font-medium">Manage manufacturing brands and brands associated with site inventory.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setIsAddDialogOpen(true)} className="h-10 rounded-sm font-bold shadow-md">
+            <Plus className="mr-2 h-4 w-4" /> Add New Make
+          </Button>
+        </div>
+      </div>
+
+      <Card className="rounded-sm shadow-sm overflow-hidden border-primary/10">
+        <CardHeader className="bg-muted/5 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6">
+          <div className="space-y-1">
+            <CardTitle className="text-base md:text-lg uppercase font-black">Authorized Makes</CardTitle>
+            <CardDescription className="text-xs">Brands registered for BoM mapping.</CardDescription>
+          </div>
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search make or GSTIN..." 
+              className="pl-8 h-10 rounded-sm border-primary/20 text-sm bg-background" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="px-6">Brand Name</TableHead>
+                  <TableHead>GSTIN</TableHead>
+                  <TableHead>Linked Identity</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredMakes.length > 0 ? filteredMakes.map((m) => {
+                  const isAlreadySupplier = allSuppliers?.some((s: any) => s.name.toLowerCase() === m.name.toLowerCase());
+                  return (
+                    <TableRow key={m.id} className="hover:bg-muted/5 group">
+                      <TableCell className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm text-primary">{m.name}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase flex items-center gap-1 mt-0.5">
+                            <MapPin className="h-3 w-3" /> {m.address || "No address"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="rounded-sm font-mono text-[10px] uppercase font-bold px-1.5 h-5">{m.gstin || '—'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {!isAlreadySupplier && (
+                          <Button variant="outline" size="sm" onClick={() => handleAddAsSupplier(m)} className="h-7 text-[9px] font-black uppercase border-primary/20 text-primary hover:bg-primary/5 rounded-sm">
+                            <RefreshCcw className="h-3 w-3 mr-1" /> Add as Supplier
+                          </Button>
+                        )}
+                        {isAlreadySupplier && (
+                          <Badge variant="outline" className="h-6 rounded-sm bg-green-50 text-green-700 border-green-200 text-[9px] uppercase font-black">
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Also Supplier
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setMakeToEdit(m)}><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleDelete(m.id)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }) : (
+                  <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic">No makes registered.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Dialogs */}
+      <Dialog open={isAddDialogOpen || !!makeToEdit} onOpenChange={(open) => { if(!open) { setIsAddDialogOpen(false); setMakeToEdit(null); } }}>
+        <DialogContent className="sm:max-w-lg rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b">
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">{makeToEdit ? 'Edit' : 'Register New'} Make</DialogTitle>
+          </DialogHeader>
+          <div className="p-6">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(makeToEdit ? onEditSubmit : onAddSubmit)} className="space-y-5">
+                <FormField control={form.control} name="name" render={({ field }) => (
+                  <FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Brand / Make Name</FormLabel><FormControl><Input placeholder="Legal name" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="gstin" render={({ field }) => (
+                    <FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">GSTIN</FormLabel><FormControl><Input placeholder="15 Digit" {...field} className="h-11 font-mono uppercase rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="mobile" render={({ field }) => (
+                    <FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Mobile</FormLabel><FormControl><Input placeholder="Contact" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Email</FormLabel><FormControl><Input placeholder="m@brand.com" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="address" render={({ field }) => (
+                  <FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Address</FormLabel><FormControl><Textarea placeholder="Full address..." {...field} className="rounded-sm min-h-[80px]" /></FormControl><FormMessage /></FormItem>
+                )} />
+                <DialogFooter className="pt-4 border-t gap-2">
+                  <DialogClose asChild><Button variant="outline" className="flex-1 h-11 rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
+                  <Button type="submit" className="flex-1 h-11 rounded-sm font-black uppercase text-[10px] shadow-lg" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Make"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

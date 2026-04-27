@@ -99,23 +99,15 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
   const isAdmin = isSuper || userRole === 'Admin';
 
   const allowedKeys = React.useMemo(() => {
-    // Super Admins see everything
     if (isSuper) return null; 
-
-    // 1. Check for individual user override
     if (userProfile?.customPermissions) {
       return new Set<string>(userProfile.customPermissions);
     }
-
-    // 2. Check for role default
-    // Normalize role string to slug format to match Firestore ID
     const roleId = slugifyRole(userRole);
     const config = roleConfigs?.find(c => c.id === roleId);
     if (config) {
       return new Set<string>(config.allowedPageKeys);
     }
-
-    // Fallback if no config exists yet (prototype defaults)
     return null;
   }, [userProfile, roleConfigs, userRole, isSuper]);
 
@@ -861,6 +853,16 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                 <Link href="/settings/rewards">
                   <Coins className="h-4 w-4 text-amber-600" />
                   <span className="font-medium">Rewards Setup</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-makes') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Makes" isActive={pathname.startsWith('/settings/makes')} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/settings/makes">
+                  <Tag className="h-4 w-4" />
+                  <span className="font-medium">Makes Registry</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

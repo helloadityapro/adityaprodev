@@ -121,6 +121,20 @@
       },
       "required": ["name"]
     },
+    "Make": {
+      "title": "Make / Manufacturer",
+      "type": "object",
+      "description": "Manufacturer / Brand registry.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "gstin": { "type": "string" },
+        "address": { "type": "string" },
+        "mobile": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["name"]
+    },
     "Contractor": {
       "title": "Contractor",
       "type": "object",
@@ -346,6 +360,10 @@
     "/suppliers/{supplierId}": {
       "schema": { "$ref": "#/backend/entities/Supplier" },
       "description": "Material supplier registry."
+    },
+    "/makes/{makeId}": {
+      "schema": { "$ref": "#/backend/entities/Make" },
+      "description": "Manufacturer / Brand registry."
     },
     "/contractors/{contractorId}": {
       "schema": { "$ref": "#/backend/entities/Contractor" },

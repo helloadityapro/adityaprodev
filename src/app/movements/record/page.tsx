@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -47,10 +48,9 @@ type Site = {
   name: string;
 };
 
-type Supplier = {
+type Make = {
   id: string;
   name: string;
-  gstin: string;
 };
 
 type BoMItem = {
@@ -94,13 +94,13 @@ export default function RecordMovementPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
-  const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
-  const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
+  const makesQuery = useMemoFirebase(() => collection(firestore, 'makes'), [firestore]);
+  const { data: allMakes } = useCollection<Make>(makesQuery);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
-  const [isSupplierPopoverOpen, setIsSupplierPopoverOpen] = React.useState(false);
-  const [supplierSearchQuery, setSupplierSearchQuery] = React.useState("");
+  const [isMakePopoverOpen, setIsMakePopoverOpen] = React.useState(false);
+  const [makeSearchQuery, setMakeSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [submittedData, setSubmittedData] = React.useState<any>(null);
@@ -221,23 +221,19 @@ export default function RecordMovementPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
       : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
-
     if (isSuper) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-
     if (isOwnDataOnly || !isAdmin) {
       const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
       return allSites.filter(s => assignedIds.has(s.id));
     }
-
     return Array.from(new Map(allSites.map(s => [s.name, s])).values());
   }, [allSites, userProfile, isAdmin, isSuper, roleConfigs]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
-  const filteredSuppliers = allSuppliers?.filter(s => s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())) || [];
+  const filteredMakes = allMakes?.filter(m => m.name.toLowerCase().includes(makeSearchQuery.toLowerCase())) || [];
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
@@ -257,10 +253,8 @@ export default function RecordMovementPage() {
                 <FormField control={form.control} name="movementDate" render={({ field }) => (
                   <FormItem><FormLabel>Movement Date</FormLabel><FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
-
                 <FormField control={form.control} name="movementType" render={({ field }) => (
                   <FormItem><FormLabel>Movement Direction</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Inward">Inward (Add to Stock)</SelectItem><SelectItem value="Outward">Outward (Remove from Stock)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-
                 <FormField control={form.control} name="siteName" render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Project Site (Recording Site)</FormLabel>
@@ -268,7 +262,7 @@ export default function RecordMovementPage() {
                       <PopoverTrigger asChild>
                         <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
                         <ScrollArea className="h-[200px]">{filteredSites.map(site => (
                           <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />{site.name}</Button>
@@ -278,7 +272,6 @@ export default function RecordMovementPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-
                 <FormField control={form.control} name="sourceOrDestinationType" render={({ field }) => (
                   <FormItem className="space-y-3">
                     <FormLabel>{movementType === 'Inward' ? 'Source' : 'Destination'} Type</FormLabel>
@@ -286,7 +279,7 @@ export default function RecordMovementPage() {
                       <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="Supplier" id="src-supp" />
-                          <Label htmlFor="src-supp">Supplier</Label>
+                          <Label htmlFor="src-supp">Make / Brand</Label>
                         </div>
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="Site" id="src-site" />
@@ -303,7 +296,7 @@ export default function RecordMovementPage() {
                 <FormItem>
                   <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{movementType === 'Inward' ? 'Received From' : 'Sent To'} Name</FormLabel>
                   {sourceOrDestinationType === 'Supplier' ? (
-                    <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search suppliers..." className="h-9 border-none" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} /></div><ScrollArea className="h-[200px]">{filteredSuppliers.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />{s.name}</Button>))}</ScrollArea></PopoverContent></Popover>
+                    <Popover open={isMakePopoverOpen} onOpenChange={setIsMakePopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select brand..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search makes..." className="h-9 border-none" value={makeSearchQuery} onChange={e => setMakeSearchQuery(e.target.value)} /></div><ScrollArea className="h-[200px]">{filteredMakes.map(m => (<Button key={m.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(m.name); setIsMakePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", m.name === field.value ? "opacity-100" : "opacity-0")} />{m.name}</Button>))}</ScrollArea></PopoverContent></Popover>
                   ) : (<FormControl><Input placeholder="Site name or address..." {...field} className="h-11 rounded-sm" /></FormControl>)}
                   <FormMessage />
                 </FormItem>
@@ -316,58 +309,14 @@ export default function RecordMovementPage() {
                   <FileText className="h-5 w-5 text-primary" />
                   <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Invoice Documentation</h3>
                 </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField control={form.control} name="invoiceNumber" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice / Challan Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. INV/2024/001" {...field} className="h-11 rounded-sm" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-
-                  <FormField control={form.control} name="invoiceDate" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} className="h-11 rounded-sm" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                  <FormField control={form.control} name="invoiceNumber" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice / Challan Number</FormLabel><FormControl><Input placeholder="e.g. INV/2024/001" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="invoiceDate" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice Date</FormLabel><FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>)} />
                 </div>
-
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <FileUp className="h-4 w-4" /> Upload Invoices / Proof
-                  </Label>
-                  <Input 
-                    type="file" 
-                    multiple 
-                    accept="image/*,application/pdf" 
-                    className="h-auto py-2 border-dashed"
-                    onChange={e => {
-                      if (e.target.files) {
-                        setInvoiceFiles(prev => [...prev, ...Array.from(e.target.files!)]);
-                      }
-                    }}
-                  />
-                  {invoiceFiles.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      {invoiceFiles.map((file, idx) => (
-                        <Badge key={idx} variant="secondary" className="gap-2 h-8 rounded-sm">
-                          <FileText className="h-3 w-3" />
-                          <span className="truncate max-w-[150px] text-[10px]">{file.name}</span>
-                          <X 
-                            className="h-3 w-3 cursor-pointer hover:text-destructive transition-colors" 
-                            onClick={() => setInvoiceFiles(prev => prev.filter((_, i) => i !== idx))}
-                          />
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
+                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2"><FileUp className="h-4 w-4" /> Upload Invoices / Proof</Label>
+                  <Input type="file" multiple accept="image/*,application/pdf" className="h-auto py-2 border-dashed" onChange={e => { if (e.target.files) setInvoiceFiles(prev => [...prev, ...Array.from(e.target.files!)]); }} />
+                  {invoiceFiles.length > 0 && (<div className="flex flex-wrap gap-2 pt-2">{invoiceFiles.map((file, idx) => (<Badge key={idx} variant="secondary" className="gap-2 h-8 rounded-sm"><FileText className="h-3 w-3" /><span className="truncate max-w-[150px] text-[10px]">{file.name}</span><X className="h-3 w-3 cursor-pointer hover:text-destructive transition-colors" onClick={() => setInvoiceFiles(prev => prev.filter((_, i) => i !== idx))} /></Badge>))}</div>)}
                 </div>
               </div>
 
@@ -395,7 +344,6 @@ export default function RecordMovementPage() {
                   </Card>
                 ))}</div>
               </div>
-
               <div className="flex justify-end gap-4 pt-6 border-t"><Button type="submit" className="min-w-[200px] h-12 text-lg font-black uppercase" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Recording...</> : "Record Movements"}</Button></div>
             </form>
           </Form>

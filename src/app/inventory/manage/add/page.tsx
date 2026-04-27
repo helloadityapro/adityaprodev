@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -18,7 +19,8 @@ import {
   AlertCircle,
   Save,
   X,
-  Sparkles
+  Sparkles,
+  Truck
 } from 'lucide-react';
 import { 
   Form, 
@@ -59,6 +61,11 @@ type MasterItem = {
   make: string;
 };
 
+type MakeRecord = {
+  id: string;
+  name: string;
+};
+
 export default function AddMasterItemPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
@@ -78,6 +85,12 @@ export default function AddMasterItemPage() {
   );
   const { data: categories } = useCollection<{ name: string }>(categoriesQuery);
 
+  const makesQuery = useMemoFirebase(() => 
+    collection(firestore, 'makes'), 
+    [firestore]
+  );
+  const { data: makesList } = useCollection<MakeRecord>(makesQuery);
+
   const masterItemsQuery = useMemoFirebase(() => collection(firestore, 'master_inventory'), [firestore]);
   const { data: existingItems } = useCollection<MasterItem>(masterItemsQuery);
 
@@ -87,7 +100,7 @@ export default function AddMasterItemPage() {
       name: '', 
       category: '', 
       unit: 'Numbers', 
-      make: 'Standard',
+      make: '',
       description: '',
       subItems: [] 
     },
@@ -140,12 +153,7 @@ export default function AddMasterItemPage() {
   };
 
   if (isUserLoading || isProfileLoading) {
-    return (
-      <div className="space-y-8 p-4">
-        <Skeleton className="h-12 w-64" />
-        <Skeleton className="h-96 w-full" />
-      </div>
-    );
+    return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
 
   if (!isAdmin) return null;
@@ -225,8 +233,18 @@ export default function AddMasterItemPage() {
 
                 <FormField control={form.control} name="make" render={({ field }) => (
                   <FormItem className="md:col-span-2">
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Make / Brand</FormLabel>
-                    <FormControl><Input placeholder="e.g. Adani / Mahindra" {...field} className="h-11 rounded-sm" /></FormControl>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Brand / Make</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 rounded-sm">
+                          <SelectValue placeholder="Select Brand..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {makesList?.map(m => <SelectItem key={m.id} value={m.name} className="text-xs font-bold">{m.name}</SelectItem>)}
+                        {!makesList?.length && <SelectItem value="_" disabled>No makes registered</SelectItem>}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -280,9 +298,6 @@ export default function AddMasterItemPage() {
                         </div>
                       </div>
                     ))}
-                    {fields.length === 0 && (
-                      <p className="text-center py-4 text-[10px] uppercase font-bold text-muted-foreground/40">No components defined for this set</p>
-                    )}
                   </div>
                 </div>
               )}

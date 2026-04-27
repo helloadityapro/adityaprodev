@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -117,13 +118,16 @@ export default function ManageMasterInventoryPage() {
   const categoriesQuery = useMemoFirebase(() => collection(firestore, 'inventory_categories'), [firestore]);
   const { data: categories } = useCollection<{ name: string }>(categoriesQuery);
 
+  const makesQuery = useMemoFirebase(() => collection(firestore, 'makes'), [firestore]);
+  const { data: makesList } = useCollection<{ name: string }>(makesQuery);
+
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
     defaultValues: { 
       name: '', 
       category: '', 
       unit: 'Numbers', 
-      make: 'Standard',
+      make: '',
       description: '',
       subItems: [] 
     },
@@ -179,14 +183,12 @@ export default function ManageMasterInventoryPage() {
 
     setIsUpdating(true);
     try {
-      // 1. Update the Master Inventory Item
       const itemRef = doc(firestore, 'master_inventory', editingItem.id);
       await updateDocumentNonBlocking(itemRef, {
         ...values,
         updatedAt: serverTimestamp(),
       });
 
-      // 2. Cascade Update to project_boms
       const bomsQuery = query(collection(firestore, 'project_boms'), where('itemName', '==', oldName));
       const bomsSnap = await getDocs(bomsQuery);
       
@@ -206,7 +208,6 @@ export default function ManageMasterInventoryPage() {
         await bomBatch.commit();
       }
 
-      // 3. Cascade Update to project_pos
       const posSnap = await getDocs(query(collection(firestore, 'project_pos'), limit(500)));
       if (!posSnap.empty) {
         const poBatch = writeBatch(firestore);
@@ -297,12 +298,7 @@ export default function ManageMasterInventoryPage() {
   };
 
   if (isUserLoading || isProfileLoading || isItemsLoading) {
-    return (
-      <div className="space-y-8 p-4">
-        <Skeleton className="h-12 w-64" />
-        <Skeleton className="h-96 w-full" />
-      </div>
-    );
+    return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
 
   return (
@@ -538,8 +534,18 @@ export default function ManageMasterInventoryPage() {
 
                     <FormField control={form.control} name="make" render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Make / Brand</FormLabel>
-                        <FormControl><Input placeholder="e.g. Adani / Mahindra" {...field} className="h-11 rounded-sm" /></FormControl>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Brand / Make</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-11 rounded-sm">
+                              <SelectValue placeholder="Select Brand..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {makesList?.map(m => <SelectItem key={m.name} value={m.name} className="text-xs font-bold">{m.name}</SelectItem>)}
+                            {!makesList?.length && <SelectItem value="_" disabled>No makes registered</SelectItem>}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )} />
