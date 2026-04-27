@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -47,16 +48,16 @@ type Site = {
   name: string;
 };
 
-type Supplier = {
+type Make = {
   id: string;
   name: string;
-  gstin: string;
 };
 
 type BoMItem = {
   id: string;
   itemName: string;
   unit: string;
+  make: string;
   status: string;
   subItems?: { name: string; quantityPerSet: number; unit: string }[];
 };
@@ -94,13 +95,13 @@ export default function RecordMovementPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
-  const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
-  const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
+  const makesQuery = useMemoFirebase(() => collection(firestore, 'makes'), [firestore]);
+  const { data: allMakes } = useCollection<Make>(makesQuery);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
-  const [isSupplierPopoverOpen, setIsSupplierPopoverOpen] = React.useState(false);
-  const [supplierSearchQuery, setSupplierSearchQuery] = React.useState("");
+  const [isMakePopoverOpen, setIsMakePopoverOpen] = React.useState(false);
+  const [makeSearchQuery, setMakeSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
   const [submittedData, setSubmittedData] = React.useState<any>(null);
@@ -126,6 +127,7 @@ export default function RecordMovementPage() {
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
   const watchSiteName = form.watch("siteName");
+  const watchSource = form.watch("sourceOrDestination");
   const movementType = form.watch("movementType");
   const sourceOrDestinationType = form.watch("sourceOrDestinationType");
 
@@ -141,20 +143,33 @@ export default function RecordMovementPage() {
     }
   }, [watchSiteName, firestore]);
 
+  // Reset items if source changes to ensure brand compliance
+  React.useEffect(() => {
+    form.setValue("items", [{ itemName: "", quantity: 0, unit: "Numbers" }]);
+  }, [watchSource, sourceOrDestinationType, form]);
+
   const [openItemPopoverIndex, setOpenItemPopoverIndex] = React.useState<number | null>(null);
   const [itemSearchQuery, setItemSearchQuery] = React.useState("");
 
   const filteredLookupItems = React.useMemo(() => {
-    const list: { name: string; unit: string }[] = [];
+    const list: { name: string; unit: string; make: string }[] = [];
     approvedBomItems.forEach(item => {
       if (item.subItems && item.subItems.length > 0) {
-        item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit }));
+        item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, make: item.make || "" }));
       } else {
-        list.push({ name: item.itemName, unit: item.unit });
+        list.push({ name: item.itemName, unit: item.unit, make: item.make || "" });
       }
     });
-    return list.filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
-  }, [approvedBomItems, itemSearchQuery]);
+
+    let filtered = list;
+    
+    // Filter by Brand if Source is a Make
+    if (sourceOrDestinationType === 'Supplier' && watchSource) {
+      filtered = filtered.filter(i => i.make.trim().toLowerCase() === watchSource.trim().toLowerCase());
+    }
+
+    return filtered.filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
+  }, [approvedBomItems, itemSearchQuery, sourceOrDestinationType, watchSource]);
 
   const onSubmit = async (values: z.infer<typeof movementSchema>) => {
     if (!user || !userProfile) return;
@@ -237,7 +252,7 @@ export default function RecordMovementPage() {
   }, [allSites, userProfile, isAdmin, isSuper, roleConfigs]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
-  const filteredSuppliers = allSuppliers?.filter(s => s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())) || [];
+  const filteredMakes = allMakes?.filter(m => m.name.toLowerCase().includes(makeSearchQuery.toLowerCase())) || [];
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
@@ -254,7 +269,6 @@ export default function RecordMovementPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Row 1: Date | Movement Direction */}
                 <FormField control={form.control} name="movementDate" render={({ field }) => (
                   <FormItem><FormLabel>Movement Date</FormLabel><FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -262,7 +276,6 @@ export default function RecordMovementPage() {
                 <FormField control={form.control} name="movementType" render={({ field }) => (
                   <FormItem><FormLabel>Movement Direction</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Inward">Inward (Add to Stock)</SelectItem><SelectItem value="Outward">Outward (Remove from Stock)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
 
-                {/* Row 2: Project Site | Source Type */}
                 <FormField control={form.control} name="siteName" render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Project Site (Recording Site)</FormLabel>
@@ -270,7 +283,7 @@ export default function RecordMovementPage() {
                       <PopoverTrigger asChild>
                         <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
                         <ScrollArea className="h-[200px]">{filteredSites.map(site => (
                           <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />{site.name}</Button>
@@ -288,7 +301,7 @@ export default function RecordMovementPage() {
                       <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="Supplier" id="src-supp" />
-                          <Label htmlFor="src-supp">Supplier</Label>
+                          <Label htmlFor="src-supp">Make / Brand</Label>
                         </div>
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="Site" id="src-site" />
@@ -301,12 +314,11 @@ export default function RecordMovementPage() {
                 )} />
               </div>
 
-              {/* Specific Entity Name Input */}
               <FormField control={form.control} name="sourceOrDestination" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{movementType === 'Inward' ? 'Received From' : 'Sent To'} Name</FormLabel>
                   {sourceOrDestinationType === 'Supplier' ? (
-                    <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select supplier..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search suppliers..." className="h-9 border-none" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} /></div><ScrollArea className="h-[200px]">{filteredSuppliers.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />{s.name}</Button>))}</ScrollArea></PopoverContent></Popover>
+                    <Popover open={isMakePopoverOpen} onOpenChange={setIsMakePopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select brand..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search makes..." className="h-9 border-none" value={makeSearchQuery} onChange={e => setMakeSearchQuery(e.target.value)} /></div><ScrollArea className="h-[200px]">{filteredMakes.map(m => (<Button key={m.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(m.name); setIsMakePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", m.name === field.value ? "opacity-100" : "opacity-0")} />{m.name}</Button>))}</ScrollArea></PopoverContent></Popover>
                   ) : (<FormControl><Input placeholder="Site name or address..." {...field} className="h-11 rounded-sm" /></FormControl>)}
                   <FormMessage />
                 </FormItem>
@@ -314,7 +326,6 @@ export default function RecordMovementPage() {
 
               <Separator />
 
-              {/* Invoice Documentation Section */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
@@ -385,8 +396,8 @@ export default function RecordMovementPage() {
                         <FormItem className="flex flex-col">
                           <FormLabel>Authorized Item</FormLabel>
                           <Popover open={openItemPopoverIndex === index} onOpenChange={o => setOpenItemPopoverIndex(o ? index : null)}>
-                            <PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-10 bg-background", !itemField.value && "text-muted-foreground")}><span className="truncate">{itemField.value || "Search approved BoM items..."}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
-                            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-10 text-xs py-2 px-3 text-left whitespace-normal flex items-start gap-2" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} /><span className="flex-1 break-words leading-relaxed">{lookup.name}</span></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No approved items found for this site.</div>)}</div></ScrollArea></PopoverContent>
+                            <PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-auto min-h-10 bg-background text-left", !itemField.value && "text-muted-foreground")}><span className="truncate whitespace-normal">{itemField.value || (sourceOrDestinationType === 'Supplier' && !watchSource ? "Select Brand First..." : "Search approved BoM items...")}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
+                            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-10 text-xs py-2 px-3 text-left whitespace-normal flex items-start gap-2" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} /><span className="flex-1 break-words leading-relaxed">{lookup.name}</span></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">{sourceOrDestinationType === 'Supplier' && watchSource ? `No approved ${watchSource} items found for this site.` : "No approved items found for this site."}</div>)}</div></ScrollArea></PopoverContent>
                           </Popover>
                           <FormMessage />
                         </FormItem>

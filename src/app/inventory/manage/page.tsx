@@ -29,7 +29,8 @@ import {
   Loader2,
   Save,
   X,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -106,6 +107,7 @@ export default function ManageMasterInventoryPage() {
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   const [editingItem, setEditingItem] = React.useState<MasterItem | null>(null);
   const [isUpdating, setIsUpdating] = React.useState(false);
+  const [isReconciling, setIsReconciling] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -285,6 +287,37 @@ export default function ManageMasterInventoryPage() {
     return result;
   }, [items, searchTerm, categoryFilter, sortConfig]);
 
+  const handleSyncMakes = async () => {
+    if (!items || !makesList) return;
+    setIsReconciling(true);
+    try {
+        const batch = writeBatch(firestore);
+        let updatedCount = 0;
+        
+        items.forEach(item => {
+            const canonicalMake = makesList.find(m => m.name.trim().toLowerCase() === item.make.trim().toLowerCase());
+            if (canonicalMake && canonicalMake.name !== item.make) {
+                batch.update(doc(firestore, 'master_inventory', item.id), {
+                    make: canonicalMake.name,
+                    updatedAt: serverTimestamp()
+                });
+                updatedCount++;
+            }
+        });
+
+        if (updatedCount > 0) {
+            await batch.commit();
+            toast({ title: 'Reconciliation Complete', description: `Synchronized ${updatedCount} items with the canonical Makes registry.` });
+        } else {
+            toast({ title: 'System Synchronized', description: 'All items already match canonical Makes registry.' });
+        }
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Sync Failed', description: e.message });
+    } finally {
+        setIsReconciling(false);
+    }
+  };
+
   const toggleRow = (id: string) => {
     const newSet = new Set(expandedRows);
     if (newSet.has(id)) newSet.delete(id);
@@ -311,11 +344,17 @@ export default function ManageMasterInventoryPage() {
           <p className="text-muted-foreground text-sm font-medium">Define global materials, components, and set-breakdowns for organizational use.</p>
         </div>
         {isAdmin && (
-          <Button asChild className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-6">
-            <Link href="/inventory/manage/add">
-              <Plus className="mr-2 h-4 w-4" /> Add New Item
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleSyncMakes} disabled={isReconciling} className="h-11 rounded-sm font-bold border-primary/20 text-primary">
+                {isReconciling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Reconcile Item Makes
+            </Button>
+            <Button asChild className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-6">
+                <Link href="/inventory/manage/add">
+                <Plus className="mr-2 h-4 w-4" /> Add New Item
+                </Link>
+            </Button>
+          </div>
         )}
       </div>
 
