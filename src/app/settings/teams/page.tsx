@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -12,7 +11,29 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check, MapPin, PlusCircle, Loader2, Pencil, ShieldCheck, XCircle, Building2, UserCog, History, Plus } from 'lucide-react';
+import { 
+  UserPlus, 
+  Trash2, 
+  Users, 
+  Search, 
+  ArrowUpDown, 
+  ArrowUp, 
+  ArrowDown, 
+  ChevronsUpDown, 
+  Check, 
+  MapPin, 
+  PlusCircle, 
+  Loader2, 
+  Pencil, 
+  ShieldCheck, 
+  XCircle, 
+  Building2, 
+  UserCog, 
+  History, 
+  Plus,
+  CheckCircle2,
+  X
+} from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -195,7 +216,7 @@ export default function TeamMappingPage() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 opacity-50" /><Input placeholder="Search..." className="h-9 border-none focus-visible:ring-0" value={managerSearchQuery} onChange={e => setManagerSearchQuery(e.target.value)} /></div>
+                    <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search..." className="h-9 border-none focus-visible:ring-0" value={managerSearchQuery} onChange={e => setManagerSearchQuery(e.target.value)} /></div>
                     <ScrollArea className="h-[200px]"><div className="p-1">{managers.filter(m => m.username?.toLowerCase().includes(managerSearchQuery.toLowerCase())).map(m => (<Button key={m.id} variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { setSelectedManagerId(m.id); setIsManagerPopoverOpen(false); }}>{m.username}</Button>))}</div></ScrollArea>
                   </PopoverContent>
                 </Popover>
@@ -210,7 +231,7 @@ export default function TeamMappingPage() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 opacity-50" /><Input placeholder="Search..." className="h-9 border-none focus-visible:ring-0" value={engineerSearchQuery} onChange={e => setEngineerSearchQuery(e.target.value)} /></div>
+                    <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search..." className="h-9 border-none focus-visible:ring-0" value={engineerSearchQuery} onChange={e => setEngineerSearchQuery(e.target.value)} /></div>
                     <ScrollArea className="h-[200px]"><div className="p-1">{engineers.filter(e => e.username?.toLowerCase().includes(engineerSearchQuery.toLowerCase())).map(e => (<Button key={e.id} variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { setSelectedEngineerId(e.id); setIsEngineerPopoverOpen(false); }}>{e.username}</Button>))}</div></ScrollArea>
                   </PopoverContent>
                 </Popover>
