@@ -125,8 +125,6 @@ export default function RecordMovementPage() {
   const [approvedPOs, setApprovedPOs] = React.useState<PurchaseOrder[]>([]);
   const [sourceSiteInventory, setSourceSiteInventory] = React.useState<InventoryItem[]>([]);
   
-  const currentSiteNameRef = React.useRef("");
-
   const form = useForm<z.infer<typeof movementSchema>>({
     resolver: zodResolver(movementSchema),
     defaultValues: { 
@@ -222,19 +220,15 @@ export default function RecordMovementPage() {
       });
     } else if (sourceOrDestinationType === 'Site') {
       // Show only items available in Source Site's inventory
-      // Determine Source Site
       const sourceSiteName = movementType === 'Outward' ? watchSiteName : watchSource;
       const sourceSiteId = allSites?.find(s => s.name === sourceSiteName)?.id;
       
-      // We need to fetch/filter inventory for the source site
-      // For performance, we assume sourceSiteInventory is fetched via effect
       sourceSiteInventory.forEach(inv => {
         if (inv.stockLevel > 0) {
           list.push({ name: inv.itemName, unit: inv.unit, make: "" });
         }
       });
     } else {
-      // Default fallback
       approvedBomItems.forEach(item => {
         if (item.subItems && item.subItems.length > 0) {
           item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, make: item.make || "" }));
@@ -332,6 +326,20 @@ export default function RecordMovementPage() {
       setIsSubmitting(false);
     }
   };
+
+  const accessibleSites = React.useMemo(() => {
+    if (!allSites || !userProfile) return [];
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
+    if (isSuper) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+    if (isOwnDataOnly || !isAdmin) {
+      const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
+      return allSites.filter(s => assignedIds.has(s.id));
+    }
+    return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+  }, [allSites, userProfile, isAdmin, isSuper, roleConfigs]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
