@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -35,7 +34,8 @@ import {
   X,
   ChevronRight,
   Settings2,
-  MapPin
+  MapPin,
+  Save
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -479,30 +479,18 @@ export default function TeamMappingPage() {
       {/* Edit Team Link Dialog */}
       <Dialog open={!!editingLinkUser} onOpenChange={(o) => !o && setEditingLinkUser(null)}>
         <DialogContent className="max-w-md w-[95vw] rounded-xl p-0 border-none shadow-2xl bg-white animate-in zoom-in-95 duration-200">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Edit Team Link</DialogTitle>
-            <DialogDescription>Reassign personnel to a different supervisor.</DialogDescription>
+          <DialogHeader className="p-6 pb-2 shrink-0 text-left space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-50 text-primary rounded-lg">
+                <Pencil className="h-5 w-5" />
+              </div>
+              <DialogTitle className="text-xl font-black tracking-tight text-slate-900">Edit Team Link</DialogTitle>
+            </div>
+            <DialogDescription className="text-xs font-medium text-slate-500 leading-relaxed">
+              Reassign <strong className="text-slate-700">{editingLinkUser?.username}</strong> to a different supervisor.
+            </DialogDescription>
           </DialogHeader>
           <div className="p-6 space-y-6">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-50 text-primary rounded-lg">
-                  <Pencil className="h-5 w-5" />
-                </div>
-                <div className="space-y-0.5 text-left">
-                  <h2 className="text-xl font-black tracking-tight text-slate-900">Edit Team Link</h2>
-                  <p className="text-xs font-medium text-slate-500 leading-relaxed">
-                    Reassign <strong className="text-slate-700">{editingLinkUser?.username}</strong> to a different supervisor.
-                  </p>
-                </div>
-              </div>
-              <DialogClose asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-400 hover:bg-slate-50">
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogClose>
-            </div>
-
             <div className="space-y-3 text-left">
               <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Assign New Supervisor</Label>
               <div className="relative group">
@@ -571,25 +559,16 @@ export default function TeamMappingPage() {
       {/* Manage Site Access Dialog (As per design image) */}
       <Dialog open={!!siteAccessUser} onOpenChange={(o) => !o && setSiteAccessUser(null)}>
         <DialogContent className="max-w-2xl w-[95vw] rounded-xl p-0 border-none shadow-2xl bg-white animate-in zoom-in-95 duration-200">
-          <DialogHeader className="p-6 pb-2 shrink-0">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-50 text-primary rounded-lg">
-                  <MapPin className="h-5 w-5" />
-                </div>
-                <div className="space-y-0.5 text-left">
-                  <DialogTitle className="text-xl font-black tracking-tight text-slate-900">Manage Site Access</DialogTitle>
-                  <DialogDescription className="text-xs font-medium text-slate-500 leading-relaxed">
-                    Assign sites to <strong className="text-slate-700">{siteAccessUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
-                  </DialogDescription>
-                </div>
+          <DialogHeader className="p-6 pb-2 shrink-0 text-left space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-50 text-primary rounded-lg">
+                <MapPin className="h-5 w-5" />
               </div>
-              <DialogClose asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-400 hover:bg-slate-50">
-                  <X className="h-4 w-4" />
-                </Button>
-              </DialogClose>
+              <DialogTitle className="text-xl font-black tracking-tight text-slate-900">Manage Site Access</DialogTitle>
             </div>
+            <DialogDescription className="text-xs font-medium text-slate-500 leading-relaxed">
+              Assign sites to <strong className="text-slate-700">{siteAccessUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
+            </DialogDescription>
           </DialogHeader>
           
           <div className="p-6 space-y-8 flex-1 overflow-hidden flex flex-col">
