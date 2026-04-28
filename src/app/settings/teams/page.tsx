@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -33,7 +34,8 @@ import {
   CheckCircle2,
   X,
   ChevronRight,
-  Settings2
+  Settings2,
+  MapPin
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -53,6 +55,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Separator } from '@/components/ui/separator';
 
 type User = {
   id: string;
@@ -114,9 +117,16 @@ export default function TeamMappingPage() {
   const [editManagerSearch, setEditManagerSearch] = React.useState("");
   const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
   
+  // Site Access Dialog States
+  const [siteAccessUser, setSiteAccessUser] = React.useState<User | null>(null);
+  const [localSiteIds, setLocalSiteIds] = React.useState<string[]>([]);
+  const [siteSearch, setSiteSearch] = React.useState("");
+  const [isSiteSearchOpen, setIsSiteSearchOpen] = React.useState(false);
+
   const [isMapping, setIsMapping] = React.useState(false);
   const [isAddingOverride, setIsAddingOverride] = React.useState(false);
   const [isUpdatingLink, setIsUpdatingLink] = React.useState(false);
+  const [isUpdatingSites, setIsUpdatingSites] = React.useState(false);
   const [newOverrideSiteId, setNewOverrideSiteId] = React.useState<string | "">("");
   const [newOverrideManagerId, setNewOverrideManagerId] = React.useState<string | "">("");
 
@@ -192,6 +202,45 @@ export default function TeamMappingPage() {
     }
   };
 
+  const syncManagerSites = async (managerId: string, updatedEngineerId: string, updatedEngineerSites: string[]) => {
+    try {
+      const q = query(collection(firestore, 'users'), where('siteManagerId', '==', managerId));
+      const snap = await getDocs(q);
+      
+      const allTeamSites = new Set<string>();
+      snap.docs.forEach(d => {
+          const data = d.data();
+          const sites = data.id === updatedEngineerId ? updatedEngineerSites : (data.assignedProjectIds || []);
+          sites.forEach((id: string) => allTeamSites.add(id));
+      });
+
+      const managerRef = doc(firestore, 'users', managerId);
+      updateDocumentNonBlocking(managerRef, { assignedProjectIds: Array.from(allTeamSites) });
+    } catch (e) {
+      console.error("Manager inheritance sync failed", e);
+    }
+  };
+
+  const handleSaveSiteAccess = async () => {
+    if (!siteAccessUser) return;
+    setIsUpdatingSites(true);
+    try {
+      const userRef = doc(firestore, 'users', siteAccessUser.id);
+      updateDocumentNonBlocking(userRef, { assignedProjectIds: localSiteIds });
+
+      if (siteAccessUser.role === 'Site Engineer' && siteAccessUser.siteManagerId) {
+        await syncManagerSites(siteAccessUser.siteManagerId, siteAccessUser.id, localSiteIds);
+      }
+
+      toast({ title: 'Access Updated', description: `Site permissions for ${siteAccessUser.username} saved.` });
+      setSiteAccessUser(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Save Failed', description: e.message });
+    } finally {
+      setIsUpdatingSites(false);
+    }
+  };
+
   const handleRemoveOverride = (id: string) => {
     deleteDocumentNonBlocking(doc(firestore, 'team_mapping_overrides', id));
     toast({ title: 'Override Removed' });
@@ -229,6 +278,20 @@ export default function TeamMappingPage() {
       });
   }, [engineers, managers, tableEngineerSearch, tableManagerSearch, sortConfig]);
 
+  const availableSitesToAllot = React.useMemo(() => {
+    if (!allSites) return [];
+    return allSites.filter(s => 
+      !localSiteIds.includes(s.id) && 
+      s.name.toLowerCase().includes(siteSearch.toLowerCase())
+    );
+  }, [allSites, localSiteIds, siteSearch]);
+
+  const handleOpenSiteAccess = (user: User) => {
+    setSiteAccessUser(user);
+    setLocalSiteIds(user.assignedProjectIds || []);
+    setSiteSearch("");
+  };
+
   if (isProfileLoading || usersLoading || sitesLoading || overridesLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   if (!isAdmin) return null;
@@ -236,7 +299,7 @@ export default function TeamMappingPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-foreground">Teams & Site Access</h1>
+        <h1 className="text-3xl font-black tracking-tight text-foreground uppercase">Teams & Site Access</h1>
         <p className="text-muted-foreground font-medium">Manage reporting structures and site authorizations. Engineer sites sync to managers automatically.</p>
       </div>
 
@@ -380,11 +443,9 @@ export default function TeamMappingPage() {
                               variant="outline" 
                               size="sm" 
                               className="h-8 rounded-sm font-bold text-[10px] uppercase border-primary/20 text-primary hover:bg-primary/5"
-                              asChild
+                              onClick={() => handleOpenSiteAccess(eng)}
                             >
-                              <Link href="/settings/site-assignment">
-                                <Building2 className="h-3.5 w-3.5 mr-1.5 opacity-60" /> Manage Sites
-                              </Link>
+                              <Building2 className="h-3.5 w-3.5 mr-1.5 opacity-60" /> Manage Sites
                             </Button>
                             <Button 
                               variant="outline" 
@@ -415,7 +476,7 @@ export default function TeamMappingPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Team Link Dialog (As per design image) */}
+      {/* Edit Team Link Dialog */}
       <Dialog open={!!editingLinkUser} onOpenChange={(o) => !o && setEditingLinkUser(null)}>
         <DialogContent className="max-w-md w-[95vw] rounded-xl p-0 border-none shadow-2xl bg-white animate-in zoom-in-95 duration-200">
           <DialogHeader className="sr-only">
@@ -483,9 +544,6 @@ export default function TeamMappingPage() {
                         </div>
                       </button>
                     ))}
-                    {!managers.some(m => m.username?.toLowerCase().includes(editManagerSearch.toLowerCase())) && (
-                      <div className="p-10 text-center text-xs font-medium text-slate-400 italic">No matches found</div>
-                    )}
                   </div>
                 </ScrollArea>
               </div>
@@ -504,7 +562,142 @@ export default function TeamMappingPage() {
               className="flex-1 rounded-lg font-bold h-11 bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-[0.98]"
             >
               {isUpdatingLink ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-              Confirm Reassignment
+              Confirm
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Site Access Dialog (As per design image) */}
+      <Dialog open={!!siteAccessUser} onOpenChange={(o) => !o && setSiteAccessUser(null)}>
+        <DialogContent className="max-w-2xl w-[95vw] rounded-xl p-0 border-none shadow-2xl bg-white animate-in zoom-in-95 duration-200">
+          <DialogHeader className="p-6 pb-2 shrink-0">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-primary rounded-lg">
+                  <MapPin className="h-5 w-5" />
+                </div>
+                <div className="space-y-0.5 text-left">
+                  <DialogTitle className="text-xl font-black tracking-tight text-slate-900">Manage Site Access</DialogTitle>
+                  <DialogDescription className="text-xs font-medium text-slate-500 leading-relaxed">
+                    Assign sites to <strong className="text-slate-700">{siteAccessUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
+                  </DialogDescription>
+                </div>
+              </div>
+              <DialogClose asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-400 hover:bg-slate-50">
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
+            </div>
+          </DialogHeader>
+          
+          <div className="p-6 space-y-8 flex-1 overflow-hidden flex flex-col">
+            {/* Search Site Bar */}
+            <div className="p-5 bg-blue-50/40 border border-blue-100 rounded-xl space-y-3 shrink-0">
+              <Label className="text-[10px] font-black uppercase text-blue-600/80 tracking-widest px-1">Select Site to Add</Label>
+              <Popover open={isSiteSearchOpen} onOpenChange={setIsSiteSearchOpen}>
+                <PopoverTrigger asChild>
+                  <div className="relative group">
+                    <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                    <Input 
+                      placeholder="Search project sites..." 
+                      className="h-12 pl-10 rounded-lg border-slate-200 bg-white focus-visible:ring-primary/20 text-sm font-medium"
+                      value={siteSearch}
+                      onChange={e => setSiteSearch(e.target.value)}
+                    />
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-lg shadow-2xl border-slate-200" align="start">
+                  <ScrollArea className="h-[220px]">
+                    <div className="p-1">
+                      {availableSitesToAllot.length > 0 ? availableSitesToAllot.map(site => (
+                        <Button 
+                          key={site.id} 
+                          variant="ghost" 
+                          className="w-full justify-start h-auto py-3 px-4 text-left rounded-md mb-0.5 hover:bg-blue-50 hover:text-primary group"
+                          onClick={() => {
+                            setLocalSiteIds(prev => [...prev, site.id]);
+                            setSiteSearch("");
+                            setIsSiteSearchOpen(false);
+                          }}
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-sm truncate">{site.name}</span>
+                            <span className="text-[10px] uppercase font-bold opacity-50 truncate group-hover:opacity-100">{site.projectCompany}</span>
+                          </div>
+                        </Button>
+                      )) : (
+                        <div className="p-8 text-center text-xs font-medium text-slate-400 italic">No available sites discovered</div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* List of Authorized Sites */}
+            <div className="space-y-3 flex-1 flex flex-col min-h-0">
+              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1 shrink-0">Authorized Site Access</Label>
+              <div className="border rounded-xl flex-1 flex flex-col overflow-hidden bg-white shadow-inner">
+                <Table>
+                  <TableHeader className="bg-slate-50 sticky top-0 z-10">
+                    <TableRow className="hover:bg-transparent border-b-slate-100">
+                      <TableHead className="text-[9px] font-black uppercase text-slate-400 h-9 px-5">Site Name</TableHead>
+                      <TableHead className="text-[9px] font-black uppercase text-slate-400 h-9">Company</TableHead>
+                      <TableHead className="w-12 h-9"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow className="h-0"><TableCell colSpan={3} className="p-0 h-0 border-none"></TableCell></TableRow>
+                  </TableBody>
+                </Table>
+                <ScrollArea className="flex-1">
+                  <Table>
+                    <TableBody>
+                      {localSiteIds.length > 0 ? localSiteIds.map(sid => {
+                        const site = allSites?.find(s => s.id === sid);
+                        return (
+                          <TableRow key={sid} className="hover:bg-slate-50 transition-colors border-b-slate-50 last:border-0 group">
+                            <TableCell className="px-5 py-4 font-black text-[13px] text-slate-800">{site?.name || '—'}</TableCell>
+                            <TableCell className="text-xs font-medium text-slate-400">{site?.projectCompany || '—'}</TableCell>
+                            <TableCell className="text-right pr-5">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                                onClick={() => setLocalSiteIds(prev => prev.filter(id => id !== sid))}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }) : (
+                        <TableRow>
+                          <TableCell colSpan={3} className="h-40 text-center text-xs font-medium text-slate-400 italic">No project sites assigned to this account.</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 bg-slate-50/50 border-t flex items-center justify-between gap-4 shrink-0">
+            <DialogClose asChild>
+              <Button variant="outline" className="flex-1 rounded-lg font-bold text-slate-600 border-slate-200 h-11 bg-white hover:bg-white hover:text-slate-900">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button 
+              disabled={isUpdatingSites} 
+              onClick={handleSaveSiteAccess}
+              className="flex-1 rounded-lg font-bold h-11 bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-[0.98]"
+            >
+              {isUpdatingSites ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Save Updates
             </Button>
           </div>
         </DialogContent>
@@ -607,3 +800,4 @@ export default function TeamMappingPage() {
     </div>
   );
 }
+
