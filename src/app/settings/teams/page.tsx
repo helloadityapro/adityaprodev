@@ -56,6 +56,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Separator } from '@/components/ui/separator';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from '@/components/ui/form';
 
 type User = {
   id: string;
@@ -80,6 +91,27 @@ type MappingOverride = {
 };
 
 type SortKey = 'engineer' | 'manager' | 'sites';
+
+const stopSchema = z.object({
+  type: z.enum(['Site', 'Other']),
+  location: z.string().min(1, 'Stop location is required.'),
+  purpose: z.string().min(1, 'Purpose for this stop is required.'),
+});
+
+const editRequestSchema = z.object({
+  pickupType: z.enum(['Site', 'Other']),
+  pickupLocation: z.string().min(1, 'Pickup location is required.'),
+  tripDate: z.string().min(1, 'Trip date is required.'),
+  reportingTime: z.string().min(1, 'Reporting time is required.'),
+  intermediateStops: z.array(stopSchema).default([]),
+  dropType: z.enum(['Site', 'Other']),
+  dropLocation: z.string().min(1, 'Drop-off location is required.'),
+  purpose: z.string().min(5, 'Purpose must be detailed (min 5 chars).'),
+  coPassengers: z.array(z.object({
+    id: z.string(),
+    name: z.string()
+  })).default([]),
+});
 
 export default function TeamMappingPage() {
   const firestore = useFirestore();
@@ -456,11 +488,11 @@ export default function TeamMappingPage() {
                               <ShieldCheck className="h-3.5 w-3.5 mr-1.5 opacity-60" /> Site Overrides
                             </Button>
                         </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/5" onClick={() => setEditingLinkUser(eng)} title="Edit Team Link">
+                        <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => setEditingLinkUser(eng)} title="Edit Team Link">
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/5" onClick={() => setUserToDelete(eng)} title="Remove Mapping">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/10" onClick={() => setUserToDelete(eng)} title="Remove Mapping">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                         </div>
