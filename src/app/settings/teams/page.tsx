@@ -21,13 +21,12 @@ import {
   ArrowDown, 
   ChevronsUpDown, 
   Check, 
-  MapPin, 
+  Building2, 
   PlusCircle, 
   Loader2, 
   Pencil, 
   ShieldCheck, 
   XCircle, 
-  Building2, 
   UserCog, 
   History, 
   Plus,
@@ -419,6 +418,10 @@ export default function TeamMappingPage() {
       {/* Edit Team Link Dialog (As per design image) */}
       <Dialog open={!!editingLinkUser} onOpenChange={(o) => !o && setEditingLinkUser(null)}>
         <DialogContent className="max-w-md w-[95vw] rounded-xl p-0 border-none shadow-2xl bg-white animate-in zoom-in-95 duration-200">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Edit Team Link</DialogTitle>
+            <DialogDescription>Reassign personnel to a different supervisor.</DialogDescription>
+          </DialogHeader>
           <div className="p-6 space-y-6">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
@@ -602,26 +605,5 @@ export default function TeamMappingPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
-  const colors = {
-    primary: "bg-primary/5 border-primary/10 text-primary",
-    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
-    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
-    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
-  };
-
-  return (
-    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
-        <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-3.5 sm:h-4 sm:w-4" />
-      </CardHeader>
-      <CardContent className="p-3 sm:p-4 pt-0">
-        <div className="text-xl sm:text-2xl font-black">{value}</div>
-      </CardContent>
-    </Card>
   );
 }
