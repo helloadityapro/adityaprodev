@@ -29,6 +29,19 @@
       },
       "required": ["id", "username", "email", "mobile", "role"]
     },
+    "TeamMappingOverride": {
+      "title": "Team Mapping Override",
+      "type": "object",
+      "description": "Optional site-specific manager overrides for individual engineers.",
+      "properties": {
+        "id": { "type": "string" },
+        "engineerId": { "type": "string" },
+        "siteId": { "type": "string" },
+        "managerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["engineerId", "siteId", "managerId"]
+    },
     "Site": {
       "title": "Project Site",
       "type": "object",
@@ -336,6 +349,10 @@
     "/users/{userId}": {
       "schema": { "$ref": "#/backend/entities/User" },
       "description": "User profiles and performance data."
+    },
+    "/team_mapping_overrides/{overrideId}": {
+      "schema": { "$ref": "#/backend/entities/TeamMappingOverride" },
+      "description": "Site-specific manager overrides for engineers."
     },
     "/sites/{siteId}": {
       "schema": { "$ref": "#/backend/entities/Site" },

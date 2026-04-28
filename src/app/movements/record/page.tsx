@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where, getDocs, setDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment, query, where, getDocs, setDoc, and } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
@@ -188,6 +188,11 @@ export default function RecordMovementPage() {
 
       const siteId = allSites?.find(s => s.name === values.siteName)?.id;
 
+      // Site-Specific Manager Lookup (Override Logic)
+      const overridesQuery = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', siteId || '')));
+      const overridesSnap = await getDocs(overridesQuery);
+      const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
+
       for (const item of values.items) {
         await addDocumentNonBlocking(collection(firestore, 'material_movements'), {
           ...values,
@@ -198,6 +203,7 @@ export default function RecordMovementPage() {
           userId: user.uid,
           userName: userProfile.username,
           siteId: siteId || null,
+          siteManagerId: effectiveSiteManagerId,
           createdAt: serverTimestamp()
         });
 
@@ -236,14 +242,18 @@ export default function RecordMovementPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
+
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
       : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+
     if (isSuper) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+
     if (isOwnDataOnly || !isAdmin) {
       const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
       return allSites.filter(s => assignedIds.has(s.id));
     }
+
     return Array.from(new Map(allSites.map(s => [s.name, s])).values());
   }, [allSites, userProfile, isAdmin, isSuper, roleConfigs]);
 
@@ -268,8 +278,10 @@ export default function RecordMovementPage() {
                 <FormField control={form.control} name="movementDate" render={({ field }) => (
                   <FormItem><FormLabel>Movement Date</FormLabel><FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
+
                 <FormField control={form.control} name="movementType" render={({ field }) => (
                   <FormItem><FormLabel>Movement Direction</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Inward">Inward (Add to Stock)</SelectItem><SelectItem value="Outward">Outward (Remove from Stock)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+
                 <FormField control={form.control} name="siteName" render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Project Site (Recording Site)</FormLabel>
@@ -287,6 +299,7 @@ export default function RecordMovementPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
+
                 <FormField control={form.control} name="sourceOrDestinationType" render={({ field }) => (
                   <FormItem className="space-y-3">
                     <FormLabel>{movementType === 'Inward' ? 'Source' : 'Destination'} Type</FormLabel>
@@ -324,14 +337,58 @@ export default function RecordMovementPage() {
                   <FileText className="h-5 w-5 text-primary" />
                   <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Invoice Documentation</h3>
                 </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField control={form.control} name="invoiceNumber" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice / Challan Number</FormLabel><FormControl><Input placeholder="e.g. INV/2024/001" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>)} />
-                  <FormField control={form.control} name="invoiceDate" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice Date</FormLabel><FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="invoiceNumber" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice / Challan Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. INV/2024/001" {...field} className="h-11 rounded-sm" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="invoiceDate" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} className="h-11 rounded-sm" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                 </div>
+
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2"><FileUp className="h-4 w-4" /> Upload Invoices / Proof</Label>
-                  <Input type="file" multiple accept="image/*,application/pdf" className="h-auto py-2 border-dashed" onChange={e => { if (e.target.files) setInvoiceFiles(prev => [...prev, ...Array.from(e.target.files!)]); }} />
-                  {invoiceFiles.length > 0 && (<div className="flex flex-wrap gap-2 pt-2">{invoiceFiles.map((file, idx) => (<Badge key={idx} variant="secondary" className="gap-2 h-8 rounded-sm"><FileText className="h-3 w-3" /><span className="truncate max-w-[150px] text-[10px]">{file.name}</span><X className="h-3 w-3 cursor-pointer hover:text-destructive transition-colors" onClick={() => setInvoiceFiles(prev => prev.filter((_, i) => i !== idx))} /></Badge>))}</div>)}
+                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <FileUp className="h-4 w-4" /> Upload Invoices / Proof
+                  </Label>
+                  <Input 
+                    type="file" 
+                    multiple 
+                    accept="image/*,application/pdf" 
+                    className="h-auto py-2 border-dashed"
+                    onChange={e => {
+                      if (e.target.files) {
+                        setInvoiceFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+                      }
+                    }}
+                  />
+                  {invoiceFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {invoiceFiles.map((file, idx) => (
+                        <Badge key={idx} variant="secondary" className="gap-2 h-8 rounded-sm">
+                          <FileText className="h-3 w-3" />
+                          <span className="truncate max-w-[150px] text-[10px]">{file.name}</span>
+                          <X 
+                            className="h-3 w-3 cursor-pointer hover:text-destructive transition-colors" 
+                            onClick={() => setInvoiceFiles(prev => prev.filter((_, i) => i !== idx))}
+                          />
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -359,6 +416,7 @@ export default function RecordMovementPage() {
                   </Card>
                 ))}</div>
               </div>
+
               <div className="flex justify-end gap-4 pt-6 border-t"><Button type="submit" className="min-w-[200px] h-12 text-lg font-black uppercase" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Recording...</> : "Record Movements"}</Button></div>
             </form>
           </Form>

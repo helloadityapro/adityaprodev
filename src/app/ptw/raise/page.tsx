@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react"
@@ -12,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { TriangleAlert, Loader2, Search, ChevronsUpDown, Check, FileUp, MessageCircle, CheckCircle2, X, FileText, FileImage, ShieldCheck } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, setDocumentNonBlocking, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase"
-import { collection, serverTimestamp, doc, arrayUnion, getDoc, query, where, getDocs, Timestamp, runTransaction } from "firebase/firestore"
+import { collection, serverTimestamp, doc, arrayUnion, getDoc, query, where, getDocs, Timestamp, runTransaction, and } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
@@ -313,6 +314,11 @@ export default function RaisePtwPage() {
       
       const targetStatus = (userRole === 'Site Engineer' || isCorrectionMode) ? "Pending" : "ManagerApproved";
 
+      // Site-Specific Manager Lookup (Override Logic)
+      const overridesQuery = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', selectedSite.id)));
+      const overridesSnap = await getDocs(overridesQuery);
+      const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || (isCorrectionMode ? permitToCorrect?.siteManagerId : null) || null);
+
       const timelineEntry = {
         status: targetStatus,
         timestamp: new Date(),
@@ -323,8 +329,6 @@ export default function RaisePtwPage() {
         action: isCorrectionMode ? "Resubmitted" : "Created",
         submissionIndex: currentSubmissionIndex
       };
-
-      const effectiveSiteManagerId = userProfile.siteManagerId || (isCorrectionMode ? permitToCorrect?.siteManagerId : null) || null;
 
       // Find authorized Admins for this PTW type
       const selectedType = ptwTypes?.find(t => t.name === values.ptwType);

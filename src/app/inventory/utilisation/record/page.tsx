@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where, getDocs, setDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment, query, where, getDocs, setDoc, and } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -47,6 +48,7 @@ type UserProfile = {
   username: string;
   role: string;
   assignedProjectIds?: string[];
+  siteManagerId?: string;
 };
 
 export default function RecordUtilisationPage() {
@@ -114,12 +116,18 @@ export default function RecordUtilisationPage() {
 
     setIsSubmitting(true);
     try {
+      // Site-Specific Manager Lookup (Override Logic)
+      const overridesQuery = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', values.siteId)));
+      const overridesSnap = await getDocs(overridesQuery);
+      const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
+
       // 1. Log Utilisation Record
       await addDocumentNonBlocking(collection(firestore, 'material_utilisations'), {
         ...values,
         unit: selectedItem.unit,
         userId: user.uid,
         userName: userProfile.username || user.email,
+        siteManagerId: effectiveSiteManagerId,
         createdAt: serverTimestamp()
       });
 

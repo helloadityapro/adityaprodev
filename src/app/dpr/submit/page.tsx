@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -9,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment, query, where, getDocs, and } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -116,6 +117,11 @@ export default function SubmitDPRPage() {
     try {
       const combinedDescription = values.updates.map(u => u.value.trim()).join('\n\n');
       const siteId = accessibleSites.find(s => s.name === values.siteName)?.id;
+
+      // Site-Specific Manager Lookup (Override Logic)
+      const overridesQuery = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', siteId || '')));
+      const overridesSnap = await getDocs(overridesQuery);
+      const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
       
       addDocumentNonBlocking(collection(firestore, 'dprs'), {
         siteId: siteId || null,
@@ -124,7 +130,7 @@ export default function SubmitDPRPage() {
         description: combinedDescription,
         userId: user.uid,
         userName: userProfile?.username || user.email,
-        siteManagerId: userProfile?.siteManagerId || null,
+        siteManagerId: effectiveSiteManagerId,
         createdAt: serverTimestamp(),
       });
 
@@ -139,8 +145,8 @@ export default function SubmitDPRPage() {
       });
 
       // 2. Award Manager (Inheritance)
-      if (userProfile?.siteManagerId && userProfile.siteManagerId !== user.uid) {
-        updateDocumentNonBlocking(doc(firestore, 'users', userProfile.siteManagerId), {
+      if (effectiveSiteManagerId && effectiveSiteManagerId !== user.uid) {
+        updateDocumentNonBlocking(doc(firestore, 'users', effectiveSiteManagerId), {
             totalPoints: increment(rateManager)
         });
       }
@@ -249,7 +255,7 @@ export default function SubmitDPRPage() {
                           placeholder="Search sites..." 
                           className="h-9 w-full border-none focus-visible:ring-0 px-0" 
                           value={siteSearchQuery} 
-                          onChange={(e) => setSiteSearchQuery(e.target.value)}
+                          onChange={(e) => setSiteSearchQuery(e.target.value)} 
                           onKeyDown={(e) => e.stopPropagation()}
                         />
                       </div>

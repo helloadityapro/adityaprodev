@@ -1,8 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc, query, where, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -11,13 +12,14 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check, MapPin, PlusCircle, Loader2, Pencil, ShieldCheck, XCircle } from 'lucide-react';
+import { UserPlus, Trash2, Users, Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronsUpDown, Check, MapPin, PlusCircle, Loader2, Pencil, ShieldCheck, XCircle, Building2, UserCog, History, Plus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type User = {
   id: string;
@@ -32,30 +34,16 @@ type Site = {
   id: string;
   name: string;
   projectCompany: string;
-  acCapacity: string;
-  dcCapacity: string;
+};
+
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
 };
 
 type SortKey = 'engineer' | 'manager' | 'sites';
-
-// Rescue lists ensure specific personnel are always categorized correctly regardless of database inconsistencies
-const RESCUE_ENGINEER_NAMES = [
-  "Shayad Shaikh",
-  "Shahabaj Shaikh",
-  "Omkar Puri",
-  "Abhay Chaudhari",
-  "Mahesh Shivpuje",
-  "Dnyaneshwar Aglave",
-  "Dipak Kshirsagar",
-  "Santosh Gulabrao Maghade",
-  "Vaibhav Samshette"
-].map(n => n.toLowerCase());
-
-const RESCUE_MANAGER_NAMES = [
-  "Praful Upadhaye",
-  "Shoukat Shaikh",
-  "Dnyaneshwar Palmate"
-].map(n => n.toLowerCase());
 
 export default function TeamMappingPage() {
   const firestore = useFirestore();
@@ -69,76 +57,43 @@ export default function TeamMappingPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
-  React.useEffect(() => {
-    if (!isProfileLoading && !isAdmin && !isManager) {
-      router.replace('/ptw/raise');
-    }
-  }, [isProfileLoading, isAdmin, isManager, router]);
-
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<User>(usersQuery);
 
-  const managers = React.useMemo(() => {
-    return allUsers?.filter(u => {
-      const role = (u.role || '').trim().toLowerCase();
-      const username = (u.username || '').trim().toLowerCase();
-      const isManagerRole = role === 'site manager' || role === 'manager' || role === 'admin';
-      const isRescueTarget = RESCUE_MANAGER_NAMES.includes(username);
-      return isManagerRole || isRescueTarget;
-    }) || [];
-  }, [allUsers]);
-
-  const engineers = React.useMemo(() => {
-    return allUsers?.filter(u => {
-      const role = (u.role || '').trim().toLowerCase();
-      const username = (u.username || '').trim().toLowerCase();
-      const isEngineerRole = role === 'site engineer' || role === 'engineer';
-      const isRescueTarget = RESCUE_ENGINEER_NAMES.includes(username);
-      return isEngineerRole || isRescueTarget;
-    }) || [];
-  }, [allUsers]);
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: overrides, isLoading: overridesLoading } = useCollection<MappingOverride>(overridesQuery);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
+  const managers = React.useMemo(() => {
+    return allUsers?.filter(u => u.role === 'Site Manager' || u.role === 'Admin') || [];
+  }, [allUsers]);
+
+  const engineers = React.useMemo(() => {
+    return allUsers?.filter(u => u.role === 'Site Engineer') || [];
+  }, [allUsers]);
+
   const [selectedManagerId, setSelectedManagerId] = React.useState<string | null>(null);
   const [selectedEngineerId, setSelectedEngineerId] = React.useState<string | null>(null);
-  const [siteManagementUser, setSiteManagementUser] = React.useState<User | null>(null);
-  const [editMappingUser, setEditMappingUser] = React.useState<User | null>(null);
-  const [localAssignedSites, setLocalAssignedSites] = React.useState<string[]>([]);
-  const [isSavingSites, setIsSavingSites] = React.useState(false);
+  const [overrideEngineer, setOverrideEngineer] = React.useState<User | null>(null);
+  
   const [isMapping, setIsMapping] = React.useState(false);
-  const [isEditingMapping, setIsEditingMapping] = React.useState(false);
+  const [isAddingOverride, setIsAddingOverride] = React.useState(false);
+  const [newOverrideSiteId, setNewOverrideSiteId] = React.useState<string | "">("");
+  const [newOverrideManagerId, setNewOverrideManagerId] = React.useState<string | "">("");
 
-  // Popover & Search states
+  // Search/Popover States
   const [isManagerPopoverOpen, setIsManagerPopoverOpen] = React.useState(false);
   const [managerSearchQuery, setManagerSearchQuery] = React.useState("");
   const [isEngineerPopoverOpen, setIsEngineerPopoverOpen] = React.useState(false);
   const [engineerSearchQuery, setEngineerSearchQuery] = React.useState("");
-  const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
-  const [editManagerSearchQuery, setEditManagerSearchQuery] = React.useState("");
-  const [selectedNewManagerId, setSelectedNewManagerId] = React.useState<string | null>(null);
 
   // Table filter states
   const [tableEngineerSearch, setTableEngineerSearch] = React.useState('');
   const [tableManagerSearch, setTableManagerSearch] = React.useState('');
 
-  // Sort state
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
-
-  const syncManagerSites = async (managerId: string) => {
-    const q = query(collection(firestore, 'users'), where('siteManagerId', '==', managerId));
-    const snap = await getDocs(q);
-    
-    const allEngineerSites = new Set<string>();
-    snap.docs.forEach(d => {
-        const data = d.data();
-        (data.assignedProjectIds || []).forEach((id: string) => allEngineerSites.add(id));
-    });
-
-    const managerRef = doc(firestore, 'users', managerId);
-    updateDocumentNonBlocking(managerRef, { assignedProjectIds: Array.from(allEngineerSites) });
-  };
 
   const handleAssign = async () => {
     if (!selectedManagerId || !selectedEngineerId) return;
@@ -150,161 +105,46 @@ export default function TeamMappingPage() {
           siteManagerId: selectedManagerId,
           role: 'Site Engineer'
         });
-
-        await syncManagerSites(selectedManagerId);
-
-        toast({
-            title: 'Team Link Created',
-            description: 'Personnel has been mapped and site access synchronized.',
-        });
-        
+        toast({ title: 'Global Manager Set', description: 'Default reporting line established.' });
         setSelectedEngineerId(null);
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Mapping Error', description: e.message });
+        toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
         setIsMapping(false);
     }
   };
 
-  const handleUpdateMapping = async () => {
-    if (!editMappingUser || !selectedNewManagerId) return;
-    setIsEditingMapping(true);
-
+  const handleAddOverride = async () => {
+    if (!overrideEngineer || !newOverrideSiteId || !newOverrideManagerId) return;
+    setIsAddingOverride(true);
     try {
-        const oldManagerId = editMappingUser.siteManagerId;
-        const engineerRef = doc(firestore, 'users', editMappingUser.id);
-        
-        updateDocumentNonBlocking(engineerRef, { 
-          siteManagerId: selectedNewManagerId 
-        });
-
-        await syncManagerSites(selectedNewManagerId);
-        if (oldManagerId) {
-            await syncManagerSites(oldManagerId);
-        }
-
-        toast({
-            title: 'Team Link Updated',
-            description: 'Reporting structure reassigned and sites synchronized.',
-        });
-        
-        setEditMappingUser(null);
-        setSelectedNewManagerId(null);
-        setEditManagerSearchQuery("");
+      await addDocumentNonBlocking(collection(firestore, 'team_mapping_overrides'), {
+        engineerId: overrideEngineer.id,
+        siteId: newOverrideSiteId,
+        managerId: newOverrideManagerId,
+        createdAt: serverTimestamp()
+      });
+      toast({ title: 'Override Created', description: 'Site-specific manager assigned.' });
+      setNewOverrideSiteId("");
+      setNewOverrideManagerId("");
     } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Update Error', description: e.message });
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
-        setIsEditingMapping(false);
+      setIsAddingOverride(false);
     }
   };
 
-  const handleRemoveMapping = async (engineerId: string) => {
-    const engineer = engineers?.find(e => e.id === engineerId);
-    const oldManagerId = engineer?.siteManagerId;
-
-    if (!oldManagerId) return;
-
-    try {
-        const engineerRef = doc(firestore, 'users', engineerId);
-        updateDocumentNonBlocking(engineerRef, { siteManagerId: null });
-        await syncManagerSites(oldManagerId);
-
-        toast({
-            title: 'Mapping Removed',
-            description: 'Personnel moved to unmapped list.',
-        });
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Error', description: e.message });
-    }
+  const handleRemoveOverride = (id: string) => {
+    deleteDocumentNonBlocking(doc(firestore, 'team_mapping_overrides', id));
+    toast({ title: 'Override Removed' });
   };
-
-  const handleOpenSiteManagement = (u: User) => {
-    setSiteManagementUser(u);
-    setLocalAssignedSites(u.assignedProjectIds || []);
-    setSiteSearchQuery("");
-  };
-
-  const handleOpenEditMapping = (u: User) => {
-    setEditMappingUser(u);
-    setSelectedNewManagerId(u.siteManagerId || null);
-    setEditManagerSearchQuery("");
-  };
-
-  const handleRemoveSiteFromLocal = (siteId: string) => {
-    setLocalAssignedSites(prev => prev.filter(id => id !== siteId));
-  };
-
-  const handleSaveSites = async () => {
-    if (!siteManagementUser) return;
-    setIsSavingSites(true);
-
-    try {
-        const userRef = doc(firestore, 'users', siteManagementUser.id);
-        updateDocumentNonBlocking(userRef, { assignedProjectIds: localAssignedSites });
-
-        if (siteManagementUser.role === 'Site Engineer' && siteManagementUser.siteManagerId) {
-            await syncManagerSites(siteManagementUser.siteManagerId);
-        }
-
-        toast({
-            title: 'Sites Updated',
-            description: `Access levels updated for ${siteManagementUser.username}.`,
-        });
-        setSiteManagementUser(null);
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
-    } finally {
-        setIsSavingSites(false);
-    }
-  };
-
-  const handleSort = (key: SortKey) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
-  };
-
-  const filteredManagers = React.useMemo(() => {
-    return managers.filter(m => 
-      (m.username || '').toLowerCase().includes(managerSearchQuery.toLowerCase()) ||
-      (m.email || '').toLowerCase().includes(managerSearchQuery.toLowerCase())
-    );
-  }, [managers, managerSearchQuery]);
-
-  const filteredManagersForEdit = React.useMemo(() => {
-    return managers.filter(m => 
-      (m.username || '').toLowerCase().includes(editManagerSearchQuery.toLowerCase()) ||
-      (m.email || '').toLowerCase().includes(editManagerSearchQuery.toLowerCase())
-    );
-  }, [managers, editManagerSearchQuery]);
-
-  const unmappedEngineers = React.useMemo(() => {
-    if (!engineers) return [];
-    return engineers.filter(e => {
-      const hasManager = e.siteManagerId && String(e.siteManagerId).trim() !== "" && String(e.siteManagerId) !== "null";
-      return !hasManager;
-    });
-  }, [engineers]);
-
-  const filteredUnmappedEngineers = React.useMemo(() => {
-    return unmappedEngineers.filter(e => 
-      (e.username || '').toLowerCase().includes(engineerSearchQuery.toLowerCase()) ||
-      (e.email || '').toLowerCase().includes(engineerSearchQuery.toLowerCase())
-    );
-  }, [unmappedEngineers, engineerSearchQuery]);
 
   const filteredMappings = React.useMemo(() => {
     if (!engineers || !managers) return [];
     
     return engineers
       .filter(e => {
-        if (isAdmin) return e.siteManagerId && String(e.siteManagerId).trim() !== "" && String(e.siteManagerId) !== "null";
+        if (isAdmin) return e.siteManagerId;
         return e.siteManagerId === user?.uid;
       })
       .filter(e => {
@@ -315,19 +155,11 @@ export default function TeamMappingPage() {
       })
       .sort((a, b) => {
         const { key, direction } = sortConfig;
-        let valA: any = '';
-        let valB: any = '';
+        let valA: any = ''; let valB: any = '';
 
-        if (key === 'engineer') {
-            valA = (a.username || '').toLowerCase();
-            valB = (b.username || '').toLowerCase();
-        } else if (key === 'manager') {
-            valA = (managers.find(m => m.id === a.siteManagerId)?.username || '').toLowerCase();
-            valB = (managers.find(m => m.id === b.siteManagerId)?.username || '').toLowerCase();
-        } else {
-            valA = (a.assignedProjectIds?.length || 0);
-            valB = (b.assignedProjectIds?.length || 0);
-        }
+        if (key === 'engineer') { valA = (a.username || '').toLowerCase(); valB = (b.username || '').toLowerCase(); }
+        else if (key === 'manager') { valA = (managers.find(m => m.id === a.siteManagerId)?.username || '').toLowerCase(); valB = (managers.find(m => m.id === b.siteManagerId)?.username || '').toLowerCase(); }
+        else { valA = (a.assignedProjectIds?.length || 0); valB = (b.assignedProjectIds?.length || 0); }
 
         if (valA < valB) return direction === 'asc' ? -1 : 1;
         if (valA > valB) return direction === 'asc' ? 1 : -1;
@@ -335,172 +167,56 @@ export default function TeamMappingPage() {
       });
   }, [engineers, managers, tableEngineerSearch, tableManagerSearch, sortConfig, isAdmin, user]);
 
-  const availableSitesToAssign = React.useMemo(() => {
-    const list = allSites?.filter(site => !localAssignedSites.includes(site.id)) || [];
-    return list.filter(site => 
-      (site.name || '').toLowerCase().includes(siteSearchQuery.toLowerCase())
-    );
-  }, [allSites, localAssignedSites, siteSearchQuery]);
-
-  if (isProfileLoading || usersLoading || sitesLoading) {
-    return (
-      <div className="space-y-6 animate-pulse">
-        <Skeleton className="h-9 w-64" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
-  }
+  if (isProfileLoading || usersLoading || sitesLoading || overridesLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight">Teams & Site Access</h1>
-        <p className="text-muted-foreground">Manage reporting structures and site authorizations. Engineer sites sync to managers automatically.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Teams & Reporting</h1>
+        <p className="text-muted-foreground">Manage global reporting structures and site-specific manager overrides.</p>
       </div>
 
       {isAdmin && (
         <Card className="rounded-sm border-primary/10 bg-primary/5">
           <CardHeader>
             <CardTitle className="text-sm font-bold uppercase tracking-wider text-primary flex items-center gap-2">
-              <UserPlus className="h-4 w-4" /> Map Site Engineer to Manager
+              <UserPlus className="h-4 w-4" /> Define Global Supervisor
             </CardTitle>
-            <CardDescription>Assign an engineer to a supervisor. Sites assigned to the engineer will sync to the manager.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase">Supervisor (Site Manager)</Label>
+                <Label className="text-xs font-bold uppercase">Default Manager</Label>
                 <Popover open={isManagerPopoverOpen} onOpenChange={setIsManagerPopoverOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className={cn(
-                        "w-full justify-between font-normal rounded-sm",
-                        !selectedManagerId && "text-muted-foreground"
-                      )}
-                    >
-                      {selectedManagerId
-                        ? managers?.find((m) => m.id === selectedManagerId)?.username
-                        : "Select Supervisor..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <Button variant="outline" className="w-full justify-between h-10 rounded-sm bg-background border-primary/10">
+                      {selectedManagerId ? managers?.find(m => m.id === selectedManagerId)?.username : "Select Manager..."}
+                      <ChevronsUpDown className="h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <div className="flex items-center border-b px-3">
-                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                      <Input
-                        placeholder="Search managers..."
-                        className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm"
-                        value={managerSearchQuery}
-                        onChange={(e) => setManagerSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        autoComplete="off"
-                      />
-                    </div>
-                    <ScrollArea className="h-[250px]">
-                      <div className="p-1">
-                        {filteredManagers.length > 0 ? (
-                          filteredManagers.map((m) => (
-                            <Button
-                              key={m.id}
-                              variant="ghost"
-                              className="w-full justify-start font-normal"
-                              onClick={() => {
-                                setSelectedManagerId(m.id);
-                                setIsManagerPopoverOpen(false);
-                                setManagerSearchQuery("");
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  m.id === selectedManagerId ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              {m.username}
-                            </Button>
-                          ))
-                        ) : (
-                          <p className="p-4 text-center text-sm text-muted-foreground">No managers found.</p>
-                        )}
-                      </div>
-                    </ScrollArea>
+                    <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 opacity-50" /><Input placeholder="Search..." className="h-9 border-none focus-visible:ring-0" value={managerSearchQuery} onChange={e => setManagerSearchQuery(e.target.value)} /></div>
+                    <ScrollArea className="h-[200px]"><div className="p-1">{managers.filter(m => m.username?.toLowerCase().includes(managerSearchQuery.toLowerCase())).map(m => (<Button key={m.id} variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { setSelectedManagerId(m.id); setIsManagerPopoverOpen(false); }}>{m.username}</Button>))}</div></ScrollArea>
                   </PopoverContent>
                 </Popover>
               </div>
-              
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase">Site Engineer</Label>
+                <Label className="text-xs font-bold uppercase">Engineer</Label>
                 <Popover open={isEngineerPopoverOpen} onOpenChange={setIsEngineerPopoverOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className={cn(
-                        "w-full justify-between font-normal rounded-sm",
-                        !selectedEngineerId && "text-muted-foreground"
-                      )}
-                    >
-                      {selectedEngineerId
-                        ? engineers?.find((e) => e.id === selectedEngineerId)?.username
-                        : "Select Engineer..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <Button variant="outline" className="w-full justify-between h-10 rounded-sm bg-background border-primary/10">
+                      {selectedEngineerId ? engineers?.find(e => e.id === selectedEngineerId)?.username : "Select Engineer..."}
+                      <ChevronsUpDown className="h-4 w-4 opacity-50" />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <div className="flex items-center border-b px-3">
-                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                      <Input
-                        placeholder="Search engineers..."
-                        className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm"
-                        value={engineerSearchQuery}
-                        onChange={(e) => setEngineerSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                        autoComplete="off"
-                      />
-                    </div>
-                    <ScrollArea className="h-[250px]">
-                      <div className="p-1">
-                        {filteredUnmappedEngineers.length > 0 ? (
-                          filteredUnmappedEngineers.map((e) => (
-                            <Button
-                              key={e.id}
-                              variant="ghost"
-                              className="w-full justify-start font-normal"
-                              onClick={() => {
-                                setSelectedEngineerId(e.id);
-                                setIsEngineerPopoverOpen(false);
-                                setEngineerSearchQuery("");
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  e.id === selectedEngineerId ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              <div className="flex flex-col items-start overflow-hidden text-left">
-                                <span className="truncate">{e.username}</span>
-                                {RESCUE_ENGINEER_NAMES.includes((e.username || '').toLowerCase()) && (
-                                  <Badge variant="outline" className="text-[8px] h-3 px-1 py-0 border-amber-500 text-amber-700 bg-amber-50 rounded-sm">Rescue Identified</Badge>
-                                )}
-                              </div>
-                            </Button>
-                          ))
-                        ) : (
-                          <p className="p-4 text-center text-sm text-muted-foreground">No available engineers.</p>
-                        )}
-                      </div>
-                    </ScrollArea>
+                    <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 opacity-50" /><Input placeholder="Search..." className="h-9 border-none focus-visible:ring-0" value={engineerSearchQuery} onChange={e => setEngineerSearchQuery(e.target.value)} /></div>
+                    <ScrollArea className="h-[200px]"><div className="p-1">{engineers.filter(e => e.username?.toLowerCase().includes(engineerSearchQuery.toLowerCase())).map(e => (<Button key={e.id} variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { setSelectedEngineerId(e.id); setIsEngineerPopoverOpen(false); }}>{e.username}</Button>))}</div></ScrollArea>
                   </PopoverContent>
                 </Popover>
               </div>
-
               <Button onClick={handleAssign} disabled={!selectedManagerId || !selectedEngineerId || isMapping} className="rounded-sm font-bold">
-                {isMapping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-                Create Team Link
+                {isMapping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />} Establish Mapping
               </Button>
             </div>
           </CardContent>
@@ -508,298 +224,106 @@ export default function TeamMappingPage() {
       )}
 
       <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-        <CardHeader className="bg-muted/5 border-b">
-          <CardTitle className="text-lg">Organization Teams</CardTitle>
-          <CardDescription>View all reporting relationships and manage individual site access levels.</CardDescription>
-        </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/30">
-                  {isAdmin && (
-                    <TableHead className="min-w-[200px]">
-                      <div className="flex flex-col gap-2 py-2">
-                        <div className="flex items-center cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('manager')}>
-                          <span className="text-xs font-bold uppercase tracking-tight">Supervisor</span>
-                          <SortIcon column="manager" />
-                        </div>
-                        <div className="relative">
-                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Filter..."
-                            value={tableManagerSearch}
-                            onChange={(e) => setTableManagerSearch(e.target.value)}
-                            className="h-8 pl-8 text-xs rounded-sm border-primary/10"
-                            autoComplete="off"
-                          />
-                        </div>
-                      </div>
-                    </TableHead>
-                  )}
-                  <TableHead className="min-w-[200px]">
-                    <div className="flex flex-col gap-2 py-2">
-                      <div className="flex items-center cursor-pointer hover:text-foreground transition-colors" onClick={() => handleSort('engineer')}>
-                        <span className="text-xs font-bold uppercase tracking-tight">Engineer Name</span>
-                        <SortIcon column="engineer" />
-                      </div>
-                      <div className="relative">
-                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Filter..."
-                          value={tableEngineerSearch}
-                          onChange={(e) => setTableEngineerSearch(e.target.value)}
-                          className="h-8 pl-8 text-xs rounded-sm border-primary/10"
-                          autoComplete="off"
-                        />
-                      </div>
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-32 align-bottom pb-4 text-center" onClick={() => handleSort('sites')}>
-                    <div className="flex items-center justify-center cursor-pointer gap-1">
-                        <span className="text-xs font-bold uppercase tracking-tight">Sites</span>
-                        <SortIcon column="sites" />
-                    </div>
-                  </TableHead>
-                  <TableHead className="text-right align-bottom pb-4 px-6">
-                    <span className="text-xs font-bold uppercase tracking-tight">Actions</span>
-                  </TableHead>
+          <Table>
+            <TableHeader className="bg-muted/30">
+              <TableRow>
+                {isAdmin && <TableHead>Global Supervisor</TableHead>}
+                <TableHead>Engineer Name</TableHead>
+                <TableHead className="text-center">Sites</TableHead>
+                <TableHead className="text-right px-6">Special Routing</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredMappings.map(e => (
+                <TableRow key={e.id}>
+                  {isAdmin && <TableCell className="font-bold text-sm">{managers.find(m => m.id === e.siteManagerId)?.username}</TableCell>}
+                  <TableCell className="font-semibold">{e.username}</TableCell>
+                  <TableCell className="text-center"><Badge variant="outline">{e.assignedProjectIds?.length || 0}</Badge></TableCell>
+                  <TableCell className="text-right px-6">
+                    <Button variant="outline" size="sm" className="h-8 rounded-sm font-bold border-amber-200 text-amber-700 hover:bg-amber-50" onClick={() => setOverrideEngineer(e)}>
+                      <Building2 className="h-3.5 w-3.5 mr-1.5" /> Site Overrides
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMappings.length > 0 ? (
-                  filteredMappings.map(e => {
-                    const manager = managers?.find(m => m.id === e.siteManagerId);
-                    return (
-                      <TableRow key={e.id} className="hover:bg-muted/5 group">
-                        {isAdmin && <TableCell className="font-bold text-sm px-4">{manager?.username || 'System Admin'}</TableCell>}
-                        <TableCell className="px-4">
-                            <div className="flex flex-col">
-                                <span className="font-semibold">{e.username}</span>
-                                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">{e.email}</span>
-                            </div>
-                        </TableCell>
-                        <TableCell className="text-center px-4">
-                            <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">
-                                {e.assignedProjectIds?.length || 0}
-                            </Badge>
-                        </TableCell>
-                        <TableCell className="text-right px-6">
-                          <div className="flex justify-end gap-1">
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-8 text-xs font-bold rounded-sm border-primary/20 hover:bg-primary hover:text-white transition-all"
-                                onClick={() => handleOpenSiteManagement(e)}
-                            >
-                                <MapPin className="h-3.5 w-3.5 mr-1.5" /> Manage Sites
-                            </Button>
-                            {isAdmin && (
-                                <>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-8 w-8 text-primary rounded-sm" 
-                                        onClick={() => handleOpenEditMapping(e)}
-                                        title="Edit Team Link"
-                                    >
-                                        <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleRemoveMapping(e.id)}>
-                                        <Trash2 className="h-4 w-4" />
-                                        <span className="sr-only">Remove Mapping</span>
-                                    </Button>
-                                </>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-24 text-muted-foreground">
-                      <div className="flex flex-col items-center justify-center">
-                        <Users className="h-12 w-12 mb-4 opacity-20" />
-                        <p className="font-medium italic">No reporting engineers found matching your filters.</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
-      {/* Edit Mapping Dialog */}
-      <Dialog open={!!editMappingUser} onOpenChange={(o) => !o && setEditMappingUser(null)}>
-        <DialogContent className="max-w-md rounded-sm">
-            <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                    <Pencil className="h-5 w-5 text-primary" /> Edit Team Link
-                </DialogTitle>
-                <DialogDescription>
-                    Reassign <strong>{editMappingUser?.username}</strong> to a different supervisor.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-6 py-4">
-                <div className="space-y-3">
-                    <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Assign New Supervisor</Label>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-primary opacity-50" />
-                        <Input 
-                            placeholder="Search name or email..." 
-                            className="pl-9 h-10 rounded-sm bg-background border-primary/20 text-sm"
-                            value={editManagerSearchQuery}
-                            onChange={(e) => setEditManagerSearchQuery(e.target.value)}
-                            autoComplete="off"
-                        />
-                    </div>
-                    
-                    <div className="border rounded-sm bg-background shadow-inner overflow-hidden">
-                        <ScrollArea className="h-[200px]">
-                            <div className="p-1">
-                                {filteredManagersForEdit.length > 0 ? (
-                                    filteredManagersForEdit.map(m => (
-                                        <Button 
-                                            key={m.id} 
-                                            variant="ghost" 
-                                            className={cn(
-                                                "w-full justify-start h-12 text-xs rounded-sm font-medium border-b border-border/10 last:border-0",
-                                                selectedNewManagerId === m.id && "bg-primary/10 text-primary"
-                                            )} 
-                                            onClick={() => setSelectedNewManagerId(m.id)}
-                                        >
-                                            <Check className={cn("mr-2 h-4 w-4 text-primary shrink-0", selectedNewManagerId === m.id ? "opacity-100" : "opacity-0")} />
-                                            <div className="flex flex-col items-start overflow-hidden text-left min-w-0">
-                                                <span className="truncate font-bold text-foreground">{m.username}</span>
-                                                <span className="text-[10px] text-muted-foreground uppercase truncate w-full">{m.email}</span>
-                                            </div>
-                                        </Button>
-                                    ))
-                                ) : (
-                                    <p className="p-8 text-center text-xs text-muted-foreground italic">No matching managers found</p>
-                                )}
-                            </div>
-                        </ScrollArea>
-                    </div>
-                </div>
-            </div>
-            <DialogFooter className="gap-2 border-t pt-4">
-                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Cancel</Button></DialogClose>
-                <Button onClick={handleUpdateMapping} disabled={!selectedNewManagerId || isEditingMapping} className="rounded-sm font-bold min-w-[140px]">
-                    {isEditingMapping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4 mr-1.5" />}
-                    Confirm Reassignment
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Site Management Dialog */}
-      <Dialog open={!!siteManagementUser} onOpenChange={(o) => !o && setSiteManagementUser(null)}>
+      {/* Override Dialog */}
+      <Dialog open={!!overrideEngineer} onOpenChange={(o) => !o && setOverrideEngineer(null)}>
         <DialogContent className="max-w-2xl rounded-sm">
-            <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-primary" /> Manage Site Access
-                </DialogTitle>
-                <DialogDescription>
-                    Assign sites to <strong>{siteManagementUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
-                </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-6 py-4">
-                <div className="flex flex-col gap-3 p-4 bg-primary/5 border border-primary/10 rounded-sm">
-                    <Label className="text-[10px] font-bold uppercase text-muted-foreground">Select Site to Add</Label>
-                    <div className="relative">
-                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search project sites..."
-                            className="pl-9 h-10 rounded-sm bg-background border-primary/20"
-                            value={siteSearchQuery}
-                            onChange={(e) => setSiteSearchQuery(e.target.value)}
-                            onKeyDown={(e) => e.stopPropagation()}
-                            autoComplete="off"
-                        />
-                    </div>
-                    
-                    {siteSearchQuery && (
-                        <div className="border rounded-sm bg-background shadow-sm overflow-hidden">
-                            <ScrollArea className="h-[150px]">
-                                <div className="p-1">
-                                    {availableSitesToAssign.length > 0 ? (
-                                        availableSitesToAssign.map((site) => (
-                                            <Button
-                                                key={site.id}
-                                                variant="ghost"
-                                                className="w-full justify-start font-normal h-9 text-sm"
-                                                onClick={() => {
-                                                    setLocalAssignedSites(prev => [...prev, site.id]);
-                                                    setSiteSearchQuery("");
-                                                }}
-                                            >
-                                                <PlusCircle className="mr-2 h-4 w-4 text-primary" />
-                                                {site.name}
-                                            </Button>
-                                        ))
-                                    ) : (
-                                        <p className="p-4 text-center text-xs text-muted-foreground italic">No matching sites found.</p>
-                                    )}
-                                </div>
-                            </ScrollArea>
-                        </div>
-                    )}
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Building2 className="h-5 w-5 text-amber-600" /> Site-specific Manager Mapping</DialogTitle>
+            <DialogDescription>Define manager overrides for <strong>{overrideEngineer?.username}</strong> per project location.</DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            <div className="p-4 bg-amber-50 border border-amber-100 rounded-sm space-y-4">
+              <Label className="text-[10px] font-black uppercase text-amber-800 tracking-widest">New Site-wise Allocation</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] uppercase font-bold">Target Site</Label>
+                  <Select value={newOverrideSiteId} onValueChange={setNewOverrideSiteId}>
+                    <SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Choose Site..." /></SelectTrigger>
+                    <SelectContent>
+                      {allSites?.filter(s => overrideEngineer?.assignedProjectIds?.includes(s.id)).map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-
-                <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wider">Authorized Site Access</Label>
-                    <div className="rounded-sm border overflow-hidden">
-                        <ScrollArea className="h-[250px]">
-                            <Table>
-                                <TableHeader className="bg-muted/30">
-                                    <TableRow>
-                                        <TableHead className="text-[10px] uppercase font-bold">Site Name</TableHead>
-                                        <TableHead className="text-[10px] uppercase font-bold">Company</TableHead>
-                                        <TableHead className="w-16 text-right px-4"></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {localAssignedSites.length > 0 ? (
-                                        localAssignedSites.map(siteId => {
-                                            const site = allSites?.find(s => s.id === siteId);
-                                            return (
-                                                <TableRow key={siteId} className="hover:bg-muted/5 group">
-                                                    <TableCell className="font-semibold text-sm">{site?.name || 'Unknown Site'}</TableCell>
-                                                    <TableCell className="text-xs text-muted-foreground">{site?.projectCompany || 'N/A'}</TableCell>
-                                                    <TableCell className="text-right px-4">
-                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive rounded-sm" onClick={() => handleRemoveSiteFromLocal(siteId)}>
-                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={3} className="h-32 text-center text-muted-foreground italic text-sm">
-                                                No sites assigned.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </ScrollArea>
-                    </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] uppercase font-bold">Designated Manager</Label>
+                  <Select value={newOverrideManagerId} onValueChange={setNewOverrideManagerId}>
+                    <SelectTrigger className="h-10 bg-white"><SelectValue placeholder="Choose Manager..." /></SelectTrigger>
+                    <SelectContent>
+                      {managers.map(m => (
+                        <SelectItem key={m.id} value={m.id}>{m.username}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+              </div>
+              <Button onClick={handleAddOverride} disabled={!newOverrideSiteId || !newOverrideManagerId || isAddingOverride} className="w-full bg-amber-600 hover:bg-amber-700">
+                {isAddingOverride ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />} Establish Site-wise Mapping
+              </Button>
             </div>
 
-            <DialogFooter className="gap-2 border-t pt-4">
-                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold">Cancel</Button></DialogClose>
-                <Button onClick={handleSaveSites} disabled={isSavingSites} className="rounded-sm font-bold min-w-[120px]">
-                    {isSavingSites ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Save Updates
-                </Button>
-            </DialogFooter>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest">Active Overrides</Label>
+              <div className="border rounded-sm">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="text-[10px] uppercase">Project Site</TableHead>
+                      <TableHead className="text-[10px] uppercase">Mapped Manager</TableHead>
+                      <TableHead className="text-right"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {overrides?.filter(o => o.engineerId === overrideEngineer?.id).map(o => (
+                      <TableRow key={o.id}>
+                        <TableCell className="text-xs font-bold">{allSites?.find(s => s.id === o.siteId)?.name || 'Unknown Site'}</TableCell>
+                        <TableCell className="text-xs">{managers.find(m => m.id === o.managerId)?.username || 'Unknown Manager'}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleRemoveOverride(o.id)}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!overrides?.some(o => o.engineerId === overrideEngineer?.id) && (
+                      <TableRow><TableCell colSpan={3} className="h-20 text-center text-xs text-muted-foreground italic">No site-specific overrides defined. Global default active.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+          <DialogFooter><DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px]">Close</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

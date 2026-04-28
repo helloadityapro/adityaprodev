@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, getDocs, and } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -116,6 +117,11 @@ export default function SubmitRequirementPage() {
       const targetStatus = isEngineer ? "Pending" : (userProfile.role === 'Site Manager' ? "ManagerApproved" : "Approved");
       const siteId = accessibleSites.find(s => s.name === values.siteName)?.id;
 
+      // Site-Specific Manager Lookup (Override Logic)
+      const overridesQuery = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', siteId || '')));
+      const overridesSnap = await getDocs(overridesQuery);
+      const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
+
       const timelineEntry = {
         action: "Created",
         status: targetStatus,
@@ -135,7 +141,7 @@ export default function SubmitRequirementPage() {
           statusUpdatedAt: serverTimestamp(),
           userId: user.uid,
           userName: userProfile?.username || user.email,
-          siteManagerId: userProfile?.siteManagerId || null,
+          siteManagerId: effectiveSiteManagerId,
           createdAt: serverTimestamp(),
           timeline: [timelineEntry]
         });
@@ -143,9 +149,9 @@ export default function SubmitRequirementPage() {
 
       await Promise.all(promises);
 
-      if (isEngineer && userProfile.siteManagerId) {
+      if (isEngineer && effectiveSiteManagerId) {
         sendNotification(firestore, {
-          userId: userProfile.siteManagerId,
+          userId: effectiveSiteManagerId,
           title: "New Site Requirement",
           description: `${userProfile.username} has submitted ${values.items.length} new site requirements for "${values.siteName}".`,
           link: "/requirements/list",
@@ -396,7 +402,7 @@ export default function SubmitRequirementPage() {
 
               <div className="flex justify-end gap-4 pt-6 border-t">
                 <Button type="submit" className="min-w-[220px] h-14 rounded-sm text-base font-black uppercase tracking-tight shadow-xl" disabled={isSubmitting}>
-                  {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> DISPATCHING...</> : "Submit Requirements"}
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> DISPATCHING...</> : "Submit Requirements"}
                 </Button>
               </div>
             </form>
