@@ -61,6 +61,21 @@ type BoMItem = {
   subItems?: { name: string; quantityPerSet: number; unit: string }[];
 };
 
+type PurchaseOrder = {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  status: string;
+  items: { itemName: string }[];
+};
+
+type InventoryItem = {
+  id: string;
+  itemName: string;
+  stockLevel: number;
+  unit: string;
+};
+
 type UserProfile = {
   id: string;
   username: string;
@@ -107,6 +122,9 @@ export default function RecordMovementPage() {
   const [invoiceFiles, setInvoiceFiles] = React.useState<File[]>([]);
 
   const [approvedBomItems, setApprovedBomItems] = React.useState<BoMItem[]>([]);
+  const [approvedPOs, setApprovedPOs] = React.useState<PurchaseOrder[]>([]);
+  const [sourceSiteInventory, setSourceSiteInventory] = React.useState<InventoryItem[]>([]);
+  
   const currentSiteNameRef = React.useRef("");
 
   const form = useForm<z.infer<typeof movementSchema>>({
@@ -130,19 +148,42 @@ export default function RecordMovementPage() {
   const movementType = form.watch("movementType");
   const sourceOrDestinationType = form.watch("sourceOrDestinationType");
 
-  React.useEffect(() => {
-    if (watchSiteName && watchSiteName !== currentSiteNameRef.current) {
-      currentSiteNameRef.current = watchSiteName;
-      const fetchApprovedBom = async () => {
-        const q = query(collection(firestore, 'project_boms'), where('siteName', '==', watchSiteName), where('status', '==', 'Approved'));
-        const snap = await getDocs(q);
-        setApprovedBomItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as BoMItem)));
-      };
-      fetchApprovedBom();
-    }
-  }, [watchSiteName, firestore]);
+  const selectedSiteId = React.useMemo(() => allSites?.find(s => s.name === watchSiteName)?.id, [allSites, watchSiteName]);
 
-  // Reset items if source changes to ensure brand compliance
+  // Fetch contextual data when site changes
+  React.useEffect(() => {
+    if (selectedSiteId) {
+      const fetchData = async () => {
+        // 1. Fetch approved BoM
+        const bomQ = query(collection(firestore, 'project_boms'), where('siteId', '==', selectedSiteId), where('status', '==', 'Approved'));
+        const bomSnap = await getDocs(bomQ);
+        setApprovedBomItems(bomSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoMItem)));
+
+        // 2. Fetch approved POs for inward supplier restriction
+        const poQ = query(collection(firestore, 'project_pos'), where('siteId', '==', selectedSiteId), where('status', '==', 'Accepted'));
+        const poSnap = await getDocs(poQ);
+        setApprovedPOs(poSnap.docs.map(d => ({ id: d.id, ...d.data() } as PurchaseOrder)));
+      };
+      fetchData();
+    }
+  }, [selectedSiteId, firestore]);
+
+  // Fetch source site inventory for transfers
+  React.useEffect(() => {
+    if (sourceOrDestinationType === 'Site' && watchSource) {
+      const sourceSiteId = allSites?.find(s => s.name === watchSource)?.id;
+      if (sourceSiteId) {
+        const fetchInv = async () => {
+          const invQ = query(collection(firestore, 'project_inventory'), where('siteId', '==', sourceSiteId));
+          const snap = await getDocs(invQ);
+          setSourceSiteInventory(snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem)));
+        };
+        fetchInv();
+      }
+    }
+  }, [sourceOrDestinationType, watchSource, allSites, firestore]);
+
+  // Reset items if source changes
   React.useEffect(() => {
     form.setValue("items", [{ itemName: "", quantity: 0, unit: "Numbers" }]);
   }, [watchSource, sourceOrDestinationType, form]);
@@ -150,28 +191,64 @@ export default function RecordMovementPage() {
   const [openItemPopoverIndex, setOpenItemPopoverIndex] = React.useState<number | null>(null);
   const [itemSearchQuery, setItemSearchQuery] = React.useState("");
 
-  const filteredLookupItems = React.useMemo(() => {
-    const list: { name: string; unit: string; make: string }[] = [];
-    approvedBomItems.forEach(item => {
-      if (item.subItems && item.subItems.length > 0) {
-        item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, make: item.make || "" }));
-      } else {
-        list.push({ name: item.itemName, unit: item.unit, make: item.make || "" });
-      }
-    });
+  const suppliersWithPOs = React.useMemo(() => {
+    const ids = new Set(approvedPOs.map(po => po.supplierId));
+    return allSuppliers?.filter(s => ids.has(s.id)) || [];
+  }, [allSuppliers, approvedPOs]);
 
-    let filtered = list;
-    
-    // Filter by Brand if Source is a Supplier (assuming Suppliers are linked to Makes)
-    if (sourceOrDestinationType === 'Supplier' && watchSource) {
-      filtered = filtered.filter(i => i.make.trim().toLowerCase() === watchSource.trim().toLowerCase());
+  const filteredSuppliers = React.useMemo(() => {
+    const list = (movementType === 'Inward' && sourceOrDestinationType === 'Supplier') ? suppliersWithPOs : (allSuppliers || []);
+    return list.filter(s => s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase()));
+  }, [allSuppliers, suppliersWithPOs, movementType, sourceOrDestinationType, supplierSearchQuery]);
+
+  const filteredLookupItems = React.useMemo(() => {
+    let list: { name: string; unit: string; make: string }[] = [];
+
+    if (movementType === 'Inward' && sourceOrDestinationType === 'Supplier') {
+      // Show only items from approved POs for this supplier
+      const selectedSupplierId = allSuppliers?.find(s => s.name === watchSource)?.id;
+      const supplierPOs = approvedPOs.filter(po => po.supplierId === selectedSupplierId);
+      const itemNames = new Set<string>();
+      supplierPOs.forEach(po => po.items.forEach(it => itemNames.add(it.itemName)));
+      
+      approvedBomItems.forEach(item => {
+        if (itemNames.has(item.itemName)) {
+          if (item.subItems && item.subItems.length > 0) {
+            item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, make: item.make || "" }));
+          } else {
+            list.push({ name: item.itemName, unit: item.unit, make: item.make || "" });
+          }
+        }
+      });
+    } else if (sourceOrDestinationType === 'Site') {
+      // Show only items available in Source Site's inventory
+      // Determine Source Site
+      const sourceSiteName = movementType === 'Outward' ? watchSiteName : watchSource;
+      const sourceSiteId = allSites?.find(s => s.name === sourceSiteName)?.id;
+      
+      // We need to fetch/filter inventory for the source site
+      // For performance, we assume sourceSiteInventory is fetched via effect
+      sourceSiteInventory.forEach(inv => {
+        if (inv.stockLevel > 0) {
+          list.push({ name: inv.itemName, unit: inv.unit, make: "" });
+        }
+      });
+    } else {
+      // Default fallback
+      approvedBomItems.forEach(item => {
+        if (item.subItems && item.subItems.length > 0) {
+          item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, make: item.make || "" }));
+        } else {
+          list.push({ name: item.itemName, unit: item.unit, make: item.make || "" });
+        }
+      });
     }
 
-    return filtered.filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
-  }, [approvedBomItems, itemSearchQuery, sourceOrDestinationType, watchSource]);
+    return list.filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
+  }, [approvedBomItems, approvedPOs, sourceSiteInventory, itemSearchQuery, movementType, sourceOrDestinationType, watchSource, allSuppliers, allSites, watchSiteName]);
 
   const onSubmit = async (values: z.infer<typeof movementSchema>) => {
-    if (!user || !userProfile) return;
+    if (!user || !userProfile || !selectedSiteId) return;
     setIsSubmitting(true);
     try {
       const storage = getStorage(firebaseApp);
@@ -185,7 +262,22 @@ export default function RecordMovementPage() {
         attachments.push({ url, name: file.name, contentType: file.type });
       }
 
-      const siteId = allSites?.find(s => s.name === values.siteName)?.id;
+      const isTransfer = values.sourceOrDestinationType === 'Site';
+      const status = isTransfer ? 'Pending' : 'Recorded';
+
+      // Find receiving manager for transfers
+      let receivingManagerId = null;
+      if (isTransfer) {
+        const destSiteName = values.movementType === 'Outward' ? values.sourceOrDestination : values.siteName;
+        const destSiteId = allSites?.find(s => s.name === destSiteName)?.id;
+        
+        if (destSiteId) {
+          const usersQ = query(collection(firestore, 'users'), where('role', '==', 'Site Manager'));
+          const usersSnap = await getDocs(usersQ);
+          const manager = usersSnap.docs.find(d => (d.data().assignedProjectIds || []).includes(destSiteId));
+          receivingManagerId = manager?.id || null;
+        }
+      }
 
       for (const item of values.items) {
         await addDocumentNonBlocking(collection(firestore, 'material_movements'), {
@@ -196,36 +288,44 @@ export default function RecordMovementPage() {
           attachments,
           userId: user.uid,
           userName: userProfile.username,
-          siteId: siteId || null,
+          siteId: selectedSiteId,
+          status,
+          receivingManagerId,
           createdAt: serverTimestamp()
         });
 
-        const invQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', siteId), where('itemName', '==', item.itemName));
-        const invSnap = await getDocs(invQuery);
-        const adjustment = values.movementType === 'Inward' ? item.quantity : -item.quantity;
+        // Only update inventory immediately if NOT a transfer
+        if (!isTransfer) {
+          const invQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId), where('itemName', '==', item.itemName));
+          const invSnap = await getDocs(invQuery);
+          const adjustment = values.movementType === 'Inward' ? item.quantity : -item.quantity;
 
-        if (!invSnap.empty) {
-          const invDoc = invSnap.docs[0];
-          updateDocumentNonBlocking(doc(firestore, 'project_inventory', invDoc.id), {
-            stockLevel: increment(adjustment),
-            lastUpdated: serverTimestamp()
-          });
-        } else {
-          const newInvRef = doc(collection(firestore, 'project_inventory'));
-          await setDoc(newInvRef, {
-            siteId,
-            siteName: values.siteName,
-            itemName: item.itemName,
-            stockLevel: Math.max(0, adjustment),
-            unit: item.unit,
-            lastUpdated: serverTimestamp()
-          });
+          if (!invSnap.empty) {
+            const invDoc = invSnap.docs[0];
+            updateDocumentNonBlocking(doc(firestore, 'project_inventory', invDoc.id), {
+              stockLevel: increment(adjustment),
+              lastUpdated: serverTimestamp()
+            });
+          } else {
+            const newInvRef = doc(collection(firestore, 'project_inventory'));
+            await setDoc(newInvRef, {
+              siteId: selectedSiteId,
+              siteName: values.siteName,
+              itemName: item.itemName,
+              stockLevel: Math.max(0, adjustment),
+              unit: item.unit,
+              lastUpdated: serverTimestamp()
+            });
+          }
         }
       }
 
       setSubmittedData(values);
       setIsSubmitted(true);
-      toast({ title: "Movement Recorded", description: "Logs generated and stock levels updated successfully." });
+      toast({ 
+        title: isTransfer ? "Transfer Logged" : "Movement Recorded", 
+        description: isTransfer ? "Request is pending destination manager approval." : "Logs generated and stock levels updated." 
+      });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
@@ -233,25 +333,7 @@ export default function RecordMovementPage() {
     }
   };
 
-  const accessibleSites = React.useMemo(() => {
-    if (!allSites || !userProfile) return [];
-
-    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
-      ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
-
-    if (isSuper) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-
-    if (isOwnDataOnly || !isAdmin) {
-      const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
-      return allSites.filter(s => assignedIds.has(s.id));
-    }
-
-    return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-  }, [allSites, userProfile, isAdmin, isSuper, roleConfigs]);
-
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
-  const filteredSuppliers = allSuppliers?.filter(s => s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())) || [];
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
@@ -259,7 +341,7 @@ export default function RecordMovementPage() {
         <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <ArrowLeftRight className="h-8 w-8" /> Record Site Movement
         </h1>
-        <p className="text-muted-foreground">Log materials entering or leaving project sites. Only approved BoM items are allowed.</p>
+        <p className="text-muted-foreground">Log materials entering or leaving project sites. Transfers require destination manager approval.</p>
       </div>
 
       <Card className="shadow-md border-primary/10 rounded-sm">
@@ -320,8 +402,8 @@ export default function RecordMovementPage() {
                     <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant="outline" className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>
-                            {field.value || "Select supplier..."}
+                          <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>
+                            {field.value || (movementType === 'Inward' ? "Select Supplier (With Approved POs)..." : "Select Supplier...")}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -342,7 +424,30 @@ export default function RecordMovementPage() {
                       </PopoverContent>
                     </Popover>
                   ) : (
-                    <FormControl><Input placeholder="Site name or address..." {...field} className="h-11 rounded-sm" /></FormControl>
+                    <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>
+                            {field.value || "Select Target Site..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <div className="flex items-center border-b px-3">
+                          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                          <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
+                        </div>
+                        <ScrollArea className="h-[200px]">
+                          {allSites?.filter(s => s.name !== watchSiteName && s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())).map(s => (
+                            <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />
+                              {s.name}
+                            </Button>
+                          ))}
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
                   )}
                   <FormMessage />
                 </FormItem>
@@ -411,7 +516,7 @@ export default function RecordMovementPage() {
               </div>
 
               <div className="space-y-6">
-                <div className="flex items-center justify-between"><h3 className="text-lg font-black uppercase tracking-widest flex items-center gap-2"><ListPlus className="h-5 w-5 text-primary" /> Approved Materials List</h3><Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="rounded-sm border-primary text-primary"><Plus className="mr-2 h-4 w-4" /> Add Line Item</Button></div>
+                <div className="flex items-center justify-between"><h3 className="text-lg font-black uppercase tracking-widest flex items-center gap-2"><ListPlus className="h-5 w-5 text-primary" /> Authorized Materials List</h3><Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="rounded-sm border-primary text-primary"><Plus className="mr-2 h-4 w-4" /> Add Line Item</Button></div>
                 <div className="space-y-4">{fields.map((field, index) => (
                   <Card key={field.id} className="relative bg-muted/10 border-dashed rounded-sm">
                     <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 text-destructive" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
@@ -420,8 +525,8 @@ export default function RecordMovementPage() {
                         <FormItem className="flex flex-col">
                           <FormLabel>Authorized Item</FormLabel>
                           <Popover open={openItemPopoverIndex === index} onOpenChange={o => setOpenItemPopoverIndex(o ? index : null)}>
-                            <PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-auto min-h-10 bg-background text-left", !itemField.value && "text-muted-foreground")}><span className="truncate whitespace-normal">{itemField.value || (sourceOrDestinationType === 'Supplier' && !watchSource ? "Select Supplier First..." : "Search approved BoM items...")}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
-                            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-10 text-xs py-2 px-3 text-left whitespace-normal flex items-start gap-2" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} /><span className="flex-1 break-words leading-relaxed">{lookup.name}</span></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">{sourceOrDestinationType === 'Supplier' && watchSource ? `No approved items from ${watchSource} found for this site.` : "No approved items found for this site."}</div>)}</div></ScrollArea></PopoverContent>
+                            <PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-auto min-h-10 bg-background text-left", !itemField.value && "text-muted-foreground")}><span className="truncate whitespace-normal">{itemField.value || "Search contextual materials..."}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
+                            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-10 text-xs py-2 px-3 text-left whitespace-normal flex items-start gap-2" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} /><span className="flex-1 break-words leading-relaxed">{lookup.name}</span></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No matching authorized items found for this context.</div>)}</div></ScrollArea></PopoverContent>
                           </Popover>
                           <FormMessage />
                         </FormItem>
