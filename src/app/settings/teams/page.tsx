@@ -44,6 +44,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type User = {
   id: string;
@@ -100,9 +110,14 @@ export default function TeamMappingPage() {
   const [selectedManagerId, setSelectedManagerId] = React.useState<string | null>(null);
   const [selectedEngineerId, setSelectedEngineerId] = React.useState<string | null>(null);
   const [overrideEngineer, setOverrideEngineer] = React.useState<User | null>(null);
+  const [editingLinkUser, setEditingLinkUser] = React.useState<User | null>(null);
+  const [editManagerId, setEditManagerId] = React.useState<string | null>(null);
+  const [editManagerSearch, setEditManagerSearch] = React.useState("");
+  const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
   
   const [isMapping, setIsMapping] = React.useState(false);
   const [isAddingOverride, setIsAddingOverride] = React.useState(false);
+  const [isUpdatingLink, setIsUpdatingLink] = React.useState(false);
   const [newOverrideSiteId, setNewOverrideSiteId] = React.useState<string | "">("");
   const [newOverrideManagerId, setNewOverrideManagerId] = React.useState<string | "">("");
 
@@ -138,6 +153,26 @@ export default function TeamMappingPage() {
     }
   };
 
+  const handleUpdateLink = async () => {
+    if (!editingLinkUser || !editManagerId) return;
+    setIsUpdatingLink(true);
+    try {
+      const userRef = doc(firestore, 'users', editingLinkUser.id);
+      updateDocumentNonBlocking(userRef, {
+        siteManagerId: editManagerId,
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: 'Mapping Updated', description: `Reporting line for ${editingLinkUser.username} has been changed.` });
+      setEditingLinkUser(null);
+      setEditManagerId(null);
+      setEditManagerSearch("");
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    } finally {
+      setIsUpdatingLink(false);
+    }
+  };
+
   const handleAddOverride = async () => {
     if (!overrideEngineer || !newOverrideSiteId || !newOverrideManagerId) return;
     setIsAddingOverride(true);
@@ -163,10 +198,12 @@ export default function TeamMappingPage() {
     toast({ title: 'Override Removed' });
   };
 
-  const handleDeleteMapping = (engId: string) => {
-    const ref = doc(firestore, 'users', engId);
+  const handleConfirmDeleteMapping = () => {
+    if (!userToDelete) return;
+    const ref = doc(firestore, 'users', userToDelete.id);
     updateDocumentNonBlocking(ref, { siteManagerId: null });
-    toast({ title: 'Mapping Removed' });
+    toast({ title: 'Mapping Removed', description: `Default reporting line for ${userToDelete.username} has been removed.` });
+    setUserToDelete(null);
   };
 
   const filteredMappings = React.useMemo(() => {
@@ -270,7 +307,7 @@ export default function TeamMappingPage() {
 
             <div className="lg:col-span-4">
               <Button onClick={handleAssign} disabled={!selectedManagerId || !selectedEngineerId || isMapping} className="w-full h-11 rounded-sm font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20">
-                {isMapping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Create Team Link
+                {isMapping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />} Create Team Link
               </Button>
             </div>
           </div>
@@ -360,8 +397,12 @@ export default function TeamMappingPage() {
                             </Button>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm"><Pencil className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleDeleteMapping(eng.id)}><Trash2 className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/5" onClick={() => setEditingLinkUser(eng)} title="Edit Team Link">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/5" onClick={() => setUserToDelete(eng)} title="Remove Mapping">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                         </div>
                       </div>
                     </TableCell>
@@ -374,6 +415,97 @@ export default function TeamMappingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Team Link Dialog (As per design image) */}
+      <Dialog open={!!editingLinkUser} onOpenChange={(o) => !o && setEditingLinkUser(null)}>
+        <DialogContent className="max-w-md w-[95vw] rounded-xl p-0 border-none shadow-2xl bg-white animate-in zoom-in-95 duration-200">
+          <div className="p-6 space-y-6">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-primary rounded-lg">
+                  <Pencil className="h-5 w-5" />
+                </div>
+                <div className="space-y-0.5 text-left">
+                  <h2 className="text-xl font-black tracking-tight text-slate-900">Edit Team Link</h2>
+                  <p className="text-xs font-medium text-slate-500 leading-relaxed">
+                    Reassign <strong className="text-slate-700">{editingLinkUser?.username}</strong> to a different supervisor.
+                  </p>
+                </div>
+              </div>
+              <DialogClose asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-slate-400 hover:bg-slate-50">
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
+            </div>
+
+            <div className="space-y-3 text-left">
+              <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Assign New Supervisor</Label>
+              <div className="relative group">
+                <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                <Input 
+                  placeholder="Search name or email..." 
+                  className="h-12 pl-10 rounded-lg border-slate-200 bg-slate-50/30 focus-visible:ring-primary/20 text-sm font-medium"
+                  value={editManagerSearch}
+                  onChange={e => setEditManagerSearch(e.target.value)}
+                />
+              </div>
+
+              <div className="border rounded-lg overflow-hidden bg-white shadow-inner">
+                <ScrollArea className="h-[220px]">
+                  <div className="divide-y divide-slate-50">
+                    {managers.filter(m => 
+                      m.username?.toLowerCase().includes(editManagerSearch.toLowerCase()) || 
+                      m.email?.toLowerCase().includes(editManagerSearch.toLowerCase())
+                    ).map(m => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setEditManagerId(m.id)}
+                        className={cn(
+                          "w-full flex items-center gap-4 p-4 text-left transition-all",
+                          editManagerId === m.id ? "bg-blue-50" : "hover:bg-slate-50"
+                        )}
+                      >
+                        <div className="h-8 w-8 flex items-center justify-center shrink-0">
+                          {editManagerId === m.id ? (
+                            <Check className="h-4 w-4 text-primary" />
+                          ) : (
+                            <div className="h-1.5 w-1.5 rounded-full bg-slate-200" />
+                          )}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className={cn("text-sm font-bold truncate leading-tight", editManagerId === m.id ? "text-primary" : "text-slate-700")}>{m.username}</span>
+                          <span className="text-[10px] font-mono text-slate-400 uppercase truncate mt-0.5">{m.email}</span>
+                        </div>
+                      </button>
+                    ))}
+                    {!managers.some(m => m.username?.toLowerCase().includes(editManagerSearch.toLowerCase())) && (
+                      <div className="p-10 text-center text-xs font-medium text-slate-400 italic">No matches found</div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 bg-slate-50/50 border-t flex items-center justify-between gap-4">
+            <DialogClose asChild>
+              <Button variant="outline" className="flex-1 rounded-lg font-bold text-slate-600 border-slate-200 h-11 bg-white hover:bg-white hover:text-slate-900 transition-colors">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button 
+              disabled={!editManagerId || isUpdatingLink} 
+              onClick={handleUpdateLink}
+              className="flex-1 rounded-lg font-bold h-11 bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-[0.98]"
+            >
+              {isUpdatingLink ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+              Confirm Reassignment
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Override Dialog */}
       <Dialog open={!!overrideEngineer} onOpenChange={(o) => !o && setOverrideEngineer(null)}>
@@ -449,6 +581,26 @@ export default function TeamMappingPage() {
           <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Manager</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Mapping Confirmation */}
+      <AlertDialog open={!!userToDelete} onOpenChange={(o) => !o && setUserToDelete(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2 font-black uppercase tracking-tight">
+              <Trash2 className="h-5 w-5" /> Remove Reporting Line
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+              Are you sure you want to remove the default supervisor mapping for <strong>{userToDelete?.username}</strong>? This user will become unassigned until a new link is created.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteMapping} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px]">
+              Confirm Removal
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
