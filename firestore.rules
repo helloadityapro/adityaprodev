@@ -31,6 +31,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /team_mapping_overrides/{overrideId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /quotes/{quoteId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
