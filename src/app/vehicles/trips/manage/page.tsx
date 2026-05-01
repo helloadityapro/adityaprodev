@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -226,7 +227,7 @@ export default function ManageAllTripsPage() {
   // Viewer States
   const [viewUrl, setViewUrl] = React.useState<string | null>(null);
   const [viewUrls, setViewUrls] = React.useState<string[]>([]);
-  const [currentUrlIndex, setCurrentUrlIndex] = React.useState(0);
+  const [currentFileIndex, setCurrentFileIndex] = React.useState(0);
   const [zoom, setZoom] = React.useState(1);
   const viewerRef = React.useRef<HTMLDivElement>(null);
 
@@ -416,6 +417,9 @@ export default function ManageAllTripsPage() {
     if (driverId === 'RENTED') {
       finalDriverId = "RENTED";
       finalDriverName = rentedDriverDetails ? `Rented: ${rentedDriverDetails}` : "Rented Driver";
+    } else if (driverId === 'SELF_DRIVE') {
+      finalDriverId = assignment.userId;
+      finalDriverName = `${assignment.userName} (Self Drive)`;
     } else {
       const driver = driversList?.find(d => d.id === driverId);
       finalDriverName = driver?.username || 'Assigned Driver';
@@ -447,7 +451,7 @@ export default function ManageAllTripsPage() {
         push: true
       });
 
-      if (finalDriverId !== 'RENTED') {
+      if (finalDriverId !== 'RENTED' && finalDriverId !== assignment.userId) {
         sendNotification(firestore, {
           userId: finalDriverId,
           title: "New Trip Assigned",
@@ -867,7 +871,10 @@ export default function ManageAllTripsPage() {
                   {vehicles?.find(v => v.id === approvalTarget?.vehicleId)?.ownership === 'Rented' ? (
                     <><Label className="text-[10px] font-black uppercase text-primary tracking-widest">Rented Driver Info</Label><Input placeholder="Name / Phone..." className="h-11 font-bold text-sm rounded-sm" value={approvalTarget?.rentedDriverDetails || ""} onChange={(e) => setApprovalState(prev => prev ? { ...prev, rentedDriverDetails: e.target.value } : null)} /></>
                   ) : (
-                    <><Label className="text-[10px] font-black uppercase text-primary tracking-widest">Assign System Driver</Label><Select disabled={!approvalTarget?.vehicleId} value={approvalTarget?.driverId} onValueChange={(val) => setApprovalState(prev => prev ? { ...prev, driverId: val } : null)}><SelectTrigger className="rounded-sm border-primary/20 h-11 font-bold text-sm bg-muted/5"><SelectValue placeholder="Designate Driver..." /></SelectTrigger><SelectContent>{driversList.map(d => (<SelectItem key={d.id} value={d.id} className="text-xs font-bold">{d.username}</SelectItem>))}</SelectContent></Select></>
+                    <><Label className="text-[10px] font-black uppercase text-primary tracking-widest">Assign System Driver</Label><Select disabled={!approvalTarget?.vehicleId} value={approvalTarget?.driverId} onValueChange={(val) => setApprovalState(prev => prev ? { ...prev, driverId: val } : null)}><SelectTrigger className="rounded-sm border-primary/20 h-11 font-bold text-sm bg-muted/5"><SelectValue placeholder="Designate Driver..." /></SelectTrigger><SelectContent>
+                      <SelectItem value="SELF_DRIVE" className="text-xs font-bold text-primary italic">Self Drive (Requester)</SelectItem>
+                      {driversList.map(d => (<SelectItem key={d.id} value={d.id} className="text-xs font-bold">{d.username}</SelectItem>))}
+                    </SelectContent></Select></>
                   )}
                 </div>
               </div>
@@ -1601,7 +1608,7 @@ function EditTripDialog({
         <DialogFooter className="p-4 bg-muted/10 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
           <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Cancel</Button></DialogClose>
           <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md">
-            {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Applying...</> : <><Save className="h-4 w-4 mr-2" /> Apply Updates</>}
+            {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Applying...</> : <><Save className="mr-2 h-4 w-4" /> Apply Updates</>}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1800,3 +1807,4 @@ function ScheduledTripsDialog({
     </Dialog>
   );
 }
+
