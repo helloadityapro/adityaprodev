@@ -38,6 +38,7 @@ export default function CheckOutPage() {
   const [facingMode, setFacingMode] = React.useState<"user" | "environment">("user");
   const [hasCameraPermission, setHasCameraPermission] = React.useState<boolean | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const streamRef = React.useRef<MediaStream | null>(null);
 
   const activeAttendanceQuery = useMemoFirebase(() => {
     if (!user) return null;
@@ -53,10 +54,19 @@ export default function CheckOutPage() {
   const currentEntry = activeAttendance?.[0];
 
   const startCamera = async (mode: "user" | "environment" = facingMode) => {
+    // Guard: Don't restart if already active and using same mode
+    if (streamRef.current?.active && mode === facingMode) {
+      if (videoRef.current && !videoRef.current.srcObject) {
+        videoRef.current.srcObject = streamRef.current;
+      }
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } } 
       });
+      streamRef.current = stream;
       setHasCameraPermission(true);
       setIsCameraActive(true);
       if (videoRef.current) {
@@ -65,26 +75,38 @@ export default function CheckOutPage() {
     } catch (error) {
       console.error('Camera access error:', error);
       setHasCameraPermission(false);
+      setIsCameraActive(false);
       toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable hardware permissions to complete check-out.' });
     }
   };
 
   React.useEffect(() => {
-    if (currentEntry && !selfie && !isCameraActive) {
+    if (currentEntry && !selfie) {
       startCamera();
     }
-    return () => {
-      if (videoRef.current?.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
   }, [currentEntry, selfie]);
 
+  // Ensure stream stays attached if component re-renders
+  React.useEffect(() => {
+    if (isCameraActive && streamRef.current && videoRef.current && !videoRef.current.srcObject) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  });
+
+  // Dedicated unmount cleanup
+  React.useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
+
   const toggleCamera = async () => {
-    if (isCameraActive) {
-      const stream = videoRef.current?.srcObject as MediaStream;
-      stream?.getTracks().forEach(track => track.stop());
+    if (isCameraActive && streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
       const nextMode = facingMode === "user" ? "environment" : "user";
       setFacingMode(nextMode);
       startCamera(nextMode);
@@ -102,8 +124,12 @@ export default function CheckOutPage() {
         ctx.drawImage(video, 0, 0);
         const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
         setSelfie(dataUrl);
-        const stream = video.srcObject as MediaStream;
-        stream?.getTracks().forEach(track => track.stop());
+
+        // Stop stream after successful capture
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
         setIsCameraActive(false);
       }
     }
