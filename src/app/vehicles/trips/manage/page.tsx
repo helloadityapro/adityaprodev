@@ -1470,7 +1470,7 @@ function EditTripDialog({
                                   </PopoverTrigger>
                                   <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                                     <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={pickupSearchQuery} onChange={e => setPickupSearchQuery(e.target.value)} /></div>
-                                    <ScrollArea className="h-[150px]">{filteredPickupSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsPickupPopoverOpen(false); }}>{s.name}</Button>))}</ScrollArea>
+                                    <ScrollArea className="h-[150px]">{filteredPickupSites.map(s => (<Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { field.onChange(s.name); setIsPickupPopoverOpen(false); setPickupSearchQuery(""); }}>{s.name}</Button>))}</ScrollArea>
                                   </PopoverContent>
                                 </Popover>
                               ) : (
@@ -1497,8 +1497,8 @@ function EditTripDialog({
                               name={`intermediateStops.${idx}.type`}
                               render={({ field: typeField }) => (
                                 <RadioGroup onValueChange={typeField.onChange} value={typeField.value} className="flex gap-4 mb-2">
-                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id={`stop-${index}-site`} /><Label htmlFor={`stop-${index}-site`} className="text-[10px] font-bold">Site</Label></div>
-                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id={`stop-${index}-other`} /><Label htmlFor={`stop-${index}-other`} className="text-[10px] font-bold">Other</Label></div>
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Site" id={`stop-${idx}-site`} /><Label htmlFor={`stop-${idx}-site`} className="text-[10px] font-bold">Site</Label></div>
+                                  <div className="flex items-center space-x-2"><RadioGroupItem value="Other" id={`stop-${idx}-other`} /><Label htmlFor={`stop-${idx}-other`} className="text-[10px] font-bold">Other</Label></div>
                                 </RadioGroup>
                               )}
                             />
@@ -1794,7 +1794,7 @@ function ScheduledTripsDialog({
           </div>
         </ScrollArea>
         <DialogFooter className="p-4 border-t bg-muted/10 shrink-0">
-          <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close</Button></DialogClose>
+          <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close</Button></DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
