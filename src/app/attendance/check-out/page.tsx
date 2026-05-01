@@ -4,16 +4,16 @@ import * as React from "react";
 import { useFirestore, useUser, useMemoFirebase, useCollection, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
 import { collection, doc, query, where, limit, serverTimestamp } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
+import { Button } from "@/ui/button";
 import { Loader2, CalendarCheck, CheckCircle2, LogOut, Camera, Trash2, SwitchCamera, AlertCircle, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { Badge } from "@/ui/badge";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import {
   Dialog,
@@ -22,7 +22,9 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "@/ui/dialog";
+
+const SUCCESS_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
 export default function CheckOutPage() {
   const firestore = useFirestore();
@@ -183,6 +185,14 @@ export default function CheckOutPage() {
         await Haptics.impact({ style: ImpactStyle.Light });
       } catch (hapticError) {}
 
+      // Play success chime
+      try {
+        const audio = new Audio(SUCCESS_SOUND_URL);
+        audio.play().catch(e => console.log('Audio play blocked or failed', e));
+      } catch (err) {
+        console.warn("Sound feedback failed", err);
+      }
+
       setIsProcessing(false);
       setShowSuccess(true);
     } catch (e: any) {
@@ -240,7 +250,7 @@ export default function CheckOutPage() {
               </div>
               <div className="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-6">
                 <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-12 w-12 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg backdrop-blur-md"><SwitchCamera className="h-6 w-6" /></Button>
-                <Button onClick={capturePhoto} className="rounded-full h-16 w-16 p-0 shadow-lg border-4 border-emerald-500/20 bg-white text-black hover:bg-white/90 transition-all active:scale-90 scale-110"><Camera className="h-8 w-8" /></Button>
+                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-lg border-4 border-emerald-500/20 bg-white text-black hover:bg-white/90 transition-all active:scale-90 scale-110"><Camera className="h-8 w-8" /></Button>
                 <div className="w-12" />
               </div>
             </div>
@@ -291,6 +301,9 @@ export default function CheckOutPage() {
             <DialogTitle className="text-2xl font-black uppercase tracking-tight text-emerald-900">Check-Out Complete</DialogTitle>
             <DialogDescription className="text-base leading-relaxed text-emerald-800">
               Your workday has been successfully concluded. Final verification and GPS coordinates have been archived.
+              <audio autoPlay hidden>
+                <source src={SUCCESS_SOUND_URL} type="audio/mpeg" />
+              </audio>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center pb-4">

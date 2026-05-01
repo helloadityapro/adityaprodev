@@ -754,7 +754,7 @@ export default function PtwListPage() {
               <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px] sm:max-w-xs">{viewFile?.name}</span>
-                <span className="text-[8px] font-bold text-white/60 uppercase">{currentFileIndex + 1} of {viewFiles.length} Evidence Artifacts</span>
+                <span className="text-[8px] font-bold text-white/60 uppercase">{currentFileIndex + 1} of {viewFiles.length} </span>
               </div>
             </div>
 
@@ -833,7 +833,7 @@ export default function PtwListPage() {
               ))}
             </div>
             <p className="text-[10px] font-black text-white/80 uppercase tracking-widest">
-              Digital Evidence Audit Profile
+              
             </p>
           </div>
         </DialogContent>

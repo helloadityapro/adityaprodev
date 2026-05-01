@@ -24,6 +24,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+const SUCCESS_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
+
 export default function CheckInPage() {
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
@@ -194,6 +196,14 @@ export default function CheckInPage() {
         await Haptics.impact({ style: ImpactStyle.Light });
       } catch {}
 
+      // Play success chime
+      try {
+        const audio = new Audio(SUCCESS_SOUND_URL);
+        audio.play().catch(e => console.log('Audio play blocked or failed', e));
+      } catch (err) {
+        console.warn("Sound feedback failed", err);
+      }
+
       setIsProcessing(false);
       setShowSuccess(true);
     } catch (e: any) {
@@ -286,6 +296,9 @@ export default function CheckInPage() {
             <DialogTitle className="text-2xl font-black uppercase tracking-tight text-emerald-900">Check-In Successful</DialogTitle>
             <DialogDescription className="text-base leading-relaxed text-emerald-800">
               Your workday has been activated. GPS and time stamps have been recorded for organizational compliance.
+              <audio autoPlay hidden>
+                <source src={SUCCESS_SOUND_URL} type="audio/mpeg" />
+              </audio>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center pb-4">
