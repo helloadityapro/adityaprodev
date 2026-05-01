@@ -4,16 +4,16 @@ import * as React from "react";
 import { useFirestore, useUser, useMemoFirebase, useCollection, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
 import { collection, doc, query, where, limit, serverTimestamp } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
-import { Button } from "@/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Loader2, CalendarCheck, CheckCircle2, LogOut, Camera, Trash2, SwitchCamera, AlertCircle, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
-import { Skeleton } from "@/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
-import { Badge } from "@/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import {
   Dialog,
@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/ui/dialog";
+} from "@/components/ui/dialog";
 
 const SUCCESS_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
