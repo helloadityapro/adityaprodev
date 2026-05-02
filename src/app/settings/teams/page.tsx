@@ -384,7 +384,7 @@ export default function TeamMappingPage() {
                 <PopoverContent className="w-[300px] p-0" align="start">
                   <div className="flex items-center border-b px-3">
                     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                    <Input placeholder="Search engineers..." className="h-10 border-none focus-visible:ring-0 text-xs" value={engineerSearchQuery} onChange={e => setEngineerSearchQuery(e.target.value)} />
+                    <Input placeholder="Search engineers..." className="h-10 border-none focus-visible:ring-0 text-xs" value={engineerSearchQuery} onChange={e => setSearchTerm(e.target.value)} />
                   </div>
                   <ScrollArea className="h-[200px]">
                     <div className="p-1">
@@ -609,17 +609,28 @@ export default function TeamMappingPage() {
               <Label className="text-[10px] font-black uppercase text-blue-600/80 tracking-widest px-1">Select Site to Add</Label>
               <Popover open={isSiteSearchOpen} onOpenChange={setIsSiteSearchOpen}>
                 <PopoverTrigger asChild>
-                  <div className="relative group">
-                    <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                  <Button 
+                    variant="outline" 
+                    role="combobox" 
+                    className={cn(
+                      "w-full justify-between h-12 rounded-lg border-slate-200 bg-white font-medium text-sm text-left shadow-sm",
+                      "hover:bg-slate-50 hover:border-primary/30 transition-all px-4"
+                    )}
+                  >
+                    <span className="truncate">Select project site...</span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-lg shadow-2xl border-slate-200" align="start">
+                  <div className="flex items-center border-b px-3 py-2 bg-slate-50/50">
+                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50 text-primary" />
                     <Input 
                       placeholder="Search project sites..." 
-                      className="h-12 pl-10 rounded-lg border-slate-200 bg-white focus-visible:ring-primary/20 text-sm font-medium"
+                      className="h-9 w-full border-none focus-visible:ring-0 bg-transparent px-0 text-sm font-medium"
                       value={siteSearch}
                       onChange={e => setSiteSearch(e.target.value)}
                     />
                   </div>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-lg shadow-2xl border-slate-200" align="start">
                   <ScrollArea className="h-[220px]">
                     <div className="p-1">
                       {availableSitesToAllot.length > 0 ? availableSitesToAllot.map(site => (
