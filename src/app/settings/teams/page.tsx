@@ -56,17 +56,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Separator } from '@/components/ui/separator';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
-} from '@/components/ui/form';
 
 type User = {
   id: string;
@@ -92,27 +81,6 @@ type MappingOverride = {
 
 type SortKey = 'engineer' | 'manager' | 'sites';
 
-const stopSchema = z.object({
-  type: z.enum(['Site', 'Other']),
-  location: z.string().min(1, 'Stop location is required.'),
-  purpose: z.string().min(1, 'Purpose for this stop is required.'),
-});
-
-const editRequestSchema = z.object({
-  pickupType: z.enum(['Site', 'Other']),
-  pickupLocation: z.string().min(1, 'Pickup location is required.'),
-  tripDate: z.string().min(1, 'Trip date is required.'),
-  reportingTime: z.string().min(1, 'Reporting time is required.'),
-  intermediateStops: z.array(stopSchema).default([]),
-  dropType: z.enum(['Site', 'Other']),
-  dropLocation: z.string().min(1, 'Drop-off location is required.'),
-  purpose: z.string().min(5, 'Purpose must be detailed (min 5 chars).'),
-  coPassengers: z.array(z.object({
-    id: z.string(),
-    name: z.string()
-  })).default([]),
-});
-
 export default function TeamMappingPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -120,7 +88,7 @@ export default function TeamMappingPage() {
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<User>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
@@ -173,6 +141,13 @@ export default function TeamMappingPage() {
   const [tableManagerSearch, setTableManagerSearch] = React.useState('');
 
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
 
   const handleAssign = async () => {
     if (!selectedManagerId || !selectedEngineerId) return;
@@ -384,7 +359,7 @@ export default function TeamMappingPage() {
                 <PopoverContent className="w-[300px] p-0" align="start">
                   <div className="flex items-center border-b px-3">
                     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                    <Input placeholder="Search engineers..." className="h-10 border-none focus-visible:ring-0 text-xs" value={engineerSearchQuery} onChange={e => setSearchTerm(e.target.value)} />
+                    <Input placeholder="Search engineers..." className="h-10 border-none focus-visible:ring-0 text-xs" value={engineerSearchQuery} onChange={e => setEngineerSearchQuery(e.target.value)} />
                   </div>
                   <ScrollArea className="h-[200px]">
                     <div className="p-1">
@@ -477,7 +452,7 @@ export default function TeamMappingPage() {
                               className="h-8 rounded-sm font-bold text-[10px] uppercase border-primary/20 text-primary hover:bg-primary/5"
                               onClick={() => handleOpenSiteAccess(eng)}
                             >
-                              <Building2 className="h-3.5 w-3.5 mr-1.5 opacity-60" /> Manage Sites
+                              <Building2 className="h-3.5 w-3.5 mr-1.5" /> Manage Sites
                             </Button>
                             <Button 
                               variant="outline" 
@@ -485,7 +460,7 @@ export default function TeamMappingPage() {
                               className="h-8 rounded-sm font-bold text-[10px] uppercase border-amber-200 text-amber-700 hover:bg-amber-50"
                               onClick={() => setOverrideEngineer(eng)}
                             >
-                              <ShieldCheck className="h-3.5 w-3.5 mr-1.5 opacity-60" /> Site Overrides
+                              <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Site Overrides
                             </Button>
                         </div>
                         <div className="flex items-center gap-1">
@@ -588,7 +563,7 @@ export default function TeamMappingPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Manage Site Access Dialog (As per design image) */}
+      {/* Manage Site Access Dialog */}
       <Dialog open={!!siteAccessUser} onOpenChange={(o) => !o && setSiteAccessUser(null)}>
         <DialogContent className="max-w-2xl w-[95vw] rounded-xl p-0 border-none shadow-2xl bg-white animate-in zoom-in-95 duration-200">
           <DialogHeader className="p-6 pb-2 shrink-0 text-left space-y-2">
@@ -822,4 +797,3 @@ export default function TeamMappingPage() {
     </div>
   );
 }
-
