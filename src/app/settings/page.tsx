@@ -21,7 +21,9 @@ import {
   Truck,
   HardHat,
   Quote,
-  Lock
+  Lock,
+  Mail,
+  User
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -130,36 +132,53 @@ export default function SettingsPage() {
       <section className="space-y-4">
         <div className="flex items-center gap-2 px-1">
           <LifeBuoy className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Support</h2>
+          <h2 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Technical Support</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-muted/20">
-            <CardContent className="p-6">
+            <CardContent className="p-6 space-y-4">
               <div className="flex items-center gap-4">
-                <div className="bg-background p-3 rounded-full border shadow-sm">
-                  <LifeBuoy className="h-6 w-6 text-primary" />
+                <div className="bg-background p-3 rounded-full border shadow-sm shrink-0">
+                  <User className="h-6 w-6 text-primary" />
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-xs font-black uppercase text-muted-foreground tracking-tighter">Email Support</span>
-                  <a href="mailto:khalil@adityagreenenergy.com" className="text-base font-bold text-primary hover:underline">
-                    khalil@adityagreenenergy.com
-                  </a>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">Administrator</span>
+                  <span className="text-base font-black truncate">Khalil Choudhary</span>
                 </div>
+              </div>
+              <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                      <Mail className="h-3.5 w-3.5 text-primary opacity-60" />
+                      <a href="mailto:khalil@adityagreenenergy.com" className="hover:underline">khalil@adityagreenenergy.com</a>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                      <Phone className="h-3.5 w-3.5 text-primary opacity-60" />
+                      <a href="tel:8983787846" className="hover:underline">8983787846</a>
+                  </div>
               </div>
             </CardContent>
           </Card>
+          
           <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-muted/20">
-            <CardContent className="p-6">
+            <CardContent className="p-6 space-y-4">
               <div className="flex items-center gap-4">
-                <div className="bg-background p-3 rounded-full border shadow-sm">
-                  <Phone className="h-6 w-6 text-primary" />
+                <div className="bg-background p-3 rounded-full border shadow-sm shrink-0">
+                  <User className="h-6 w-6 text-primary" />
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-xs font-black uppercase text-muted-foreground tracking-tighter">Phone Support</span>
-                  <a href="tel:9960769636" className="text-base font-bold text-primary hover:underline">
-                    9960769636
-                  </a>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">Developer</span>
+                  <span className="text-base font-black truncate">Abhijeet Bramhawale</span>
                 </div>
+              </div>
+              <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                      <Mail className="h-3.5 w-3.5 text-primary opacity-60" />
+                      <a href="mailto:abhijeet.agepl@gmail.com" className="hover:underline">abhijeet.agepl@gmail.com</a>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                      <Phone className="h-3.5 w-3.5 text-primary opacity-60" />
+                      <a href="tel:9960769636" className="hover:underline">9960769636</a>
+                  </div>
               </div>
             </CardContent>
           </Card>
