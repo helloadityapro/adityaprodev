@@ -269,12 +269,19 @@ type MaterialUtilisation = {
   createdAt: any;
 };
 
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
+};
+
 type POSortKey = 'poNumber' | 'supplier' | 'status' | 'date' | 'total';
 type WOSortKey = 'woNumber' | 'contractor' | 'status' | 'date' | 'total';
 type BoMSortKey = 'itemName' | 'category' | 'make' | 'status' | 'plannedQuantity' | 'approvedQuantity';
 type PaymentSortKey = 'date' | 'payee' | 'amount' | 'reference';
 
-const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Drums"];
+const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Pairs", "Drums"];
 
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
@@ -546,19 +553,44 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: teamLoading } = useCollection<UserProfile>(allUsersQuery);
 
+  // Overrides lookup for this specific project
+  const overridesQuery = useMemoFirebase(() => 
+    query(collection(firestore, 'team_mapping_overrides'), where('siteId', '==', projectId)), 
+    [firestore, projectId]
+  );
+  const { data: siteOverrides } = useCollection<MappingOverride>(overridesQuery);
+
   const siteTeam = React.useMemo(() => {
     if (!allUsers) return [];
+    
+    // 1. Identify users explicitly assigned to this site
     const directTeam = allUsers.filter(u => u.assignedProjectIds?.includes(projectId));
-    const managerIds = new Set<string>();
-    directTeam.forEach(u => { if (u.siteManagerId) managerIds.add(u.siteManagerId); });
-    const linkedManagers = allUsers.filter(u => managerIds.has(u.id));
-    const combined = [...directTeam];
-    linkedManagers.forEach(m => { if (!combined.find(u => u.id === m.id)) combined.push(m); });
-    return combined.sort((a, b) => {
-      const h: any = { 'Admin': 0, 'Site Manager': 1, 'Site Engineer': 2 };
-      return (h[a.role] ?? 3) - (h[b.role] ?? 3);
+    
+    // 2. Identify effective supervisors for each team member
+    const supervisorIds = new Set<string>();
+    directTeam.forEach(u => {
+      // Check for site-specific override first
+      const override = siteOverrides?.find(o => o.engineerId === u.id);
+      if (override) {
+        supervisorIds.add(override.managerId);
+      } else if (u.siteManagerId) {
+        // Fallback to default manager
+        supervisorIds.add(u.siteManagerId);
+      }
     });
-  }, [allUsers, projectId]);
+
+    // 3. Find profile details for those supervisors
+    const linkedSupervisors = allUsers.filter(u => supervisorIds.has(u.id));
+    
+    // 4. Combine everyone
+    const combined = [...directTeam];
+    linkedSupervisors.forEach(m => { if (!combined.find(u => u.id === m.id)) combined.push(m); });
+    
+    return combined.sort((a, b) => {
+      const h: any = { 'Admin': 0, 'Site Manager': 1, 'Site Engineer': 2, 'Driver': 3 };
+      return (h[a.role] ?? 4) - (h[b.role] ?? 4);
+    });
+  }, [allUsers, projectId, siteOverrides]);
 
   const filteredMasterItems = React.useMemo(() => {
     if (!masterItems) return [];
@@ -998,13 +1030,31 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline" className={cn(
-                                "rounded-sm text-[9px] font-black uppercase border-primary/20",
-                                member.role === 'Site Manager' ? "bg-primary text-white border-none" : "text-primary bg-primary/5"
-                              )}>
-                                {member.role === 'Site Manager' && <UserCog className="h-2.5 w-2.5 mr-1" />}
-                                {member.role}
-                              </Badge>
+                                {(() => {
+                                    const override = siteOverrides?.find(o => o.engineerId === member.id);
+                                    const effectiveManagerId = override ? override.managerId : member.siteManagerId;
+                                    const manager = allUsers?.find(m => m.id === effectiveManagerId);
+                                    
+                                    return (
+                                        <div className="flex flex-col gap-1">
+                                            <Badge variant="outline" className={cn(
+                                                "rounded-sm text-[9px] font-black uppercase border-primary/20",
+                                                member.role === 'Site Manager' ? "bg-primary text-white border-none" : "text-primary bg-primary/5"
+                                            )}>
+                                                {member.role === 'Site Manager' && <UserCog className="h-2.5 w-2.5 mr-1" />}
+                                                {member.role}
+                                            </Badge>
+                                            <div className="flex flex-col pl-1">
+                                                <span className="text-[10px] font-bold text-foreground">
+                                                    {manager?.username || (member.role === 'Site Engineer' ? 'Unassigned' : '—')}
+                                                </span>
+                                                {override && (
+                                                    <Badge variant="outline" className="w-fit text-[7px] h-3 px-1 mt-0.5 border-amber-200 text-amber-700 bg-amber-50 font-black uppercase">Site Override</Badge>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">

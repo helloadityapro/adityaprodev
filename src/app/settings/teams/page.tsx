@@ -427,54 +427,62 @@ export default function TeamMappingPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMappings.length > 0 ? filteredMappings.map((eng) => (
-                  <TableRow key={eng.id} className="hover:bg-muted/5 group transition-colors">
-                    <TableCell className="px-6 py-4 font-bold text-sm text-foreground">
-                      {managers.find(m => m.id === eng.siteManagerId)?.username || "Unassigned"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-sm text-foreground">{eng.username}</span>
-                        <span className="text-[9px] font-medium text-muted-foreground truncate max-w-[180px]">{eng.email}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className="h-6 w-6 p-0 flex items-center justify-center rounded-sm font-mono font-black text-[10px] bg-primary/5 text-primary border-primary/20">
-                        {eng.assignedProjectIds?.length || 0}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right px-6">
-                      <div className="flex justify-end items-center gap-2">
-                        <div className="flex gap-2 mr-2">
-                           <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="h-8 rounded-sm font-bold text-[10px] uppercase border-primary/20 text-primary hover:bg-primary/5"
-                              onClick={() => handleOpenSiteAccess(eng)}
-                            >
-                              <Building2 className="h-3.5 w-3.5 mr-1.5" /> Manage Sites
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="h-8 rounded-sm font-bold text-[10px] uppercase border-amber-200 text-amber-700 hover:bg-amber-50"
-                              onClick={() => setOverrideEngineer(eng)}
-                            >
-                              <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Site Overrides
-                            </Button>
+                {filteredMappings.length > 0 ? filteredMappings.map((eng) => {
+                  const hasOverrides = overrides?.some(o => o.engineerId === eng.id);
+                  return (
+                    <TableRow key={eng.id} className="hover:bg-muted/5 group transition-colors">
+                      <TableCell className="px-6 py-4 font-bold text-sm text-foreground">
+                        {managers.find(m => m.id === eng.siteManagerId)?.username || "Unassigned"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-foreground">{eng.username}</span>
+                            {hasOverrides && (
+                              <Badge variant="outline" className="text-[7px] h-3 px-1 border-amber-200 text-amber-700 bg-amber-50 font-black uppercase">Site-Specific</Badge>
+                            )}
+                          </div>
+                          <span className="text-[9px] font-medium text-muted-foreground truncate max-w-[180px]">{eng.email}</span>
                         </div>
-                        <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => setEditingLinkUser(eng)} title="Edit Team Link">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/10" onClick={() => setUserToDelete(eng)} title="Remove Mapping">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="h-6 w-6 p-0 flex items-center justify-center rounded-sm font-mono font-black text-[10px] bg-primary/5 text-primary border-primary/20">
+                          {eng.assignedProjectIds?.length || 0}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end items-center gap-2">
+                          <div className="flex gap-2 mr-2">
+                             <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 rounded-sm font-bold text-[10px] uppercase border-primary/20 text-primary hover:bg-primary/5"
+                                onClick={() => handleOpenSiteAccess(eng)}
+                              >
+                                <Building2 className="h-3.5 w-3.5 mr-1.5" /> Manage Sites
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 rounded-sm font-bold text-[10px] uppercase border-amber-200 text-amber-700 hover:bg-amber-50"
+                                onClick={() => setOverrideEngineer(eng)}
+                              >
+                                <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Site Overrides
+                              </Button>
+                          </div>
+                          <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => setEditingLinkUser(eng)} title="Edit Team Link">
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/10" onClick={() => setUserToDelete(eng)} title="Remove Mapping">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )) : (
+                      </TableCell>
+                    </TableRow>
+                  );
+                }) : (
                   <TableRow><TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic font-medium">No personnel mappings discovered.</TableCell></TableRow>
                 )}
               </TableBody>

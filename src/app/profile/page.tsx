@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Trophy, Star, Award, Coins, MapPin, ShieldCheck, UserCog, TrendingUp, HardHat, Smartphone, Zap, Users, Calendar, Fingerprint, CreditCard } from 'lucide-react';
+import { Trophy, Star, Award, Coins, MapPin, ShieldCheck, UserCog, TrendingUp, HardHat, Smartphone, Zap, Users, Calendar, Fingerprint, CreditCard, ChevronRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
+import Link from 'next/link';
 
 type UserProfile = {
   id: string;
@@ -37,6 +38,13 @@ type RewardSettings = {
 type Site = {
   id: string;
   name: string;
+};
+
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
 };
 
 function ProfilePageSkeleton() {
@@ -68,7 +76,7 @@ export default function ProfilePage() {
   const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
   const { data: settings } = useDoc<RewardSettings>(settingsRef);
 
-  // 3. Fetch all users to calculate rank
+  // 3. Fetch all users to calculate rank and resolve managers
   const leadersQuery = useMemoFirebase(() => 
     query(collection(firestore, 'users'), orderBy('totalPoints', 'desc')), 
     [firestore]
@@ -89,7 +97,14 @@ export default function ProfilePage() {
   }, [firestore, user, userProfile?.role]);
   const { data: teamMembers, isLoading: isTeamLoading } = useCollection<UserProfile>(teamQuery);
 
-  // 6. Fetch all sites to map assigned IDs
+  // 6. Fetch site-specific overrides for this user
+  const overridesQuery = useMemoFirebase(() => 
+    user ? query(collection(firestore, 'team_mapping_overrides'), where('engineerId', '==', user.uid)) : null,
+    [firestore, user]
+  );
+  const { data: userOverrides } = useCollection<MappingOverride>(overridesQuery);
+
+  // 7. Fetch all sites to map assigned IDs
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
@@ -129,7 +144,7 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-8 pb-20">
-      {/* Top Hero Section: Horizontal Profile Card */}
+      {/* Top Hero Section */}
       <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden bg-gradient-to-r from-primary/5 to-transparent">
         <CardContent className="p-6 md:p-8">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-10">
@@ -178,7 +193,7 @@ export default function ProfilePage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          {/* Official Credentials Section */}
+          {/* Credentials Section */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 px-1">
                 <ShieldCheck className="h-4 w-4 text-primary fill-primary" />
@@ -238,7 +253,7 @@ export default function ProfilePage() {
             </Card>
           </div>
 
-          {/* Account Performance Section */}
+          {/* Performance Section */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 px-1">
                 <Zap className="h-4 w-4 text-primary fill-primary" />
@@ -253,7 +268,6 @@ export default function ProfilePage() {
                                 <span className="text-[10px] font-black uppercase tracking-widest">Points Bank</span>
                             </div>
                             <div className="text-4xl font-black text-amber-700 tracking-tighter">{userPoints.toFixed(2)}</div>
-                            <p className="text-[10px] text-muted-foreground font-medium">Accumulated professional balance</p>
                         </div>
                     </div>
                     <div className="p-6 bg-green-500/[0.02]">
@@ -263,7 +277,6 @@ export default function ProfilePage() {
                                 <span className="text-[10px] font-black uppercase tracking-widest">Rewards Value</span>
                             </div>
                             <div className="text-4xl font-black text-green-700 tracking-tighter">₹{monetaryValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-                            <p className="text-[10px] text-muted-foreground font-medium">Estimated conversion (1 Pt = ₹{pointValue})</p>
                         </div>
                     </div>
                     <div className="p-6 bg-primary/[0.02]">
@@ -273,7 +286,6 @@ export default function ProfilePage() {
                                 <span className="text-[10px] font-black uppercase tracking-widest">Global Rank</span>
                             </div>
                             <div className="text-4xl font-black text-primary tracking-tighter">#{globalRank || '—'}</div>
-                            <p className="text-[10px] text-muted-foreground font-medium">Overall platform percentile</p>
                         </div>
                     </div>
                 </div>
@@ -283,96 +295,105 @@ export default function ProfilePage() {
 
         <div className="space-y-8">
           {/* Hierarchy Section */}
-          {userProfile.role === 'Site Engineer' && (
-            <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden w-full">
-              <CardHeader className="bg-primary/5 py-3 border-b">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
-                  <UserCog className="h-4 w-4" /> Reporting Manager
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {managerProfile ? (
-                  <div className="py-4 px-6 flex items-center gap-3">
-                    <Avatar className="h-10 w-10 border shadow-sm">
-                      <AvatarFallback className="text-xs font-bold bg-muted">{managerProfile.username?.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-sm font-bold truncate">{managerProfile.username}</span>
-                      <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">Assigned Site Manager</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center m-6">
-                    <p className="text-sm text-muted-foreground italic">No manager mapped.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {userProfile.role === 'Site Manager' && (
-            <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden w-full">
-              <CardHeader className="bg-primary/5 py-3 border-b">
-                <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
-                  <Users className="h-4 w-4" /> My Team
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {teamMembers && teamMembers.length > 0 ? (
-                  <div className="divide-y">
-                    {teamMembers.map(member => (
-                      <div key={member.id} className="py-3 px-6 flex items-center gap-3 hover:bg-muted/5 transition-colors">
-                        <Avatar className="h-8 w-8 border shadow-sm">
-                          <AvatarFallback className="text-[10px] font-bold bg-muted">{member.username?.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-bold truncate">{member.username}</span>
-                          <span className="text-[8px] text-muted-foreground uppercase font-bold tracking-tight">{member.role}</span>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+                <UserCog className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Team & Supervisors</h2>
+            </div>
+            <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden">
+                <CardHeader className="bg-primary/5 py-3 border-b">
+                    <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Primary Manager</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {managerProfile ? (
+                        <div className="py-4 px-6 flex items-center gap-3">
+                            <Avatar className="h-10 w-10 border shadow-sm">
+                                <AvatarFallback className="text-xs font-bold bg-muted">{managerProfile.username?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold truncate">{managerProfile.username}</span>
+                                <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tight">Main Reporting Supervisor</span>
+                            </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-8 bg-muted/20 border border-dashed rounded-sm text-center m-6">
-                    <p className="text-sm text-muted-foreground italic">No team members mapped.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+                    ) : (
+                        <div className="p-8 text-center"><p className="text-xs italic text-muted-foreground">No global manager assigned.</p></div>
+                    )}
+                </CardContent>
 
-          {/* My Sites Section */}
-          <Card className="rounded-sm border-primary/10 overflow-hidden shadow-md w-full">
-            <CardHeader className="bg-primary/5 py-3 border-b">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
-                <MapPin className="h-4 w-4" /> Authorized Sites
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {assignedSites.length > 0 ? (
-                <div className="divide-y max-h-[300px] overflow-y-auto">
-                  {assignedSites.map(site => (
-                    <div key={site.id} className="py-3 px-6 flex items-center gap-3 hover:bg-muted/5 transition-colors group">
-                      <Avatar className="h-8 w-8 border shadow-sm">
-                        <AvatarFallback className="text-[10px] font-bold bg-muted group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                          <HardHat className="h-3.5 w-3.5" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-bold truncate group-hover:text-primary transition-colors">{site.name}</span>
-                        <span className="text-[8px] text-muted-foreground uppercase font-black tracking-tighter">Project Location</span>
-                      </div>
+                {userOverrides && userOverrides.length > 0 && (
+                    <div className="border-t">
+                        <div className="bg-amber-500/5 px-6 py-2 border-b">
+                            <span className="text-[8px] font-black uppercase tracking-widest text-amber-700">Allocated Site Supervisors</span>
+                        </div>
+                        <div className="divide-y max-h-[200px] overflow-y-auto">
+                            {userOverrides.map(override => {
+                                const site = allSites?.find(s => s.id === override.siteId);
+                                const manager = allUsers?.find(u => u.id === override.managerId);
+                                return (
+                                    <div key={override.id} className="py-2.5 px-6 flex items-center justify-between hover:bg-muted/5 transition-colors">
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-[10px] font-black text-foreground truncate">{site?.name || 'Unknown Site'}</span>
+                                            <span className="text-[9px] font-bold text-primary uppercase">{manager?.username || 'Override Manager'}</span>
+                                        </div>
+                                        <Badge variant="outline" className="text-[7px] font-black uppercase h-3 px-1 border-amber-200 text-amber-700 bg-amber-50">Override</Badge>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center bg-muted/10 rounded-sm border border-dashed m-6">
-                  <MapPin className="h-8 w-8 text-muted-foreground/30 mb-2" />
-                  <p className="text-xs text-muted-foreground font-medium">No sites currently assigned.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+            </Card>
+
+            {userProfile.role === 'Site Manager' && teamMembers && teamMembers.length > 0 && (
+                <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden">
+                    <CardHeader className="bg-primary/5 py-3 border-b">
+                        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Direct Team Members</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="divide-y max-h-[300px] overflow-y-auto">
+                            {teamMembers.map(member => (
+                                <div key={member.id} className="py-3 px-6 flex items-center gap-3 hover:bg-muted/5 transition-colors">
+                                    <Avatar className="h-8 w-8 border shadow-sm">
+                                        <AvatarFallback className="text-[10px] font-bold bg-muted">{member.username?.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="text-xs font-bold truncate">{member.username}</span>
+                                        <span className="text-[8px] text-muted-foreground uppercase font-bold tracking-tight">{member.role}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+          </div>
+
+          {/* Assigned Projects Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+                <MapPin className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Project Access</h2>
+            </div>
+            <Card className="rounded-sm border-primary/10 overflow-hidden shadow-md">
+                <CardContent className="p-0">
+                    {assignedSites.length > 0 ? (
+                        <div className="divide-y max-h-[350px] overflow-y-auto">
+                            {assignedSites.map(site => (
+                                <Link key={site.id} href={`/projects/${site.id}`} className="py-3 px-6 flex items-center justify-between hover:bg-muted/5 transition-colors group">
+                                    <div className="flex items-center gap-3">
+                                        <Building2 className="h-3.5 w-3.5 text-primary opacity-40 group-hover:opacity-100 transition-opacity" />
+                                        <span className="text-xs font-bold truncate group-hover:text-primary transition-colors">{site.name}</span>
+                                    </div>
+                                    <ChevronRight className="h-3 w-3 text-muted-foreground/30 group-hover:text-primary transition-all" />
+                                </Link>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="p-10 text-center italic text-xs text-muted-foreground uppercase tracking-widest font-bold opacity-30">No site assignments active.</div>
+                    )}
+                </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

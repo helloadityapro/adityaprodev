@@ -142,7 +142,7 @@ export default function SettingsPage() {
                   <User className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">Administrator</span>
+                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">For Support</span>
                   <span className="text-base font-black truncate">Khalil Choudhary</span>
                 </div>
               </div>
@@ -166,7 +166,7 @@ export default function SettingsPage() {
                   <User className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">Developer</span>
+                  <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">For Support</span>
                   <span className="text-base font-black truncate">Abhijeet Bramhawale</span>
                 </div>
               </div>
