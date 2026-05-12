@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -97,12 +98,9 @@ export default function ProfilePage() {
   }, [firestore, user, userProfile?.role]);
   const { data: teamMembers, isLoading: isTeamLoading } = useCollection<UserProfile>(teamQuery);
 
-  // 6. Fetch site-specific overrides for this user
-  const overridesQuery = useMemoFirebase(() => 
-    user ? query(collection(firestore, 'team_mapping_overrides'), where('engineerId', '==', user.uid)) : null,
-    [firestore, user]
-  );
-  const { data: userOverrides } = useCollection<MappingOverride>(overridesQuery);
+  // 6. Fetch all site-specific overrides
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
 
   // 7. Fetch all sites to map assigned IDs
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
@@ -117,18 +115,39 @@ export default function ProfilePage() {
   const assignedSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
     
-    // Start with directly assigned sites
-    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
-    
-    // For Managers, explicitly aggregate from team members in real-time
-    if (userProfile.role === 'Site Manager' && teamMembers) {
-      teamMembers.forEach(member => {
-        (member.assignedProjectIds || []).forEach(id => siteIds.add(id));
+    // Strict Sovereignty Calculation
+    const siteIds = new Set<string>();
+
+    if (userProfile.role === 'Site Manager') {
+      // 1. Sites where this manager is an explicit override
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => {
+        siteIds.add(o.siteId);
       });
+
+      // 2. Sites where this manager is the default supervisor for an engineer
+      // AND that engineer has NO site-specific override pointing to someone else
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(sid => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
+            if (!hasOtherOverride) {
+              siteIds.add(sid);
+            }
+          });
+        });
+      }
+    } else {
+      // Engineers just see their direct assignments
+      (userProfile.assignedProjectIds || []).forEach(id => siteIds.add(id));
     }
 
-    return allSites.filter(s => siteIds.has(s.id));
-  }, [userProfile, allSites, teamMembers]);
+    return allSites.filter(s => siteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [userProfile, allSites, teamMembers, allOverrides]);
+
+  const userOverrides = React.useMemo(() => {
+    if (!allOverrides || !user) return [];
+    return allOverrides.filter(o => o.engineerId === user.uid);
+  }, [allOverrides, user]);
 
   const pointValue = settings?.pointValueInRs || 1;
   const userPoints = userProfile?.totalPoints || 0;

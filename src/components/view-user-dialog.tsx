@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -47,6 +48,13 @@ type Site = {
   name: string;
 };
 
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
+};
+
 interface ViewUserDialogProps {
   user: UserProfile | null;
   open: boolean;
@@ -73,6 +81,9 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
 
   const allUsersQuery = useMemoFirebase(() => query(collection(firestore, 'users'), orderBy('totalPoints', 'desc')), [firestore]);
   const { data: allUsers } = useCollection<UserProfile>(allUsersQuery);
+
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
 
   const engineersQuery = useMemoFirebase(() => {
     if (!user || user.role !== 'Site Manager') return null;
@@ -107,17 +118,39 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
   const assignedSites = React.useMemo(() => {
     if (!allSites || !user) return [];
     
-    // Aggregated site visibility for Managers
-    const siteIds = new Set<string>(user.assignedProjectIds || []);
-    
-    if (user.role === 'Site Manager' && mappedEngineers) {
-      mappedEngineers.forEach(member => {
-        (member.assignedProjectIds || []).forEach(id => siteIds.add(id));
+    // Strict Sovereignty Calculation
+    const siteIds = new Set<string>();
+
+    if (user.role === 'Site Manager') {
+      // 1. Sites where this manager is an explicit override for SOMEONE
+      allOverrides?.filter(o => o.managerId === user.id).forEach(o => {
+        siteIds.add(o.siteId);
       });
+
+      // 2. Sites where this manager is the default supervisor for an engineer
+      // AND that engineer has NO site-specific override pointing to someone else
+      if (mappedEngineers) {
+        mappedEngineers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(sid => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== user.id);
+            if (!hasOtherOverride) {
+              siteIds.add(sid);
+            }
+          });
+        });
+      }
+    } else {
+      // Engineers just see their direct assignments
+      (user.assignedProjectIds || []).forEach(id => siteIds.add(id));
     }
 
     return allSites.filter(s => siteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
-  }, [user, allSites, mappedEngineers]);
+  }, [user, allSites, mappedEngineers, allOverrides]);
+
+  const userOverrides = React.useMemo(() => {
+    if (!allOverrides || !user) return [];
+    return allOverrides.filter(o => o.engineerId === user.id);
+  }, [allOverrides, user]);
 
   const syncManagerSites = async (managerId: string) => {
     try {
@@ -371,6 +404,24 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                   </div>
                 )}
               </div>
+
+              {userOverrides && userOverrides.length > 0 && (
+                  <div className="space-y-6 pt-10">
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 border-b pb-2 text-left">Allocated Site Supervisors</h3>
+                      <div className="divide-y divide-border/30 border rounded-sm overflow-hidden bg-background">
+                          {userOverrides.map(override => {
+                              const site = allSites?.find(s => s.id === override.siteId);
+                              const mgr = allUsers?.find(u => u.id === override.managerId);
+                              return (
+                                  <div key={override.id} className="py-3 px-4 flex flex-col gap-1 hover:bg-primary/[0.02] transition-colors">
+                                      <span className="text-[11px] font-black text-foreground uppercase truncate">{site?.name || 'Unknown Site'}</span>
+                                      <span className="text-[9px] font-bold text-primary uppercase">{mgr?.username || 'Override Manager'}</span>
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  </div>
+              )}
             </div>
 
             <div className="md:col-span-3 p-8 bg-muted/[0.02]">

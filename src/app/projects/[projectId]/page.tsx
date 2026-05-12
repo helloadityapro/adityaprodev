@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -563,28 +564,34 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const siteTeam = React.useMemo(() => {
     if (!allUsers) return [];
     
-    // 1. Identify users explicitly assigned to this site
-    const directTeam = allUsers.filter(u => u.assignedProjectIds?.includes(projectId));
+    // 1. Identify users (Engineers, Drivers, etc.) explicitly assigned to this site
+    // excluding Managers and Admins for the primary list
+    const assignedEngineersAndOthers = allUsers.filter(u => 
+      u.assignedProjectIds?.includes(projectId) && 
+      u.role !== 'Admin' && u.role !== 'Site Manager'
+    );
     
-    // 2. Identify effective supervisors for each team member
-    const supervisorIds = new Set<string>();
-    directTeam.forEach(u => {
+    // 2. Identify effective supervisors for each assigned personnel for THIS site
+    const effectiveSupervisorIds = new Set<string>();
+    assignedEngineersAndOthers.forEach(u => {
       // Check for site-specific override first
       const override = siteOverrides?.find(o => o.engineerId === u.id);
       if (override) {
-        supervisorIds.add(override.managerId);
+        effectiveSupervisorIds.add(override.managerId);
       } else if (u.siteManagerId) {
         // Fallback to default manager
-        supervisorIds.add(u.siteManagerId);
+        effectiveSupervisorIds.add(u.siteManagerId);
       }
     });
 
-    // 3. Find profile details for those supervisors
-    const linkedSupervisors = allUsers.filter(u => supervisorIds.has(u.id));
+    // 3. Find profile details for those effective supervisors
+    const effectiveSupervisors = allUsers.filter(u => effectiveSupervisorIds.has(u.id));
     
-    // 4. Combine everyone
-    const combined = [...directTeam];
-    linkedSupervisors.forEach(m => { if (!combined.find(u => u.id === m.id)) combined.push(m); });
+    // 4. Combine into a strict site hierarchy
+    const combined = [...assignedEngineersAndOthers];
+    effectiveSupervisors.forEach(m => { 
+        if (!combined.find(u => u.id === m.id)) combined.push(m); 
+    });
     
     return combined.sort((a, b) => {
       const h: any = { 'Admin': 0, 'Site Manager': 1, 'Site Engineer': 2, 'Driver': 3 };
@@ -651,7 +658,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     }));
   };
 
-  const POSortIcon = ({ column }: { column: POSortKey }) => {
+  const POSortIcon = ({ column }: { column: SortKey }) => {
     if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
     return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
@@ -663,7 +670,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     }));
   };
 
-  const WOSortIcon = ({ column }: { column: WOSortKey }) => {
+  const WOSortIcon = ({ column }: { column: SortKey }) => {
     if (woSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
     return woSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };

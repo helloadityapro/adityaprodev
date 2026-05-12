@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -393,15 +394,15 @@ export default function TeamMappingPage() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="px-6 min-w-[200px]">
+                  <TableHead className="px-6 min-w-[250px]">
                     <div className="flex flex-col gap-2 py-2">
                         <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('manager')}>
-                            <span className="text-[10px] font-black uppercase tracking-widest">Supervisor</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest">Supervisor Hierarchy</span>
                             {sortConfig.key === 'manager' && (sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
                         </div>
                         <div className="relative">
                             <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
-                            <Input placeholder="Filter..." className="h-8 pl-7 text-[10px] rounded-sm bg-background border-primary/10" value={tableManagerSearch} onChange={e => setTableManagerSearch(e.target.value)} />
+                            <Input placeholder="Filter supervisor..." className="h-8 pl-7 text-[10px] rounded-sm bg-background border-primary/10" value={tableManagerSearch} onChange={e => setTableManagerSearch(e.target.value)} />
                         </div>
                     </div>
                   </TableHead>
@@ -428,17 +429,41 @@ export default function TeamMappingPage() {
               </TableHeader>
               <TableBody>
                 {filteredMappings.length > 0 ? filteredMappings.map((eng) => {
-                  const hasOverrides = overrides?.some(o => o.engineerId === eng.id);
+                  const hasOverrides = overrides?.filter(o => o.engineerId === eng.id) || [];
+                  const defaultManager = managers.find(m => m.id === eng.siteManagerId);
+
                   return (
                     <TableRow key={eng.id} className="hover:bg-muted/5 group transition-colors">
-                      <TableCell className="px-6 py-4 font-bold text-sm text-foreground">
-                        {managers.find(m => m.id === eng.siteManagerId)?.username || "Unassigned"}
+                      <TableCell className="px-6 py-4">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex flex-col">
+                            <span className="text-[8px] font-black text-muted-foreground uppercase tracking-tighter">Default Supervisor</span>
+                            <span className="font-bold text-sm text-foreground">{defaultManager?.username || "Unassigned"}</span>
+                          </div>
+                          
+                          {hasOverrides.length > 0 && (
+                            <div className="flex flex-col gap-1 mt-1">
+                               <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">Site Overrides</span>
+                               {hasOverrides.map(o => {
+                                 const site = allSites?.find(s => s.id === o.siteId);
+                                 const mgr = managers.find(m => m.id === o.managerId);
+                                 return (
+                                   <div key={o.id} className="flex items-center gap-1.5 text-[10px] bg-amber-500/5 p-1 rounded-sm border border-amber-500/10">
+                                      <MapPin className="h-2.5 w-2.5 text-amber-600" />
+                                      <span className="font-black text-amber-800">{site?.name}:</span>
+                                      <span className="font-medium text-foreground">{mgr?.username}</span>
+                                   </div>
+                                 );
+                               })}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-sm text-foreground">{eng.username}</span>
-                            {hasOverrides && (
+                            {hasOverrides.length > 0 && (
                               <Badge variant="outline" className="text-[7px] h-3 px-1 border-amber-200 text-amber-700 bg-amber-50 font-black uppercase">Site-Specific</Badge>
                             )}
                           </div>
