@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, parseISO, differenceInMinutes, endOfDay } from 'date-fns';
+import { format, parseISO, differenceInMinutes, endOfDay, isValid } from 'date-fns';
 import { 
   CalendarDays, 
   Search, 
@@ -273,7 +273,10 @@ export default function AttendanceSummaryPage() {
   const handleWhatsAppShare = () => {
     if (summaryData.length === 0) return;
 
-    const formattedDate = format(parseISO(selectedDate), 'dd MMMM yyyy');
+    const dateObj = parseISO(selectedDate);
+    if (!isValid(dateObj)) return;
+
+    const formattedDate = format(dateObj, 'dd MMMM yyyy');
     let message = `*Aditya Pro - Daily Attendance Summary*\n`;
     message += `*Date:* ${formattedDate}\n\n`;
     message += `*Summary Stats:*\n`;
@@ -312,6 +315,11 @@ export default function AttendanceSummaryPage() {
   }
 
   if (!isAdmin) return null;
+
+  const displayDate = () => {
+    const d = parseISO(selectedDate);
+    return isValid(d) ? format(d, 'dd MMMM yyyy') : 'Invalid Date';
+  };
 
   return (
     <div className="space-y-8 pb-20">
@@ -364,9 +372,9 @@ export default function AttendanceSummaryPage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                Presence Log for {format(parseISO(selectedDate), 'dd MMMM yyyy')}
+                Presence Log for {displayDate()}
               </CardTitle>
-              {selectedDate < format(new Date(), 'yyyy-MM-dd') && stats.ongoing > 0 && (
+              {selectedDate && isValid(parseISO(selectedDate)) && selectedDate < format(new Date(), 'yyyy-MM-dd') && stats.ongoing > 0 && (
                 <Badge className="bg-amber-100 text-amber-800 border-amber-200 uppercase font-black text-[9px] flex items-center gap-1.5 px-3 rounded-sm shadow-sm animate-pulse">
                   <ShieldCheck className="h-3 w-3" /> Auto-Cleanup Active
                 </Badge>
