@@ -455,13 +455,9 @@ export default function PtwListPage() {
     const newX = e.clientX - startPan.x;
     const newY = e.clientY - startPan.y;
     
-    // Improved clamping logic to prevent unexpected shifting
-    const container = containerRef.current?.getBoundingClientRect();
-    const media = mediaRef.current?.getBoundingClientRect();
-    if (!container || !media) return;
-
-    const limitX = Math.max(0, (media.width - container.width) / 2);
-    const limitY = Math.max(0, (media.height - container.height) / 2);
+    // Improved clamping logic
+    const limitX = Math.max(0, (window.innerWidth * scale - window.innerWidth) / 2);
+    const limitY = Math.max(0, (window.innerHeight * scale - window.innerHeight) / 2);
 
     setPosition({
       x: Math.min(Math.max(newX, -limitX), limitX),
@@ -482,7 +478,7 @@ export default function PtwListPage() {
   };
 
   const handleCloseDetails = () => {
-    setDetailsAssignment(null);
+    setDetailsPermit(null);
   };
 
   const clearFilters = () => {
@@ -760,7 +756,7 @@ export default function PtwListPage() {
 
             <div className="flex items-center gap-1.5">
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1.5) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button>
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={resetViewer}><RotateCcw className="h-4 w-4" /></Button>
               <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
               <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/10 hover:bg-red-500 text-white border-none transition-colors"><X className="h-5 w-5" /></Button></DialogClose>
@@ -832,9 +828,6 @@ export default function PtwListPage() {
                 <div key={i} className={cn("h-1 w-4 rounded-full transition-all", i === currentFileIndex ? "bg-primary w-8" : "bg-white/20")} />
               ))}
             </div>
-            <p className="text-[10px] font-black text-white/80 uppercase tracking-widest">
-              
-            </p>
           </div>
         </DialogContent>
       </Dialog>
