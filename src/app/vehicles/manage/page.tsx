@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, writeBatch } from '@/firebase';
-import { collection, query, orderBy, doc, where, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, serverTimestamp, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -110,6 +110,7 @@ type Assignment = {
   endTime?: any;
   startReading?: number;
   endReading?: number;
+  intermediateStops?: { type: 'Site' | 'Other', location: string, purpose: string }[];
 };
 
 type UserProfile = {
@@ -390,9 +391,7 @@ export default function ManageVehiclesPage() {
                         v.status === 'Available' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
                         v.status === 'Ongoing' ? "bg-blue-50 text-blue-700 border-blue-200" :
                         "bg-amber-50 text-amber-700 border-amber-200"
-                      )}>
-                        {v.status}
-                      </Badge>
+                      )}>{v.status}</Badge>
                     </TableCell>
                     <TableCell>
                       {activeAssignment ? (
@@ -411,6 +410,12 @@ export default function ManageVehiclesPage() {
                             <MapPin className="h-3 w-3 text-emerald-600" />
                             <span className="truncate">{activeAssignment.pickupLocation}</span>
                           </div>
+                          {activeAssignment.intermediateStops?.map((stop, sIdx) => (
+                            <div key={sIdx} className="flex items-center gap-1.5 text-[9px] font-medium text-muted-foreground ml-4">
+                              <ArrowRight className="h-2.5 w-2.5 opacity-50" />
+                              <span className="truncate">{stop.location}</span>
+                            </div>
+                          ))}
                           <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground ml-4">
                             <ArrowRight className="h-2.5 w-2.5 text-muted-foreground" />
                             <span className="truncate">{activeAssignment.dropLocation}</span>
@@ -759,6 +764,11 @@ function VehicleHistoryDialog({ vehicle, assignments, open, onOpenChange }: { ve
                       <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 uppercase">
                         <MapPin className="h-2.5 w-2.5" /> {a.pickupLocation}
                       </div>
+                      {a.intermediateStops?.map((stop, sIdx) => (
+                        <div key={sIdx} className="flex items-center gap-1 text-[9px] font-medium text-muted-foreground ml-3">
+                          <ArrowRight className="h-2.5 w-2.5 opacity-50" /> {stop.location}
+                        </div>
+                      ))}
                       <div className="flex items-center gap-1 text-[10px] font-bold text-red-700 uppercase ml-3">
                         <ArrowRight className="h-2.5 w-2.5" /> {a.dropLocation}
                       </div>
