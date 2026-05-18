@@ -342,7 +342,7 @@ export default function PtwListPage() {
 
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const handleAction = async (permit: Permit, targetStatus: Permit['status'], remarks: string) => {
@@ -455,13 +455,13 @@ export default function PtwListPage() {
     const newX = e.clientX - startPan.x;
     const newY = e.clientY - startPan.y;
     
-    // Simple clamping logic
+    // Improved clamping logic to prevent unexpected shifting
     const container = containerRef.current?.getBoundingClientRect();
     const media = mediaRef.current?.getBoundingClientRect();
     if (!container || !media) return;
 
-    const limitX = (media.width - container.width) / 2;
-    const limitY = (media.height - container.height) / 2;
+    const limitX = Math.max(0, (media.width - container.width) / 2);
+    const limitY = Math.max(0, (media.height - container.height) / 2);
 
     setPosition({
       x: Math.min(Math.max(newX, -limitX), limitX),
@@ -482,7 +482,7 @@ export default function PtwListPage() {
   };
 
   const handleCloseDetails = () => {
-    setDetailsPermit(null);
+    setDetailsAssignment(null);
   };
 
   const clearFilters = () => {
@@ -796,7 +796,7 @@ export default function PtwListPage() {
             <div 
               ref={mediaRef}
               className={cn(
-                "transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none",
+                "transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit",
                 isDragging && "transition-none"
               )}
               style={{ 
