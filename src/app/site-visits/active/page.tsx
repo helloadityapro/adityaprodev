@@ -66,6 +66,15 @@ export default function ActiveSiteVisitsPage() {
 
   const { data: visits, isLoading } = useCollection<SiteVisit>(visitsQuery);
 
+  const sortedVisits = React.useMemo(() => {
+    if (!visits) return [];
+    return [...visits].sort((a, b) => {
+      const timeA = a.startTime?.toDate?.()?.getTime() || 0;
+      const timeB = b.startTime?.toDate?.()?.getTime() || 0;
+      return timeB - timeA;
+    });
+  }, [visits]);
+
   if (isLoading || isProfileLoading) {
     return (
       <div className="space-y-6 max-w-4xl mx-auto">
@@ -89,9 +98,9 @@ export default function ActiveSiteVisitsPage() {
         </p>
       </div>
 
-      {visits && visits.length > 0 ? (
+      {sortedVisits && sortedVisits.length > 0 ? (
         <div className="grid gap-6">
-          {visits.map((visit) => (
+          {sortedVisits.map((visit) => (
             <Card key={visit.id} className="border-l-4 border-l-primary shadow-md overflow-hidden animate-in fade-in slide-in-from-left-4 duration-500">
               <CardHeader className="bg-primary/5 pb-4">
                 <div className="flex items-center justify-between">
@@ -167,7 +176,7 @@ export default function ActiveSiteVisitsPage() {
         <div className="flex flex-col items-center justify-center py-24 text-center bg-card border border-dashed rounded-sm border-primary/20">
           <Navigation className="h-16 w-16 text-muted-foreground/20 mb-4" />
           <h3 className="text-xl font-bold">No Active Visits</h3>
-          <p className="text-muted-foreground max-w-sm mx-auto mt-2">
+          <p className="text-muted-foreground max-sm mx-auto mt-2">
             {isAdmin 
               ? "There are currently no personnel logged in at any project site." 
               : "You are not currently logged in at any site. Click 'Start Visit' when you arrive at a project location."}
