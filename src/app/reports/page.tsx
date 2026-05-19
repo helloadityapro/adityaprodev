@@ -17,7 +17,9 @@ import {
   Cell, 
   PieChart, 
   Pie, 
-  Legend 
+  Legend,
+  AreaChart,
+  Area
 } from 'recharts';
 import { 
   BarChart3, 
@@ -50,7 +52,8 @@ import {
   Tags,
   BookOpen,
   LayoutGrid,
-  Fuel
+  Fuel,
+  Activity
 } from 'lucide-react';
 import { format, subDays, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -148,7 +151,7 @@ export default function ReportsDashboard() {
   const [selectedSite, setSelectedSite] = React.useState<string>("All Sites");
   const [timeRange, setTimeRange] = React.useState<number>(7);
   const [customStartDate, setCustomStartDate] = React.useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
-  const [customEndDate, setCustomEndDate] = React.useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
+  const [customEndDate, setCustomEndDate] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
 
@@ -258,7 +261,6 @@ export default function ReportsDashboard() {
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: redemptions, isLoading: redemptionsLoading } = useCollection<DataItem>(redemptionsQuery);
 
-  // New sources for full coverage
   const usersQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), limit(50)) : null, [firestore, isAdmin]);
   const { data: usersList, isLoading: usersListLoading } = useCollection<DataItem>(usersQuery);
 
@@ -277,10 +279,10 @@ export default function ReportsDashboard() {
   const lmsModulesQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'lms_modules'), limit(50)) : null, [firestore, isAdmin]);
   const { data: lmsModules, isLoading: lmsModulesLoading } = useCollection<DataItem>(lmsModulesQuery);
 
-  const isLoading = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || visitsLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading || usersListLoading || vehicleReqsLoading || docsLoading || groupsLoading || lmsCoursesLoading || lmsModulesLoading;
+  const isLoadingTotal = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || (isAdmin && (visitsLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading || usersListLoading || vehicleReqsLoading || docsLoading || groupsLoading || lmsCoursesLoading || lmsModulesLoading));
 
   const stats = React.useMemo(() => {
-    if (isLoading) return null;
+    if (isLoadingTotal) return null;
 
     let startDateRange: Date;
     let endDateRange = new Date();
@@ -323,9 +325,8 @@ export default function ReportsDashboard() {
         label: format(date, effectiveDays > 7 ? 'dd/MM' : 'dd MMM'),
         date: date,
         permits: 0,
-        dprs: 0,
-        movements: 0,
-        requirements: 0
+        reports: 0,
+        movements: 0
       };
     }).reverse();
 
@@ -342,14 +343,31 @@ export default function ReportsDashboard() {
     };
 
     fPermits.forEach(p => { const idx = processItemDate(p, 'requestDate'); if (idx !== -1) trendDays[idx].permits++; });
-    fDprs.forEach(d => { const idx = processItemDate(d, 'createdAt'); if (idx !== -1) trendDays[idx].dprs++; });
+    fDprs.forEach(d => { const idx = processItemDate(d, 'createdAt'); if (idx !== -1) trendDays[idx].reports++; });
     fMovements.forEach(m => { const idx = processItemDate(m, 'createdAt'); if (idx !== -1) trendDays[idx].movements++; });
-    fRequirements.forEach(r => { const idx = processItemDate(r, 'createdAt'); if (idx !== -1) trendDays[idx].requirements++; });
 
-    const permitStatus = [
-      { name: 'Approved', value: fPermits.filter(p => p.status === 'Approved').length, color: '#22c55e' },
-      { name: 'Pending', value: fPermits.filter(p => p.status === 'Pending' || p.status === 'ManagerApproved').length, color: '#eab308' },
-      { name: 'Rejected', value: fPermits.filter(p => p.status === 'Rejected').length, color: '#ef4444' },
+    const approvedPermitsCount = fPermits.filter(p => p.status === 'Approved').length;
+    const pendingPermitsCount = fPermits.filter(p => p.status === 'Pending' || p.status === 'ManagerApproved').length;
+    const rejectedPermitsCount = fPermits.filter(p => p.status === 'Rejected').length;
+    const totalPermits = fPermits.length;
+    const approvalRate = totalPermits > 0 ? Math.round((approvedPermitsCount / totalPermits) * 100) : 0;
+
+    const permitDistribution = [
+      { name: 'APPROVED', value: approvedPermitsCount, color: '#22c55e' },
+      { name: 'PENDING', value: pendingPermitsCount, color: '#eab308' },
+      { name: 'REJECTED', value: rejectedPermitsCount, color: '#ef4444' },
+    ];
+
+    const taskProgress = [
+      { name: 'Completed', value: fTasks.filter(t => t.status === 'Completed').length, fill: '#22c55e' },
+      { name: 'Ongoing', value: fTasks.filter(t => t.status === 'In Progress' || t.status === 'To-do').length, fill: '#3b82f6' },
+      { name: 'Cancelled', value: fTasks.filter(t => t.status === 'Cancelled').length, fill: '#ef4444' },
+    ].reverse();
+
+    const reqUrgency = [
+      { name: 'High', value: fRequirements.filter(r => r.urgency === 'High').length, fill: '#ef4444' },
+      { name: 'Medium', value: fRequirements.filter(r => r.urgency === 'Medium').length, fill: '#f59e0b' },
+      { name: 'Low', value: fRequirements.filter(r => r.urgency === 'Low').length, fill: '#3b82f6' },
     ];
 
     const aggregatedActivities: RecentActivity[] = [];
@@ -388,7 +406,6 @@ export default function ReportsDashboard() {
       payments?.forEach(p => addItemToActivity(p, 'Payment', 'Finance', IndianRupee, 'text-emerald-700', 'date', 'recordedByName', `${p.recordedByName} recorded a payment of ₹${p.amount?.toLocaleString()} against ${p.referenceNumber} for ${p.siteName}`, `/payments/project-wise`));
       redemptions?.forEach(r => addItemToActivity(r, 'Redemption', 'Rewards', CreditCard, 'text-green-600', 'createdAt', 'userName', `${r.userName} requested a points redemption of ₹${r.amountInRs?.toLocaleString()}`, `/settings/rewards`));
       
-      // New Activity Types
       usersList?.forEach(u => addItemToActivity(u, 'User', 'Registry', UserPlus, 'text-purple-600', 'createdAt', 'username', `New user added to registry: ${u.username}`, `/settings/users`));
       vehicleReqs?.forEach(v => {
         if (v.status === 'Pending') {
@@ -405,7 +422,10 @@ export default function ReportsDashboard() {
 
     return {
       dailyTrend: trendDays,
-      permitDistribution: permitStatus,
+      permitDistribution,
+      approvalRate,
+      taskProgress,
+      requirementUrgency: reqUrgency,
       recentActivities: aggregatedActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 50),
       counts: {
         permits: fPermits.length,
@@ -415,21 +435,21 @@ export default function ReportsDashboard() {
         tasks: fTasks.length,
       }
     };
-  }, [isLoading, permits, dprs, movements, requirements, tasks, visits, expenses, pos, wos, payments, redemptions, usersList, vehicleReqs, siteDocs, siteGroups, lmsCourses, lmsModules, selectedSite, timeRange, customStartDate, customEndDate, isAdmin]);
+  }, [isLoadingTotal, permits, dprs, movements, requirements, tasks, visits, expenses, pos, wos, payments, redemptions, usersList, vehicleReqs, siteDocs, siteGroups, lmsCourses, lmsModules, selectedSite, timeRange, customStartDate, customEndDate, isAdmin]);
 
-  if (isLoading) return <div className="space-y-8 p-4"><Skeleton className="h-10 w-48" /><Skeleton className="h-4 w-96" /><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full rounded-sm" />)}</div></div>;
+  if (isLoadingTotal) return <div className="space-y-8 p-4"><Skeleton className="h-10 w-48" /><Skeleton className="h-4 w-96" /><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full rounded-sm" />)}</div></div>;
 
   if (!stats) return null;
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-12 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-primary" />
             <h1>Operational Reports</h1>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Operational summaries and performance data analytics.</p>
+          <p className="text-muted-foreground text-sm font-medium">Platform-wide analytical summaries and performance tracking.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={timeRange.toString()} onValueChange={(val) => setTimeRange(parseInt(val))}>
@@ -466,46 +486,142 @@ export default function ReportsDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Row 1: Activity Trend & Compliance Health */}
         <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
-          <CardHeader className="bg-muted/5 border-b py-4"><div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" /><CardTitle className="text-sm font-bold uppercase tracking-widest">Activity Trend</CardTitle></div></CardHeader>
-          <CardContent className="pt-8"><div className="h-[300px] w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={stats.dailyTrend}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} /><YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} /><RechartsTooltip contentStyle={{ borderRadius: '4px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} cursor={{fill: 'rgba(0,0,0,0.02)'}} /><Legend iconType="circle" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase'}} /><Bar dataKey="permits" name="Permits" fill="#3b82f6" radius={[2, 2, 0, 0]} /><Bar dataKey="dprs" name="Reports" fill="#f59e0b" radius={[2, 2, 0, 0]} /><Bar dataKey="movements" name="Movements" fill="#10b981" radius={[2, 2, 0, 0]} /></BarChart></ResponsiveContainer></div></CardContent>
+          <CardHeader className="bg-muted/5 border-b py-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Document Activity Trend</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-8 px-6">
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.dailyTrend}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
+                  <RechartsTooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} />
+                  <Legend iconType="circle" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase'}} />
+                  <Bar dataKey="permits" name="PERMITS" fill="#3b82f6" radius={[2, 2, 0, 0]} barSize={10} />
+                  <Bar dataKey="reports" name="REPORTS" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={10} />
+                  <Bar dataKey="movements" name="MOVEMENTS" fill="#10b981" radius={[2, 2, 0, 0]} barSize={10} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
         </Card>
 
+        <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden flex flex-col h-full">
+          <CardHeader className="bg-muted/5 border-b py-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Compliance Health</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col items-center justify-center pt-8">
+            <div className="h-[250px] w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={stats.permitDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {stats.permitDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip />
+                  <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{fontSize: '9px', fontWeight: 900, paddingTop: '10px'}} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
+                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-tighter">PTW APPROVAL RATE</span>
+                <span className="text-3xl font-black text-primary">{stats.approvalRate}%</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Row 2: Task Progress & Requirement Urgency */}
+        <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+          <CardHeader className="bg-muted/5 border-b py-4">
+            <div className="flex items-center gap-2">
+              <CheckSquare className="h-4 w-4 text-primary" />
+              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Task Progress Analysis</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-8 px-6">
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.taskProgress} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
+                  <RechartsTooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} />
+                  <Bar dataKey="value" radius={[0, 2, 2, 0]} barSize={25} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+          <CardHeader className="bg-muted/5 border-b py-4">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-primary" />
+              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Requirement Urgency</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-8 px-6">
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.requirementUrgency}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
+                  <YAxis hide />
+                  <RechartsTooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} />
+                  <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={50} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Administration Audit List - Spans whole row or side */}
         <Card className="rounded-sm border-primary/10 shadow-md flex flex-col h-full overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <History className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm font-bold uppercase tracking-widest">Recent Activities</CardTitle>
+                <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Recent Activities</CardTitle>
               </div>
               <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase">Latest 50 Actions</Badge>
             </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 overflow-hidden">
-            <ScrollArea className="h-[520px]">
+            <ScrollArea className="h-[200px]">
               <div className="divide-y divide-border/50">
                 {stats.recentActivities.length > 0 ? stats.recentActivities.map((activity) => (
                   <Link key={activity.id} href={activity.link} className="block group">
-                    <div className="p-4 hover:bg-primary/[0.03] transition-colors space-y-2 cursor-pointer">
+                    <div className="p-3 hover:bg-primary/[0.03] transition-colors space-y-1 cursor-pointer">
                       <div className="flex items-start justify-between gap-3">
-                        <div className={cn("p-2 rounded-sm bg-muted shrink-0 group-hover:bg-primary/10 transition-colors", activity.color)}>
-                          <activity.icon className="h-4 w-4" />
+                        <div className={cn("p-1.5 rounded-sm bg-muted shrink-0 group-hover:bg-primary/10 transition-colors", activity.color)}>
+                          <activity.icon className="h-3.5 w-3.5" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-foreground leading-snug group-hover:text-primary transition-colors">{activity.sentence}</p>
-                          <p className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-tight mt-0.5">{activity.module}</p>
+                          <p className="text-[11px] font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{activity.sentence}</p>
+                          <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-tight mt-0.5">{activity.module}</p>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-[9px] font-mono font-bold text-muted-foreground">{format(activity.timestamp, 'HH:mm')}</p>
+                          <p className="text-[8px] font-mono font-bold text-muted-foreground">{format(activity.timestamp, 'HH:mm')}</p>
                           <p className="text-[8px] font-medium text-muted-foreground/40">{format(activity.timestamp, 'dd MMM')}</p>
                         </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <UserIcon className="h-2.5 w-2.5 text-primary/40" />
-                          <span className="text-[10px] font-bold text-muted-foreground truncate">{activity.userName}</span>
-                        </div>
-                        <ArrowRight className="h-3 w-3 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0" />
                       </div>
                     </div>
                   </Link>
@@ -515,6 +631,11 @@ export default function ReportsDashboard() {
               </div>
             </ScrollArea>
           </CardContent>
+          <CardFooter className="bg-muted/5 border-t p-3">
+            <Button variant="ghost" size="sm" className="w-full h-7 text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary" asChild>
+              <Link href="/ptw/activities">View Full Audit Trail <ArrowRight className="ml-1.5 h-3 w-3" /></Link>
+            </Button>
+          </CardFooter>
         </Card>
       </div>
     </div>
