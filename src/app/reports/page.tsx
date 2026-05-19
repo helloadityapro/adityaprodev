@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, where, or, doc, orderBy } from 'firebase/firestore';
+import { collection, query, where, or, doc, orderBy, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -32,7 +32,13 @@ import {
   Check,
   ChevronsUpDown,
   MapPin,
-  CalendarRange
+  CalendarRange,
+  History,
+  Wallet,
+  Navigation,
+  User as UserIcon,
+  Clock,
+  ArrowRight
 } from 'lucide-react';
 import { format, subDays, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -53,6 +59,8 @@ import { cn } from '@/lib/utils';
 type DataItem = {
   id: string;
   siteName: string;
+  title?: string;
+  itemName?: string;
   createdAt?: any;
   requestDate?: any;
   movementDate?: string;
@@ -60,12 +68,18 @@ type DataItem = {
   dueDate?: string;
   status?: string;
   userId?: string;
+  userName?: string;
   siteEngineerId?: string;
+  siteEngineerName?: string;
   assignedToId?: string;
+  assignedToName?: string;
   assignedById?: string;
+  assignedByName?: string;
   siteManagerId?: string | null;
   priority?: string;
   urgency?: string;
+  startTime?: any;
+  amount?: number;
 };
 
 type UserProfile = {
@@ -79,6 +93,18 @@ type UserProfile = {
 type Site = {
   id: string;
   name: string;
+};
+
+type RecentActivity = {
+  id: string;
+  type: string;
+  title: string;
+  userName: string;
+  module: string;
+  timestamp: Date;
+  siteName: string;
+  icon: any;
+  color: string;
 };
 
 export default function ReportsDashboard() {
@@ -175,7 +201,21 @@ export default function ReportsDashboard() {
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: tasks, isLoading: tasksLoading } = useCollection<DataItem>(tasksQuery);
 
-  const isLoading = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading;
+  // 6. Site Visits (Only for Activity Log)
+  const visitsQuery = useMemoFirebase(() => {
+    if (!user || isProfileLoading || !isAdmin) return null;
+    return query(collection(firestore, 'site_visits'), limit(100));
+  }, [firestore, user, isProfileLoading, isAdmin]);
+  const { data: visits, isLoading: visitsLoading } = useCollection<DataItem>(visitsQuery);
+
+  // 7. Expenses (Only for Activity Log)
+  const expensesQuery = useMemoFirebase(() => {
+    if (!user || isProfileLoading || !isAdmin) return null;
+    return query(collection(firestore, 'expenses'), limit(100));
+  }, [firestore, user, isProfileLoading, isAdmin]);
+  const { data: expenses, isLoading: expensesLoading } = useCollection<DataItem>(expensesQuery);
+
+  const isLoading = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || visitsLoading || expensesLoading;
 
   // Analytical Calculations
   const stats = React.useMemo(() => {
@@ -282,11 +322,47 @@ export default function ReportsDashboard() {
       { name: 'Low', value: fRequirements.filter(r => r.urgency === 'Low').length, color: '#3b82f6' },
     ];
 
+    // Activity Aggregator (For Admins)
+    const aggregatedActivities: RecentActivity[] = [];
+    if (isAdmin) {
+      const addItemToActivity = (item: DataItem, type: string, module: string, icon: any, color: string, dateField: string, titleField: string, userField: string) => {
+        let d: Date | null = null;
+        const val = (item as any)[dateField];
+        if (val?.toDate) d = val.toDate();
+        else if (val) d = new Date(val);
+
+        if (d && (selectedSite === "All Sites" || item.siteName === selectedSite)) {
+          aggregatedActivities.push({
+            id: item.id,
+            type,
+            module,
+            icon,
+            color,
+            title: (item as any)[titleField] || type,
+            userName: (item as any)[userField] || 'Unknown User',
+            timestamp: d,
+            siteName: item.siteName
+          });
+        }
+      };
+
+      permits?.forEach(p => addItemToActivity(p, 'Permit', 'Compliance', ShieldCheck, 'text-blue-600', 'requestDate', 'serialNumber', 'siteEngineerName'));
+      tasks?.forEach(t => addItemToActivity(t, 'Task', 'Operations', CheckSquare, 'text-slate-600', 'createdAt', 'title', 'assignedToName'));
+      dprs?.forEach(d => addItemToActivity(d, 'DPR', 'Reporting', FileText, 'text-amber-600', 'createdAt', 'siteName', 'userName'));
+      movements?.forEach(m => addItemToActivity(m, 'Movement', 'Inventory', ArrowLeftRight, 'text-emerald-600', 'createdAt', 'itemName', 'userName'));
+      requirements?.forEach(r => addItemToActivity(r, 'Requirement', 'Procurement', ClipboardList, 'text-purple-600', 'createdAt', 'itemName', 'userName'));
+      expenses?.forEach(e => addItemToActivity(e, 'Expense', 'Finance', Wallet, 'text-indigo-600', 'createdAt', 'title', 'userName'));
+      visits?.forEach(v => addItemToActivity(v, 'Site Visit', 'Visits', Navigation, 'text-rose-600', 'startTime', 'siteName', 'managerName'));
+    }
+
+    const sortedActivities = aggregatedActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 50);
+
     return {
       dailyTrend: trendDays,
       permitDistribution: permitStatus,
       taskDistribution: taskStatus,
       requirementDistribution: requirementUrgency,
+      recentActivities: sortedActivities,
       counts: {
         permits: fPermits.length,
         dprs: fDprs.length,
@@ -295,7 +371,7 @@ export default function ReportsDashboard() {
         tasks: fTasks.length,
       }
     };
-  }, [isLoading, permits, dprs, movements, requirements, tasks, selectedSite, timeRange, customStartDate, customEndDate]);
+  }, [isLoading, permits, dprs, movements, requirements, tasks, visits, expenses, selectedSite, timeRange, customStartDate, customEndDate, isAdmin]);
 
   if (isLoading) {
     return (
@@ -377,7 +453,7 @@ export default function ReportsDashboard() {
                 <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                 <Input 
                   placeholder="Filter site..." 
-                  className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" 
+                  className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
                   value={siteSearchQuery}
                   onChange={(e) => setSiteSearchQuery(e.target.value)}
                 />
@@ -525,63 +601,116 @@ export default function ReportsDashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <Card className="rounded-sm border-primary/10 shadow-md">
-          <CardHeader className="bg-muted/5 border-b py-4">
-            <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-              <CheckSquare className="h-4 w-4 text-primary" /> Task Progress Analysis
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-8 h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart layout="vertical" data={stats.taskDistribution} margin={{ left: 40, right: 40 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                <XAxis type="number" hide />
-                <YAxis 
-                  dataKey="name" 
-                  type="category" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} 
-                />
-                <RechartsTooltip />
-                <Bar dataKey="value" name="Count" radius={[0, 2, 2, 0]}>
-                  {stats.taskDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <Card className="rounded-sm border-primary/10 shadow-md">
+            <CardHeader className="bg-muted/5 border-b py-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                <CheckSquare className="h-4 w-4 text-primary" /> Task Progress Analysis
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-8 h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart layout="vertical" data={stats.taskDistribution} margin={{ left: 40, right: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} 
+                  />
+                  <RechartsTooltip />
+                  <Bar dataKey="value" name="Count" radius={[0, 2, 2, 0]}>
+                    {stats.taskDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-        <Card className="rounded-sm border-primary/10 shadow-md">
-          <CardHeader className="bg-muted/5 border-b py-4">
-            <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-              <ClipboardList className="h-4 w-4 text-primary" /> Requirement Urgency
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-8 h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.requirementDistribution}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} 
-                />
-                <YAxis axisLine={false} tickLine={false} hide />
-                <RechartsTooltip />
-                <Bar dataKey="value" name="Volume" radius={[2, 2, 0, 0]}>
-                  {stats.requirementDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          <Card className="rounded-sm border-primary/10 shadow-md">
+            <CardHeader className="bg-muted/5 border-b py-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-primary" /> Requirement Urgency
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-8 h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={stats.requirementDistribution}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} 
+                  />
+                  <YAxis axisLine={false} tickLine={false} hide />
+                  <RechartsTooltip />
+                  <Bar dataKey="value" name="Volume" radius={[2, 2, 0, 0]}>
+                    {stats.requirementDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activities Card - Admin Only */}
+        {isAdmin && (
+          <Card className="rounded-sm border-primary/10 shadow-md flex flex-col h-full overflow-hidden">
+            <CardHeader className="bg-muted/5 border-b py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-sm font-bold uppercase tracking-widest">Recent Activities</CardTitle>
+                </div>
+                <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase">Live Log</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0 flex-1 overflow-hidden">
+              <ScrollArea className="h-[520px]">
+                <div className="divide-y divide-border/50">
+                  {stats.recentActivities.length > 0 ? stats.recentActivities.map((activity) => (
+                    <div key={activity.id} className="p-4 hover:bg-muted/30 transition-colors space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className={cn("p-1.5 rounded-sm bg-muted shrink-0", activity.color)}>
+                          <activity.icon className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-foreground leading-tight line-clamp-1">{activity.title}</p>
+                          <p className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-tight mt-0.5">{activity.module} • {activity.siteName}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[9px] font-mono font-bold text-muted-foreground">{format(activity.timestamp, 'HH:mm')}</p>
+                          <p className="text-[8px] font-medium text-muted-foreground/40">{format(activity.timestamp, 'dd MMM')}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <UserIcon className="h-2.5 w-2.5 text-primary/40" />
+                        <span className="text-[10px] font-bold text-muted-foreground truncate">{activity.userName}</span>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="p-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold opacity-30">
+                      No matching activity logs
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+            <CardFooter className="bg-muted/5 border-t p-3">
+              <Button variant="ghost" size="sm" className="w-full h-7 text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary" asChild>
+                <Link href="/ptw/activities">View Full Audit Trail <ArrowRight className="ml-1.5 h-3 w-3" /></Link>
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
       </div>
     </div>
   );
