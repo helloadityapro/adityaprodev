@@ -49,7 +49,8 @@ import {
   FileUp,
   Tags,
   BookOpen,
-  LayoutGrid
+  LayoutGrid,
+  Fuel
 } from 'lucide-react';
 import { format, subDays, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -147,7 +148,7 @@ export default function ReportsDashboard() {
   const [selectedSite, setSelectedSite] = React.useState<string>("All Sites");
   const [timeRange, setTimeRange] = React.useState<number>(7);
   const [customStartDate, setCustomStartDate] = React.useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
-  const [customEndDate, setCustomEndDate] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [customEndDate, setCustomEndDate] = React.useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
 
