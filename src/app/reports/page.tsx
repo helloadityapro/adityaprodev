@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -42,7 +43,13 @@ import {
   Gavel,
   ShoppingBag,
   IndianRupee,
-  CreditCard
+  CreditCard,
+  UserPlus,
+  CarFront,
+  FileUp,
+  Tags,
+  BookOpen,
+  LayoutGrid
 } from 'lucide-react';
 import { format, subDays, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -66,6 +73,8 @@ type DataItem = {
   siteName: string;
   title?: string;
   itemName?: string;
+  name?: string;
+  fileName?: string;
   createdAt?: any;
   requestDate?: any;
   movementDate?: string;
@@ -95,6 +104,8 @@ type DataItem = {
   movementType?: string;
   points?: number;
   amountInRs?: number;
+  username?: string;
+  pickupLocation?: string;
 };
 
 type UserProfile = {
@@ -246,7 +257,26 @@ export default function ReportsDashboard() {
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: redemptions, isLoading: redemptionsLoading } = useCollection<DataItem>(redemptionsQuery);
 
-  const isLoading = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || visitsLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading;
+  // New sources for full coverage
+  const usersQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), limit(50)) : null, [firestore, isAdmin]);
+  const { data: usersList, isLoading: usersListLoading } = useCollection<DataItem>(usersQuery);
+
+  const vehiclesReqsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'vehicle_assignments'), limit(50)) : null, [firestore, isAdmin]);
+  const { data: vehicleReqs, isLoading: vehicleReqsLoading } = useCollection<DataItem>(vehiclesReqsQuery);
+
+  const docsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_documents'), limit(50)) : null, [firestore, isAdmin]);
+  const { data: siteDocs, isLoading: docsLoading } = useCollection<DataItem>(docsQuery);
+
+  const groupsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_groups'), limit(50)) : null, [firestore, isAdmin]);
+  const { data: siteGroups, isLoading: groupsLoading } = useCollection<DataItem>(groupsQuery);
+
+  const lmsCoursesQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'lms_courses'), limit(50)) : null, [firestore, isAdmin]);
+  const { data: lmsCourses, isLoading: lmsCoursesLoading } = useCollection<DataItem>(lmsCoursesQuery);
+
+  const lmsModulesQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'lms_modules'), limit(50)) : null, [firestore, isAdmin]);
+  const { data: lmsModules, isLoading: lmsModulesLoading } = useCollection<DataItem>(lmsModulesQuery);
+
+  const isLoading = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || visitsLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading || usersListLoading || vehicleReqsLoading || docsLoading || groupsLoading || lmsCoursesLoading || lmsModulesLoading;
 
   const stats = React.useMemo(() => {
     if (isLoading) return null;
@@ -321,18 +351,6 @@ export default function ReportsDashboard() {
       { name: 'Rejected', value: fPermits.filter(p => p.status === 'Rejected').length, color: '#ef4444' },
     ];
 
-    const taskStatus = [
-      { name: 'Completed', value: fTasks.filter(t => t.status === 'Completed').length, color: '#22c55e' },
-      { name: 'Ongoing', value: fTasks.filter(t => t.status === 'In Progress' || t.status === 'To-do').length, color: '#3b82f6' },
-      { name: 'Cancelled', value: fTasks.filter(t => t.status === 'Cancelled').length, color: '#94a3b8' },
-    ];
-
-    const requirementUrgency = [
-      { name: 'High', value: fRequirements.filter(r => r.urgency === 'High').length, color: '#ef4444' },
-      { name: 'Medium', value: fRequirements.filter(r => r.urgency === 'Medium').length, color: '#eab308' },
-      { name: 'Low', value: fRequirements.filter(r => r.urgency === 'Low').length, color: '#3b82f6' },
-    ];
-
     const aggregatedActivities: RecentActivity[] = [];
     if (isAdmin) {
       const addItemToActivity = (item: DataItem, type: string, module: string, icon: any, color: string, dateField: string, userField: string, sentence: string, link: string) => {
@@ -368,13 +386,25 @@ export default function ReportsDashboard() {
       wos?.forEach(w => addItemToActivity(w, 'Work Order', 'Procurement', Gavel, 'text-slate-700', 'createdAt', 'createdByName', `${w.createdByName} issued a Work Order ${w.woNumber} for ${w.siteName}`, `/projects/${w.siteId}?tab=wo`));
       payments?.forEach(p => addItemToActivity(p, 'Payment', 'Finance', IndianRupee, 'text-emerald-700', 'date', 'recordedByName', `${p.recordedByName} recorded a payment of ₹${p.amount?.toLocaleString()} against ${p.referenceNumber} for ${p.siteName}`, `/payments/project-wise`));
       redemptions?.forEach(r => addItemToActivity(r, 'Redemption', 'Rewards', CreditCard, 'text-green-600', 'createdAt', 'userName', `${r.userName} requested a points redemption of ₹${r.amountInRs?.toLocaleString()}`, `/settings/rewards`));
+      
+      // New Activity Types
+      usersList?.forEach(u => addItemToActivity(u, 'User', 'Registry', UserPlus, 'text-purple-600', 'createdAt', 'username', `New user added to registry: ${u.username}`, `/settings/users`));
+      vehicleReqs?.forEach(v => {
+        if (v.status === 'Pending') {
+          addItemToActivity(v, 'Trip Request', 'Fleet', Fuel, 'text-orange-500', 'requestDate', 'userName', `${v.userName} requested a vehicle for trip to ${v.pickupLocation}`, `/vehicles/trips/manage`);
+        } else if (v.status === 'Approved') {
+          addItemToActivity(v, 'Trip Allotted', 'Fleet', CarFront, 'text-blue-500', 'approvalDate', 'userName', `Vehicle allotted to ${v.userName} for trip on ${v.tripDate}`, `/vehicles/trips/manage`);
+        }
+      });
+      siteDocs?.forEach(doc => addItemToActivity(doc, 'Document', 'Files', FileUp, 'text-sky-600', 'createdAt', 'uploadedByName', `${doc.uploadedByName} uploaded a document "${doc.fileName}" for ${doc.siteName}`, `/documents/${doc.siteId}`));
+      siteGroups?.forEach(g => addItemToActivity(g, 'Group', 'Registry', Tags, 'text-pink-600', 'createdAt', 'createdByName', `New site group created: "${g.name}"`, `/projects/groups`));
+      lmsCourses?.forEach(c => addItemToActivity(c, 'Course', 'LMS', BookOpen, 'text-indigo-700', 'createdAt', 'createdBy', `New training course published: "${c.title}"`, `/lms/admin`));
+      lmsModules?.forEach(m => addItemToActivity(m, 'Module', 'LMS', LayoutGrid, 'text-indigo-500', 'createdAt', 'createdBy', `New module "${m.title}" added to course curriculum`, `/lms/admin`));
     }
 
     return {
       dailyTrend: trendDays,
       permitDistribution: permitStatus,
-      taskDistribution: taskStatus,
-      requirementDistribution: requirementUrgency,
       recentActivities: aggregatedActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 50),
       counts: {
         permits: fPermits.length,
@@ -384,7 +414,7 @@ export default function ReportsDashboard() {
         tasks: fTasks.length,
       }
     };
-  }, [isLoading, permits, dprs, movements, requirements, tasks, visits, expenses, pos, wos, payments, redemptions, selectedSite, timeRange, customStartDate, customEndDate, isAdmin]);
+  }, [isLoading, permits, dprs, movements, requirements, tasks, visits, expenses, pos, wos, payments, redemptions, usersList, vehicleReqs, siteDocs, siteGroups, lmsCourses, lmsModules, selectedSite, timeRange, customStartDate, customEndDate, isAdmin]);
 
   if (isLoading) return <div className="space-y-8 p-4"><Skeleton className="h-10 w-48" /><Skeleton className="h-4 w-96" /><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full rounded-sm" />)}</div></div>;
 
@@ -440,16 +470,6 @@ export default function ReportsDashboard() {
           <CardContent className="pt-8"><div className="h-[300px] w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={stats.dailyTrend}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} /><YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} /><RechartsTooltip contentStyle={{ borderRadius: '4px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} cursor={{fill: 'rgba(0,0,0,0.02)'}} /><Legend iconType="circle" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase'}} /><Bar dataKey="permits" name="Permits" fill="#3b82f6" radius={[2, 2, 0, 0]} /><Bar dataKey="dprs" name="Reports" fill="#f59e0b" radius={[2, 2, 0, 0]} /><Bar dataKey="movements" name="Movements" fill="#10b981" radius={[2, 2, 0, 0]} /></BarChart></ResponsiveContainer></div></CardContent>
         </Card>
 
-        <Card className="rounded-sm border-primary/10 shadow-md flex flex-col">
-          <CardHeader className="bg-muted/5 border-b py-4"><div className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" /><CardTitle className="text-sm font-bold uppercase tracking-widest">Compliance Health</CardTitle></div></CardHeader>
-          <CardContent className="flex-1 pt-8 flex flex-col items-center justify-center">
-            <div className="h-[250px] w-full"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={stats.permitDistribution} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">{stats.permitDistribution.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie><RechartsTooltip /><Legend verticalAlign="bottom" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase'}} /></PieChart></ResponsiveContainer></div>
-            <div className="mt-4 text-center space-y-1"><p className="text-[10px] uppercase font-black text-muted-foreground tracking-tighter">PtW Approval Rate</p><p className="text-2xl font-black text-primary">{stats.counts.permits > 0 ? Math.round((stats.permitDistribution[0].value / stats.counts.permits) * 100) : 0}%</p></div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {isAdmin && (
         <Card className="rounded-sm border-primary/10 shadow-md flex flex-col h-full overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center justify-between">
@@ -494,13 +514,8 @@ export default function ReportsDashboard() {
               </div>
             </ScrollArea>
           </CardContent>
-          <CardFooter className="bg-muted/5 border-t p-3">
-            <Button variant="ghost" size="sm" className="w-full h-7 text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary" asChild>
-              <Link href="/ptw/activities">Access Extended Audit Trail <ArrowRight className="ml-1.5 h-3 w-3" /></Link>
-            </Button>
-          </CardFooter>
         </Card>
-      )}
+      </div>
     </div>
   );
 }
