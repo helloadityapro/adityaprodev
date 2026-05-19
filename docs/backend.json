@@ -286,6 +286,45 @@
       },
       "required": ["name"]
     },
+    "Expense": {
+      "title": "Expense Submission",
+      "type": "object",
+      "description": "Reimbursement claims and official expenditure logs.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "title": { "type": "string" },
+        "siteName": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected", "Paid"] },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "category": { "type": "string" },
+              "description": { "type": "string" },
+              "amount": { "type": "number" },
+              "date": { "type": "string" },
+              "receiptUrl": { "type": "string" }
+            }
+          }
+        },
+        "adminRemarks": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "totalAmount"]
+    },
+    "ExpenseCategory": {
+      "title": "Expense Category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["name"]
+    },
     "TableConfiguration": {
       "title": "Table Configuration",
       "type": "object",
@@ -413,6 +452,14 @@
     "/inventory_categories/{categoryId}": {
       "schema": { "$ref": "#/backend/entities/InventoryCategory" },
       "description": "Categories for inventory items."
+    },
+    "/expenses/{expenseId}": {
+      "schema": { "$ref": "#/backend/entities/Expense" },
+      "description": "Reimbursement claims and official expenditure logs."
+    },
+    "/expense_categories/{catId}": {
+      "schema": { "$ref": "#/backend/entities/ExpenseCategory" },
+      "description": "Dropdown values for expense classification."
     },
     "/table_configurations/{tableId}": {
       "schema": { "$ref": "#/backend/entities/TableConfiguration" },

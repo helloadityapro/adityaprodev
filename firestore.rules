@@ -81,6 +81,23 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    match /expenses/{expenseId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == resource.data.userId || 
+        isAdmin() || 
+        getUserData().get('department', '') == 'Account' ||
+        getUserData().get('role', '') == 'Manager - Human Resources'
+      );
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (isAdmin() || getUserData().get('department', '') == 'Account');
+      allow delete: if isAdmin();
+    }
+
+    match /expense_categories/{catId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /table_configurations/{tableId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
