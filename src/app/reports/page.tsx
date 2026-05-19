@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, query, where, or, doc, orderBy, limit } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   BarChart, 
@@ -11,7 +11,7 @@ import {
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  Tooltip as RechartsTooltip, 
+  RechartsTooltip, 
   ResponsiveContainer, 
   Cell, 
   PieChart, 
@@ -55,6 +55,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 type DataItem = {
   id: string;
