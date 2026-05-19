@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, where, or, doc, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, or, doc, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -11,7 +11,7 @@ import {
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  RechartsTooltip, 
+  Tooltip as RechartsTooltip, 
   ResponsiveContainer, 
   Cell, 
   PieChart, 
@@ -38,7 +38,11 @@ import {
   Navigation,
   User as UserIcon,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Gavel,
+  ShoppingBag,
+  IndianRupee,
+  CreditCard
 } from 'lucide-react';
 import { format, subDays, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -81,6 +85,16 @@ type DataItem = {
   urgency?: string;
   startTime?: any;
   amount?: number;
+  poNumber?: string;
+  woNumber?: string;
+  supplierName?: string;
+  contractorName?: string;
+  referenceNumber?: string;
+  paymentAgainst?: string;
+  ptwType?: string;
+  movementType?: string;
+  points?: number;
+  amountInRs?: number;
 };
 
 type UserProfile = {
@@ -99,11 +113,12 @@ type Site = {
 type RecentActivity = {
   id: string;
   type: string;
-  title: string;
+  sentence: string;
   userName: string;
   module: string;
   timestamp: Date;
   siteName: string;
+  link: string;
   icon: any;
   color: string;
 };
@@ -119,17 +134,15 @@ export default function ReportsDashboard() {
   const isManager = userProfile?.role === 'Site Manager';
 
   const [selectedSite, setSelectedSite] = React.useState<string>("All Sites");
-  const [timeRange, setTimeRange] = React.useState<number>(7); // -1 for Custom Range, 0 for Today
+  const [timeRange, setTimeRange] = React.useState<number>(7);
   const [customStartDate, setCustomStartDate] = React.useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
   const [customEndDate, setCustomEndDate] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
 
-  // Sites query for filtering
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSitesList } = useCollection<Site>(sitesQuery);
 
-  // Fetch team members for managers to aggregate sites
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
     return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
@@ -140,7 +153,6 @@ export default function ReportsDashboard() {
     if (!allSitesList || !userProfile) return [];
     if (isAdmin) return Array.from(new Map(allSitesList.map(s => [s.name, s])).values());
     
-    // Aggregated site visibility for Managers
     const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
     if (isManager && teamMembers) {
       teamMembers.forEach(member => {
@@ -153,7 +165,7 @@ export default function ReportsDashboard() {
 
   const filteredSiteList = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
-  // 1. Permits
+  // Data Collections
   const permitsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'permits_to_work');
@@ -163,7 +175,6 @@ export default function ReportsDashboard() {
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: permits, isLoading: permitsLoading } = useCollection<DataItem>(permitsQuery);
 
-  // 2. DPRs
   const dprsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'dprs');
@@ -173,7 +184,6 @@ export default function ReportsDashboard() {
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: dprs, isLoading: dprsLoading } = useCollection<DataItem>(dprsQuery);
 
-  // 3. Movements
   const movementsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'material_movements');
@@ -183,7 +193,6 @@ export default function ReportsDashboard() {
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: movements, isLoading: movementsLoading } = useCollection<DataItem>(movementsQuery);
 
-  // 4. Requirements
   const requirementsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'requirements');
@@ -193,7 +202,6 @@ export default function ReportsDashboard() {
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: requirements, isLoading: requirementsLoading } = useCollection<DataItem>(requirementsQuery);
 
-  // 5. Tasks
   const tasksQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'tasks');
@@ -202,23 +210,44 @@ export default function ReportsDashboard() {
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: tasks, isLoading: tasksLoading } = useCollection<DataItem>(tasksQuery);
 
-  // 6. Site Visits (Only for Activity Log)
   const visitsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading || !isAdmin) return null;
     return query(collection(firestore, 'site_visits'), limit(100));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: visits, isLoading: visitsLoading } = useCollection<DataItem>(visitsQuery);
 
-  // 7. Expenses (Only for Activity Log)
   const expensesQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading || !isAdmin) return null;
     return query(collection(firestore, 'expenses'), limit(100));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: expenses, isLoading: expensesLoading } = useCollection<DataItem>(expensesQuery);
 
-  const isLoading = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || visitsLoading || expensesLoading;
+  const posQuery = useMemoFirebase(() => {
+    if (!user || isProfileLoading || !isAdmin) return null;
+    return query(collection(firestore, 'project_pos'), limit(100));
+  }, [firestore, user, isProfileLoading, isAdmin]);
+  const { data: pos, isLoading: posLoading } = useCollection<DataItem>(posQuery);
 
-  // Analytical Calculations
+  const wosQuery = useMemoFirebase(() => {
+    if (!user || isProfileLoading || !isAdmin) return null;
+    return query(collection(firestore, 'project_wos'), limit(100));
+  }, [firestore, user, isProfileLoading, isAdmin]);
+  const { data: wos, isLoading: wosLoading } = useCollection<DataItem>(wosQuery);
+
+  const paymentsQuery = useMemoFirebase(() => {
+    if (!user || isProfileLoading || !isAdmin) return null;
+    return query(collection(firestore, 'payments'), limit(100));
+  }, [firestore, user, isProfileLoading, isAdmin]);
+  const { data: payments, isLoading: paymentsLoading } = useCollection<DataItem>(paymentsQuery);
+
+  const redemptionsQuery = useMemoFirebase(() => {
+    if (!user || isProfileLoading || !isAdmin) return null;
+    return query(collection(firestore, 'redemption_requests'), limit(100));
+  }, [firestore, user, isProfileLoading, isAdmin]);
+  const { data: redemptions, isLoading: redemptionsLoading } = useCollection<DataItem>(redemptionsQuery);
+
+  const isLoading = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || visitsLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading;
+
   const stats = React.useMemo(() => {
     if (isLoading) return null;
 
@@ -234,31 +263,26 @@ export default function ReportsDashboard() {
       if (!customStartDate || !customEndDate) return null;
       startDateRange = startOfDay(new Date(customStartDate));
       endDateRange = endOfDay(new Date(customEndDate));
-      
       effectiveDays = Math.max(1, Math.ceil((endDateRange.getTime() - startDateRange.getTime()) / (1000 * 60 * 60 * 24)));
-      if (effectiveDays > 365) effectiveDays = 365; // Cap for visualization
+      if (effectiveDays > 365) effectiveDays = 365;
     }
 
     const applyFilters = (list: DataItem[] | null, dateField: string) => {
       if (!list) return [];
       return list.filter(item => {
-        // Site filter
         const siteMatch = selectedSite === "All Sites" || item.siteName === selectedSite;
         if (!siteMatch) return false;
-
-        // Date filter
         let d: Date | null = null;
         const val = (item as any)[dateField];
         if (val?.toDate) d = val.toDate();
         else if (val) d = new Date(val);
-        
         return d && d >= startDateRange && d <= endDateRange;
       });
     };
 
     const fPermits = applyFilters(permits, 'requestDate');
-    const fDprs = applyFilters(dprs, 'reportDate');
-    const fMovements = applyFilters(movements, 'movementDate');
+    const fDprs = applyFilters(dprs, 'createdAt');
+    const fMovements = applyFilters(movements, 'createdAt');
     const fRequirements = applyFilters(requirements, 'createdAt');
     const fTasks = applyFilters(tasks, 'createdAt');
 
@@ -279,31 +303,17 @@ export default function ReportsDashboard() {
       const val = (item as any)[dateField];
       if (val?.toDate) d = val.toDate();
       else if (val) d = new Date(val);
-      
       if (d) {
         const dateStr = format(d!, 'yyyy-MM-dd');
-        const index = trendDays.findIndex(day => format(day.date, 'yyyy-MM-dd') === dateStr);
-        return index;
+        return trendDays.findIndex(day => format(day.date, 'yyyy-MM-dd') === dateStr);
       }
       return -1;
     };
 
-    fPermits.forEach(p => {
-      const idx = processItemDate(p, 'requestDate');
-      if (idx !== -1) trendDays[idx].permits++;
-    });
-    fDprs.forEach(d => {
-      const idx = processItemDate(d, 'reportDate');
-      if (idx !== -1) trendDays[idx].dprs++;
-    });
-    fMovements.forEach(m => {
-      const idx = processItemDate(m, 'movementDate');
-      if (idx !== -1) trendDays[idx].movements++;
-    });
-    fRequirements.forEach(r => {
-      const idx = processItemDate(r, 'createdAt');
-      if (idx !== -1) trendDays[idx].requirements++;
-    });
+    fPermits.forEach(p => { const idx = processItemDate(p, 'requestDate'); if (idx !== -1) trendDays[idx].permits++; });
+    fDprs.forEach(d => { const idx = processItemDate(d, 'createdAt'); if (idx !== -1) trendDays[idx].dprs++; });
+    fMovements.forEach(m => { const idx = processItemDate(m, 'createdAt'); if (idx !== -1) trendDays[idx].movements++; });
+    fRequirements.forEach(r => { const idx = processItemDate(r, 'createdAt'); if (idx !== -1) trendDays[idx].requirements++; });
 
     const permitStatus = [
       { name: 'Approved', value: fPermits.filter(p => p.status === 'Approved').length, color: '#22c55e' },
@@ -323,47 +333,49 @@ export default function ReportsDashboard() {
       { name: 'Low', value: fRequirements.filter(r => r.urgency === 'Low').length, color: '#3b82f6' },
     ];
 
-    // Activity Aggregator (For Admins)
     const aggregatedActivities: RecentActivity[] = [];
     if (isAdmin) {
-      const addItemToActivity = (item: DataItem, type: string, module: string, icon: any, color: string, dateField: string, titleField: string, userField: string) => {
+      const addItemToActivity = (item: DataItem, type: string, module: string, icon: any, color: string, dateField: string, userField: string, sentence: string, link: string) => {
         let d: Date | null = null;
         const val = (item as any)[dateField];
         if (val?.toDate) d = val.toDate();
         else if (val) d = new Date(val);
 
-        if (d && (selectedSite === "All Sites" || item.siteName === selectedSite)) {
+        if (d && (selectedSite === "All Sites" || !item.siteName || item.siteName === selectedSite)) {
           aggregatedActivities.push({
             id: item.id,
             type,
             module,
             icon,
             color,
-            title: (item as any)[titleField] || type,
+            sentence,
             userName: (item as any)[userField] || 'Unknown User',
             timestamp: d,
-            siteName: item.siteName
+            siteName: item.siteName || 'System',
+            link
           });
         }
       };
 
-      permits?.forEach(p => addItemToActivity(p, 'Permit', 'Compliance', ShieldCheck, 'text-blue-600', 'requestDate', 'serialNumber', 'siteEngineerName'));
-      tasks?.forEach(t => addItemToActivity(t, 'Task', 'Operations', CheckSquare, 'text-slate-600', 'createdAt', 'title', 'assignedToName'));
-      dprs?.forEach(d => addItemToActivity(d, 'DPR', 'Reporting', FileText, 'text-amber-600', 'createdAt', 'siteName', 'userName'));
-      movements?.forEach(m => addItemToActivity(m, 'Movement', 'Inventory', ArrowLeftRight, 'text-emerald-600', 'createdAt', 'itemName', 'userName'));
-      requirements?.forEach(r => addItemToActivity(r, 'Requirement', 'Procurement', ClipboardList, 'text-purple-600', 'createdAt', 'itemName', 'userName'));
-      expenses?.forEach(e => addItemToActivity(e, 'Expense', 'Finance', Wallet, 'text-indigo-600', 'createdAt', 'title', 'userName'));
-      visits?.forEach(v => addItemToActivity(v, 'Site Visit', 'Visits', Navigation, 'text-rose-600', 'startTime', 'siteName', 'managerName'));
+      permits?.forEach(p => addItemToActivity(p, 'Permit', 'Compliance', ShieldCheck, 'text-blue-600', 'requestDate', 'siteEngineerName', `${p.siteEngineerName} requested a ${p.ptwType} permit for ${p.siteName}`, `/ptw/list?view=${p.id}`));
+      tasks?.forEach(t => addItemToActivity(t, 'Task', 'Operations', CheckSquare, 'text-slate-600', 'createdAt', 'assignedByName', `${t.assignedByName} assigned a task "${t.title}" to ${t.assignedToName} for ${t.siteName}`, `/tasks/list`));
+      dprs?.forEach(d => addItemToActivity(d, 'DPR', 'Reporting', FileText, 'text-amber-600', 'createdAt', 'userName', `${d.userName} submitted a DPR for ${d.siteName}`, `/dpr/list`));
+      movements?.forEach(m => addItemToActivity(m, 'Movement', 'Inventory', ArrowLeftRight, 'text-emerald-600', 'createdAt', 'userName', `${m.userName} recorded a material ${m.movementType} for ${m.itemName} at ${m.siteName}`, `/movements/list`));
+      requirements?.forEach(r => addItemToActivity(r, 'Requirement', 'Procurement', ClipboardList, 'text-purple-600', 'createdAt', 'userName', `${r.userName} raised a requirement for ${r.itemName} at ${r.siteName}`, `/requirements/list`));
+      expenses?.forEach(e => addItemToActivity(e, 'Expense', 'Finance', Wallet, 'text-indigo-600', 'createdAt', 'userName', `${e.userName} submitted an expense claim: "${e.title}"`, `/expenses/list?view=${e.id}`));
+      visits?.forEach(v => addItemToActivity(v, 'Site Visit', 'Visits', Navigation, 'text-rose-600', 'startTime', 'managerName', `${v.managerName} started a site visit at ${v.siteName}`, `/site-visits/${v.id}`));
+      pos?.forEach(p => addItemToActivity(p, 'Purchase Order', 'Procurement', ShoppingBag, 'text-blue-700', 'createdAt', 'createdByName', `${p.createdByName} generated a Purchase Order ${p.poNumber} for ${p.siteName}`, `/projects/${p.siteId}?tab=po`));
+      wos?.forEach(w => addItemToActivity(w, 'Work Order', 'Procurement', Gavel, 'text-slate-700', 'createdAt', 'createdByName', `${w.createdByName} issued a Work Order ${w.woNumber} for ${w.siteName}`, `/projects/${w.siteId}?tab=wo`));
+      payments?.forEach(p => addItemToActivity(p, 'Payment', 'Finance', IndianRupee, 'text-emerald-700', 'date', 'recordedByName', `${p.recordedByName} recorded a payment of ₹${p.amount?.toLocaleString()} against ${p.referenceNumber} for ${p.siteName}`, `/payments/project-wise`));
+      redemptions?.forEach(r => addItemToActivity(r, 'Redemption', 'Rewards', CreditCard, 'text-green-600', 'createdAt', 'userName', `${r.userName} requested a points redemption of ₹${r.amountInRs?.toLocaleString()}`, `/settings/rewards`));
     }
-
-    const sortedActivities = aggregatedActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 50);
 
     return {
       dailyTrend: trendDays,
       permitDistribution: permitStatus,
       taskDistribution: taskStatus,
       requirementDistribution: requirementUrgency,
-      recentActivities: sortedActivities,
+      recentActivities: aggregatedActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 50),
       counts: {
         permits: fPermits.length,
         dprs: fDprs.length,
@@ -372,25 +384,9 @@ export default function ReportsDashboard() {
         tasks: fTasks.length,
       }
     };
-  }, [isLoading, permits, dprs, movements, requirements, tasks, visits, expenses, selectedSite, timeRange, customStartDate, customEndDate, isAdmin]);
+  }, [isLoading, permits, dprs, movements, requirements, tasks, visits, expenses, pos, wos, payments, redemptions, selectedSite, timeRange, customStartDate, customEndDate, isAdmin]);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-8 p-4">
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full rounded-sm" />)}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Skeleton className="h-[400px] lg:col-span-2 rounded-sm" />
-          <Skeleton className="h-[400px] rounded-sm" />
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <div className="space-y-8 p-4"><Skeleton className="h-10 w-48" /><Skeleton className="h-4 w-96" /><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full rounded-sm" />)}</div></div>;
 
   if (!stats) return null;
 
@@ -402,348 +398,119 @@ export default function ReportsDashboard() {
             <BarChart3 className="h-6 w-6 text-primary" />
             <h1>Operational Reports</h1>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">
-            Operational summaries and performance data analytics.
-          </p>
+          <p className="text-muted-foreground text-sm font-medium">Operational summaries and performance data analytics.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2">
-            <Select value={timeRange.toString()} onValueChange={(val) => setTimeRange(parseInt(val))}>
-              <SelectTrigger className="w-[140px] h-8 rounded-sm font-black uppercase text-[10px] tracking-widest bg-secondary border-none">
-                <Calendar className="mr-1.5 h-3 w-3" />
-                <SelectValue placeholder="Time Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0" className="text-[10px] font-black uppercase">Today</SelectItem>
-                <SelectItem value="7" className="text-[10px] font-black uppercase">Last 7 Days</SelectItem>
-                <SelectItem value="30" className="text-[10px] font-black uppercase">Last 30 Days</SelectItem>
-                <SelectItem value="90" className="text-[10px] font-black uppercase">Last 90 Days</SelectItem>
-                <SelectItem value="-1" className="text-[10px] font-black uppercase">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {timeRange === -1 && (
-              <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-                <Input 
-                  type="date" 
-                  className="h-8 w-32 rounded-sm text-[10px] font-bold border-primary/20 bg-background" 
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                />
-                <span className="text-[10px] font-black uppercase text-muted-foreground">to</span>
-                <Input 
-                  type="date" 
-                  className="h-8 w-32 rounded-sm text-[10px] font-bold border-primary/20 bg-background" 
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                />
-              </div>
-            )}
-          </div>
-          
+          <Select value={timeRange.toString()} onValueChange={(val) => setTimeRange(parseInt(val))}>
+            <SelectTrigger className="w-[140px] h-8 rounded-sm font-black uppercase text-[10px] tracking-widest bg-secondary border-none">
+              <Calendar className="mr-1.5 h-3 w-3" /><SelectValue placeholder="Time Range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0" className="text-[10px] font-black uppercase">Today</SelectItem>
+              <SelectItem value="7" className="text-[10px] font-black uppercase">Last 7 Days</SelectItem>
+              <SelectItem value="30" className="text-[10px] font-black uppercase">Last 30 Days</SelectItem>
+              <SelectItem value="-1" className="text-[10px] font-black uppercase">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
           <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="rounded-sm font-bold border-primary/20 text-primary h-8 px-3">
-                <Filter className="mr-1.5 h-3 w-3" />
-                {selectedSite}
-                <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50" />
+                <Filter className="mr-1.5 h-3 w-3" />{selectedSite}<ChevronsUpDown className="ml-2 h-3 w-3 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[250px] p-0" align="end">
-              <div className="flex items-center border-b px-3">
-                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                <Input 
-                  placeholder="Filter site..." 
-                  className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
-                  value={siteSearchQuery}
-                  onChange={(e) => setSiteSearchQuery(e.target.value)}
-                />
-              </div>
-              <ScrollArea className="h-[200px]">
-                <div className="p-1">
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start font-bold text-xs rounded-sm h-8"
-                    onClick={() => { setSelectedSite("All Sites"); setIsSitePopoverOpen(false); }}
-                  >
-                    <Check className={cn("mr-2 h-3 w-3", selectedSite === "All Sites" ? "opacity-100" : "opacity-0")} />
-                    All Sites
-                  </Button>
-                  {filteredSiteList.map(site => (
-                    <Button
-                      key={site.id}
-                      variant="ghost"
-                      className="w-full justify-start font-medium text-xs rounded-sm h-8"
-                      onClick={() => { setSelectedSite(site.name); setIsSitePopoverOpen(false); }}
-                    >
-                      <Check className={cn("mr-2 h-3 w-3", selectedSite === site.name ? "opacity-100" : "opacity-0")} />
-                      <span className="truncate">{site.name}</span>
-                    </Button>
-                  ))}
-                </div>
-              </ScrollArea>
+              <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter site..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={siteSearchQuery} onChange={(e) => setSiteSearchQuery(e.target.value)} /></div>
+              <ScrollArea className="h-[200px]"><div className="p-1"><Button variant="ghost" className="w-full justify-start font-bold text-xs h-8" onClick={() => { setSelectedSite("All Sites"); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-3 w-3", selectedSite === "All Sites" ? "opacity-100" : "opacity-0")} />All Sites</Button>{filteredSiteList.map(site => (<Button key={site.id} variant="ghost" className="w-full justify-start font-medium text-xs h-8" onClick={() => { setSelectedSite(site.name); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-3 w-3", selectedSite === site.name ? "opacity-100" : "opacity-0")} /><span className="truncate">{site.name}</span></Button>))}</div></ScrollArea>
             </PopoverContent>
           </Popover>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <SummaryCard 
-          title="Permits" 
-          value={stats.counts.permits} 
-          icon={ShieldCheck} 
-          description="Compliance logs"
-          color="blue"
-        />
-        <SummaryCard 
-          title="Reports" 
-          value={stats.counts.dprs} 
-          icon={FileText} 
-          description="Activity updates"
-          color="amber"
-        />
-        <SummaryCard 
-          title="Material Logs" 
-          value={stats.counts.movements} 
-          icon={ArrowLeftRight} 
-          description="Stock movements"
-          color="emerald"
-        />
-        <SummaryCard 
-          title="Requirements" 
-          value={stats.counts.requirements} 
-          icon={ClipboardList} 
-          description="Site requests"
-          color="purple"
-        />
-        <SummaryCard 
-          title="Tasks" 
-          value={stats.counts.tasks} 
-          icon={CheckSquare} 
-          description="Work items"
-          color="slate"
-        />
+        <SummaryCard title="Permits" value={stats.counts.permits} icon={ShieldCheck} description="Compliance logs" color="blue" />
+        <SummaryCard title="Reports" value={stats.counts.dprs} icon={FileText} description="Activity updates" color="amber" />
+        <SummaryCard title="Material Logs" value={stats.counts.movements} icon={ArrowLeftRight} description="Stock movements" color="emerald" />
+        <SummaryCard title="Requirements" value={stats.counts.requirements} icon={ClipboardList} description="Site requests" color="purple" />
+        <SummaryCard title="Tasks" value={stats.counts.tasks} icon={CheckSquare} description="Work items" color="slate" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
-          <CardHeader className="bg-muted/5 border-b py-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-bold uppercase tracking-widest">Document Activity Trend</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-8">
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.dailyTrend}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis 
-                    dataKey="label" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} 
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} 
-                  />
-                  <RechartsTooltip 
-                    contentStyle={{ borderRadius: '4px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    cursor={{fill: 'rgba(0,0,0,0.02)'}}
-                  />
-                  <Legend iconType="circle" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase'}} />
-                  <Bar dataKey="permits" name="Permits" fill="#3b82f6" radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="dprs" name="Reports" fill="#f59e0b" radius={[2, 2, 0, 0]} />
-                  <Bar dataKey="movements" name="Movements" fill="#10b981" radius={[2, 2, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
+          <CardHeader className="bg-muted/5 border-b py-4"><div className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" /><CardTitle className="text-sm font-bold uppercase tracking-widest">Activity Trend</CardTitle></div></CardHeader>
+          <CardContent className="pt-8"><div className="h-[300px] w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={stats.dailyTrend}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} /><YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} /><RechartsTooltip contentStyle={{ borderRadius: '4px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} cursor={{fill: 'rgba(0,0,0,0.02)'}} /><Legend iconType="circle" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase'}} /><Bar dataKey="permits" name="Permits" fill="#3b82f6" radius={[2, 2, 0, 0]} /><Bar dataKey="dprs" name="Reports" fill="#f59e0b" radius={[2, 2, 0, 0]} /><Bar dataKey="movements" name="Movements" fill="#10b981" radius={[2, 2, 0, 0]} /></BarChart></ResponsiveContainer></div></CardContent>
         </Card>
 
         <Card className="rounded-sm border-primary/10 shadow-md flex flex-col">
-          <CardHeader className="bg-muted/5 border-b py-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-primary" />
-              <CardTitle className="text-sm font-bold uppercase tracking-widest">Compliance Health</CardTitle>
-            </div>
-          </CardHeader>
+          <CardHeader className="bg-muted/5 border-b py-4"><div className="flex items-center gap-2"><BarChart3 className="h-4 w-4 text-primary" /><CardTitle className="text-sm font-bold uppercase tracking-widest">Compliance Health</CardTitle></div></CardHeader>
           <CardContent className="flex-1 pt-8 flex flex-col items-center justify-center">
-            <div className="h-[250px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={stats.permitDistribution}
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {stats.permitDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip />
-                  <Legend verticalAlign="bottom" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase'}} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="mt-4 text-center space-y-1">
-              <p className="text-[10px] uppercase font-black text-muted-foreground tracking-tighter">PtW Approval Rate</p>
-              <p className="text-2xl font-black text-primary">
-                {stats.counts.permits > 0 
-                  ? Math.round((stats.permitDistribution[0].value / stats.counts.permits) * 100) 
-                  : 0}%
-              </p>
-            </div>
+            <div className="h-[250px] w-full"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={stats.permitDistribution} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">{stats.permitDistribution.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie><RechartsTooltip /><Legend verticalAlign="bottom" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase'}} /></PieChart></ResponsiveContainer></div>
+            <div className="mt-4 text-center space-y-1"><p className="text-[10px] uppercase font-black text-muted-foreground tracking-tighter">PtW Approval Rate</p><p className="text-2xl font-black text-primary">{stats.counts.permits > 0 ? Math.round((stats.permitDistribution[0].value / stats.counts.permits) * 100) : 0}%</p></div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <Card className="rounded-sm border-primary/10 shadow-md">
-            <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                <CheckSquare className="h-4 w-4 text-primary" /> Task Progress Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-8 h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart layout="vertical" data={stats.taskDistribution} margin={{ left: 40, right: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                  <XAxis type="number" hide />
-                  <YAxis 
-                    dataKey="name" 
-                    type="category" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} 
-                  />
-                  <RechartsTooltip />
-                  <Bar dataKey="value" name="Count" radius={[0, 2, 2, 0]}>
-                    {stats.taskDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-sm border-primary/10 shadow-md">
-            <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-primary" /> Requirement Urgency
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-8 h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.requirementDistribution}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} 
-                  />
-                  <YAxis axisLine={false} tickLine={false} hide />
-                  <RechartsTooltip />
-                  <Bar dataKey="value" name="Volume" radius={[2, 2, 0, 0]}>
-                    {stats.requirementDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent Activities Card - Admin Only */}
-        {isAdmin && (
-          <Card className="rounded-sm border-primary/10 shadow-md flex flex-col h-full overflow-hidden">
-            <CardHeader className="bg-muted/5 border-b py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <History className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm font-bold uppercase tracking-widest">Recent Activities</CardTitle>
-                </div>
-                <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase">Live Log</Badge>
+      {isAdmin && (
+        <Card className="rounded-sm border-primary/10 shadow-md flex flex-col h-full overflow-hidden">
+          <CardHeader className="bg-muted/5 border-b py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <History className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm font-bold uppercase tracking-widest">Recent Activities</CardTitle>
               </div>
-            </CardHeader>
-            <CardContent className="p-0 flex-1 overflow-hidden">
-              <ScrollArea className="h-[520px]">
-                <div className="divide-y divide-border/50">
-                  {stats.recentActivities.length > 0 ? stats.recentActivities.map((activity) => (
-                    <div key={activity.id} className="p-4 hover:bg-muted/30 transition-colors space-y-2">
+              <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase">Latest 50 Actions</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0 flex-1 overflow-hidden">
+            <ScrollArea className="h-[520px]">
+              <div className="divide-y divide-border/50">
+                {stats.recentActivities.length > 0 ? stats.recentActivities.map((activity) => (
+                  <Link key={activity.id} href={activity.link} className="block group">
+                    <div className="p-4 hover:bg-primary/[0.03] transition-colors space-y-2 cursor-pointer">
                       <div className="flex items-start justify-between gap-3">
-                        <div className={cn("p-1.5 rounded-sm bg-muted shrink-0", activity.color)}>
-                          <activity.icon className="h-3.5 w-3.5" />
+                        <div className={cn("p-2 rounded-sm bg-muted shrink-0 group-hover:bg-primary/10 transition-colors", activity.color)}>
+                          <activity.icon className="h-4 w-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-foreground leading-tight line-clamp-1">{activity.title}</p>
-                          <p className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-tight mt-0.5">{activity.module} • {activity.siteName}</p>
+                          <p className="text-xs font-semibold text-foreground leading-snug group-hover:text-primary transition-colors">{activity.sentence}</p>
+                          <p className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-tight mt-0.5">{activity.module}</p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-[9px] font-mono font-bold text-muted-foreground">{format(activity.timestamp, 'HH:mm')}</p>
                           <p className="text-[8px] font-medium text-muted-foreground/40">{format(activity.timestamp, 'dd MMM')}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <UserIcon className="h-2.5 w-2.5 text-primary/40" />
-                        <span className="text-[10px] font-bold text-muted-foreground truncate">{activity.userName}</span>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <UserIcon className="h-2.5 w-2.5 text-primary/40" />
+                          <span className="text-[10px] font-bold text-muted-foreground truncate">{activity.userName}</span>
+                        </div>
+                        <ArrowRight className="h-3 w-3 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0" />
                       </div>
                     </div>
-                  )) : (
-                    <div className="p-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold opacity-30">
-                      No matching activity logs
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </CardContent>
-            <CardFooter className="bg-muted/5 border-t p-3">
-              <Button variant="ghost" size="sm" className="w-full h-7 text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary" asChild>
-                <Link href="/ptw/activities">View Full Audit Trail <ArrowRight className="ml-1.5 h-3 w-3" /></Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        )}
-      </div>
+                  </Link>
+                )) : (
+                  <div className="p-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold opacity-30">No activity logs found for this period.</div>
+                )}
+              </div>
+            </ScrollArea>
+          </CardContent>
+          <CardFooter className="bg-muted/5 border-t p-3">
+            <Button variant="ghost" size="sm" className="w-full h-7 text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary" asChild>
+              <Link href="/ptw/activities">Access Extended Audit Trail <ArrowRight className="ml-1.5 h-3 w-3" /></Link>
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
     </div>
   );
 }
 
-function SummaryCard({ title, value, icon: Icon, description, color }: { 
-  title: string, 
-  value: number, 
-  icon: any, 
-  description: string,
-  color: 'blue' | 'amber' | 'emerald' | 'purple' | 'slate'
-}) {
-  const colors = {
-    blue: 'bg-blue-500/10 text-blue-600 border-blue-200',
-    amber: 'bg-amber-500/10 text-amber-600 border-amber-200',
-    emerald: 'bg-emerald-500/10 text-emerald-600 border-emerald-200',
-    purple: 'bg-purple-500/10 text-purple-600 border-purple-200',
-    slate: 'bg-slate-500/10 text-slate-600 border-slate-200',
-  };
-
+function SummaryCard({ title, value, icon: Icon, description, color }: { title: string, value: number, icon: any, description: string, color: 'blue' | 'amber' | 'emerald' | 'purple' | 'slate' }) {
+  const colors = { blue: 'bg-blue-500/10 text-blue-600 border-blue-200', amber: 'bg-amber-500/10 text-amber-600 border-amber-200', emerald: 'bg-emerald-500/10 text-emerald-600 border-emerald-200', purple: 'bg-purple-500/10 text-purple-600 border-purple-200', slate: 'bg-slate-500/10 text-slate-600 border-slate-200' };
   return (
     <Card className="rounded-sm border-primary/10 shadow-sm hover:shadow-md transition-all">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <div className={cn("p-1.5 rounded-sm border", colors[color])}>
-          <Icon className="h-3.5 w-3.5" />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-black tracking-tight">{value}</div>
-        <p className="text-[10px] text-muted-foreground mt-1 font-medium italic line-clamp-1">"{description}"</p>
-      </CardContent>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle><div className={cn("p-1.5 rounded-sm border", colors[color])}><Icon className="h-3.5 w-3.5" /></div></CardHeader>
+      <CardContent><div className="text-3xl font-black tracking-tight">{value}</div><p className="text-[10px] text-muted-foreground mt-1 font-medium italic line-clamp-1">"{description}"</p></CardContent>
     </Card>
   );
 }
