@@ -29,7 +29,8 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  ChevronLeft
+  ChevronLeft,
+  History
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -74,8 +75,13 @@ export default function ChecklistsDataPage() {
   const [viewFile, setViewFile] = React.useState<Attachment | null>(null);
   const [viewFiles, setViewFiles] = React.useState<Attachment[]>([]);
   const [currentFileIndex, setCurrentFileIndex] = React.useState(0);
-  const [zoom, setZoom] = React.useState(1);
-  const viewerRef = React.useRef<HTMLDivElement>(null);
+  const [scale, setScale] = React.useState(1);
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [startPan, setStartPan] = React.useState({ x: 0, y: 0 });
+  
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const mediaRef = React.useRef<HTMLDivElement>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -109,13 +115,73 @@ export default function ChecklistsDataPage() {
     return stats;
   }, [instRecords]);
 
+  const resetViewer = () => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
+
   const openViewer = (file: Attachment, gallery: Attachment[]) => {
     const mediaFiles = gallery.filter(a => a.contentType?.startsWith('image/') || a.contentType?.startsWith('video/'));
     const index = mediaFiles.findIndex(a => a.url === file.url);
     setViewFiles(mediaFiles);
     setCurrentFileIndex(index >= 0 ? index : 0);
     setViewFile(file);
-    setZoom(1);
+    resetViewer();
+  };
+
+  const nextFile = () => {
+    if (viewFiles.length <= 1) return;
+    const nextIdx = (currentFileIndex + 1) % viewFiles.length;
+    setCurrentFileIndex(nextIdx);
+    setViewFile(viewFiles[nextIdx]);
+    resetViewer();
+  };
+
+  const prevFile = () => {
+    if (viewFiles.length <= 1) return;
+    const prevIdx = (currentFileIndex - 1 + viewFiles.length) % viewFiles.length;
+    setCurrentFileIndex(prevIdx);
+    setViewFile(viewFiles[prevIdx]);
+    resetViewer();
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (viewFile && isVideo(viewFile)) return;
+    const delta = e.deltaY > 0 ? -0.2 : 0.2;
+    const newScale = Math.min(Math.max(scale + delta, 1), 4);
+    setScale(newScale);
+    if (newScale === 1) setPosition({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scale <= 1 || (viewFile && isVideo(viewFile))) return;
+    setIsDragging(true);
+    setStartPan({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || scale <= 1) return;
+    const newX = e.clientX - startPan.x;
+    const newY = e.clientY - startPan.y;
+    
+    const limitX = Math.max(0, (window.innerWidth * scale - window.innerWidth) / 2);
+    const limitY = Math.max(0, (window.innerHeight * scale - window.innerHeight) / 2);
+
+    setPosition({
+      x: Math.min(Math.max(newX, -limitX), limitX),
+      y: Math.min(Math.max(newY, -limitY), limitY)
+    });
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
+  const handleDoubleClick = () => {
+    if (viewFile && isVideo(viewFile)) return;
+    if (scale > 1) {
+      resetViewer();
+    } else {
+      setScale(2);
+    }
   };
 
   const isVideo = (file: Attachment) => file.contentType?.startsWith('video/');
@@ -269,7 +335,7 @@ export default function ChecklistsDataPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right px-6">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingInstallation(record)}>
                           <Eye className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -392,69 +458,94 @@ export default function ChecklistsDataPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Media Gallery Overlay */}
-      <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { setZoom(1); setViewFile(null); setViewFiles([]); } }}>
-        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
-          <div className="absolute top-4 left-4 flex gap-2 z-50">
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={() => setZoom(prev => Math.min(prev + 0.25, 4))}>
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))}>
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={() => setZoom(1)}>
-              <RotateCcw className="h-4 w-4" />
-            </Button>
+      {/* Modern High-Fidelity Media Viewer Overlay */}
+      <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { resetViewer(); setViewFile(null); setViewFiles([]); } }}>
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
+          <DialogHeader className="sr-only"><DialogTitle>Audit Media Detail</DialogTitle><DialogDescription>Visual evidence review</DialogDescription></DialogHeader>
+          
+          {/* Top Toolbar */}
+          <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent no-print">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px] sm:max-w-xs">{viewFile?.name}</span>
+                <span className="text-[8px] font-bold text-white/60 uppercase">{currentFileIndex + 1} of {viewFiles.length} </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={resetViewer}><RotateCcw className="h-4 w-4" /></Button>
+              <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
+              <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/10 hover:bg-red-500 text-white border-none transition-colors"><X className="h-5 w-5" /></Button></DialogClose>
+            </div>
           </div>
 
+          {/* Navigation Controls */}
           {viewFiles.length > 1 && (
             <>
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { 
-                  e.stopPropagation();
-                  const prevIdx = (currentFileIndex - 1 + viewFiles.length) % viewFiles.length;
-                  setCurrentFileIndex(prevIdx);
-                  setViewFile(viewFiles[prevIdx]);
-                  setZoom(1);
-                }}>
-                  <ChevronLeft className="h-8 w-8" />
-                </Button>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl backdrop-blur-md" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-8 w-8" /></Button>
               </div>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { 
-                  e.stopPropagation();
-                  const nextIdx = (currentFileIndex + 1) % viewFiles.length;
-                  setCurrentFileIndex(nextIdx);
-                  setViewFile(viewFiles[nextIdx]);
-                  setZoom(1);
-                }}>
-                  <ChevronRight className="h-8 w-8" />
-                </Button>
-              </div>
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
-                <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
-                  {currentFileIndex + 1} / {viewFiles.length}
-                </Badge>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl backdrop-blur-md" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-8 w-8" /></Button>
               </div>
             </>
           )}
-          
-          <div className="relative w-full h-full overflow-auto p-4 flex">
+
+          {/* Canvas Engine */}
+          <div 
+            ref={containerRef}
+            className={cn(
+              "relative w-full h-full flex items-center justify-center overflow-hidden touch-none",
+              scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"
+            )}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onDoubleClick={handleDoubleClick}
+          >
             <div 
-              ref={viewerRef}
+              ref={mediaRef}
               className={cn(
-                "m-auto transition-transform duration-200",
-                zoom > 1 ? "cursor-move" : "cursor-default"
+                "transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit",
+                isDragging && "transition-none"
               )}
-              style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
+              style={{ 
+                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+              }}
             >
               {viewFile && (
                 isVideo(viewFile) ? (
-                  <video src={viewFile.url} controls autoPlay className="max-w-full max-h-[85vh] shadow-2xl" />
+                  <div className="pointer-events-auto">
+                    <video 
+                      src={viewFile.url} 
+                      controls 
+                      autoPlay 
+                      className="max-w-[90vw] max-h-[80vh] shadow-2xl rounded-sm" 
+                    />
+                  </div>
                 ) : (
-                  <img src={viewFile.url} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Audit Evidence" />
+                  <img 
+                    src={viewFile.url} 
+                    className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" 
+                    alt="Evidence View" 
+                    draggable={false}
+                  />
                 )
               )}
+            </div>
+          </div>
+
+          {/* Footer Metadata */}
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent flex flex-col items-center gap-2 no-print">
+            <div className="flex gap-1">
+              {viewFiles.map((_, i) => (
+                <div key={i} className={cn("h-1 w-4 rounded-full transition-all", i === currentFileIndex ? "bg-primary w-8" : "bg-white/20")} />
+              ))}
             </div>
           </div>
         </DialogContent>
