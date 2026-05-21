@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -28,7 +27,8 @@ import {
   ImageIcon,
   X,
   UserCheck,
-  Save
+  Save,
+  Trash2
 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import imageCompression from 'browser-image-compression';
+import { Progress } from "@/components/ui/progress";
 
 const checkItemSchema = z.object({
   remarks: z.string().optional(),
@@ -377,7 +378,7 @@ export default function ModuleInstallationChecklistPage() {
                               </div>
                             )}
                             <Button variant="destructive" size="sm" className="h-7 px-3 rounded-sm text-[9px] font-black uppercase" onClick={() => onChange(null)}>
-                              <Trash2 className="h-3 w-3 mr-1" /> Remove
+                              <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
                             </Button>
                           </div>
                         </div>
@@ -440,13 +441,9 @@ export default function ModuleInstallationChecklistPage() {
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-4 sm:p-6 rounded-sm bg-primary/5 border border-primary/20">
                   <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="mt-1" /></FormControl>
                   <div className="space-y-1">
-                    <FormLabel className="text-xs sm:text-sm font-bold text-foreground leading-relaxed italic cursor-pointer">
-                      “I, <span className="text-primary not-italic font-black underline">{userProfile?.username || user?.email}</span>, hereby undertake and confirm that the information provided above is true and accurate as of <span className="text-primary not-italic font-black underline">{format(new Date(), 'dd MMMM yyyy')}</span>.”
+                    <FormLabel className="text-xs sm:text-sm text-foreground leading-relaxed cursor-pointer">
+                      “I, {userProfile?.username || user?.email}, hereby undertake and confirm that the information provided above is true and accurate as of {format(new Date(), 'dd MMMM yyyy')}.”
                     </FormLabel>
-                    <div className="pt-2 flex items-center gap-2 text-[8px] sm:text-[10px] font-black uppercase text-muted-foreground tracking-widest">
-                      <UserCheck className="h-3 w-3 text-primary" />
-                      Record Submitted by: {userProfile?.username || user?.email}
-                    </div>
                     <FormMessage />
                   </div>
                 </FormItem>
@@ -455,7 +452,7 @@ export default function ModuleInstallationChecklistPage() {
               <div className="flex flex-col sm:flex-row justify-end gap-4 border-t pt-8">
                 <Button type="button" variant="ghost" onClick={() => router.back()} className="rounded-sm font-bold uppercase text-[10px] h-12 px-8">Cancel</Button>
                 <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-xs tracking-widest h-14 px-12 shadow-xl shadow-primary/20">
-                  {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Publishing Results...</> : <><Save className="mr-2 h-4 w-4" /> Finalize Record</>}
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing Results...</> : <><Save className="mr-2 h-4 w-4" /> Finalize Record</>}
                 </Button>
               </div>
             </CardContent>
