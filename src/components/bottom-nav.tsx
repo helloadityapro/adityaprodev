@@ -16,8 +16,7 @@ import {
   LayoutList,
   ShieldCheck,
   UserCircle2,
-  Fuel,
-  ClipboardCheck
+  Fuel
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -56,12 +55,6 @@ export function BottomNav() {
   ];
 
   const quickActions = [
-    {
-      label: 'Table Level MMS',
-      icon: <ClipboardCheck className="h-4 w-4 text-primary" />,
-      href: '/checklists/installation',
-      description: 'Submit structural quality audit',
-    },
     {
       label: 'Start Site Visit',
       icon: <Navigation className="h-4 w-4 text-indigo-500" />,
