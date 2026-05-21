@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -32,7 +31,8 @@ import {
   Trash2,
   Paperclip,
   Film,
-  FileText
+  FileText,
+  Plus
 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -500,7 +500,7 @@ export default function ModuleInstallationChecklistPage() {
               )} />
 
               <div className="flex flex-col sm:flex-row justify-end gap-4 border-t pt-8">
-                <Button type="button" variant="ghost" onClick={() => router.back()} className="rounded-sm font-bold uppercase text-[10px] h-12 px-8">Cancel</Button>
+                <Button type="button" variant="ghost" onClick={() => router.back()} className="rounded-sm font-bold h-11">Cancel</Button>
                 <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-xs tracking-widest h-14 px-12 shadow-xl shadow-primary/20">
                   {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Transferring Media...</> : <><Save className="mr-2 h-4 w-4" /> Finalize Record</>}
                 </Button>
