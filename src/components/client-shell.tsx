@@ -191,6 +191,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (isAuthPage || isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
     if (isUserLoading || isProfileLoading || !userProfile) return true;
 
+    // Checklists are universally accessible
+    if (pathname.startsWith('/checklists')) return true;
+
     const pageKey = getPageKeyByPath(pathname);
     if (!pageKey) return true;
 

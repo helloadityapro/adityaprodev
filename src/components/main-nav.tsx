@@ -4,7 +4,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   ChevronDown,
-  History,
   FolderOpen,
   BookOpen,
   FileBarChart,
@@ -28,7 +27,6 @@ import {
   ShoppingBag,
   CirclePlus,
   TrendingUp,
-  HandCoins,
   FileText,
   Table as TableIcon,
   ArrowLeftRight,
@@ -45,7 +43,6 @@ import {
   FilePlus,
   MapPinned,
   Car,
-  CalendarCheck,
   Clock,
   List,
   Building2,
@@ -55,7 +52,9 @@ import {
   ClipboardCheck,
   ClipboardList,
   PackagePlus,
-  Database
+  Database,
+  History,
+  CalendarCheck
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -709,7 +708,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
         </SidebarMenu>
       </SidebarGroup>
 
-      {/* Checklists Section */}
+      {/* Checklists Section - Globally Accessible */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Checklists</SidebarGroupLabel>
         <SidebarMenu>
@@ -724,26 +723,22 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenuSub>
-                  {canShow('checklists-installation') && (
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/checklists/installation'} onClick={handleMobileClose}>
-                        <Link href="/checklists/installation">
-                          <LayoutGrid className="h-4 w-4" />
-                          <span>Table Level MMS</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  )}
-                  {canShow('checklists-data') && (
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/checklists/data'} onClick={handleMobileClose}>
-                        <Link href="/checklists/data">
-                          <Database className="h-4 w-4" />
-                          <span>Checklists Data</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  )}
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/installation'} onClick={handleMobileClose}>
+                      <Link href="/checklists/installation">
+                        <LayoutGrid className="h-4 w-4" />
+                        <span>Table Level MMS</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/data'} onClick={handleMobileClose}>
+                      <Link href="/checklists/data">
+                        <Database className="h-4 w-4" />
+                        <span>Checklists Data</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
                 </SidebarMenuSub>
               </CollapsibleContent>
             </SidebarMenuItem>

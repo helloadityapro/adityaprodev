@@ -20,7 +20,8 @@ import {
   CheckSquare,
   Plus,
   Navigation,
-  Fuel
+  Fuel,
+  ClipboardCheck
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion } from 'framer-motion';
@@ -29,6 +30,12 @@ export function QuickActions() {
   const router = useRouter();
 
   const actions = [
+    {
+      label: 'Table Level MMS',
+      icon: <ClipboardCheck className="mr-2 h-4 w-4 text-primary" />,
+      href: '/checklists/installation',
+      description: 'Submit structural quality audit',
+    },
     {
       label: 'Start Site Visit',
       icon: <Navigation className="mr-2 h-4 w-4 text-indigo-500" />,
