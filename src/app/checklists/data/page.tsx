@@ -1,9 +1,10 @@
+
 'use client';
 
 import * as React from 'react';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, query, orderBy, doc, limit } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +16,6 @@ import {
   Search, 
   FilterX, 
   Building2, 
-  Calendar, 
   User, 
   ClipboardCheck, 
   LayoutGrid, 
@@ -24,12 +24,13 @@ import {
   ShieldCheck, 
   CheckCircle2, 
   X,
-  Building,
   History,
   ImageIcon,
   Maximize2,
   ArrowLeft,
-  ArrowRight
+  Film,
+  FileText,
+  PlayCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -38,8 +39,15 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
 
 type Site = { id: string; name: string; projectCompany?: string };
+
+type Attachment = {
+  url: string;
+  contentType: string;
+  name: string;
+};
 
 type MMSChecklist = {
   id: string;
@@ -59,9 +67,9 @@ type InstallationChecklist = {
   tableNumber: string;
   userName: string;
   createdAt: any;
-  checks: { label: string; remarks: string; photoUrl: string | null }[];
+  checks: { label: string; remarks: string; attachments?: Attachment[] }[];
   otherRemarks: string;
-  otherPhotoUrl?: string;
+  otherAttachments?: Attachment[];
   customerRepPresent: boolean;
   customerRepName?: string;
 };
@@ -76,6 +84,13 @@ export default function ChecklistsDataPage() {
 
   const [viewingMms, setViewingMms] = React.useState<MMSChecklist | null>(null);
   const [viewingInstallation, setViewingInstallation] = React.useState<InstallationChecklist | null>(null);
+  
+  // High-fidelity media viewer state
+  const [viewFile, setViewFile] = React.useState<Attachment | null>(null);
+  const [viewFiles, setViewFiles] = React.useState<Attachment[]>([]);
+  const [currentFileIndex, setCurrentFileIndex] = React.useState(0);
+  const [zoom, setZoom] = React.useState(1);
+  const viewerRef = React.useRef<HTMLDivElement>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -131,6 +146,17 @@ export default function ChecklistsDataPage() {
     });
     return stats;
   }, [mmsRecords, instRecords]);
+
+  const openViewer = (file: Attachment, gallery: Attachment[]) => {
+    const mediaFiles = gallery.filter(a => a.contentType?.startsWith('image/') || a.contentType?.startsWith('video/'));
+    const index = mediaFiles.findIndex(a => a.url === file.url);
+    setViewFiles(mediaFiles);
+    setCurrentFileIndex(index >= 0 ? index : 0);
+    setViewFile(file);
+    setZoom(1);
+  };
+
+  const isVideo = (file: Attachment) => file.contentType?.startsWith('video/');
 
   if (isProfileLoading || mmsLoading || instLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
@@ -301,7 +327,7 @@ export default function ChecklistsDataPage() {
                           </TableCell>
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-sm">No MMS audits found for this project.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-sm">No MMS audits found.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -341,7 +367,7 @@ export default function ChecklistsDataPage() {
                           </TableCell>
                         </TableRow>
                       )) : (
-                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-sm">No installation audits found for this project.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-sm">No installation audits found.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -427,13 +453,13 @@ export default function ChecklistsDataPage() {
 
               <Separator />
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4" /> Verification Points Feed
                 </Label>
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-6">
                   {viewingInstallation?.checks.map((check, idx) => (
-                    <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 border rounded-sm bg-muted/5 group transition-colors hover:border-primary/20">
+                    <div key={idx} className="flex flex-col gap-4 p-5 border rounded-sm bg-muted/5 group transition-colors hover:border-primary/20">
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] font-black uppercase text-foreground">{check.label}</span>
@@ -444,15 +470,30 @@ export default function ChecklistsDataPage() {
                         </p>
                       </div>
                       
-                      {check.photoUrl ? (
-                        <div className="relative aspect-video w-full sm:w-40 rounded-sm overflow-hidden border shadow-sm shrink-0 bg-muted">
-                          <img src={check.photoUrl} className="w-full h-full object-cover" alt={check.label} />
-                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Maximize2 className="h-4 w-4 text-white" />
-                          </div>
+                      {check.attachments && check.attachments.length > 0 ? (
+                        <div className="flex flex-wrap gap-3">
+                          {check.attachments.map((file, fIdx) => (
+                            <div 
+                              key={fIdx} 
+                              className="relative aspect-video w-32 sm:w-40 rounded-sm overflow-hidden border shadow-sm shrink-0 bg-muted cursor-pointer"
+                              onClick={() => openViewer(file, check.attachments!)}
+                            >
+                              {isVideo(file) ? (
+                                <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                                  <Film className="h-8 w-8 text-white opacity-40" />
+                                  <PlayCircle className="absolute h-8 w-8 text-white" />
+                                </div>
+                              ) : (
+                                <img src={file.url} className="w-full h-full object-cover" alt={file.name} />
+                              )}
+                              <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Maximize2 className="h-4 w-4 text-white" />
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : (
-                        <div className="w-full sm:w-40 aspect-video bg-muted/50 border border-dashed rounded-sm flex items-center justify-center text-[8px] font-bold text-muted-foreground uppercase opacity-40 shrink-0">No Photo</div>
+                        <div className="w-fit px-4 h-8 bg-muted/50 border border-dashed rounded-sm flex items-center justify-center text-[8px] font-bold text-muted-foreground uppercase opacity-40">No Media Evidence</div>
                       )}
                     </div>
                   ))}
@@ -460,23 +501,108 @@ export default function ChecklistsDataPage() {
               </div>
 
               {viewingInstallation?.otherRemarks && (
-                <div className="p-6 bg-primary/5 border rounded-sm space-y-4">
-                  <div className="flex flex-col md:flex-row gap-8">
-                    {viewingInstallation.otherPhotoUrl && (
-                      <div className="w-full md:w-64 aspect-video rounded-sm overflow-hidden border shadow-lg bg-muted shrink-0">
-                        <img src={viewingInstallation.otherPhotoUrl} className="w-full h-full object-cover" alt="Supplementary Proof" />
-                      </div>
-                    )}
-                    <div className="flex-1 space-y-2">
+                <div className="p-6 bg-primary/5 border rounded-sm space-y-6">
+                   <div className="space-y-2">
                       <Label className="text-[9px] font-black uppercase text-primary tracking-widest">Supplementary Observations</Label>
                       <p className="text-sm font-medium leading-relaxed italic text-foreground/80">"{viewingInstallation.otherRemarks}"</p>
                     </div>
-                  </div>
+
+                    {viewingInstallation.otherAttachments && viewingInstallation.otherAttachments.length > 0 && (
+                       <div className="flex flex-wrap gap-4">
+                          {viewingInstallation.otherAttachments.map((file, idx) => (
+                            <div 
+                              key={idx} 
+                              className="relative aspect-video w-32 sm:w-48 rounded-sm overflow-hidden border shadow-lg bg-muted shrink-0 cursor-pointer"
+                              onClick={() => openViewer(file, viewingInstallation.otherAttachments!)}
+                            >
+                              {isVideo(file) ? (
+                                <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                                  <Film className="h-10 w-10 text-white opacity-40" />
+                                  <PlayCircle className="absolute h-10 w-10 text-white" />
+                                </div>
+                              ) : (
+                                <img src={file.url} className="w-full h-full object-cover" alt="Supplementary" />
+                              )}
+                              <div className="absolute top-2 right-2 p-1 bg-black/40 rounded-sm">
+                                <Maximize2 className="h-3 w-3 text-white" />
+                              </div>
+                            </div>
+                          ))}
+                       </div>
+                    )}
                 </div>
               )}
             </div>
           </ScrollArea>
           <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-11 px-8 w-full sm:w-auto">Close Audit Log</Button></DialogClose></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Media Gallery Overlay */}
+      <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { setZoom(1); setViewFile(null); setViewFiles([]); } }}>
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
+          <div className="absolute top-4 left-4 flex gap-2 z-50">
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={() => setZoom(prev => Math.min(prev + 0.25, 4))}>
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))}>
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={() => setZoom(1)}>
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {viewFiles.length > 1 && (
+            <>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl" onClick={(e) => { 
+                  e.stopPropagation();
+                  const prevIdx = (currentFileIndex - 1 + viewFiles.length) % viewFiles.length;
+                  setCurrentFileIndex(prevIdx);
+                  setViewFile(viewFiles[prevIdx]);
+                  setZoom(1);
+                }}>
+                  <ChevronLeft className="h-8 w-8" />
+                </Button>
+              </div>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl" onClick={(e) => { 
+                  e.stopPropagation();
+                  const nextIdx = (currentFileIndex + 1) % viewFiles.length;
+                  setCurrentFileIndex(nextIdx);
+                  setViewFile(viewFiles[nextIdx]);
+                  setZoom(1);
+                }}>
+                  <ChevronRightIcon className="h-8 w-8" />
+                </Button>
+              </div>
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
+                <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
+                  {currentFileIndex + 1} / {viewFiles.length}
+                </Badge>
+              </div>
+            </>
+          )}
+          
+          <div className="relative w-full h-full overflow-auto p-4 flex">
+            <div 
+              ref={viewerRef}
+              className={cn(
+                "m-auto transition-transform duration-200",
+                zoom > 1 ? "cursor-move" : "cursor-default"
+              )}
+              style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
+            >
+              {viewFile && (
+                isVideo(viewFile) ? (
+                  <video src={viewFile.url} controls autoPlay className="max-w-full max-h-[85vh] shadow-2xl" />
+                ) : (
+                  <img src={viewFile.url} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Audit Evidence" />
+                )
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

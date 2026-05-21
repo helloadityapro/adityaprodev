@@ -1,7 +1,8 @@
+
 "use client";
 
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
@@ -28,7 +29,10 @@ import {
   X,
   UserCheck,
   Save,
-  Trash2
+  Trash2,
+  Paperclip,
+  Film,
+  FileText
 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -42,7 +46,7 @@ import { Badge } from "@/components/ui/badge";
 
 const checkItemSchema = z.object({
   remarks: z.string().optional(),
-  photo: z.any().optional(),
+  localFiles: z.array(z.any()).default([]),
 });
 
 const installationSchema = z.object({
@@ -61,12 +65,12 @@ const installationSchema = z.object({
     earthingCondition: checkItemSchema,
   }),
   otherRemarks: z.string().optional(),
-  otherPhoto: z.any().optional(),
+  otherLocalFiles: z.array(z.any()).default([]),
   customerRepPresent: z.enum(["Yes", "No"]),
   customerRepName: z.string().optional(),
   customerRepRemarks: z.string().optional(),
   undertaking: z.boolean().refine(val => val === true, {
-    message: "You must confirm the undertaking to proceed."
+    message: "You must agree to the undertaking."
   }),
 });
 
@@ -109,15 +113,15 @@ export default function ModuleInstallationChecklistPage() {
       columnCount: 0,
       moduleCount: 0,
       checks: {
-        moduleNutBolt: { remarks: "", photo: null },
-        mmsNutBolt: { remarks: "", photo: null },
-        crackedModules: { remarks: "", photo: null },
-        cableDressing: { remarks: "", photo: null },
-        cappingCondition: { remarks: "", photo: null },
-        earthingCondition: { remarks: "", photo: null },
+        moduleNutBolt: { remarks: "", localFiles: [] },
+        mmsNutBolt: { remarks: "", localFiles: [] },
+        crackedModules: { remarks: "", localFiles: [] },
+        cableDressing: { remarks: "", localFiles: [] },
+        cappingCondition: { remarks: "", localFiles: [] },
+        earthingCondition: { remarks: "", localFiles: [] },
       },
       otherRemarks: "",
-      otherPhoto: null,
+      otherLocalFiles: [],
       customerRepPresent: "No",
       customerRepName: "",
       customerRepRemarks: "",
@@ -127,22 +131,31 @@ export default function ModuleInstallationChecklistPage() {
 
   const watchRepPresent = form.watch("customerRepPresent");
 
-  const uploadFile = async (file: File, path: string, label: string) => {
-    const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920 });
+  const uploadFile = async (file: File, path: string): Promise<{url: string, contentType: string, name: string}> => {
+    let blob: Blob = file;
+    // Only compress images
+    if (file.type.startsWith('image/')) {
+      try {
+        blob = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920 });
+      } catch (e) {
+        console.warn("Compression skipped", e);
+      }
+    }
+    
     const storage = getStorage(firebaseApp);
     const storageRef = ref(storage, path);
-    const uploadTask = uploadBytesResumable(storageRef, compressed);
+    const uploadTask = uploadBytesResumable(storageRef, blob);
     
-    return new Promise<string>((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       uploadTask.on('state_changed', 
         (snapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(prev => ({ ...prev, [label]: progress }));
+          setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
         }, 
         reject, 
         async () => {
           const url = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve(url);
+          resolve({ url, contentType: file.type, name: file.name });
         }
       );
     });
@@ -155,30 +168,33 @@ export default function ModuleInstallationChecklistPage() {
 
     try {
       const timestamp = Date.now();
-      const uploadResults: Record<string, string> = {};
+      const finalChecks: any[] = [];
 
-      // Handle photos for checks
+      // Process indexed checks
       for (const [key, check] of Object.entries(values.checks)) {
-        if (check.photo instanceof File) {
-          const label = (CHECK_LABELS as any)[key];
-          const path = `checklists/installation/${user.uid}/${timestamp}_${key}_${check.photo.name.replace(/\s+/g, '_')}`;
-          uploadResults[key] = await uploadFile(check.photo, path, label);
+        const attachments = [];
+        for (let i = 0; i < check.localFiles.length; i++) {
+          const file = check.localFiles[i];
+          const path = `checklists/installation/${user.uid}/${timestamp}_${key}_${i}_${file.name.replace(/\s+/g, '_')}`;
+          const uploaded = await uploadFile(file, path);
+          attachments.push(uploaded);
         }
+        finalChecks.push({
+          key,
+          label: (CHECK_LABELS as any)[key],
+          remarks: check.remarks || "",
+          attachments
+        });
       }
 
-      // Handle other photo
-      let otherPhotoUrl = null;
-      if (values.otherPhoto instanceof File) {
-        const path = `checklists/installation/${user.uid}/${timestamp}_other_${values.otherPhoto.name.replace(/\s+/g, '_')}`;
-        otherPhotoUrl = await uploadFile(values.otherPhoto, path, "Other Proof");
+      // Process other files
+      const otherAttachments = [];
+      for (let i = 0; i < values.otherLocalFiles.length; i++) {
+        const file = values.otherLocalFiles[i];
+        const path = `checklists/installation/${user.uid}/${timestamp}_other_${i}_${file.name.replace(/\s+/g, '_')}`;
+        const uploaded = await uploadFile(file, path);
+        otherAttachments.push(uploaded);
       }
-
-      const finalChecks = Object.entries(values.checks).map(([key, check]) => ({
-        key,
-        label: (CHECK_LABELS as any)[key],
-        remarks: check.remarks || "",
-        photoUrl: uploadResults[key] || null,
-      }));
 
       await addDocumentNonBlocking(collection(firestore, 'installation_checklists'), {
         siteId: values.siteId,
@@ -189,7 +205,7 @@ export default function ModuleInstallationChecklistPage() {
         moduleCount: values.moduleCount,
         checks: finalChecks,
         otherRemarks: values.otherRemarks || "",
-        otherPhotoUrl: otherPhotoUrl,
+        otherAttachments: otherAttachments,
         customerRepPresent: values.customerRepPresent === "Yes",
         customerRepName: values.customerRepName || "",
         customerRepRemarks: values.customerRepRemarks || "",
@@ -198,8 +214,8 @@ export default function ModuleInstallationChecklistPage() {
         createdAt: serverTimestamp(),
       });
 
-      toast({ title: "Success", description: "Installation checklist submitted successfully." });
-      router.push("/dashboard");
+      toast({ title: "Success", description: "Audit published to registry." });
+      router.push("/checklists/data");
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
@@ -211,21 +227,20 @@ export default function ModuleInstallationChecklistPage() {
   const filteredSites = allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())) || [];
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto pb-20 px-2 sm:px-4">
+    <div className="space-y-8 max-w-4xl mx-auto pb-32 px-2 sm:px-4">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <ClipboardCheck className="h-8 w-8" /> Module Installation Checklist
+        <h1 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+          <ClipboardCheck className="h-7 w-7" /> Module Installation Audit
         </h1>
-        <p className="text-muted-foreground font-medium">Capture quality metrics for physical site installations.</p>
+        <p className="text-muted-foreground font-medium text-sm">Comprehensive field verification for solar tables.</p>
       </div>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          {/* Section: Context */}
           <Card className="rounded-sm shadow-md border-primary/10">
             <CardHeader className="bg-primary/5 border-b py-4">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-primary" /> Site Context
+              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" /> Site & Table Context
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -281,14 +296,14 @@ export default function ModuleInstallationChecklistPage() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="columnCount" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Number of Columns</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Columns</FormLabel>
                     <FormControl><Input type="number" {...field} className="h-11 rounded-sm" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="moduleCount" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Number of Modules</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Modules</FormLabel>
                     <FormControl><Input type="number" {...field} className="h-11 rounded-sm" /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -297,10 +312,9 @@ export default function ModuleInstallationChecklistPage() {
             </CardContent>
           </Card>
 
-          {/* Section: Checks */}
           <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
             <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest">Verification Points</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-widest">Verification Points</CardTitle>
             </CardHeader>
             <CardContent className="p-0 divide-y">
               {Object.keys(CHECK_LABELS).map((key) => (
@@ -309,87 +323,125 @@ export default function ModuleInstallationChecklistPage() {
                     <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">
                       {(CHECK_LABELS as any)[key]}
                     </Label>
-                    <div className="flex items-center gap-4">
-                      <FormField control={form.control} name={`checks.${key}.photo` as any} render={({ field: { value, onChange, ...rest } }) => (
-                        <FormItem className="space-y-0 w-full sm:w-auto">
-                          <FormControl>
-                            <div className="flex flex-col gap-2">
-                              <div className="flex items-center gap-2">
-                                {value ? (
-                                  <Badge variant="secondary" className="h-9 gap-1.5 pl-2 pr-1 rounded-sm bg-primary/5 text-primary border-primary/20 flex-1 sm:flex-none">
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                    <span className="text-[10px] font-black truncate max-w-[100px]">{value instanceof File ? value.name : 'Photo Captured'}</span>
-                                    <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive" onClick={() => onChange(null)}>
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                  </Badge>
-                                ) : (
-                                  <label className="cursor-pointer w-full sm:w-auto">
-                                    <div className="flex items-center justify-center gap-2 px-4 h-9 rounded-sm border border-primary/20 bg-background text-primary hover:bg-primary/5 transition-colors text-[10px] font-black uppercase tracking-widest">
-                                      <Camera className="h-3.5 w-3.5" /> Attach Photo
-                                    </div>
-                                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onChange(e.target.files?.[0])} {...rest} />
-                                  </label>
-                                )}
-                              </div>
-                              {uploadProgress[(CHECK_LABELS as any)[key]] !== undefined && (
-                                <div className="space-y-1">
-                                  <Progress value={uploadProgress[(CHECK_LABELS as any)[key]]} className="h-1 rounded-none" />
+                    
+                    <FormField control={form.control} name={`checks.${key}.localFiles` as any} render={({ field: { value, onChange } }) => (
+                      <FormItem className="space-y-0 w-full sm:w-auto">
+                        <FormControl>
+                          <div className="flex flex-col gap-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {value.map((file: File, fIdx: number) => (
+                                <Badge key={fIdx} variant="secondary" className="h-8 gap-1.5 pl-2 pr-1 rounded-sm bg-primary/5 text-primary border-primary/20">
+                                  {file.type.startsWith('video/') ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                                  <span className="text-[9px] font-black truncate max-w-[80px]">{file.name}</span>
+                                  <Button 
+                                    type="button"
+                                    variant="ghost" size="icon" 
+                                    className="h-5 w-5 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
+                                    onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </Badge>
+                              ))}
+                              
+                              <label className="cursor-pointer">
+                                <div className="flex items-center justify-center gap-2 px-3 h-8 rounded-sm border border-dashed border-primary/30 bg-background text-primary hover:bg-primary/5 transition-colors text-[9px] font-black uppercase tracking-widest">
+                                  <Camera className="h-3 w-3" /> Add Proof
                                 </div>
-                              )}
+                                <input 
+                                  type="file" 
+                                  multiple 
+                                  accept="image/*,video/*" 
+                                  className="hidden" 
+                                  onChange={(e) => {
+                                    const newFiles = Array.from(e.target.files || []);
+                                    onChange([...value, ...newFiles]);
+                                  }} 
+                                />
+                              </label>
                             </div>
-                          </FormControl>
-                        </FormItem>
-                      )} />
-                    </div>
+                            
+                            {/* Upload Progress Area */}
+                            <div className="space-y-1">
+                              {value.map((file: File) => uploadProgress[file.name] !== undefined && (
+                                <div key={file.name} className="space-y-1">
+                                  <div className="flex justify-between text-[8px] font-black uppercase text-primary">
+                                    <span className="truncate max-w-[100px]">{file.name}</span>
+                                    <span>{Math.round(uploadProgress[file.name])}%</span>
+                                  </div>
+                                  <Progress value={uploadProgress[file.name]} className="h-0.5 rounded-none" />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </FormControl>
+                      </FormItem>
+                    )} />
                   </div>
                   <FormField control={form.control} name={`checks.${key}.remarks` as any} render={({ field }) => (
-                    <FormControl><Textarea placeholder="Enter findings or observations..." {...field} className="rounded-sm bg-muted/5 min-h-[80px]" /></FormControl>
+                    <FormControl><Textarea placeholder="Enter findings..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm" /></FormControl>
                   )} />
                 </div>
               ))}
             </CardContent>
           </Card>
 
-          {/* Other Remarks */}
           <Card className="rounded-sm shadow-md border-primary/10">
             <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest">Additional Feedback</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-widest">Additional Feedback</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
               <FormField control={form.control} name="otherRemarks" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Other Remarks / Comments</FormLabel>
-                  <FormControl><Textarea placeholder="Any other site observations..." rows={4} {...field} className="rounded-sm" /></FormControl>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">General Remarks</FormLabel>
+                  <FormControl><Textarea placeholder="Supplementary site observations..." rows={4} {...field} className="rounded-sm text-sm" /></FormControl>
                 </FormItem>
               )} />
               
-              <FormField control={form.control} name="otherPhoto" render={({ field: { value, onChange, ...rest } }) => (
+              <FormField control={form.control} name="otherLocalFiles" render={({ field: { value, onChange } }) => (
                 <FormItem>
                   <FormControl>
-                    <div className="flex flex-col items-center gap-4 p-8 border-2 border-dashed rounded-sm bg-muted/5">
-                      {value ? (
-                        <div className="relative group">
-                          <img src={URL.createObjectURL(value)} className="h-32 w-auto rounded-sm shadow-md" alt="Other proof" />
-                          <div className="mt-2 text-center">
-                            {uploadProgress['Other Proof'] !== undefined && (
-                              <div className="w-full space-y-1 mb-2">
-                                <span className="text-[8px] font-black uppercase text-primary">Uploading...</span>
-                                <Progress value={uploadProgress['Other Proof']} className="h-1" />
+                    <div className="space-y-4 p-6 border-2 border-dashed rounded-sm bg-muted/5">
+                      <div className="flex flex-wrap gap-4 justify-center">
+                        {value.map((file: File, fIdx: number) => (
+                          <div key={fIdx} className="relative group w-24 h-24 rounded-sm overflow-hidden border bg-background flex items-center justify-center">
+                            {file.type.startsWith('image/') ? (
+                              <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" />
+                            ) : (
+                              <Film className="h-8 w-8 text-primary opacity-40" />
+                            )}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                               <Button 
+                                type="button"
+                                variant="destructive" size="icon" className="h-7 w-7 rounded-full" 
+                                onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}
+                               >
+                                 <Trash2 className="h-3.5 w-3.5" />
+                               </Button>
+                            </div>
+                            {uploadProgress[file.name] !== undefined && (
+                              <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary/20">
+                                <Progress value={uploadProgress[file.name]} className="h-full rounded-none" />
                               </div>
                             )}
-                            <Button variant="destructive" size="sm" className="h-7 px-3 rounded-sm text-[9px] font-black uppercase" onClick={() => onChange(null)}>
-                              <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
-                            </Button>
                           </div>
-                        </div>
-                      ) : (
-                        <label className="flex flex-col items-center gap-2 cursor-pointer">
-                          <div className="p-3 bg-primary/10 rounded-full text-primary"><ImageIcon className="h-6 w-6" /></div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Upload Supplementary Proof</span>
-                          <input type="file" accept="image/*" className="hidden" onChange={(e) => onChange(e.target.files?.[0])} {...rest} />
+                        ))}
+
+                        <label className="flex flex-col items-center justify-center w-24 h-24 cursor-pointer border border-dashed border-primary/30 rounded-sm hover:bg-primary/5 transition-colors">
+                          <Plus className="h-6 w-6 text-primary" />
+                          <span className="text-[8px] font-black uppercase text-primary mt-1">Add Media</span>
+                          <input 
+                            type="file" 
+                            multiple 
+                            accept="image/*,video/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const newFiles = Array.from(e.target.files || []);
+                              onChange([...value, ...newFiles]);
+                            }} 
+                          />
                         </label>
-                      )}
+                      </div>
                     </div>
                   </FormControl>
                 </FormItem>
@@ -397,10 +449,9 @@ export default function ModuleInstallationChecklistPage() {
             </CardContent>
           </Card>
 
-          {/* Customer Representative */}
           <Card className="rounded-sm shadow-md border-primary/10">
             <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-sm font-bold uppercase tracking-widest">Customer Verification</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-widest">Customer Verification</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-6">
               <FormField control={form.control} name="customerRepPresent" render={({ field }) => (
@@ -420,14 +471,13 @@ export default function ModuleInstallationChecklistPage() {
                   <FormField control={form.control} name="customerRepName" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Representative Name</FormLabel>
-                      <FormControl><Input placeholder="Full name of representative" {...field} className="h-11 rounded-sm" /></FormControl>
-                      <FormMessage />
+                      <FormControl><Input placeholder="Full name" {...field} className="h-11 rounded-sm" /></FormControl>
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="customerRepRemarks" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Representative Remarks / Comments</FormLabel>
-                      <FormControl><Textarea placeholder="Any comments from the customer..." rows={3} {...field} className="rounded-sm bg-muted/5" /></FormControl>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Representative Feedback</FormLabel>
+                      <FormControl><Textarea placeholder="Client comments..." rows={3} {...field} className="rounded-sm bg-muted/5 text-sm" /></FormControl>
                     </FormItem>
                   )} />
                 </div>
@@ -435,7 +485,6 @@ export default function ModuleInstallationChecklistPage() {
             </CardContent>
           </Card>
 
-          {/* Undertaking */}
           <Card className="rounded-sm border-primary/10 shadow-lg overflow-hidden">
             <CardContent className="p-6 sm:p-8 space-y-8">
               <FormField control={form.control} name="undertaking" render={({ field }) => (
@@ -453,7 +502,7 @@ export default function ModuleInstallationChecklistPage() {
               <div className="flex flex-col sm:flex-row justify-end gap-4 border-t pt-8">
                 <Button type="button" variant="ghost" onClick={() => router.back()} className="rounded-sm font-bold uppercase text-[10px] h-12 px-8">Cancel</Button>
                 <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-xs tracking-widest h-14 px-12 shadow-xl shadow-primary/20">
-                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing Results...</> : <><Save className="mr-2 h-4 w-4" /> Finalize Record</>}
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Transferring Media...</> : <><Save className="mr-2 h-4 w-4" /> Finalize Record</>}
                 </Button>
               </div>
             </CardContent>
