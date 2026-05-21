@@ -38,6 +38,7 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import imageCompression from 'browser-image-compression';
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 const checkItemSchema = z.object({
   remarks: z.string().optional(),
@@ -84,8 +85,8 @@ export default function ModuleInstallationChecklistPage() {
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
   const { user } = useUser();
-  const { toast } = useToast();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
@@ -407,8 +408,8 @@ export default function ModuleInstallationChecklistPage() {
                   <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Is a Representative of Project Customer present at site?</FormLabel>
                   <FormControl>
                     <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
-                      <div className="flex items-center space-x-2"><RadioGroupItem value="Yes" id="rep-yes" /><Label htmlFor="rep-yes" className="font-bold cursor-pointer">Yes</Label></div>
-                      <div className="flex items-center space-x-2"><RadioGroupItem value="No" id="rep-no" /><Label htmlFor="rep-no" className="font-bold cursor-pointer">No</Label></div>
+                      <div className="flex items-center space-x-2"><RadioGroupItem value="Yes" id="rep-yes" /><Label htmlFor="rep-yes" className="font-bold cursor-pointer text-xs">Yes</Label></div>
+                      <div className="flex items-center space-x-2"><RadioGroupItem value="No" id="rep-no" /><Label htmlFor="rep-no" className="font-bold cursor-pointer text-xs">No</Label></div>
                     </RadioGroup>
                   </FormControl>
                 </FormItem>
@@ -442,7 +443,7 @@ export default function ModuleInstallationChecklistPage() {
                   <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="mt-1" /></FormControl>
                   <div className="space-y-1">
                     <FormLabel className="text-xs sm:text-sm text-foreground leading-relaxed cursor-pointer">
-                      “I, {userProfile?.username || user?.email}, hereby undertake and confirm that the information provided above is true and accurate as of {format(new Date(), 'dd MMMM yyyy')}.”
+                      I, {userProfile?.username || user?.email}, hereby undertake and confirm that the information provided above is true and accurate as of {format(new Date(), 'dd MMMM yyyy')}.
                     </FormLabel>
                     <FormMessage />
                   </div>
