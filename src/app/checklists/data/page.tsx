@@ -427,28 +427,33 @@ export default function ChecklistsDataPage() {
 
               <Separator />
 
-              <div className="space-y-6">
-                <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Verification Points Proof</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" /> Verification Points Feed
+                </Label>
+                <div className="flex flex-col gap-3">
                   {viewingInstallation?.checks.map((check, idx) => (
-                    <div key={idx} className="space-y-3 p-4 border rounded-sm bg-muted/5 group">
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="text-11 font-black uppercase text-foreground">{check.label}</span>
-                        <Badge variant="outline" className="h-4 px-1.5 text-[7px] font-black uppercase bg-white border-primary/20 text-primary">Requirement</Badge>
+                    <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 border rounded-sm bg-muted/5 group transition-colors hover:border-primary/20">
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-black uppercase text-foreground">{check.label}</span>
+                          <Badge variant="outline" className="h-3.5 px-1.5 text-[6px] font-black uppercase bg-white border-primary/20 text-primary">Requirement</Badge>
+                        </div>
+                        <p className="text-xs italic text-muted-foreground leading-relaxed">
+                          "{check.remarks || 'No specific observations recorded.'}"
+                        </p>
                       </div>
-                      <div className="flex gap-4">
-                        {check.photoUrl ? (
-                          <div className="relative aspect-video w-32 rounded-sm overflow-hidden border shadow-sm shrink-0 bg-muted">
-                            <img src={check.photoUrl} className="w-full h-full object-cover" alt={check.label} />
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <Maximize2 className="h-4 w-4 text-white" />
-                            </div>
+                      
+                      {check.photoUrl ? (
+                        <div className="relative aspect-video w-full sm:w-40 rounded-sm overflow-hidden border shadow-sm shrink-0 bg-muted">
+                          <img src={check.photoUrl} className="w-full h-full object-cover" alt={check.label} />
+                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Maximize2 className="h-4 w-4 text-white" />
                           </div>
-                        ) : (
-                          <div className="w-32 aspect-video bg-muted/50 border border-dashed rounded-sm flex items-center justify-center text-[8px] font-bold text-muted-foreground uppercase opacity-40 shrink-0">No Photo</div>
-                        )}
-                        <p className="text-xs italic text-muted-foreground leading-relaxed">"{check.remarks || 'No specific observations recorded.'}"</p>
-                      </div>
+                        </div>
+                      ) : (
+                        <div className="w-full sm:w-40 aspect-video bg-muted/50 border border-dashed rounded-sm flex items-center justify-center text-[8px] font-bold text-muted-foreground uppercase opacity-40 shrink-0">No Photo</div>
+                      )}
                     </div>
                   ))}
                 </div>
