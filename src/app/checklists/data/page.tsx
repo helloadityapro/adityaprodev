@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -11,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { 
   Search, 
   FilterX, 
@@ -349,7 +349,7 @@ export default function ChecklistsDataPage() {
                   {viewingInstallation?.checks.map((check, idx) => (
                     <div key={idx} className="space-y-3 p-4 border rounded-sm bg-muted/5 group">
                       <div className="flex items-center justify-between gap-4">
-                        <span className="text-[11px] font-black uppercase text-foreground">{check.label}</span>
+                        <span className="text-11 font-black uppercase text-foreground">{check.label}</span>
                         <Badge variant="outline" className="h-4 px-1.5 text-[7px] font-black uppercase bg-white border-primary/20 text-primary">Requirement</Badge>
                       </div>
                       <div className="flex gap-4">
