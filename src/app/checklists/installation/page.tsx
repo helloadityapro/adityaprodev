@@ -263,7 +263,7 @@ export default function ModuleInstallationChecklistPage() {
               <FormField control={form.control} name="tableNumber" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Table Number</FormLabel>
-                  <FormControl><Input placeholder="e.g. T-042" {...field} className="h-11 rounded-sm" /></FormControl>
+                  <FormControl><Input placeholder="e.g. T-101" {...field} className="h-11 rounded-sm" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -271,7 +271,7 @@ export default function ModuleInstallationChecklistPage() {
               <FormField control={form.control} name="tableSize" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Size of Table</FormLabel>
-                  <FormControl><Input placeholder="e.g. 2Rx14C" {...field} className="h-11 rounded-sm" /></FormControl>
+                  <FormControl><Input placeholder="e.g. 2P36" {...field} className="h-11 rounded-sm" /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />

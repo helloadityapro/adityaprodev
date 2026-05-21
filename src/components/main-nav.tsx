@@ -55,7 +55,8 @@ import {
   ListTodo,
   ClipboardCheck,
   ClipboardList,
-  PackagePlus
+  PackagePlus,
+  Database
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -740,6 +741,16 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                         <Link href="/checklists/installation">
                           <ClipboardList className="h-4 w-4" />
                           <span>Module Installation</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                  {canShow('checklists-data') && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/checklists/data'} onClick={handleMobileClose}>
+                        <Link href="/checklists/data">
+                          <Database className="h-4 w-4" />
+                          <span>Checklists Data</span>
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
