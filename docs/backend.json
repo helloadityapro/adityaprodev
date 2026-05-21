@@ -379,6 +379,40 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteId", "tableId", "userId"]
+    },
+    "InstallationChecklist": {
+      "title": "Installation Checklist",
+      "type": "object",
+      "description": "General site installation verification checklist.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "tableNumber": { "type": "string" },
+        "tableSize": { "type": "string" },
+        "columnCount": { "type": "number" },
+        "moduleCount": { "type": "number" },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "remarks": { "type": "string" },
+              "photoUrl": { "type": "string" }
+            }
+          }
+        },
+        "otherRemarks": { "type": "string" },
+        "otherPhotoUrl": { "type": "string" },
+        "customerRepPresent": { "type": "boolean" },
+        "customerRepName": { "type": "string" },
+        "customerRepRemarks": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "tableNumber", "userId"]
     }
   },
   "auth": {
@@ -467,7 +501,11 @@
     },
     "/mms_checklists/{checklistId}": {
       "schema": { "$ref": "#/backend/entities/MMSChecklist" },
-      "description": "Table-level verification records."
+      "description": "Table-level verification for Mounting Structures."
+    },
+    "/installation_checklists/{checklistId}": {
+      "schema": { "$ref": "#/backend/entities/InstallationChecklist" },
+      "description": "General installation quality checks."
     },
     "/notifications/{notifId}": {
       "schema": { "$ref": "#/backend/entities/Notification" },

@@ -23,6 +23,7 @@ export type PageKey =
   | 'attendance'
   | 'attendance-map'
   | 'checklists-mms'
+  | 'checklists-installation'
   | 'master-data-tables-add'
   | 'master-data-tables-list'
   | 'admin-attendance-summary'
@@ -81,6 +82,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'attendance-map', label: 'Personnel Live Map', category: 'Operations', path: '/attendance/map-view' },
 
   { id: 'checklists-mms', label: 'Table Level MMS Checklist', category: 'Checklists', path: '/checklists/mms' },
+  { id: 'checklists-installation', label: 'Module Installation Checklist', category: 'Checklists', path: '/checklists/installation' },
 
   { id: 'master-data-tables-add', label: 'Add Tables Data', category: 'Master Data', path: '/master-data/tables/add' },
   { id: 'master-data-tables-list', label: 'Tables Data', category: 'Master Data', path: '/master-data/tables/list' },
@@ -137,6 +139,7 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/site-visits')) return 'visits';
   if (path.startsWith('/attendance')) return 'attendance';
   if (path.startsWith('/checklists/mms')) return 'checklists-mms';
+  if (path.startsWith('/checklists/installation')) return 'checklists-installation';
   if (path.startsWith('/master-data')) {
     if (path.includes('/tables/add')) return 'master-data-tables-add';
     if (path.includes('/tables/list')) return 'master-data-tables-list';

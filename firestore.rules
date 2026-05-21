@@ -104,8 +104,11 @@ service cloud.firestore {
     }
 
     match /mms_checklists/{checklistId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
+    }
+
+    match /installation_checklists/{checklistId} {
+      allow read, write: if isSignedIn();
     }
 
     match /vehicle_assignments/{assignmentId} {

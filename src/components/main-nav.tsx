@@ -734,6 +734,16 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   )}
+                  {canShow('checklists-installation') && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/checklists/installation'} onClick={handleMobileClose}>
+                        <Link href="/checklists/installation">
+                          <ClipboardList className="h-4 w-4" />
+                          <span>Module Installation</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
                 </SidebarMenuSub>
               </CollapsibleContent>
             </SidebarMenuItem>
