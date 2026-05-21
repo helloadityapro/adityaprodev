@@ -1,8 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, orderBy, doc, limit } from 'firebase/firestore';
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, doc, limit, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -30,14 +30,22 @@ import {
   ZoomOut,
   RotateCcw,
   ChevronLeft,
-  History
+  History,
+  Trash2,
+  MessageCircle,
+  Send,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 
 type Site = { id: string; name: string; projectCompany?: string };
 
@@ -47,11 +55,19 @@ type Attachment = {
   name: string;
 };
 
+type Comment = {
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: any;
+};
+
 type InstallationChecklist = {
   id: string;
   siteId: string;
   siteName: string;
   tableNumber: string;
+  userId: string;
   userName: string;
   createdAt: any;
   checks: { label: string; remarks: string; attachments?: Attachment[] }[];
@@ -59,17 +75,23 @@ type InstallationChecklist = {
   otherAttachments?: Attachment[];
   customerRepPresent: boolean;
   customerRepName?: string;
+  comments?: Comment[];
 };
 
 export default function ChecklistsDataPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
   
   const [selectedSiteId, setSelectedSiteId] = React.useState<string>("all");
   const [searchTerm, setSearchTerm] = React.useState("");
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
 
   const [viewingInstallation, setViewingInstallation] = React.useState<InstallationChecklist | null>(null);
+  const [commentingRecord, setCommentingRecord] = React.useState<InstallationChecklist | null>(null);
+  const [deletingRecord, setDeletingRecord] = React.useState<InstallationChecklist | null>(null);
+  const [newComment, setNewComment] = React.useState("");
+  const [isProcessing, setIsProcessing] = React.useState(false);
   
   // High-fidelity media viewer state
   const [viewFile, setViewFile] = React.useState<Attachment | null>(null);
@@ -185,6 +207,42 @@ export default function ChecklistsDataPage() {
   };
 
   const isVideo = (file: Attachment) => file.contentType?.startsWith('video/');
+
+  const handlePostComment = async () => {
+    if (!commentingRecord || !newComment.trim() || !user || !userProfile) return;
+    setIsProcessing(true);
+    try {
+      const ref = doc(firestore, 'installation_checklists', commentingRecord.id);
+      await updateDocumentNonBlocking(ref, {
+        comments: arrayUnion({
+          userId: user.uid,
+          userName: userProfile.username || user.email,
+          text: newComment.trim(),
+          createdAt: new Date().toISOString()
+        })
+      });
+      setNewComment("");
+      toast({ title: "Comment Posted" });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Error", description: e.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteRecord = async () => {
+    if (!deletingRecord) return;
+    setIsProcessing(true);
+    try {
+      await deleteDocumentNonBlocking(doc(firestore, 'installation_checklists', deletingRecord.id));
+      toast({ title: "Audit Deleted", description: "Record has been removed from registry." });
+      setDeletingRecord(null);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Error", description: e.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   if (isProfileLoading || instLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
@@ -316,8 +374,9 @@ export default function ChecklistsDataPage() {
                 <TableHeader className="bg-muted/30">
                   <TableRow>
                     <TableHead className="px-6">Date & Time</TableHead>
-                    <TableHead>Table Reference</TableHead>
+                    <TableHead>Table Ref</TableHead>
                     <TableHead>Auditor</TableHead>
+                    <TableHead className="text-center">Comments</TableHead>
                     <TableHead className="text-right px-6">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -334,14 +393,29 @@ export default function ChecklistsDataPage() {
                           {record.userName}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right px-6">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingInstallation(record)}>
-                          <Eye className="h-4 w-4" />
+                      <TableCell className="text-center">
+                        <Button variant="ghost" size="sm" onClick={() => setCommentingRecord(record)} className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary">
+                          <MessageCircle className="h-3.5 w-3.5" /> {record.comments?.length || 0}
                         </Button>
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingInstallation(record)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm hover:text-primary" onClick={() => setCommentingRecord(record)}>
+                            <MessageCircle className="h-4 w-4" />
+                          </Button>
+                          {(isAdmin || record.userId === user?.uid) && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingRecord(record)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   )) : (
-                    <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-sm">No audits found for this site.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-sm">No audits found for this site.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -457,6 +531,92 @@ export default function ChecklistsDataPage() {
           <DialogFooter className="p-4 bg-muted/5 border-t shrink-0"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-11 px-8 w-full sm:w-auto">Close Audit Log</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Comment Dialog */}
+      <Dialog open={!!commentingRecord} onOpenChange={(o) => !o && setCommentingRecord(null)}>
+        <DialogContent className="max-w-md w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[70vh]">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><MessageCircle className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Audit Discussion</DialogTitle>
+                <DialogDescription className="text-xs font-medium">Table {commentingRecord?.tableNumber} • {commentingRecord?.siteName}</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 flex flex-col min-h-0 bg-background">
+            <ScrollArea className="flex-1 p-6">
+              <div className="space-y-6">
+                {commentingRecord?.comments && commentingRecord.comments.length > 0 ? (
+                  commentingRecord.comments.map((comment, i) => (
+                    <div key={i} className="flex flex-col gap-1.5 animate-in fade-in">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-primary uppercase tracking-tight">{comment.userName}</span>
+                        <span className="text-[9px] font-mono text-muted-foreground uppercase">{comment.createdAt ? format(new Date(comment.createdAt), 'dd MMM, HH:mm') : '—'}</span>
+                      </div>
+                      <div className="p-3 bg-muted/20 border rounded-sm">
+                        <p className="text-sm font-medium leading-relaxed italic">"{comment.text}"</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-20 text-center flex flex-col items-center gap-3 opacity-20">
+                    <MessageCircle className="h-10 w-10" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">No comments yet</p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+            
+            <div className="p-6 border-t bg-muted/5 space-y-4 shrink-0">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Post Comment</Label>
+              <div className="flex gap-2">
+                <Textarea 
+                  placeholder="Type your message..." 
+                  className="min-h-[80px] rounded-sm bg-background border-primary/20 text-sm"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <DialogClose asChild><Button variant="ghost" className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Close</Button></DialogClose>
+                <Button 
+                  onClick={handlePostComment} 
+                  disabled={isProcessing || !newComment.trim()} 
+                  className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md"
+                >
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
+                  Send
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Alert */}
+      <AlertDialog open={!!deletingRecord} onOpenChange={(o) => !o && setDeletingRecord(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
+              <Trash2 className="h-5 w-5" /> Delete Audit Record?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+              Are you sure you want to permanently remove this audit log for Table <strong>{deletingRecord?.tableNumber}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11 px-6">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteRecord} 
+              disabled={isProcessing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] h-11 px-8 shadow-lg shadow-destructive/10"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Confirm Deletion"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modern High-Fidelity Media Viewer Overlay */}
       <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { resetViewer(); setViewFile(null); setViewFiles([]); } }}>
