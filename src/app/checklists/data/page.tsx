@@ -295,7 +295,7 @@ export default function ChecklistsDataPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right px-6">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setViewingMms(record)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingMms(record)}>
                               <Eye className="h-4 w-4" />
                             </Button>
                           </TableCell>
@@ -335,7 +335,7 @@ export default function ChecklistsDataPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right px-6">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setViewingInstallation(record)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}>
                               <Eye className="h-4 w-4" />
                             </Button>
                           </TableCell>
