@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, where, orderBy, doc, limit } from 'firebase/firestore';
+import { collection, query, orderBy, doc, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -27,7 +27,9 @@ import {
   Building,
   History,
   ImageIcon,
-  Maximize2
+  Maximize2,
+  ArrowLeft,
+  ArrowRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -37,7 +39,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { isSuperAdmin } from '@/lib/auth-constants';
 
-type Site = { id: string; name: string };
+type Site = { id: string; name: string; projectCompany?: string };
 
 type MMSChecklist = {
   id: string;
@@ -85,13 +87,13 @@ export default function ChecklistsDataPage() {
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
   const mmsQuery = useMemoFirebase(() => {
-    const q = query(collection(firestore, 'mms_checklists'), orderBy('createdAt', 'desc'), limit(500));
+    const q = query(collection(firestore, 'mms_checklists'), orderBy('createdAt', 'desc'), limit(1000));
     return q;
   }, [firestore]);
   const { data: mmsRecords, isLoading: mmsLoading } = useCollection<MMSChecklist>(mmsQuery);
 
   const instQuery = useMemoFirebase(() => {
-    const q = query(collection(firestore, 'installation_checklists'), orderBy('createdAt', 'desc'), limit(500));
+    const q = query(collection(firestore, 'installation_checklists'), orderBy('createdAt', 'desc'), limit(1000));
     return q;
   }, [firestore]);
   const { data: instRecords, isLoading: instLoading } = useCollection<InstallationChecklist>(instQuery);
@@ -118,9 +120,24 @@ export default function ChecklistsDataPage() {
     });
   }, [instRecords, selectedSiteId, searchTerm]);
 
+  const siteStats = React.useMemo(() => {
+    const stats: Record<string, { mms: number, inst: number }> = {};
+    mmsRecords?.forEach(r => {
+      if (!stats[r.siteId]) stats[r.siteId] = { mms: 0, inst: 0 };
+      stats[r.siteId].mms++;
+    });
+    instRecords?.forEach(r => {
+      if (!stats[r.siteId]) stats[r.siteId] = { mms: 0, inst: 0 };
+      stats[r.siteId].inst++;
+    });
+    return stats;
+  }, [mmsRecords, instRecords]);
+
   if (isProfileLoading || mmsLoading || instLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
+
+  const selectedSiteObj = allSites?.find(s => s.id === selectedSiteId);
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
@@ -131,142 +148,194 @@ export default function ChecklistsDataPage() {
         <p className="text-muted-foreground font-medium">Project-wise quality audit and verification logs.</p>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
-        <div className="flex flex-col gap-1.5 flex-1">
-          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Filter by Project Site</Label>
-          <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full justify-between h-11 rounded-sm bg-background border-primary/10 font-bold text-sm uppercase">
-                {selectedSiteId === 'all' ? "All Project Sites" : allSites?.find(s => s.id === selectedSiteId)?.name}
-                <Building2 className="ml-2 h-4 w-4 opacity-50" />
+      {selectedSiteId === 'all' ? (
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search projects..." 
+                className="pl-10 h-11 rounded-sm bg-background border-primary/10 text-sm"
+                value={siteSearchQuery}
+                onChange={e => setSiteSearchQuery(e.target.value)}
+              />
+            </div>
+            <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-8 border-none">
+              {allSites?.length || 0} Sites Registered
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())).map(site => {
+              const stats = siteStats[site.id] || { mms: 0, inst: 0 };
+              const total = stats.mms + stats.inst;
+
+              return (
+                <Card 
+                  key={site.id} 
+                  className="hover:shadow-md transition-all cursor-pointer group border-primary/10 rounded-sm overflow-hidden h-full flex flex-col"
+                  onClick={() => setSelectedSiteId(site.id)}
+                >
+                  <CardHeader className="bg-primary/5 py-4 border-b flex flex-row items-start justify-between space-y-0">
+                    <div className="space-y-1 min-w-0">
+                      <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors truncate pr-2" title={site.name}>
+                        {site.name}
+                      </CardTitle>
+                      {site.projectCompany && (
+                        <CardDescription className="text-[10px] uppercase font-black text-muted-foreground truncate">{site.projectCompany}</CardDescription>
+                      )}
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0 shrink-0" />
+                  </CardHeader>
+                  <CardContent className="pt-4 flex-1">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-2.5 bg-muted/20 rounded-sm border border-primary/5 flex flex-col gap-0.5">
+                        <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">MMS Audits</span>
+                        <span className="text-base font-black text-primary">{stats.mms}</span>
+                      </div>
+                      <div className="p-2.5 bg-muted/20 rounded-sm border border-primary/5 flex flex-col gap-0.5">
+                        <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Inst. Audits</span>
+                        <span className="text-base font-black text-primary">{stats.inst}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="bg-muted/5 border-t p-3">
+                    <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-widest flex items-center gap-1.5">
+                      <History className="h-3 w-3" /> Total Records: {total}
+                    </p>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="space-y-1">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => { setSelectedSiteId('all'); setSearchTerm(""); }} 
+                className="h-7 mb-1 -ml-2 text-muted-foreground hover:text-primary"
+              >
+                <ArrowLeft className="mr-2 h-3.5 w-3.5" /> Back to Project List
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[300px] p-0" align="start">
-              <div className="flex items-center border-b px-3">
-                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                <Input placeholder="Search sites..." className="h-10 border-none focus-visible:ring-0 text-sm" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} />
-              </div>
-              <ScrollArea className="h-[200px]">
-                <div className="p-1">
-                  <Button variant="ghost" className="w-full justify-start h-10 text-xs font-bold uppercase" onClick={() => { setSelectedSiteId('all'); setIsSitePopoverOpen(false); }}>All Active Sites</Button>
-                  {allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())).map(s => (
-                    <Button key={s.id} variant="ghost" className="w-full justify-start h-10 text-xs font-medium" onClick={() => { setSelectedSiteId(s.id); setIsSitePopoverOpen(false); }}>{s.name}</Button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
+              <h2 className="text-2xl font-black text-foreground uppercase tracking-tight flex items-center gap-3">
+                <Building2 className="h-6 w-6 text-primary" />
+                {selectedSiteObj?.name}
+              </h2>
+              <p className="text-muted-foreground text-xs font-bold uppercase tracking-[0.2em]">{selectedSiteObj?.projectCompany}</p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+               <div className="relative w-full md:w-80">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search site specific audits..." 
+                    className="pl-9 h-9 rounded-sm bg-background border-primary/10 text-xs"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                  />
+               </div>
+               <Button variant="ghost" size="icon" onClick={() => setSearchTerm("")} className="h-9 w-9 text-muted-foreground">
+                  <FilterX className="h-4 w-4" />
+               </Button>
+            </div>
+          </div>
+
+          <Tabs defaultValue="mms" className="w-full">
+            <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-12 max-w-md mb-6">
+              <TabsTrigger value="mms" className="rounded-sm font-bold text-[10px] uppercase tracking-widest h-10 px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm flex items-center gap-2">
+                <LayoutGrid className="h-3.5 w-3.5" /> Table Level MMS
+              </TabsTrigger>
+              <TabsTrigger value="inst" className="rounded-sm font-bold text-[10px] uppercase tracking-widest h-10 px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm flex items-center gap-2">
+                <ShieldCheck className="h-3.5 w-3.5" /> Module Installation
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="mms" className="animate-in fade-in slide-in-from-top-2 duration-300">
+              <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6">Date & Time</TableHead>
+                        <TableHead>Table Ref</TableHead>
+                        <TableHead>Personnel</TableHead>
+                        <TableHead className="text-right px-6">Review</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredMms.length > 0 ? filteredMms.map((record) => (
+                        <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group">
+                          <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
+                            {record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}
+                          </TableCell>
+                          <TableCell><Badge variant="secondary" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10">{record.tableName}</Badge></TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-xs font-medium">
+                              <User className="h-3 w-3 text-primary opacity-50" />
+                              {record.userName}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setViewingMms(record)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )) : (
+                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-sm">No MMS audits found for this project.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="inst" className="animate-in fade-in slide-in-from-top-2 duration-300">
+              <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="px-6">Date & Time</TableHead>
+                        <TableHead>Table Ref</TableHead>
+                        <TableHead>Personnel</TableHead>
+                        <TableHead className="text-right px-6">Review</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredInst.length > 0 ? filteredInst.map((record) => (
+                        <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group">
+                          <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
+                            {record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}
+                          </TableCell>
+                          <TableCell><Badge variant="secondary" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10">{record.tableNumber}</Badge></TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-xs font-medium">
+                              <User className="h-3 w-3 text-primary opacity-50" />
+                              {record.userName}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setViewingInstallation(record)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )) : (
+                        <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic text-sm">No installation audits found for this project.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
-
-        <div className="flex flex-col gap-1.5 w-full md:w-80">
-          <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Keywords</Label>
-          <Input 
-            placeholder="Personnel or table info..." 
-            className="h-11 rounded-sm bg-background border-primary/10 text-sm"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
-        </div>
-        
-        <Button variant="ghost" size="icon" onClick={() => { setSelectedSiteId("all"); setSearchTerm(""); }} className="h-11 w-11 text-muted-foreground mt-5">
-          <FilterX className="h-5 w-5" />
-        </Button>
-      </div>
-
-      <Tabs defaultValue="mms" className="w-full">
-        <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-12 max-w-md mb-6">
-          <TabsTrigger value="mms" className="rounded-sm font-bold text-[10px] uppercase tracking-widest h-10 px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm flex items-center gap-2">
-            <LayoutGrid className="h-3.5 w-3.5" /> MMS Audits
-          </TabsTrigger>
-          <TabsTrigger value="inst" className="rounded-sm font-bold text-[10px] uppercase tracking-widest h-10 px-6 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm flex items-center gap-2">
-            <ShieldCheck className="h-3.5 w-3.5" /> Installation Audits
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="mms" className="animate-in fade-in slide-in-from-top-2 duration-300">
-          <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-muted/30">
-                  <TableRow>
-                    <TableHead className="px-6">Date & Time</TableHead>
-                    <TableHead>Project Site</TableHead>
-                    <TableHead>Table Ref</TableHead>
-                    <TableHead>Personnel</TableHead>
-                    <TableHead className="text-right px-6">Review</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMms.length > 0 ? filteredMms.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group">
-                      <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
-                        {record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}
-                      </TableCell>
-                      <TableCell className="font-bold text-sm text-foreground">{record.siteName}</TableCell>
-                      <TableCell><Badge variant="secondary" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10">{record.tableName}</Badge></TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-xs font-medium">
-                          <User className="h-3 w-3 text-primary opacity-50" />
-                          {record.userName}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right px-6">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setViewingMms(record)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )) : (
-                    <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-sm">No MMS audits found.</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="inst" className="animate-in fade-in slide-in-from-top-2 duration-300">
-          <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-muted/30">
-                  <TableRow>
-                    <TableHead className="px-6">Date & Time</TableHead>
-                    <TableHead>Project Site</TableHead>
-                    <TableHead>Table Ref</TableHead>
-                    <TableHead>Personnel</TableHead>
-                    <TableHead className="text-right px-6">Review</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredInst.length > 0 ? filteredInst.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group">
-                      <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
-                        {record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}
-                      </TableCell>
-                      <TableCell className="font-bold text-sm text-foreground">{record.siteName}</TableCell>
-                      <TableCell><Badge variant="secondary" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10">{record.tableNumber}</Badge></TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-xs font-medium">
-                          <User className="h-3 w-3 text-primary opacity-50" />
-                          {record.userName}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right px-6">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setViewingInstallation(record)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )) : (
-                    <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-sm">No installation audits found.</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      )}
 
       {/* Detail Dialogs */}
       <Dialog open={!!viewingMms} onOpenChange={(o) => !o && setViewingMms(null)}>
