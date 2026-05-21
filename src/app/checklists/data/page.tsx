@@ -166,7 +166,7 @@ export default function ChecklistsDataPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())).map(site => {
-              const stats = siteStats[site.id] || { mms: number = 0, inst: number = 0 };
+              const stats = siteStats[site.id] || { mms: 0, inst: 0 };
               const total = stats.mms + stats.inst;
 
               return (
