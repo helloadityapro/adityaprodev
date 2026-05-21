@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect } from 'react';
@@ -8,7 +7,8 @@ export default function ChecklistsBasePage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/checklists/mms');
+    // Redirect to the point-based Table Level MMS checklist
+    router.replace('/checklists/installation');
   }, [router]);
 
   return null;

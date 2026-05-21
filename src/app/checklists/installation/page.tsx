@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
@@ -22,16 +22,12 @@ import {
   Loader2, 
   Building2, 
   ClipboardCheck,
-  CheckCircle2,
   Camera,
   ImageIcon,
   X,
-  UserCheck,
   Save,
   Trash2,
-  Paperclip,
   Film,
-  FileText,
   Plus
 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -85,7 +81,7 @@ const CHECK_LABELS = {
   earthingCondition: "Earthing Condition",
 };
 
-export default function ModuleInstallationChecklistPage() {
+export default function TableLevelMMSChecklistPage() {
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
   const { user } = useUser();
@@ -133,7 +129,6 @@ export default function ModuleInstallationChecklistPage() {
 
   const uploadFile = async (file: File, path: string): Promise<{url: string, contentType: string, name: string}> => {
     let blob: Blob = file;
-    // Only compress images
     if (file.type.startsWith('image/')) {
       try {
         blob = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920 });
@@ -170,12 +165,11 @@ export default function ModuleInstallationChecklistPage() {
       const timestamp = Date.now();
       const finalChecks: any[] = [];
 
-      // Process indexed checks
       for (const [key, check] of Object.entries(values.checks)) {
         const attachments = [];
         for (let i = 0; i < check.localFiles.length; i++) {
           const file = check.localFiles[i];
-          const path = `checklists/installation/${user.uid}/${timestamp}_${key}_${i}_${file.name.replace(/\s+/g, '_')}`;
+          const path = `checklists/mms/${user.uid}/${timestamp}_${key}_${i}_${file.name.replace(/\s+/g, '_')}`;
           const uploaded = await uploadFile(file, path);
           attachments.push(uploaded);
         }
@@ -187,11 +181,10 @@ export default function ModuleInstallationChecklistPage() {
         });
       }
 
-      // Process other files
       const otherAttachments = [];
       for (let i = 0; i < values.otherLocalFiles.length; i++) {
         const file = values.otherLocalFiles[i];
-        const path = `checklists/installation/${user.uid}/${timestamp}_other_${i}_${file.name.replace(/\s+/g, '_')}`;
+        const path = `checklists/mms/${user.uid}/${timestamp}_other_${i}_${file.name.replace(/\s+/g, '_')}`;
         const uploaded = await uploadFile(file, path);
         otherAttachments.push(uploaded);
       }
@@ -230,7 +223,7 @@ export default function ModuleInstallationChecklistPage() {
     <div className="space-y-8 max-w-4xl mx-auto pb-32 px-2 sm:px-4">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <ClipboardCheck className="h-7 w-7" /> Module Installation Audit
+          <ClipboardCheck className="h-7 w-7" /> Table Level MMS Audit
         </h1>
         <p className="text-muted-foreground font-medium text-sm">Comprehensive field verification for solar tables.</p>
       </div>
@@ -346,7 +339,7 @@ export default function ModuleInstallationChecklistPage() {
                               
                               <label className="cursor-pointer">
                                 <div className="flex items-center justify-center gap-2 px-3 h-8 rounded-sm border border-dashed border-primary/30 bg-background text-primary hover:bg-primary/5 transition-colors text-[9px] font-black uppercase tracking-widest">
-                                  <Camera className="h-3 w-3" /> Add Proof
+                                  <Camera className="h-3 w-3" /> Add Photo/Video
                                 </div>
                                 <input 
                                   type="file" 
@@ -360,8 +353,6 @@ export default function ModuleInstallationChecklistPage() {
                                 />
                               </label>
                             </div>
-                            
-                            {/* Upload Progress Area */}
                             <div className="space-y-1">
                               {value.map((file: File) => uploadProgress[file.name] !== undefined && (
                                 <div key={file.name} className="space-y-1">
@@ -500,7 +491,7 @@ export default function ModuleInstallationChecklistPage() {
               )} />
 
               <div className="flex flex-col sm:flex-row justify-end gap-4 border-t pt-8">
-                <Button type="button" variant="ghost" onClick={() => router.back()} className="rounded-sm font-bold h-11">Cancel</Button>
+                <Button type="button" variant="outline" onClick={() => router.back()} className="rounded-sm font-bold h-11">Cancel</Button>
                 <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-xs tracking-widest h-14 px-12 shadow-xl shadow-primary/20">
                   {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Transferring Media...</> : <><Save className="mr-2 h-4 w-4" /> Finalize Record</>}
                 </Button>

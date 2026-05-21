@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview Definition of all available sidebar pages and their keys.
  * This acts as the source of truth for the User Access Management system.
@@ -22,7 +21,6 @@ export type PageKey =
   | 'trips' 
   | 'attendance'
   | 'attendance-map'
-  | 'checklists-mms'
   | 'checklists-installation'
   | 'checklists-data'
   | 'master-data-tables-add'
@@ -82,9 +80,8 @@ export const APP_PAGES: AppPage[] = [
   { id: 'attendance', label: 'Personnel Attendance', category: 'Operations', path: '/attendance' },
   { id: 'attendance-map', label: 'Personnel Live Map', category: 'Operations', path: '/attendance/map-view' },
 
-  { id: 'checklists-mms', label: 'Table Level MMS Checklist', category: 'Checklists', path: '/checklists/mms' },
-  { id: 'checklists-installation', label: 'Module Installation Checklist', category: 'Checklists', path: '/checklists/installation' },
-  { id: 'checklists-data', label: 'Checklist Data', category: 'Checklists', path: '/checklists/data' },
+  { id: 'checklists-installation', label: 'Table Level MMS Checklist', category: 'Checklists', path: '/checklists/installation' },
+  { id: 'checklists-data', label: 'Checklist Data Registry', category: 'Checklists', path: '/checklists/data' },
 
   { id: 'master-data-tables-add', label: 'Add Tables Data', category: 'Master Data', path: '/master-data/tables/add' },
   { id: 'master-data-tables-list', label: 'Tables Data', category: 'Master Data', path: '/master-data/tables/list' },
@@ -140,7 +137,6 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/requirements')) return 'requirements';
   if (path.startsWith('/site-visits')) return 'visits';
   if (path.startsWith('/attendance')) return 'attendance';
-  if (path.startsWith('/checklists/mms')) return 'checklists-mms';
   if (path.startsWith('/checklists/installation')) return 'checklists-installation';
   if (path.startsWith('/checklists/data')) return 'checklists-data';
   if (path.startsWith('/master-data')) {

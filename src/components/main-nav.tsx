@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -725,22 +724,12 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <SidebarMenuSub>
-                  {canShow('checklists-mms') && (
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/checklists/mms'} onClick={handleMobileClose}>
-                        <Link href="/checklists/mms">
-                          <LayoutGrid className="h-4 w-4" />
-                          <span>Table Level MMS</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  )}
                   {canShow('checklists-installation') && (
                     <SidebarMenuSubItem>
                       <SidebarMenuSubButton asChild isActive={pathname === '/checklists/installation'} onClick={handleMobileClose}>
                         <Link href="/checklists/installation">
-                          <ClipboardList className="h-4 w-4" />
-                          <span>Module Installation</span>
+                          <LayoutGrid className="h-4 w-4" />
+                          <span>Table Level MMS</span>
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
