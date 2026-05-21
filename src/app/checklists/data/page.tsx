@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, query, orderBy, doc, limit } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -72,7 +72,6 @@ export default function ChecklistsDataPage() {
   
   const [selectedSiteId, setSelectedSiteId] = React.useState<string>("all");
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
 
   const [viewingMms, setViewingMms] = React.useState<MMSChecklist | null>(null);
@@ -167,7 +166,7 @@ export default function ChecklistsDataPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())).map(site => {
-              const stats = siteStats[site.id] || { mms: 0, inst: 0 };
+              const stats = siteStats[site.id] || { mms: number = 0, inst: number = 0 };
               const total = stats.mms + stats.inst;
 
               return (
