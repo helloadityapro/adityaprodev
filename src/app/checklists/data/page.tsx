@@ -164,49 +164,65 @@ export default function ChecklistsDataPage() {
             </Badge>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())).map(site => {
-              const stats = siteStats[site.id] || { mms: 0, inst: 0 };
-              const total = stats.mms + stats.inst;
-
-              return (
-                <Card 
-                  key={site.id} 
-                  className="hover:shadow-md transition-all cursor-pointer group border-primary/10 rounded-sm overflow-hidden h-full flex flex-col"
-                  onClick={() => setSelectedSiteId(site.id)}
-                >
-                  <CardHeader className="bg-primary/5 py-4 border-b flex flex-row items-start justify-between space-y-0">
-                    <div className="space-y-1 min-w-0">
-                      <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors truncate pr-2" title={site.name}>
-                        {site.name}
-                      </CardTitle>
-                      {site.projectCompany && (
-                        <CardDescription className="text-[10px] uppercase font-black text-muted-foreground truncate">{site.projectCompany}</CardDescription>
-                      )}
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0 shrink-0" />
-                  </CardHeader>
-                  <CardContent className="pt-4 flex-1">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-2.5 bg-muted/20 rounded-sm border border-primary/5 flex flex-col gap-0.5">
-                        <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">MMS Audits</span>
-                        <span className="text-base font-black text-primary">{stats.mms}</span>
-                      </div>
-                      <div className="p-2.5 bg-muted/20 rounded-sm border border-primary/5 flex flex-col gap-0.5">
-                        <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Inst. Audits</span>
-                        <span className="text-base font-black text-primary">{stats.inst}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="bg-muted/5 border-t p-3">
-                    <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-widest flex items-center gap-1.5">
-                      <History className="h-3 w-3" /> Total Records: {total}
-                    </p>
-                  </CardFooter>
-                </Card>
-              );
-            })}
-          </div>
+          <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="px-6">Project Name</TableHead>
+                    <TableHead className="hidden md:table-cell">Project Company</TableHead>
+                    <TableHead className="text-center">MMS Audits</TableHead>
+                    <TableHead className="text-center">Inst. Audits</TableHead>
+                    <TableHead className="text-right px-6">Total Records</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())).map(site => {
+                    const stats = siteStats[site.id] || { mms: 0, inst: 0 };
+                    const total = stats.mms + stats.inst;
+                    return (
+                      <TableRow 
+                        key={site.id} 
+                        className="hover:bg-muted/5 cursor-pointer transition-colors group"
+                        onClick={() => setSelectedSiteId(site.id)}
+                      >
+                        <TableCell className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{site.name}</span>
+                            <span className="text-[10px] md:hidden uppercase font-black text-muted-foreground">{site.projectCompany}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          <span className="text-[10px] uppercase font-black text-muted-foreground">{site.projectCompany}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="rounded-sm h-6 px-2 text-[10px] font-bold border-primary/10 bg-primary/5 text-primary">
+                            {stats.mms}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className="rounded-sm h-6 px-2 text-[10px] font-bold border-primary/10 bg-primary/5 text-primary">
+                            {stats.inst}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right px-6">
+                          <div className="flex items-center justify-end gap-3 text-xs font-black text-foreground">
+                            {total}
+                            <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-all group-hover:translate-x-1" />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">No projects found.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
       ) : (
         <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
