@@ -226,7 +226,7 @@ export default function TableLevelMMSChecklistPage() {
   const filteredSites = allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())) || [];
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto pb-32 px-2 sm:px-4">
+    <div className="space-y-8 max-w-4xl mx-auto pb-20 px-2 sm:px-4">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <ClipboardCheck className="h-7 w-7" /> Table Level MMS Audit
@@ -495,8 +495,7 @@ export default function TableLevelMMSChecklistPage() {
                   <FormField control={form.control} name="customerRepName" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Representative Name</FormLabel>
-                      <FormControl><Input placeholder="Full name" {...field} className="h-11 rounded-sm" /></FormControl>
-                    </FormItem>
+                      <FormControl><Input placeholder="Full name" {...field} className="h-11 rounded-sm" /></FormItem>
                   )} />
                   <FormField control={form.control} name="customerRepRemarks" render={({ field }) => (
                     <FormItem>
@@ -525,13 +524,11 @@ export default function TableLevelMMSChecklistPage() {
             </CardContent>
           </Card>
           
-          <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-t p-4 md:left-[16rem]">
-            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => router.back()} className="rounded-sm font-bold h-12 sm:w-32">Cancel</Button>
-              <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-xs tracking-widest h-12 px-10 shadow-xl shadow-primary/20">
-                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Transferring Media...</> : <><Save className="mr-2 h-4 w-4" /> Finalize Record</>}
-              </Button>
-            </div>
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-8">
+            <Button type="button" variant="outline" onClick={() => router.back()} className="rounded-sm font-bold h-12 sm:w-32">Cancel</Button>
+            <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-xs tracking-widest h-12 px-10 shadow-xl shadow-primary/20">
+              {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Transferring Media...</> : <><Save className="mr-2 h-4 w-4" /> Finalize Record</>}
+            </Button>
           </div>
         </form>
       </Form>
