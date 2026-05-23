@@ -35,7 +35,8 @@ import {
   MessageCircle,
   Send,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  FileDown
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -67,6 +68,9 @@ type InstallationChecklist = {
   siteId: string;
   siteName: string;
   tableNumber: string;
+  tableSize: string;
+  columnCount: number;
+  moduleCount: number;
   userId: string;
   userName: string;
   createdAt: any;
@@ -75,6 +79,7 @@ type InstallationChecklist = {
   otherAttachments?: Attachment[];
   customerRepPresent: boolean;
   customerRepName?: string;
+  customerRepRemarks?: string;
   comments?: Comment[];
 };
 
@@ -92,6 +97,7 @@ export default function ChecklistsDataPage() {
   const [deletingRecord, setDeletingRecord] = React.useState<InstallationChecklist | null>(null);
   const [newComment, setNewComment] = React.useState("");
   const [isProcessing, setIsProcessing] = React.useState(false);
+  const [isExporting, setIsExporting] = React.useState(false);
   
   // High-fidelity media viewer state
   const [viewFile, setViewFile] = React.useState<Attachment | null>(null);
@@ -136,6 +142,186 @@ export default function ChecklistsDataPage() {
     });
     return stats;
   }, [instRecords]);
+
+  // PDF Export Logic
+  const exportToPDF = async (items: InstallationChecklist[]) => {
+    if (items.length === 0) return;
+    setIsExporting(true);
+    
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+      
+      items.forEach((record, index) => {
+        if (index > 0) doc.addPage();
+        
+        const margin = 15;
+        let currY = 25;
+        const colWidthLabel = 65;
+        const colWidthValue = 115;
+        const rowHeight = 8;
+        const pageWidth = 210;
+
+        // Title
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('TABLE LEVEL MMS CHECKLIST', margin, currY - 8);
+        
+        // Header Table Helper
+        const drawRow = (label: string, value: string) => {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.rect(margin, currY, colWidthLabel, rowHeight);
+          doc.text(label, margin + 2, currY + 5.5);
+          
+          doc.setFont('helvetica', 'normal');
+          doc.rect(margin + colWidthLabel, currY, colWidthValue, rowHeight);
+          doc.text(String(value || '—'), margin + colWidthLabel + 2, currY + 5.5);
+          currY += rowHeight;
+        };
+
+        drawRow('PROJECT NAME', record.siteName);
+        drawRow('TABLE NUMBER', record.tableNumber);
+        drawRow('SIZE OF TABLE', record.tableSize || '—');
+        drawRow('NUMBER OF COLUMNS', String(record.columnCount || '—'));
+        drawRow('NUMBER OF MODULES', String(record.moduleCount || '—'));
+
+        currY += 5;
+
+        // Checks Table Header
+        const col1 = 65;
+        const col2 = 75;
+        const col3 = 40;
+
+        doc.setFont('helvetica', 'bold');
+        doc.rect(margin, currY, col1, rowHeight);
+        doc.text('CHECKS/ AUTHORITIES', margin + 2, currY + 5.5);
+        doc.rect(margin + col1, currY, col2, rowHeight);
+        doc.text('REMARKS', margin + col1 + 2, currY + 5.5);
+        doc.rect(margin + col1 + col2, currY, col3, rowHeight);
+        doc.text('ATTACHMENTS', margin + col1 + col2 + 2, currY + 5.5);
+        currY += rowHeight;
+
+        // Checks Rows
+        doc.setFont('helvetica', 'normal');
+        record.checks.forEach(check => {
+          const attCount = check.attachments?.length || 0;
+          const attText = attCount > 0 ? `YES (${attCount})` : 'NO';
+          
+          const remarkLines = doc.splitTextToSize(check.remarks || '—', col2 - 4);
+          const h = Math.max(rowHeight, remarkLines.length * 4 + 4);
+
+          // Check for page break if content exceeds
+          if (currY + h > 270) {
+            doc.addPage();
+            currY = 20;
+          }
+
+          doc.rect(margin, currY, col1, h);
+          doc.text(check.label.toUpperCase(), margin + 2, currY + 5.5);
+          
+          doc.rect(margin + col1, currY, col2, h);
+          doc.text(remarkLines, margin + col1 + 2, currY + 5.5);
+          
+          doc.rect(margin + col1 + col2, currY, col3, h);
+          doc.text(attText, margin + col1 + col2 + 2, currY + 5.5);
+          currY += h;
+        });
+
+        // Other Remark
+        const otherRemLines = doc.splitTextToSize(record.otherRemarks || '—', col2 - 4);
+        const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4);
+        
+        if (currY + otherH > 270) {
+          doc.addPage();
+          currY = 20;
+        }
+
+        doc.rect(margin, currY, col1, otherH);
+        doc.text('OTHER REMARK (IF ANY)', margin + 2, currY + 5.5);
+        doc.rect(margin + col1, currY, col2, otherH);
+        doc.text(otherRemLines, margin + col1 + 2, currY + 5.5);
+        const otherAttCount = record.otherAttachments?.length || 0;
+        doc.rect(margin + col1 + col2, currY, col3, otherH);
+        doc.text(otherAttCount > 0 ? `YES (${otherAttCount})` : 'NO', margin + col1 + col2 + 2, currY + 5.5);
+        currY += otherH;
+
+        currY += 5;
+
+        // Footer Metadata Rows
+        const drawFooterRow = (label: string, value: string) => {
+          if (currY + rowHeight > 270) {
+            doc.addPage();
+            currY = 20;
+          }
+          doc.setFont('helvetica', 'bold');
+          doc.rect(margin, currY, colWidthLabel, rowHeight);
+          doc.text(label, margin + 2, currY + 5.5);
+          doc.setFont('helvetica', 'normal');
+          doc.rect(margin + colWidthLabel, currY, colWidthValue, rowHeight);
+          doc.text(value, margin + colWidthLabel + 2, currY + 5.5);
+          currY += rowHeight;
+        };
+
+        drawFooterRow('SUBMITTED BY', record.userName);
+        drawFooterRow('DATE', record.createdAt ? format(record.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : '—');
+        
+        currY += 5;
+        
+        // Client Representative Section
+        const clientRemarks = record.customerRepRemarks || '—';
+        const clientContent = record.customerRepPresent 
+          ? `Rep: ${record.customerRepName || 'N/A'}\nRemarks: ${clientRemarks}` 
+          : "Not Present";
+        
+        const clientLines = doc.splitTextToSize(clientContent, colWidthValue - 4);
+        const clientH = Math.max(rowHeight * 2, clientLines.length * 4 + 6);
+
+        if (currY + clientH > 270) {
+          doc.addPage();
+          currY = 20;
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.rect(margin, currY, colWidthLabel, clientH);
+        doc.text('REPRESENTATIVE OF PROJECT\nCLIENT & THEIR COMMENTS', margin + 2, currY + 5.5);
+        doc.setFont('helvetica', 'normal');
+        doc.rect(margin + colWidthLabel, currY, colWidthValue, clientH);
+        doc.text(clientLines, margin + colWidthLabel + 2, currY + 5.5);
+        currY += clientH;
+
+        currY += 5;
+
+        // External App Comments Section
+        const extCommentsRaw = record.comments?.map(c => `[${format(new Date(c.createdAt), 'dd/MM HH:mm')}] ${c.userName}: ${c.text}`).join('\n') || '—';
+        const extLines = doc.splitTextToSize(extCommentsRaw, colWidthValue - 4);
+        const extH = Math.max(rowHeight * 2, extLines.length * 4 + 6);
+
+        if (currY + extH > 270) {
+          doc.addPage();
+          currY = 20;
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.rect(margin, currY, colWidthLabel, extH);
+        doc.text('EXTERNAL COMMENTS', margin + 2, currY + 5.5);
+        doc.setFont('helvetica', 'normal');
+        doc.rect(margin + colWidthLabel, currY, colWidthValue, extH);
+        doc.text(extLines, margin + colWidthLabel + 2, currY + 5.5);
+      });
+
+      const fileName = items.length === 1 
+        ? `AdityaPro_MMS_Audit_${items[0].tableNumber}.pdf` 
+        : `AdityaPro_MMS_Batch_${items[0].siteName.replace(/\s+/g, '_')}.pdf`;
+        
+      doc.save(fileName);
+      toast({ title: 'PDF Generated', description: 'Audit document saved successfully.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: error.message });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const resetViewer = () => {
     setScale(1);
@@ -357,6 +543,15 @@ export default function ChecklistsDataPage() {
                     onChange={e => setSearchTerm(e.target.value)}
                   />
                </div>
+               <Button 
+                onClick={() => exportToPDF(filteredInst)} 
+                disabled={isExporting || filteredInst.length === 0} 
+                variant="outline" 
+                className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5"
+               >
+                 {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />}
+                 Export All (PDF)
+               </Button>
                <Button variant="ghost" size="icon" onClick={() => setSearchTerm("")} className="h-9 w-9 text-muted-foreground">
                   <FilterX className="h-4 w-4" />
                </Button>
@@ -403,6 +598,15 @@ export default function ChecklistsDataPage() {
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingInstallation(record)}>
                             <Eye className="h-4 w-4" />
                           </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-slate-600 rounded-sm hover:text-primary" 
+                            onClick={() => exportToPDF([record])}
+                            title="Export PDF"
+                          >
+                            <FileDown className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm hover:text-primary" onClick={() => setCommentingRecord(record)}>
                             <MessageCircle className="h-4 w-4" />
                           </Button>
@@ -434,6 +638,11 @@ export default function ChecklistsDataPage() {
                 <DialogTitle className="text-xl font-black uppercase tracking-tight">Audit Summary</DialogTitle>
                 <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{viewingInstallation?.siteName} • Table {viewingInstallation?.tableNumber}</DialogDescription>
               </div>
+            </div>
+            <div className="flex items-center gap-2 pr-8">
+               <Button onClick={() => viewingInstallation && exportToPDF([viewingInstallation])} variant="outline" size="sm" className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary">
+                 <FileDown className="h-3.5 w-3.5 mr-1.5" /> PDF Report
+               </Button>
             </div>
           </DialogHeader>
           <ScrollArea className="flex-1">
@@ -585,7 +794,7 @@ export default function ChecklistsDataPage() {
                   disabled={isProcessing || !newComment.trim()} 
                   className="rounded-sm font-black uppercase text-[10px] h-10 px-8 shadow-md"
                 >
-                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
                   Send
                 </Button>
               </div>
