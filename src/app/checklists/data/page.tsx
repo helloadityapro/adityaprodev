@@ -73,6 +73,7 @@ type InstallationChecklist = {
   id: string;
   siteId: string;
   siteName: string;
+  projectCompany?: string;
   tableNumber: string;
   tableSize: string;
   columnCount: number;
@@ -134,7 +135,6 @@ export default function ChecklistsDataPage() {
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
   const instQuery = useMemoFirebase(() => {
-    // In-memory filter handles complexity better than composite indices for prototyping
     return query(collection(firestore, 'installation_checklists'), limit(1000));
   }, [firestore]);
   const { data: instRecords, isLoading: instLoading } = useCollection<InstallationChecklist>(instQuery);
@@ -228,8 +228,31 @@ export default function ChecklistsDataPage() {
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
+
+      // Helper to load image as data URL reliably
+      const loadImage = (url: string): Promise<string | null> => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'Anonymous';
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            } else {
+                resolve(null);
+            }
+          };
+          img.onerror = () => resolve(null);
+          img.src = url;
+        });
+      };
       
-      items.forEach((record, index) => {
+      for (let index = 0; index < items.length; index++) {
+        const record = items[index];
         if (index > 0) doc.addPage();
         
         const margin = 15;
@@ -256,6 +279,7 @@ export default function ChecklistsDataPage() {
           currY += rowHeight;
         };
 
+        drawRow('PROJECT COMPANY', record.projectCompany || 'Aditya Green Energy');
         drawRow('PROJECT NAME', record.siteName);
         drawRow('TABLE NUMBER', record.tableNumber);
         drawRow('SIZE OF TABLE', record.tableSize || '—');
@@ -280,12 +304,15 @@ export default function ChecklistsDataPage() {
 
         // Checks Rows
         doc.setFont('helvetica', 'normal');
-        record.checks.forEach(check => {
-          const attCount = check.attachments?.length || 0;
-          const attText = attCount > 0 ? `YES (${attCount})` : 'NO';
+        for (const check of record.checks) {
+          const attachments = check.attachments || [];
+          const images = attachments.filter(a => a.contentType?.startsWith('image/'));
+          const videos = attachments.filter(a => a.contentType?.startsWith('video/'));
           
           const remarkLines = doc.splitTextToSize(check.remarks || '—', col2 - 4);
-          const h = Math.max(rowHeight, remarkLines.length * 4 + 4);
+          const imageSize = 15;
+          const hasImages = images.length > 0;
+          const h = Math.max(rowHeight, remarkLines.length * 4 + 4, hasImages ? imageSize + 6 : 0);
 
           // Check for page break if content exceeds
           if (currY + h > 270) {
@@ -300,13 +327,31 @@ export default function ChecklistsDataPage() {
           doc.text(remarkLines, margin + col1 + 2, currY + 5.5);
           
           doc.rect(margin + col1 + col2, currY, col3, h);
-          doc.text(attText, margin + col1 + col2 + 2, currY + 5.5);
+          
+          if (hasImages) {
+            let imgX = margin + col1 + col2 + 2;
+            for (let i = 0; i < Math.min(images.length, 2); i++) {
+                const imgData = await loadImage(images[i].url);
+                if (imgData) {
+                    doc.addImage(imgData, 'JPEG', imgX, currY + 2, imageSize, imageSize);
+                    imgX += imageSize + 2;
+                }
+            }
+          } else if (videos.length > 0) {
+            doc.setFontSize(7);
+            doc.text('VIDEO PROOF', margin + col1 + col2 + 2, currY + 5.5);
+          } else {
+            doc.text('NO', margin + col1 + col2 + 2, currY + 5.5);
+          }
+          
           currY += h;
-        });
+        }
 
         // Other Remark
         const otherRemLines = doc.splitTextToSize(record.otherRemarks || '—', col2 - 4);
-        const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4);
+        const otherAtts = record.otherAttachments || [];
+        const hasOtherImages = otherAtts.some(a => a.contentType?.startsWith('image/'));
+        const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4, hasOtherImages ? 21 : 0);
         
         if (currY + otherH > 270) {
           doc.addPage();
@@ -317,9 +362,21 @@ export default function ChecklistsDataPage() {
         doc.text('OTHER REMARK (IF ANY)', margin + 2, currY + 5.5);
         doc.rect(margin + col1, currY, col2, otherH);
         doc.text(otherRemLines, margin + col1 + 2, currY + 5.5);
-        const otherAttCount = record.otherAttachments?.length || 0;
+        
         doc.rect(margin + col1 + col2, currY, col3, otherH);
-        doc.text(otherAttCount > 0 ? `YES (${otherAttCount})` : 'NO', margin + col1 + col2 + 2, currY + 5.5);
+        if (hasOtherImages) {
+            let imgX = margin + col1 + col2 + 2;
+            const images = otherAtts.filter(a => a.contentType?.startsWith('image/'));
+            for (let i = 0; i < Math.min(images.length, 2); i++) {
+                const imgData = await loadImage(images[i].url);
+                if (imgData) {
+                    doc.addImage(imgData, 'JPEG', imgX, currY + 2, 15, 15);
+                    imgX += 17;
+                }
+            }
+        } else {
+            doc.text(otherAtts.length > 0 ? 'YES' : 'NO', margin + col1 + col2 + 2, currY + 5.5);
+        }
         currY += otherH;
 
         currY += 5;
@@ -384,7 +441,7 @@ export default function ChecklistsDataPage() {
         doc.setFont('helvetica', 'normal');
         doc.rect(margin + colWidthLabel, currY, colWidthValue, extH);
         doc.text(extLines, margin + colWidthLabel + 2, currY + 5.5);
-      });
+      }
 
       const fileName = items.length === 1 
         ? `AdityaPro_MMS_Audit_${items[0].tableNumber}.pdf` 
@@ -393,6 +450,7 @@ export default function ChecklistsDataPage() {
       doc.save(fileName);
       toast({ title: 'PDF Generated', description: 'Audit document saved successfully.' });
     } catch (error: any) {
+      console.error(error);
       toast({ variant: 'destructive', title: 'Export Failed', description: error.message });
     } finally {
       setIsExporting(false);
@@ -661,7 +719,7 @@ export default function ChecklistsDataPage() {
 
               <div className="flex items-end gap-2">
                 {dateFilter === 'custom' ? (
-                  <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95">
+                  <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95 duration-200">
                     <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-10 rounded-sm border-primary/20 text-[10px]" />
                     <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-10 rounded-sm border-primary/20 text-[10px]" />
                   </div>
@@ -1057,3 +1115,4 @@ export default function ChecklistsDataPage() {
     </div>
   );
 }
+
