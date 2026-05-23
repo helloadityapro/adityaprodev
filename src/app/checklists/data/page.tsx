@@ -159,7 +159,14 @@ export default function ChecklistsDataPage() {
     if (!instRecords) return [];
     const { start, end } = queryDateRange;
 
-    let result = instRecords.filter(r => {
+    let result = instRecords.map(r => {
+      // Enrichment for legacy records that might not have the projectCompany field
+      const site = allSites?.find(s => s.id === r.siteId);
+      return {
+        ...r,
+        projectCompany: r.projectCompany || site?.projectCompany || 'Aditya Green Energy'
+      };
+    }).filter(r => {
       const rDate = r.createdAt?.toDate?.() || new Date(r.createdAt);
       const rDateStr = format(rDate, 'yyyy-MM-dd');
 
@@ -198,7 +205,7 @@ export default function ChecklistsDataPage() {
     });
 
     return result;
-  }, [instRecords, selectedSiteId, searchTerm, queryDateRange, sortConfig]);
+  }, [instRecords, selectedSiteId, searchTerm, queryDateRange, sortConfig, allSites]);
 
   const siteStats = React.useMemo(() => {
     const stats: Record<string, number> = {};
@@ -230,7 +237,7 @@ export default function ChecklistsDataPage() {
       const doc = new jsPDF('p', 'mm', 'a4');
 
       // Helper to load image as data URL reliably
-      const loadImage = (url: string): Promise<string | null> => {
+      const loadImageData = (url: string): Promise<{data: string, format: string} | null> => {
         return new Promise((resolve) => {
           const img = new Image();
           img.crossOrigin = 'Anonymous';
@@ -241,7 +248,11 @@ export default function ChecklistsDataPage() {
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 ctx.drawImage(img, 0, 0);
-                resolve(canvas.toDataURL('image/jpeg', 0.7));
+                const format = url.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
+                resolve({ 
+                  data: canvas.toDataURL(format === 'PNG' ? 'image/png' : 'image/jpeg', 0.7), 
+                  format 
+                });
             } else {
                 resolve(null);
             }
@@ -306,8 +317,8 @@ export default function ChecklistsDataPage() {
         doc.setFont('helvetica', 'normal');
         for (const check of record.checks) {
           const attachments = check.attachments || [];
-          const images = attachments.filter(a => a.contentType?.startsWith('image/'));
-          const videos = attachments.filter(a => a.contentType?.startsWith('video/'));
+          const images = attachments.filter(a => isImage(a));
+          const videos = attachments.filter(a => isVideo(a));
           
           const remarkLines = doc.splitTextToSize(check.remarks || '—', col2 - 4);
           const imageSize = 15;
@@ -331,15 +342,16 @@ export default function ChecklistsDataPage() {
           if (hasImages) {
             let imgX = margin + col1 + col2 + 2;
             for (let i = 0; i < Math.min(images.length, 2); i++) {
-                const imgData = await loadImage(images[i].url);
-                if (imgData) {
-                    doc.addImage(imgData, 'JPEG', imgX, currY + 2, imageSize, imageSize);
+                const imgResult = await loadImageData(images[i].url);
+                if (imgResult) {
+                    doc.addImage(imgResult.data, imgResult.format, imgX, currY + 2, imageSize, imageSize);
                     imgX += imageSize + 2;
                 }
             }
           } else if (videos.length > 0) {
             doc.setFontSize(7);
             doc.text('VIDEO PROOF', margin + col1 + col2 + 2, currY + 5.5);
+            doc.setFontSize(9);
           } else {
             doc.text('NO', margin + col1 + col2 + 2, currY + 5.5);
           }
@@ -350,7 +362,8 @@ export default function ChecklistsDataPage() {
         // Other Remark
         const otherRemLines = doc.splitTextToSize(record.otherRemarks || '—', col2 - 4);
         const otherAtts = record.otherAttachments || [];
-        const hasOtherImages = otherAtts.some(a => a.contentType?.startsWith('image/'));
+        const otherImages = otherAtts.filter(a => isImage(a));
+        const hasOtherImages = otherImages.length > 0;
         const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4, hasOtherImages ? 21 : 0);
         
         if (currY + otherH > 270) {
@@ -366,11 +379,10 @@ export default function ChecklistsDataPage() {
         doc.rect(margin + col1 + col2, currY, col3, otherH);
         if (hasOtherImages) {
             let imgX = margin + col1 + col2 + 2;
-            const images = otherAtts.filter(a => a.contentType?.startsWith('image/'));
-            for (let i = 0; i < Math.min(images.length, 2); i++) {
-                const imgData = await loadImage(images[i].url);
-                if (imgData) {
-                    doc.addImage(imgData, 'JPEG', imgX, currY + 2, 15, 15);
+            for (let i = 0; i < Math.min(otherImages.length, 2); i++) {
+                const imgResult = await loadImageData(otherImages[i].url);
+                if (imgResult) {
+                    doc.addImage(imgResult.data, imgResult.format, imgX, currY + 2, 15, 15);
                     imgX += 17;
                 }
             }
@@ -457,13 +469,25 @@ export default function ChecklistsDataPage() {
     }
   };
 
+  const isVideo = (file: Attachment) => {
+    const type = file.contentType?.toLowerCase() || '';
+    const name = file.name?.toLowerCase() || '';
+    return type.startsWith('video/') || name.endsWith('.mp4') || name.endsWith('.mov') || name.endsWith('.webm');
+  };
+
+  const isImage = (file: Attachment) => {
+    const type = file.contentType?.toLowerCase() || '';
+    const name = file.name?.toLowerCase() || '';
+    return type.startsWith('image/') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp');
+  };
+
   const resetViewer = () => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
   };
 
   const openViewer = (file: Attachment, gallery: Attachment[]) => {
-    const mediaFiles = gallery.filter(a => a.contentType?.startsWith('image/') || a.contentType?.startsWith('video/'));
+    const mediaFiles = gallery.filter(a => isImage(a) || isVideo(a));
     const index = mediaFiles.findIndex(a => a.url === file.url);
     setViewFiles(mediaFiles);
     setCurrentFileIndex(index >= 0 ? index : 0);
@@ -525,8 +549,6 @@ export default function ChecklistsDataPage() {
       setScale(2);
     }
   };
-
-  const isVideo = (file: Attachment) => file.contentType?.startsWith('video/');
 
   const handlePostComment = async () => {
     if (!commentingRecord || !newComment.trim() || !user || !userProfile) return;
@@ -1115,4 +1137,3 @@ export default function ChecklistsDataPage() {
     </div>
   );
 }
-
