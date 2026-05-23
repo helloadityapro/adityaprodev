@@ -732,7 +732,11 @@ export default function ChecklistsDataPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredInst.length > 0 ? filteredInst.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group">
+                    <TableRow 
+                      key={record.id} 
+                      className="hover:bg-muted/5 transition-colors group cursor-pointer"
+                      onClick={() => setViewingInstallation(record)}
+                    >
                       <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
                         {record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}
                       </TableCell>
@@ -744,12 +748,17 @@ export default function ChecklistsDataPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Button variant="ghost" size="sm" onClick={() => setCommentingRecord(record)} className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={(e) => { e.stopPropagation(); setCommentingRecord(record); }} 
+                          className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary"
+                        >
                           <MessageCircle className="h-3.5 w-3.5" /> {record.comments?.length || 0}
                         </Button>
                       </TableCell>
                       <TableCell className="text-right px-6">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingInstallation(record)}>
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -1077,4 +1086,3 @@ export default function ChecklistsDataPage() {
     </div>
   );
 }
-
