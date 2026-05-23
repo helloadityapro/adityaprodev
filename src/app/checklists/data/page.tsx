@@ -235,32 +235,6 @@ export default function ChecklistsDataPage() {
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
-
-      // Helper to load image as data URL reliably
-      const loadImageData = (url: string): Promise<{data: string, format: string} | null> => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.crossOrigin = 'Anonymous';
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.drawImage(img, 0, 0);
-                const format = url.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
-                resolve({ 
-                  data: canvas.toDataURL(format === 'PNG' ? 'image/png' : 'image/jpeg', 0.7), 
-                  format 
-                });
-            } else {
-                resolve(null);
-            }
-          };
-          img.onerror = () => resolve(null);
-          img.src = url;
-        });
-      };
       
       for (let index = 0; index < items.length; index++) {
         const record = items[index];
@@ -316,14 +290,8 @@ export default function ChecklistsDataPage() {
         // Checks Rows
         doc.setFont('helvetica', 'normal');
         for (const check of record.checks) {
-          const attachments = check.attachments || [];
-          const images = attachments.filter(a => isImage(a));
-          const videos = attachments.filter(a => isVideo(a));
-          
           const remarkLines = doc.splitTextToSize(check.remarks || '—', col2 - 4);
-          const imageSize = 15;
-          const hasImages = images.length > 0;
-          const h = Math.max(rowHeight, remarkLines.length * 4 + 4, hasImages ? imageSize + 6 : 0);
+          const h = Math.max(rowHeight, remarkLines.length * 4 + 4);
 
           // Check for page break if content exceeds
           if (currY + h > 270) {
@@ -338,33 +306,15 @@ export default function ChecklistsDataPage() {
           doc.text(remarkLines, margin + col1 + 2, currY + 5.5);
           
           doc.rect(margin + col1 + col2, currY, col3, h);
-          
-          if (hasImages) {
-            let imgX = margin + col1 + col2 + 2;
-            for (let i = 0; i < Math.min(images.length, 2); i++) {
-                const imgResult = await loadImageData(images[i].url);
-                if (imgResult) {
-                    doc.addImage(imgResult.data, imgResult.format, imgX, currY + 2, imageSize, imageSize);
-                    imgX += imageSize + 2;
-                }
-            }
-          } else if (videos.length > 0) {
-            doc.setFontSize(7);
-            doc.text('VIDEO PROOF', margin + col1 + col2 + 2, currY + 5.5);
-            doc.setFontSize(9);
-          } else {
-            doc.text('NO', margin + col1 + col2 + 2, currY + 5.5);
-          }
+          const attCount = check.attachments?.length || 0;
+          doc.text(attCount > 0 ? `YES (${attCount})` : 'NO', margin + col1 + col2 + 2, currY + 5.5);
           
           currY += h;
         }
 
         // Other Remark
         const otherRemLines = doc.splitTextToSize(record.otherRemarks || '—', col2 - 4);
-        const otherAtts = record.otherAttachments || [];
-        const otherImages = otherAtts.filter(a => isImage(a));
-        const hasOtherImages = otherImages.length > 0;
-        const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4, hasOtherImages ? 21 : 0);
+        const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4);
         
         if (currY + otherH > 270) {
           doc.addPage();
@@ -377,18 +327,8 @@ export default function ChecklistsDataPage() {
         doc.text(otherRemLines, margin + col1 + 2, currY + 5.5);
         
         doc.rect(margin + col1 + col2, currY, col3, otherH);
-        if (hasOtherImages) {
-            let imgX = margin + col1 + col2 + 2;
-            for (let i = 0; i < Math.min(otherImages.length, 2); i++) {
-                const imgResult = await loadImageData(otherImages[i].url);
-                if (imgResult) {
-                    doc.addImage(imgResult.data, imgResult.format, imgX, currY + 2, 15, 15);
-                    imgX += 17;
-                }
-            }
-        } else {
-            doc.text(otherAtts.length > 0 ? 'YES' : 'NO', margin + col1 + col2 + 2, currY + 5.5);
-        }
+        const otherAttCount = record.otherAttachments?.length || 0;
+        doc.text(otherAttCount > 0 ? `YES (${otherAttCount})` : 'NO', margin + col1 + col2 + 2, currY + 5.5);
         currY += otherH;
 
         currY += 5;
@@ -1137,3 +1077,4 @@ export default function ChecklistsDataPage() {
     </div>
   );
 }
+
