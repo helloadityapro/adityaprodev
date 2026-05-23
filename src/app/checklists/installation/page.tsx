@@ -355,7 +355,7 @@ export default function TableLevelMMSChecklistPage() {
                         <FormControl>
                           <div className="flex flex-col gap-3">
                             <div className="flex flex-wrap items-center gap-2">
-                              {value.map((file: File, fIdx: number) => (
+                              {(value || []).map((file: File, fIdx: number) => (
                                 <Badge key={fIdx} variant="secondary" className="h-8 gap-1.5 pl-2 pr-1 rounded-sm bg-primary/5 text-primary border-primary/20">
                                   {file.type.startsWith('video/') ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
                                   <span className="text-[9px] font-black truncate max-w-[80px]">{file.name}</span>
@@ -381,13 +381,13 @@ export default function TableLevelMMSChecklistPage() {
                                   className="hidden" 
                                   onChange={(e) => {
                                     const newFiles = Array.from(e.target.files || []);
-                                    onChange([...value, ...newFiles]);
+                                    onChange([...(value || []), ...newFiles]);
                                   }} 
                                 />
                               </label>
                             </div>
                             <div className="space-y-1">
-                              {value.map((file: File) => uploadProgress[file.name] !== undefined && (
+                              {(value || []).map((file: File) => uploadProgress[file.name] !== undefined && (
                                 <div key={file.name} className="space-y-1">
                                   <div className="flex justify-between text-[8px] font-black uppercase text-primary">
                                     <span className="truncate max-w-[100px]">{file.name}</span>
@@ -427,7 +427,7 @@ export default function TableLevelMMSChecklistPage() {
                   <FormControl>
                     <div className="space-y-4 p-6 border-2 border-dashed rounded-sm bg-muted/5">
                       <div className="flex flex-wrap gap-4 justify-center">
-                        {value.map((file: File, fIdx: number) => (
+                        {(value || []).map((file: File, fIdx: number) => (
                           <div key={fIdx} className="relative group w-24 h-24 rounded-sm overflow-hidden border bg-background flex items-center justify-center">
                             {file.type.startsWith('image/') ? (
                               <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" />
@@ -461,7 +461,7 @@ export default function TableLevelMMSChecklistPage() {
                             className="hidden" 
                             onChange={(e) => {
                               const newFiles = Array.from(e.target.files || []);
-                              onChange([...value, ...newFiles]);
+                              onChange([...(value || []), ...newFiles]);
                             }} 
                           />
                         </label>
@@ -495,12 +495,17 @@ export default function TableLevelMMSChecklistPage() {
                   <FormField control={form.control} name="customerRepName" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Representative Name</FormLabel>
-                      <FormControl><Input placeholder="Full name" {...field} className="h-11 rounded-sm" /></FormItem>
+                      <FormControl>
+                        <Input placeholder="Full name" {...field} className="h-11 rounded-sm" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )} />
                   <FormField control={form.control} name="customerRepRemarks" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Representative Feedback</FormLabel>
                       <FormControl><Textarea placeholder="Client comments..." rows={3} {...field} className="rounded-sm bg-muted/5 text-sm" /></FormControl>
+                      <FormMessage />
                     </FormItem>
                   )} />
                 </div>
