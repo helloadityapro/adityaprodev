@@ -36,9 +36,14 @@ import {
   Send,
   Loader2,
   AlertCircle,
-  FileDown
+  FileDown,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Calendar,
+  Clock
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, subDays, subMonths, subYears } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,6 +52,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Site = { id: string; name: string; projectCompany?: string };
 
@@ -83,6 +89,8 @@ type InstallationChecklist = {
   comments?: Comment[];
 };
 
+type SortKey = 'date' | 'table' | 'user' | 'comments';
+
 export default function ChecklistsDataPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -91,6 +99,12 @@ export default function ChecklistsDataPage() {
   const [selectedSiteId, setSelectedSiteId] = React.useState<string>("all");
   const [searchTerm, setSearchTerm] = React.useState("");
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
+  
+  // Sorting & Advanced Filtering
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+  const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
   const [viewingInstallation, setViewingInstallation] = React.useState<InstallationChecklist | null>(null);
   const [commentingRecord, setCommentingRecord] = React.useState<InstallationChecklist | null>(null);
@@ -120,20 +134,71 @@ export default function ChecklistsDataPage() {
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
   const instQuery = useMemoFirebase(() => {
-    return query(collection(firestore, 'installation_checklists'), orderBy('createdAt', 'desc'), limit(1000));
+    // In-memory filter handles complexity better than composite indices for prototyping
+    return query(collection(firestore, 'installation_checklists'), limit(1000));
   }, [firestore]);
   const { data: instRecords, isLoading: instLoading } = useCollection<InstallationChecklist>(instQuery);
 
+  const queryDateRange = React.useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    switch (dateFilter) {
+      case 'today': return { start: todayStr, end: todayStr };
+      case 'yesterday': return { start: format(subDays(today, 1), 'yyyy-MM-dd'), end: format(subDays(today, 1), 'yyyy-MM-dd') };
+      case '7days': return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastMonth': return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastYear': return { start: format(subYears(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime': return { start: '1970-01-01', end: '2099-12-31' };
+      case 'custom': return { start: customStart, end: customEnd };
+      default: return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+    }
+  }, [dateFilter, customStart, customEnd]);
+
   const filteredInst = React.useMemo(() => {
     if (!instRecords) return [];
-    return instRecords.filter(r => {
+    const { start, end } = queryDateRange;
+
+    let result = instRecords.filter(r => {
+      const rDate = r.createdAt?.toDate?.() || new Date(r.createdAt);
+      const rDateStr = format(rDate, 'yyyy-MM-dd');
+
       const matchesSite = selectedSiteId === 'all' || r.siteId === selectedSiteId;
       const matchesSearch = r.siteName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            r.tableNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            r.userName.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSite && matchesSearch;
+      const matchesDate = rDateStr >= start && rDateStr <= end;
+
+      return matchesSite && matchesSearch && matchesDate;
     });
-  }, [instRecords, selectedSiteId, searchTerm]);
+
+    // Apply Sorting
+    result.sort((a, b) => {
+      const { key, direction } = sortConfig;
+      let valA: any = '';
+      let valB: any = '';
+
+      if (key === 'date') {
+        valA = a.createdAt?.toDate?.()?.getTime() || 0;
+        valB = b.createdAt?.toDate?.()?.getTime() || 0;
+      } else if (key === 'table') {
+        valA = a.tableNumber.toLowerCase();
+        valB = b.tableNumber.toLowerCase();
+      } else if (key === 'user') {
+        valA = a.userName.toLowerCase();
+        valB = b.userName.toLowerCase();
+      } else if (key === 'comments') {
+        valA = a.comments?.length || 0;
+        valB = b.comments?.length || 0;
+      }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [instRecords, selectedSiteId, searchTerm, queryDateRange, sortConfig]);
 
   const siteStats = React.useMemo(() => {
     const stats: Record<string, number> = {};
@@ -142,6 +207,18 @@ export default function ChecklistsDataPage() {
     });
     return stats;
   }, [instRecords]);
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+  };
 
   // PDF Export Logic
   const exportToPDF = async (items: InstallationChecklist[]) => {
@@ -160,7 +237,6 @@ export default function ChecklistsDataPage() {
         const colWidthLabel = 65;
         const colWidthValue = 115;
         const rowHeight = 8;
-        const pageWidth = 210;
 
         // Title
         doc.setFont('helvetica', 'bold');
@@ -430,6 +506,11 @@ export default function ChecklistsDataPage() {
     }
   };
 
+  const clearAuditFilters = () => {
+    setSearchTerm("");
+    setDateFilter("7days");
+  };
+
   if (isProfileLoading || instLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
@@ -533,45 +614,99 @@ export default function ChecklistsDataPage() {
               <p className="text-muted-foreground text-xs font-bold uppercase tracking-[0.2em]">{selectedSiteObj?.projectCompany}</p>
             </div>
             
-            <div className="flex items-center gap-3">
-               <div className="relative w-full md:w-80">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Search audits..." 
-                    className="pl-9 h-9 rounded-sm bg-background border-primary/10 text-xs"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                  />
-               </div>
-               <Button 
+            <div className="flex flex-wrap items-center gap-3">
+              <Button 
                 onClick={() => exportToPDF(filteredInst)} 
                 disabled={isExporting || filteredInst.length === 0} 
                 variant="outline" 
                 className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5"
-               >
-                 {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />}
-                 Export All (PDF)
-               </Button>
-               <Button variant="ghost" size="icon" onClick={() => setSearchTerm("")} className="h-9 w-9 text-muted-foreground">
+              >
+                {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />}
+                Export All (PDF)
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div className="md:col-span-2 space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Table or Auditor</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Filter by table ref or personnel..." 
+                    className="pl-9 h-10 rounded-sm bg-background border-primary/10 text-xs"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Time Range</Label>
+                <Select value={dateFilter} onValueChange={setDateFilter}>
+                  <SelectTrigger className="h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+                    <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+                    <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+                    <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+                    <SelectItem value="allTime" className="text-xs font-bold uppercase">All Records</SelectItem>
+                    <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-end gap-2">
+                {dateFilter === 'custom' ? (
+                  <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95">
+                    <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-10 rounded-sm border-primary/20 text-[10px]" />
+                    <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-10 rounded-sm border-primary/20 text-[10px]" />
+                  </div>
+                ) : <div className="flex-1" />}
+                <Button variant="ghost" size="icon" onClick={clearAuditFilters} className="h-10 w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
                   <FilterX className="h-4 w-4" />
-               </Button>
+                </Button>
+              </div>
             </div>
           </div>
 
           <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
             <CardHeader className="bg-muted/5 border-b py-4">
               <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-primary" /> Audit Records
+                <ShieldCheck className="h-4 w-4 text-primary" /> Audit Records ({filteredInst.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader className="bg-muted/30">
                   <TableRow>
-                    <TableHead className="px-6">Date & Time</TableHead>
-                    <TableHead>Table Ref</TableHead>
-                    <TableHead>Auditor</TableHead>
-                    <TableHead className="text-center">Comments</TableHead>
+                    <TableHead 
+                      className="px-6 cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSort('date')}
+                    >
+                      <div className="flex items-center">Date & Time <SortIcon column="date" /></div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSort('table')}
+                    >
+                      <div className="flex items-center">Table Ref <SortIcon column="table" /></div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSort('user')}
+                    >
+                      <div className="flex items-center">Auditor <SortIcon column="user" /></div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSort('comments')}
+                    >
+                      <div className="flex items-center justify-center">Comments <SortIcon column="comments" /></div>
+                    </TableHead>
                     <TableHead className="text-right px-6">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -619,7 +754,7 @@ export default function ChecklistsDataPage() {
                       </TableCell>
                     </TableRow>
                   )) : (
-                    <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-sm">No audits found for this site.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-sm">No audits found matching criteria.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
