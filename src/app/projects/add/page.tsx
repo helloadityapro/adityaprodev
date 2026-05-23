@@ -20,6 +20,7 @@ import {
   Search, 
   Plus, 
   FileDown, 
+  FileUp,
   Check, 
   AlertCircle, 
   Loader2, 
@@ -29,7 +30,9 @@ import {
   Building2,
   Zap,
   ShieldCheck,
-  ChevronDown
+  ChevronDown,
+  MapPin,
+  Download
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -97,6 +100,8 @@ export default function AddNewProjectPage() {
   const [isBulkDialogOpen, setIsBulkDialogOpen] = React.useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [siteToEdit, setSiteToEdit] = React.useState<any | null>(null);
+  const [isImporting, setIsImporting] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   
   const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
 
@@ -225,6 +230,96 @@ export default function AddNewProjectPage() {
     };
   }, [filteredSitesList]);
 
+  const handleDownloadTemplate = () => {
+    const wsData = [
+      ["Site Name", "Project Company", "AC Capacity (MW)", "DC Capacity (MWp)", "Latitude", "Longitude"],
+      ["Shahapur Site", "HTI Energies", "4.5", "5.2", "19.2312", "73.1234"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "SiteTemplate");
+    XLSX.writeFile(wb, "Project_Import_Template.xlsx");
+  };
+
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet) as any[];
+
+        if (jsonData.length === 0) {
+          toast({ variant: "destructive", title: "Import Failed", description: "The uploaded file contains no data." });
+          return;
+        }
+
+        const batch = writeBatch(firestore);
+        let count = 0;
+
+        for (const row of jsonData) {
+          const name = row["Site Name"] || row["name"];
+          const company = row["Project Company"] || row["company"];
+          const ac = parseFloat(row["AC Capacity (MW)"] || row["ac"]);
+          const dc = parseFloat(row["DC Capacity (MWp)"] || row["dc"]);
+          const lat = parseFloat(row["Latitude"] || row["lat"] || 0);
+          const lng = parseFloat(row["Longitude"] || row["lng"] || 0);
+
+          if (name && company) {
+            const newDocRef = doc(collection(firestore, 'sites'));
+            batch.set(newDocRef, {
+              name: String(name).trim(),
+              projectCompany: String(company).trim(),
+              acCapacity: isNaN(ac) ? 0 : ac,
+              dcCapacity: isNaN(dc) ? 0 : dc,
+              latitude: isNaN(lat) ? 0 : lat,
+              longitude: isNaN(lng) ? 0 : lng,
+              createdAt: serverTimestamp()
+            });
+            count++;
+          }
+        }
+
+        if (count > 0) {
+          await batch.commit();
+          toast({ title: "Import Success", description: `Successfully added ${count} projects to the registry.` });
+        } else {
+          toast({ variant: "destructive", title: "Import Failed", description: "No valid project rows found in file." });
+        }
+      } catch (err: any) {
+        toast({ variant: "destructive", title: "Import Error", description: err.message });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleExportFiltered = () => {
+    if (filteredSitesList.length === 0) return;
+    
+    const exportData = filteredSitesList.map(s => ({
+      "Site Name": s.name,
+      "Project Company": s.projectCompany,
+      "AC Capacity (MW)": s.acCapacity,
+      "DC Capacity (MWp)": s.dcCapacity,
+      "Latitude": s.latitude || 0,
+      "Longitude": s.longitude || 0,
+      "Created At": s.createdAt?.toDate?.() ? format(s.createdAt.toDate(), 'dd-MM-yyyy') : '—'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Filtered Projects");
+    XLSX.writeFile(wb, `AdityaPro_Projects_Export_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  };
+
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredSitesList.length) {
       setSelectedIds([]);
@@ -257,10 +352,10 @@ export default function AddNewProjectPage() {
           <p className="text-muted-foreground">Manage specific site records or organize them into clusters via groups.</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2 mt-4">
+        <div className="flex flex-wrap items-center gap-3 mt-4">
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="rounded-sm font-bold h-11 shadow-md">
+              <Button className="rounded-sm font-bold h-11 shadow-md px-6">
                 <Plus className="h-4 w-4 mr-2" /> Add New Site
               </Button>
             </DialogTrigger>
@@ -301,6 +396,29 @@ export default function AddNewProjectPage() {
               </Form>
             </DialogContent>
           </Dialog>
+
+          <Button variant="outline" onClick={handleDownloadTemplate} className="rounded-sm font-bold h-11 border-primary/20 text-primary hover:bg-primary/5">
+            <Download className="h-4 w-4 mr-2" /> Template
+          </Button>
+
+          <div className="relative">
+            <input 
+              type="file" 
+              accept=".xlsx,.xls,.csv" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleBulkImport} 
+              disabled={isImporting}
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="rounded-sm font-bold h-11 border-primary/20 text-primary hover:bg-primary/5">
+              {isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />}
+              Bulk Import
+            </Button>
+          </div>
+
+          <Button variant="outline" onClick={handleExportFiltered} disabled={filteredSitesList.length === 0} className="rounded-sm font-bold h-11 border-primary/20 text-primary hover:bg-primary/5">
+            <FileDown className="h-4 w-4 mr-2" /> Export Filtered
+          </Button>
 
           <Button variant="outline" asChild className="rounded-sm font-bold h-11 border-primary/20 text-primary hover:bg-primary/5">
             <Link href="/projects/groups">
@@ -439,6 +557,7 @@ export default function AddNewProjectPage() {
                   <TableHead className="text-[10px] uppercase font-black tracking-widest">Site Name</TableHead>
                   <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">AC Capacity</TableHead>
                   <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">DC Capacity</TableHead>
+                  <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">GPS Location</TableHead>
                   <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">Groups</TableHead>
                   <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Manage</TableHead>
                 </TableRow>
@@ -467,6 +586,16 @@ export default function AddNewProjectPage() {
                         <TableCell className="text-center font-mono text-[10px] font-black text-amber-600">
                           {formatCapacity(site.dcCapacity)} MWp
                         </TableCell>
+                        <TableCell className="text-center font-mono text-[10px] text-muted-foreground">
+                          {site.latitude && site.longitude ? (
+                            <div className="flex flex-col">
+                              <span>{site.latitude.toFixed(4)}</span>
+                              <span>{site.longitude.toFixed(4)}</span>
+                            </div>
+                          ) : (
+                            <span className="opacity-20 italic">No GPS</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-center">
                           <div className="flex flex-wrap justify-center gap-1">
                             {siteGroups.slice(0, 2).map(g => (
@@ -477,10 +606,10 @@ export default function AddNewProjectPage() {
                         </TableCell>
                         <TableCell className="text-right px-6">
                           <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setSiteToEdit(site)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm transition-colors" onClick={() => setSiteToEdit(site)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteSite(site.id)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm transition-colors" onClick={() => deleteSite(site.id)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -567,30 +696,5 @@ export default function AddNewProjectPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, description, color }: { 
-  title: string, 
-  value: number | string, 
-  icon: any, 
-  description: string,
-  color: 'primary'
-}) {
-  const colors = {
-    primary: "bg-primary/5 border-primary/10 text-primary",
-  };
-
-  return (
-    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
-        <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-3.5 sm:h-4 sm:w-4" />
-      </CardHeader>
-      <CardContent className="p-3 sm:p-4 pt-0">
-        <div className="text-xl sm:text-2xl font-black">{value}</div>
-        <p className="text-[8px] font-bold text-primary/60 uppercase mt-1">{description}</p>
-      </CardContent>
-    </Card>
   );
 }
