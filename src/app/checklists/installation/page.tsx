@@ -28,7 +28,8 @@ import {
   Save,
   Trash2,
   Film,
-  Plus
+  Plus,
+  CheckCircle2
 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -48,6 +49,7 @@ const checkItemSchema = z.object({
 const installationSchema = z.object({
   siteId: z.string().min(1, "Site is required"),
   siteName: z.string(),
+  projectCompany: z.string().optional(),
   tableNumber: z.string().min(1, "Table Number is required"),
   tableSize: z.string().min(1, "Size of Table is required"),
   columnCount: z.coerce.number().min(1, "Number of Columns is required"),
@@ -70,7 +72,7 @@ const installationSchema = z.object({
   }),
 });
 
-type Site = { id: string; name: string };
+type Site = { id: string; name: string; projectCompany?: string };
 
 const CHECK_LABELS = {
   moduleNutBolt: "Module Nut-bolt Tightness",
@@ -104,6 +106,7 @@ export default function TableLevelMMSChecklistPage() {
     defaultValues: {
       siteId: "",
       siteName: "",
+      projectCompany: "",
       tableNumber: "",
       tableSize: "",
       columnCount: 0,
@@ -189,10 +192,13 @@ export default function TableLevelMMSChecklistPage() {
         otherAttachments.push(uploaded);
       }
 
+      const finalTableNumber = values.tableNumber.startsWith("T - ") ? values.tableNumber : `T - ${values.tableNumber}`;
+
       await addDocumentNonBlocking(collection(firestore, 'installation_checklists'), {
         siteId: values.siteId,
         siteName: values.siteName,
-        tableNumber: values.tableNumber,
+        projectCompany: values.projectCompany || "",
+        tableNumber: finalTableNumber,
         tableSize: values.tableSize,
         columnCount: values.columnCount,
         moduleCount: values.moduleCount,
@@ -243,7 +249,7 @@ export default function TableLevelMMSChecklistPage() {
                   <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
-                        <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
+                        <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>
                           {field.value ? allSites?.find(s => s.id === field.value)?.name : "Choose site..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
@@ -257,7 +263,12 @@ export default function TableLevelMMSChecklistPage() {
                       <ScrollArea className="h-[200px]">
                         <div className="p-1">
                           {filteredSites.map(site => (
-                            <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { field.onChange(site.id); form.setValue('siteName', site.name); setIsSitePopoverOpen(false); }}>
+                            <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs text-left" onClick={() => { 
+                              field.onChange(site.id); 
+                              form.setValue('siteName', site.name); 
+                              form.setValue('projectCompany', site.projectCompany || "");
+                              setIsSitePopoverOpen(false); 
+                            }}>
                               <Check className={cn("mr-2 h-4 w-4 text-primary", field.value === site.id ? "opacity-100" : "opacity-0")} />
                               {site.name}
                             </Button>
@@ -270,10 +281,25 @@ export default function TableLevelMMSChecklistPage() {
                 </FormItem>
               )} />
 
+              <FormField control={form.control} name="projectCompany" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Project Company</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly className="h-11 rounded-sm bg-muted/20 cursor-not-allowed" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
               <FormField control={form.control} name="tableNumber" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Table Number</FormLabel>
-                  <FormControl><Input placeholder="e.g. T-101" {...field} className="h-11 rounded-sm" /></FormControl>
+                  <FormControl>
+                    <div className="relative">
+                      <span className="absolute left-3 top-3 text-sm font-bold text-muted-foreground">T - </span>
+                      <Input placeholder="101" {...field} className="h-11 rounded-sm pl-10" />
+                    </div>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -281,7 +307,14 @@ export default function TableLevelMMSChecklistPage() {
               <FormField control={form.control} name="tableSize" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Size of Table</FormLabel>
-                  <FormControl><Input placeholder="e.g. 2P36" {...field} className="h-11 rounded-sm" /></FormControl>
+                  <FormControl>
+                    <Input 
+                      placeholder="e.g. 2P36" 
+                      {...field} 
+                      className="h-11 rounded-sm" 
+                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -339,7 +372,7 @@ export default function TableLevelMMSChecklistPage() {
                               
                               <label className="cursor-pointer">
                                 <div className="flex items-center justify-center gap-2 px-3 h-8 rounded-sm border border-dashed border-primary/30 bg-background text-primary hover:bg-primary/5 transition-colors text-[9px] font-black uppercase tracking-widest">
-                                  <Camera className="h-3 w-3" /> Add Photo/Video
+                                  <Camera className="h-3 w-3" /> Add Media
                                 </div>
                                 <input 
                                   type="file" 
@@ -489,15 +522,17 @@ export default function TableLevelMMSChecklistPage() {
                   </div>
                 </FormItem>
               )} />
-
-              <div className="flex flex-col sm:flex-row justify-end gap-4 border-t pt-8">
-                <Button type="button" variant="outline" onClick={() => router.back()} className="rounded-sm font-bold h-11">Cancel</Button>
-                <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-xs tracking-widest h-14 px-12 shadow-xl shadow-primary/20">
-                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Transferring Media...</> : <><Save className="mr-2 h-4 w-4" /> Finalize Record</>}
-                </Button>
-              </div>
             </CardContent>
           </Card>
+          
+          <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 z-40 bg-background/80 backdrop-blur-md border-t p-4 md:left-[16rem]">
+            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => router.back()} className="rounded-sm font-bold h-12 sm:w-32">Cancel</Button>
+              <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-xs tracking-widest h-12 px-10 shadow-xl shadow-primary/20">
+                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Transferring Media...</> : <><Save className="mr-2 h-4 w-4" /> Finalize Record</>}
+              </Button>
+            </div>
+          </div>
         </form>
       </Form>
     </div>
