@@ -1,8 +1,9 @@
+
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp, arrayUnion, limit, getDoc, and } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp, arrayUnion, limit, getDoc, and, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -250,6 +251,19 @@ export default function RequirementListPage() {
             push: true
         });
     }
+
+    // Notify Admins
+    const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+    const adminDocs = await getDocs(adminsQuery);
+    adminDocs.forEach(adminDoc => {
+      sendNotification(firestore, {
+        userId: adminDoc.id,
+        title: "Requirement Processed",
+        description: `Requirement for "${req.itemName}" at "${req.siteName}" updated to ${targetStatus} by ${userProfile.username}.`,
+        link: "/requirements/list",
+        push: true
+      });
+    });
 
     toast({ title: "Status Updated", description: `Requirement set to ${targetStatus}.` });
     setActionState(null);
@@ -627,7 +641,7 @@ export default function RequirementListPage() {
       </Dialog>
 
       <Dialog open={!!historyReq} onOpenChange={(o) => !o && setHistoryReq(null)}>
-        <DialogContent className="rounded-sm max-w-lg p-0 overflow-hidden border-none shadow-2xl bg-background">
+        <DialogContent className="rounded-sm max-lg p-0 overflow-hidden border-none shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><History className="h-5 w-5 text-primary" /></div>

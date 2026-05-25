@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -396,10 +397,23 @@ export default function PtwListPage() {
 
     sendNotification(firestore, {
       userId: permit.siteEngineerId,
-      title: "Permit Update",
+      title: `Permit Update: ${targetStatus}`,
       description: `Permit ${permit.serialNumber} is now ${targetStatus}.`,
       link: `/ptw/list?view=${permit.id}`,
       push: true
+    });
+
+    // Notify Admins
+    const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+    const adminDocs = await getDocs(adminsQuery);
+    adminDocs.forEach(adminDoc => {
+      sendNotification(firestore, {
+        userId: adminDoc.id,
+        title: "Permit Status Updated",
+        description: `Permit ${permit.serialNumber} (${permit.siteName}) was updated to ${targetStatus} by ${userProfile.username}.`,
+        link: `/ptw/list?view=${permit.id}`,
+        push: true
+      });
     });
 
     toast({ title: "Updated", description: `Permit status set to ${targetStatus}.` });

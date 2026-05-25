@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -29,7 +30,7 @@ export default function StartSiteVisitPage() {
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<any>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
@@ -117,13 +118,12 @@ export default function StartSiteVisitPage() {
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
-        if (adminDoc.id === user.uid) return;
         sendNotification(firestore, {
           userId: adminDoc.id,
           title: "Site Visit Started",
           description: `${userProfile.username} checked-in at "${selectedSite.name}".`,
           link: `/site-visits/${visitRef!.id}`,
-          push: false
+          push: true
         });
       });
 

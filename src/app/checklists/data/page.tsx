@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -552,13 +553,12 @@ export default function ChecklistsDataPage() {
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
-        if (adminDoc.id === user.uid || adminDoc.id === commentingRecord.userId) return;
         sendNotification(firestore, {
           userId: adminDoc.id,
           title: "Audit Comment",
           description: `${userProfile.username} commented on an audit for ${commentingRecord.siteName}.`,
           link: `/checklists/data`,
-          push: false
+          push: true
         });
       });
 

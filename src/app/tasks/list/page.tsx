@@ -1,8 +1,9 @@
+
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, increment, getDoc, limit } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, increment, getDoc, limit, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -179,10 +180,7 @@ export default function TaskListPage() {
     if (isOwnDataOnly && !isSuper) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
       list = list.filter(task => {
-        // If the task is explicitly assigned to or by this user, they should see it 
-        // regardless of the site-based filtering policy.
         if (task.assignedToId === user?.uid || task.assignedById === user?.uid) return true;
-        
         if (!task.siteId) return true;
         return assignedIds.has(task.siteId);
       });
@@ -274,6 +272,19 @@ export default function TaskListPage() {
             push: true
         });
     }
+
+    // Notify Admins
+    const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+    const adminDocs = await getDocs(adminsQuery);
+    adminDocs.forEach(adminDoc => {
+      sendNotification(firestore, {
+        userId: adminDoc.id,
+        title: "Task Processed",
+        description: `Task "${actionTask.title}" (${actionTask.siteName}) was marked as ${nextStatus} by ${userProfile.username}.`,
+        link: "/tasks/list",
+        push: true
+      });
+    });
 
     toast({ title: "Task Updated", description: `Status changed to ${nextStatus}. Points updated if applicable.` });
     setIsUpdating(false);

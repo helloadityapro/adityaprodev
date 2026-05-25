@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -332,13 +333,12 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
-        if (adminDoc.id === user.uid) return;
         sendNotification(firestore, {
           userId: adminDoc.id,
           title: "Site Visit Concluded",
           description: `${visit.managerName} published a final report for "${visit.siteName}".`,
           link: `/site-visits/${visit.id}`,
-          push: false
+          push: true
         });
       });
 
@@ -375,7 +375,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
       </div>
 
       <div className="space-y-6">
-        {/* Section 1: Action Items - ALWAYS VISIBLE */}
+        {/* Section 1: Action Items */}
         <Card className="rounded-sm shadow-md border-primary/10 transition-all duration-300">
           <CardHeader className="bg-primary/5 border-b p-4 sm:py-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -458,7 +458,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                 disabled={isSubmitting}
               >
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save Progress & Continue Later
+                Save Progress
               </Button>
               {!isFinalizing && (
                 <Button 
@@ -466,14 +466,14 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                   onClick={handleProceedToFinal}
                   disabled={isSubmitting || tasks.every(t => t.text.trim() === "")}
                 >
-                  Complete Site Visit <ArrowRight className="ml-2 h-5 w-5" />
+                  Complete Visit <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               )}
             </div>
           </CardFooter>
         </Card>
 
-        {/* Section 2: Final Audit - VISIBLE WHEN isFinalizing is TRUE */}
+        {/* Section 2: Final Audit */}
         <AnimatePresence>
           {isFinalizing && (
             <motion.div 
@@ -495,7 +495,6 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                   <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                     <Camera className="h-4 w-4 text-primary" /> Mandatory Selfie Audit
                   </CardTitle>
-                  <CardDescription className="text-[9px] font-bold text-amber-700 uppercase">Include face and upper body profile</CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex flex-col items-center gap-4">
@@ -582,7 +581,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                     onClick={onSubmitFinalReport}
                     disabled={isSubmitting || !selfie || !purpose || details.trim().length < 10}
                   >
-                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <><Send className="mr-2 h-4 w-4" /> CONCLUDE & PUBLISH REPORT</>}
+                    {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> DISPATCHING...</> : <><Send className="mr-2 h-4 w-4" /> CONCLUDE & PUBLISH REPORT</>}
                   </Button>
                 </CardFooter>
               </Card>

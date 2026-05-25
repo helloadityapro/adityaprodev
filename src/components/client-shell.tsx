@@ -116,6 +116,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = pathname === '/login' || pathname === '/register' || pathname === '/forgot-password';
 
+  const processedNotifsRef = React.useRef<Set<string>>(new Set());
+  const shellMountTime = React.useRef(Date.now());
+
   React.useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       const backListener = App.addListener('backButton', (data) => {
@@ -172,7 +175,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
   const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
-  // Celebration detection
   const isBirthday = React.useMemo(() => {
     if (!userProfile?.dob) return false;
     const today = new Date();
@@ -184,7 +186,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (!userProfile?.doj) return false;
     const today = new Date();
     const doj = new Date(userProfile.doj);
-    const years = today.getFullYear() - doj.getFullYear();
+    const years = today.getFullYear() - joinDate.getFullYear();
     return years > 0 && today.getMonth() === doj.getMonth() && today.getDate() === doj.getDate();
   }, [userProfile?.doj]);
 
@@ -192,7 +194,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (isAuthPage || isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
     if (isUserLoading || isProfileLoading || !userProfile) return true;
 
-    // Checklists are universally accessible
     if (pathname.startsWith('/checklists')) return true;
 
     const pageKey = getPageKeyByPath(pathname);
@@ -293,38 +294,29 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     });
   }, [unsortedNotifications]);
 
-  const [displayedNotifIds, setDisplayedNotifIds] = React.useState<Set<string>>(new Set());
-
-  React.useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
-      if (raw && raw.trim().length > 0) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          setDisplayedNotifIds(new Set(parsed));
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to parse displayed notifications from session storage", e);
-    }
-  }, []);
-
+  // Handle Toast Triggering logic
   React.useEffect(() => {
       if (notifications && user) {
-          const newDisplayedIds = new Set(displayedNotifIds);
-          let wasUpdated = false;
           const now = Date.now();
           const freshnessThreshold = 60000; // 60 seconds
 
           notifications.forEach(notif => {
-              const createdAt = notif.createdAt?.toDate?.().getTime() || now;
-              const isFresh = (now - createdAt) < freshnessThreshold;
+              if (processedNotifsRef.current.has(notif.id)) return;
 
-              // Trigger toast if unread and not displayed yet in this session, and is fresh
-              if (!notif.read && !displayedNotifIds.has(notif.id) && isFresh) {
-                  const title = notif.title;
-                  const isSuccess = title.includes('Approved') || title.includes('Success') || title.includes('Confirmed') || title.includes('Completed') || title.includes('Earned') || title.includes('Assigned');
-                  const isDestructive = title.includes('Rejected') || title.includes('Error') || title.includes('Cancelled') || title.includes('Removed');
+              // Mark as processed immediately to prevent double toasts during rapid state updates
+              processedNotifsRef.current.add(notif.id);
+
+              const createdAt = notif.createdAt?.toDate?.().getTime() || now;
+              
+              // Only toast if:
+              // 1. Notification is unread
+              // 2. Notification is "Fresh" (created within 60s) OR created AFTER this component mounted
+              const isFresh = (now - createdAt) < freshnessThreshold || createdAt > shellMountTime.current;
+
+              if (!notif.read && isFresh) {
+                  const title = notif.title || "Activity Update";
+                  const isSuccess = /approved|success|confirmed|completed|earned|assigned|logged|submitted/i.test(title);
+                  const isDestructive = /rejected|error|cancelled|removed|failed/i.test(title);
 
                   toast({ 
                     title: notif.title, 
@@ -343,22 +335,26 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                       </Button>
                     ) : undefined
                   });
-
-                  newDisplayedIds.add(notif.id);
-                  wasUpdated = true;
-              } else if (!notif.read && !displayedNotifIds.has(notif.id)) {
-                  // Mark as processed (but no toast for stale items) to avoid reprocessing
-                  newDisplayedIds.add(notif.id);
-                  wasUpdated = true;
               }
           });
           
-          if (wasUpdated) {
-              setDisplayedNotifIds(newDisplayedIds);
-              sessionStorage.setItem(DISPLAYED_NOTIFS_KEY, JSON.stringify(Array.from(newDisplayedIds)));
-          }
+          // Persistence for displayed items across session navigation
+          sessionStorage.setItem(DISPLAYED_NOTIFS_KEY, JSON.stringify(Array.from(processedNotifsRef.current)));
       }
-  }, [notifications, user, toast, displayedNotifIds, firestore, router]);
+  }, [notifications, user, toast, firestore, router]);
+
+  // Load seen notifications from session storage on mount
+  React.useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(id => processedNotifsRef.current.add(id));
+        }
+      }
+    } catch (e) {}
+  }, []);
 
   if (isAuthPage) return <>{children}</>;
 
@@ -427,7 +423,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              {/* Special Day Header Indicators */}
               <AnimatePresence>
                 {isBirthday && (
                   <motion.div
@@ -501,3 +496,4 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+

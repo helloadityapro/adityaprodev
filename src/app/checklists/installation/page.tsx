@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -199,7 +200,7 @@ export default function TableLevelMMSChecklistPage() {
 
       const finalTableNumber = values.tableNumber.startsWith("T - ") ? values.tableNumber : `T - ${values.tableNumber}`;
 
-      const checklistRef = await addDocumentNonBlocking(collection(firestore, 'installation_checklists'), {
+      await addDocumentNonBlocking(collection(firestore, 'installation_checklists'), {
         siteId: values.siteId,
         siteName: values.siteName,
         projectCompany: values.projectCompany || "",
@@ -222,13 +223,12 @@ export default function TableLevelMMSChecklistPage() {
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
-        if (adminDoc.id === user.uid) return;
         sendNotification(firestore, {
           userId: adminDoc.id,
           title: "New MMS Audit Logged",
           description: `${userProfile.username} submitted an audit for Table ${finalTableNumber} at ${values.siteName}.`,
           link: `/checklists/data`,
-          push: false
+          push: true
         });
       });
 
@@ -277,7 +277,7 @@ export default function TableLevelMMSChecklistPage() {
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                       <div className="flex items-center border-b px-3">
                         <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                        <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} />
+                        <Input placeholder="Search sites..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} />
                       </div>
                       <ScrollArea className="h-[200px]">
                         <div className="p-1">
