@@ -90,7 +90,8 @@ type InstallationChecklist = {
   comments?: Comment[];
 };
 
-type SortKey = 'date' | 'table' | 'user' | 'comments';
+type AuditSortKey = 'date' | 'table' | 'user' | 'comments';
+type SiteSortKey = 'name' | 'company' | 'count';
 
 export default function ChecklistsDataPage() {
   const firestore = useFirestore();
@@ -101,8 +102,10 @@ export default function ChecklistsDataPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   
-  // Sorting & Advanced Filtering
-  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+  // Sorting & Advanced Filtering for Audits
+  const [auditSortConfig, setAuditSortConfig] = React.useState<{ key: AuditSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+  const [siteSortConfig, setSiteSortConfig] = React.useState<{ key: SiteSortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+  
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -155,12 +158,47 @@ export default function ChecklistsDataPage() {
     }
   }, [dateFilter, customStart, customEnd]);
 
+  const siteStats = React.useMemo(() => {
+    const stats: Record<string, number> = {};
+    instRecords?.forEach(r => {
+      stats[r.siteId] = (stats[r.siteId] || 0) + 1;
+    });
+    return stats;
+  }, [instRecords]);
+
+  const filteredSortedSites = React.useMemo(() => {
+    if (!allSites) return [];
+    let result = allSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
+
+    result.sort((a, b) => {
+      const { key, direction } = siteSortConfig;
+      let valA: any = '';
+      let valB: any = '';
+
+      if (key === 'name') {
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+      } else if (key === 'company') {
+        valA = (a.projectCompany || '').toLowerCase();
+        valB = (b.projectCompany || '').toLowerCase();
+      } else if (key === 'count') {
+        valA = siteStats[a.id] || 0;
+        valB = siteStats[b.id] || 0;
+      }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [allSites, siteSearchQuery, siteSortConfig, siteStats]);
+
   const filteredInst = React.useMemo(() => {
     if (!instRecords) return [];
     const { start, end } = queryDateRange;
 
     let result = instRecords.map(r => {
-      // Enrichment for legacy records that might not have the projectCompany field
       const site = allSites?.find(s => s.id === r.siteId);
       return {
         ...r,
@@ -179,9 +217,8 @@ export default function ChecklistsDataPage() {
       return matchesSite && matchesSearch && matchesDate;
     });
 
-    // Apply Sorting
     result.sort((a, b) => {
-      const { key, direction } = sortConfig;
+      const { key, direction } = auditSortConfig;
       let valA: any = '';
       let valB: any = '';
 
@@ -205,26 +242,30 @@ export default function ChecklistsDataPage() {
     });
 
     return result;
-  }, [instRecords, selectedSiteId, searchTerm, queryDateRange, sortConfig, allSites]);
+  }, [instRecords, selectedSiteId, searchTerm, queryDateRange, auditSortConfig, allSites]);
 
-  const siteStats = React.useMemo(() => {
-    const stats: Record<string, number> = {};
-    instRecords?.forEach(r => {
-      stats[r.siteId] = (stats[r.siteId] || 0) + 1;
-    });
-    return stats;
-  }, [instRecords]);
-
-  const handleSort = (key: SortKey) => {
-    setSortConfig(prev => ({
+  const handleAuditSort = (key: AuditSortKey) => {
+    setAuditSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
   };
 
-  const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+  const handleSiteSort = (key: SiteSortKey) => {
+    setSiteSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const AuditSortIcon = ({ column }: { column: AuditSortKey }) => {
+    if (auditSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return auditSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+  };
+
+  const SiteSortIcon = ({ column }: { column: SiteSortKey }) => {
+    if (siteSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return siteSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   // PDF Export Logic
@@ -246,12 +287,10 @@ export default function ChecklistsDataPage() {
         const colWidthValue = 115;
         const rowHeight = 8;
 
-        // Title
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(14);
         doc.text('TABLE LEVEL MMS CHECKLIST', margin, currY - 8);
         
-        // Header Table Helper
         const drawRow = (label: string, value: string) => {
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(9);
@@ -273,7 +312,6 @@ export default function ChecklistsDataPage() {
 
         currY += 5;
 
-        // Checks Table Header
         const col1 = 65;
         const col2 = 75;
         const col3 = 40;
@@ -287,13 +325,11 @@ export default function ChecklistsDataPage() {
         doc.text('ATTACHMENTS', margin + col1 + col2 + 2, currY + 5.5);
         currY += rowHeight;
 
-        // Checks Rows
         doc.setFont('helvetica', 'normal');
         for (const check of record.checks) {
           const remarkLines = doc.splitTextToSize(check.remarks || '—', col2 - 4);
           const h = Math.max(rowHeight, remarkLines.length * 4 + 4);
 
-          // Check for page break if content exceeds
           if (currY + h > 270) {
             doc.addPage();
             currY = 20;
@@ -312,7 +348,6 @@ export default function ChecklistsDataPage() {
           currY += h;
         }
 
-        // Other Remark
         const otherRemLines = doc.splitTextToSize(record.otherRemarks || '—', col2 - 4);
         const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4);
         
@@ -333,7 +368,6 @@ export default function ChecklistsDataPage() {
 
         currY += 5;
 
-        // Footer Metadata Rows
         const drawFooterRow = (label: string, value: string) => {
           if (currY + rowHeight > 270) {
             doc.addPage();
@@ -353,7 +387,6 @@ export default function ChecklistsDataPage() {
         
         currY += 5;
         
-        // Client Representative Section
         const clientRemarks = record.customerRepRemarks || '—';
         const clientContent = record.customerRepPresent 
           ? `Rep: ${record.customerRepName || 'N/A'}\nRemarks: ${clientRemarks}` 
@@ -377,7 +410,6 @@ export default function ChecklistsDataPage() {
 
         currY += 5;
 
-        // External App Comments Section
         const extCommentsRaw = record.comments?.map(c => `[${format(new Date(c.createdAt), 'dd/MM HH:mm')}] ${c.userName}: ${c.text}`).join('\n') || '—';
         const extLines = doc.splitTextToSize(extCommentsRaw, colWidthValue - 4);
         const extH = Math.max(rowHeight * 2, extLines.length * 4 + 6);
@@ -568,14 +600,29 @@ export default function ChecklistsDataPage() {
               <Table>
                 <TableHeader className="bg-muted/30">
                   <TableRow>
-                    <TableHead className="px-6">Project Name</TableHead>
-                    <TableHead className="hidden md:table-cell">Project Company</TableHead>
-                    <TableHead className="text-center">Audits Logged</TableHead>
+                    <TableHead 
+                      className="px-6 cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSiteSort('name')}
+                    >
+                      <div className="flex items-center">Project Name <SiteSortIcon column="name" /></div>
+                    </TableHead>
+                    <TableHead 
+                      className="hidden md:table-cell cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSiteSort('company')}
+                    >
+                      <div className="flex items-center">Project Company <SiteSortIcon column="company" /></div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSiteSort('count')}
+                    >
+                      <div className="flex items-center justify-center">Audits Logged <SiteSortIcon column="count" /></div>
+                    </TableHead>
                     <TableHead className="text-right px-6">Review</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())).map(site => {
+                  {filteredSortedSites.map(site => {
                     const count = siteStats[site.id] || 0;
                     return (
                       <TableRow 
@@ -605,7 +652,7 @@ export default function ChecklistsDataPage() {
                       </TableRow>
                     );
                   })}
-                  {allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())).length === 0 && (
+                  {filteredSortedSites.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={4} className="h-32 text-center text-muted-foreground italic">No projects found.</TableCell>
                     </TableRow>
@@ -705,27 +752,27 @@ export default function ChecklistsDataPage() {
                   <TableRow>
                     <TableHead 
                       className="px-6 cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => handleSort('date')}
+                      onClick={() => handleAuditSort('date')}
                     >
-                      <div className="flex items-center">Date & Time <SortIcon column="date" /></div>
+                      <div className="flex items-center">Date & Time <AuditSortIcon column="date" /></div>
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => handleSort('table')}
+                      onClick={() => handleAuditSort('table')}
                     >
-                      <div className="flex items-center">Table Ref <SortIcon column="table" /></div>
+                      <div className="flex items-center">Table Ref <AuditSortIcon column="table" /></div>
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => handleSort('user')}
+                      onClick={() => handleAuditSort('user')}
                     >
-                      <div className="flex items-center">Auditor <SortIcon column="user" /></div>
+                      <div className="flex items-center">Auditor <AuditSortIcon column="user" /></div>
                     </TableHead>
                     <TableHead 
                       className="text-center cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => handleSort('comments')}
+                      onClick={() => handleAuditSort('comments')}
                     >
-                      <div className="flex items-center justify-center">Comments <SortIcon column="comments" /></div>
+                      <div className="flex items-center justify-center">Comments <AuditSortIcon column="comments" /></div>
                     </TableHead>
                     <TableHead className="text-right px-6">Action</TableHead>
                   </TableRow>
