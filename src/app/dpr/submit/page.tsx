@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
+import { sendNotification } from "@/lib/notifications";
 
 const dprSchema = z.object({
   siteName: z.string().min(1, "Site is required"),
@@ -123,7 +124,7 @@ export default function SubmitDPRPage() {
       const overridesSnap = await getDocs(overridesQuery);
       const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
       
-      addDocumentNonBlocking(collection(firestore, 'dprs'), {
+      await addDocumentNonBlocking(collection(firestore, 'dprs'), {
         siteId: siteId || null,
         siteName: values.siteName,
         reportDate: values.reportDate,
@@ -132,6 +133,29 @@ export default function SubmitDPRPage() {
         userName: userProfile?.username || user.email,
         siteManagerId: effectiveSiteManagerId,
         createdAt: serverTimestamp(),
+      });
+
+      // Notify Manager
+      if (effectiveSiteManagerId && effectiveSiteManagerId !== user.uid) {
+        sendNotification(firestore, {
+          userId: effectiveSiteManagerId,
+          title: "DPR Submitted",
+          description: `${userProfile.username} submitted a progress report for ${values.siteName}.`,
+          link: "/dpr/list",
+        });
+      }
+
+      // Notify All Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid || adminDoc.id === effectiveSiteManagerId) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "New DPR Logged",
+          description: `Site: ${values.siteName} • By: ${userProfile.username}`,
+          link: "/dpr/list",
+        });
       });
 
       // Reward Points Logic for DPR

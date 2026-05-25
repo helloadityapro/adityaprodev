@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -24,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useRouter } from "next/navigation";
+import { sendNotification } from "@/lib/notifications";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item selection is required"),
@@ -314,6 +316,41 @@ export default function RecordMovementPage() {
         }
       }
 
+      // Send summary notification for the whole batch
+      if (isTransfer && receivingManagerId) {
+         sendNotification(firestore, {
+            userId: receivingManagerId,
+            title: "Material Transfer",
+            description: `${userProfile.username} initiated a material transfer to your site context.`,
+            link: "/movements/list",
+            push: true
+         });
+      }
+
+      // Notify Site Manager if recorder is an engineer
+      const managerId = userProfile.siteManagerId;
+      if (managerId && managerId !== receivingManagerId) {
+        sendNotification(firestore, {
+          userId: managerId,
+          title: "Material Movement Logged",
+          description: `${userProfile.username} recorded a ${values.movementType.toLowerCase()} log for ${values.siteName}.`,
+          link: "/movements/list",
+        });
+      }
+
+      // Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid || adminDoc.id === receivingManagerId || adminDoc.id === managerId) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "New Movement Log",
+          description: `${userProfile.username}: ${values.movementType} activity for ${values.siteName}.`,
+          link: "/movements/list"
+        });
+      });
+
       setSubmittedData(values);
       setIsSubmitted(true);
       toast({ 
@@ -548,7 +585,7 @@ export default function RecordMovementPage() {
                 ))}</div>
               </div>
 
-              <div className="flex justify-end gap-4 pt-6 border-t"><Button type="submit" className="min-w-[220px] h-12 text-lg font-black uppercase" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Recording...</> : "Record Movements"}</Button></div>
+              <div className="flex justify-end gap-4 pt-6 border-t"><Button type="submit" className="min-w-[200px] h-12 text-lg font-black uppercase" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Recording...</> : "Record Movements"}</Button></div>
             </form>
           </Form>
         </CardContent>

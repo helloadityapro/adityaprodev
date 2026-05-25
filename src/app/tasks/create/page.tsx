@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, query, increment } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, increment, where, getDocs } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -152,7 +153,7 @@ export default function CreateTaskPage() {
         updatedAt: serverTimestamp(),
       };
 
-      await addDocumentNonBlocking(collection(firestore, 'tasks'), taskData);
+      const taskRef = await addDocumentNonBlocking(collection(firestore, 'tasks'), taskData);
 
       // Reward Points Logic for Assigner
       const rate = rewardSettings?.taskAssignment ?? 0.25;
@@ -161,13 +162,26 @@ export default function CreateTaskPage() {
         totalPoints: increment(rate * multiplier)
       });
 
-      // Send Platform and Push Notification
+      // Send Platform and Push Notification to Assignee
       sendNotification(firestore, {
         userId: values.assignedToId,
         title: "New Task Assigned",
         description: `${userProfile.username} assigned you a new task: "${values.title}" for ${taskData.siteName}.`,
         link: "/tasks/list",
         push: true
+      });
+
+      // Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid || adminDoc.id === values.assignedToId) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "New Task Logged",
+          description: `${userProfile.username} assigned "${values.title}" to ${assignedUser?.username}.`,
+          link: "/tasks/list",
+        });
       });
       
       setSubmittedTask({

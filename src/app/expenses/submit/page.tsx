@@ -15,7 +15,7 @@ import {
   addDocumentNonBlocking, 
   useFirebaseApp 
 } from '@/firebase';
-import { collection, doc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from '@/lib/utils';
 import { Progress } from "@/components/ui/progress";
+import { sendNotification } from '@/lib/notifications';
 
 const expenseItemSchema = z.object({
   category: z.string().min(1, 'Category is required.'),
@@ -152,6 +153,7 @@ export default function SubmitExpensePage() {
         return { ...rest, proofUrl };
       }));
 
+      const expenseId = `exp_${Date.now()}`;
       await addDocumentNonBlocking(collection(firestore, 'expenses'), {
         userId: user.uid,
         userName: userProfile.username || user.email,
@@ -162,6 +164,20 @@ export default function SubmitExpensePage() {
         totalAmount,
         status: 'Pending',
         createdAt: serverTimestamp(),
+      });
+
+      // Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "New Expense Claim",
+          description: `${userProfile.username} submitted an expense claim of ₹${totalAmount.toFixed(2)}.`,
+          link: `/expenses/list`,
+          push: true
+        });
       });
 
       setIsSuccess(true);
@@ -414,7 +430,7 @@ export default function SubmitExpensePage() {
                                       step="0.01" 
                                       placeholder="0.00" 
                                       {...field} 
-                                      className="h-10 rounded-sm bg-background font-mono pl-7" 
+                                      className="h-10 rounded-sm bg-background font-mono font-bold pl-7" 
                                     />
                                   </div>
                                 </FormControl>

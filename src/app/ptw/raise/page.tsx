@@ -367,6 +367,19 @@ export default function RaisePtwPage() {
         }
       }
 
+      // Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid || adminDoc.id === effectiveSiteManagerId) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "New Permit Activity",
+          description: `Permit ${serialNumber} ${isCorrectionMode ? 'updated' : 'requested'} for ${values.siteName}.`,
+          link: `/ptw/list?view=${permitId}`,
+        });
+      });
+
       if (isCorrectionMode) {
         permitData.attachments = arrayUnion(...newAttachments);
         permitData.timeline = arrayUnion(timelineEntry);

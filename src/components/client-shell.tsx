@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from "react";
@@ -317,10 +318,14 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               // CRITICAL: We only fire toasts for in-app notifications (push: false)
               // to prevent duplication with the native push notification listener.
               if (!notif.read && !notif.push && !displayedNotifIds.has(notif.id)) {
+                  const title = notif.title;
+                  const isSuccess = title.includes('Approved') || title.includes('Success') || title.includes('Confirmed') || title.includes('Completed') || title.includes('Earned');
+                  const isDestructive = title.includes('Rejected') || title.includes('Error') || title.includes('Cancelled') || title.includes('Removed');
+
                   toast({ 
                     title: notif.title, 
                     description: notif.description, 
-                    variant: notif.title.includes('Approved') ? 'success' : notif.title.includes('Rejected') ? 'destructive' : 'default',
+                    variant: isSuccess ? 'success' : isDestructive ? 'destructive' : 'default',
                     action: notif.link ? (
                       <Button 
                         size="sm" 
@@ -339,7 +344,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                   wasUpdated = true;
               } else if (!notif.read && !notif.push) {
                   // Mark as displayed to keep the session tracking consistent
-                  // but do not fire a toast (let PushNotificationManager handle it)
                   if (!displayedNotifIds.has(notif.id)) {
                     newDisplayedIds.add(notif.id);
                     wasUpdated = true;
