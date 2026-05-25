@@ -275,8 +275,8 @@ export default function ReportsDashboard() {
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: redemptions, isLoading: redemptionsLoading } = useCollection<DataItem>(redemptionsQuery);
 
-  const usersQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), limit(50)) : null, [firestore, isAdmin]);
-  const { data: usersList, isLoading: usersListLoading } = useCollection<DataItem>(usersQuery);
+  const usersListQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), limit(50)) : null, [firestore, isAdmin]);
+  const { data: usersList, isLoading: usersListLoading } = useCollection<DataItem>(usersListQuery);
 
   const vehiclesReqsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'vehicle_assignments'), limit(100)) : null, [firestore, isAdmin]);
   const { data: vehicleReqs, isLoading: vehicleReqsLoading } = useCollection<DataItem>(vehiclesReqsQuery);
@@ -593,7 +593,7 @@ export default function ReportsDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+        <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center gap-2">
               <ClipboardList className="h-4 w-4 text-primary" />
@@ -615,7 +615,7 @@ export default function ReportsDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-sm border-primary/10 shadow-md flex flex-col h-full overflow-hidden">
+        <Card className="lg:col-span-3 rounded-sm border-primary/10 shadow-md flex flex-col h-full overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -626,7 +626,7 @@ export default function ReportsDashboard() {
             </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 overflow-hidden">
-            <ScrollArea className="h-[200px]">
+            <ScrollArea className="h-[500px]">
               <div className="divide-y divide-border/50">
                 {stats.recentActivities.length > 0 ? stats.recentActivities.map((activity) => (
                   <Link key={activity.id} href={activity.link} className="block group">
