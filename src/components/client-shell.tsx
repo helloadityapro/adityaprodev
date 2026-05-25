@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from "react";
@@ -186,7 +185,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (!userProfile?.doj) return false;
     const today = new Date();
     const doj = new Date(userProfile.doj);
-    const years = today.getFullYear() - joinDate.getFullYear();
+    const years = today.getFullYear() - doj.getFullYear();
     return years > 0 && today.getMonth() === doj.getMonth() && today.getDate() === doj.getDate();
   }, [userProfile?.doj]);
 
@@ -496,4 +495,3 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
