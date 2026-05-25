@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, limit, arrayUnion, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, limit, arrayUnion, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,7 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { sendNotification } from '@/lib/notifications';
 
 type Site = { id: string; name: string; projectCompany?: string };
 
@@ -104,7 +105,7 @@ export default function ChecklistsDataPage() {
   
   // Sorting & Advanced Filtering for Audits
   const [auditSortConfig, setAuditSortConfig] = React.useState<{ key: AuditSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
-  const [siteSortConfig, setSiteSortConfig] = React.useState<{ key: SiteSortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+  const [siteSortConfig, setSortConfig] = React.useState<{ key: SiteSortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -252,7 +253,7 @@ export default function ChecklistsDataPage() {
   };
 
   const handleSiteSort = (key: SiteSortKey) => {
-    setSiteSortConfig(prev => ({
+    setSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
@@ -535,6 +536,32 @@ export default function ChecklistsDataPage() {
           createdAt: new Date().toISOString()
         })
       });
+
+      // Notify Checklist Owner if not self
+      if (commentingRecord.userId !== user.uid) {
+        sendNotification(firestore, {
+          userId: commentingRecord.userId,
+          title: "New Comment on Audit",
+          description: `${userProfile.username} commented on your Table ${commentingRecord.tableNumber} audit.`,
+          link: `/checklists/data`,
+          push: true
+        });
+      }
+
+      // Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid || adminDoc.id === commentingRecord.userId) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "Audit Comment",
+          description: `${userProfile.username} commented on an audit for ${commentingRecord.siteName}.`,
+          link: `/checklists/data`,
+          push: false
+        });
+      });
+
       setNewComment("");
       toast({ title: "Comment Posted" });
     } catch (e: any) {

@@ -1,10 +1,9 @@
-
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirestore, useUser, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { doc, collection, query, where, serverTimestamp, arrayUnion, increment } from 'firebase/firestore';
+import { doc, collection, query, where, serverTimestamp, arrayUnion, increment, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { sendNotification } from '@/lib/notifications';
 
 type Module = {
   id: string;
@@ -41,10 +41,6 @@ type ProgressData = {
   quizAttempts?: Record<string, number>;
 };
 
-/**
- * Extracts the YouTube Video ID and returns a proper embed URL.
- * Prevents "Connection Refused" errors caused by using standard watch URLs in iframes.
- */
 function getYouTubeEmbedUrl(url?: string) {
   if (!url) return '';
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
@@ -93,7 +89,7 @@ export default function ModuleLearningPage({ params }: { params: Promise<{ cours
   const nextModule = sortedModules?.[currentIndex + 1];
   const prevModule = sortedModules?.[currentIndex - 1];
 
-  const handleQuizSubmit = () => {
+  const handleQuizSubmit = async () => {
     if (!quiz || !user) return;
     
     let correctCount = 0;
@@ -107,7 +103,6 @@ export default function ModuleLearningPage({ params }: { params: Promise<{ cours
     setScore(finalScore);
     setIsQuizSubmitted(true);
 
-    // Track attempt in progress data
     const pRef = doc(firestore, 'lms_progress', `${user.uid}_${courseId}`);
     updateDocumentNonBlocking(pRef, {
       [`quizAttempts.${moduleId}`]: increment(1),
@@ -116,6 +111,26 @@ export default function ModuleLearningPage({ params }: { params: Promise<{ cours
 
     if (finalScore >= 80) {
       toast({ title: 'Assessment Passed!', description: `You scored ${finalScore}%. Module marked as complete.` });
+      
+      const completedIds = progress?.completedModuleIds || [];
+      if (!completedIds.includes(moduleId) && (completedIds.length + 1) === sortedModules.length) {
+         // Final module finished - notify admins
+         const courseSnap = await getDocs(query(collection(firestore, 'lms_courses'), where('__name__', '==', courseId)));
+         const courseTitle = courseSnap.docs[0]?.data()?.title || "Knowledge Course";
+         
+         const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+         const adminDocs = await getDocs(adminsQuery);
+         adminDocs.forEach(adminDoc => {
+           sendNotification(firestore, {
+             userId: adminDoc.id,
+             title: "Course Milestone Achieved",
+             description: `${userProfile?.username || 'User'} completed "${courseTitle}".`,
+             link: `/lms/admin`,
+             push: false
+           });
+         });
+      }
+      
       markModuleComplete(finalScore);
     } else {
       toast({ variant: 'destructive', title: 'Assessment Failed', description: `You scored ${finalScore}%. A minimum of 80% is required.` });

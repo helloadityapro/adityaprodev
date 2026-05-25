@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -446,7 +445,7 @@ export default function ManageAllTripsPage() {
       sendNotification(firestore, {
         userId: assignment.userId,
         title: "Vehicle Allotted",
-        description: `Your trip request for ${assignment.tripDate} has been authorized. Vehicle: ${vehicle?.plateNumber}.`,
+        description: `Trip to ${assignment.dropLocation} assigned to ${vehicle?.plateNumber} with driver ${finalDriverName}.`,
         link: `/vehicles/trips/manage?view=${assignment.id}`,
         push: true
       });
@@ -569,7 +568,7 @@ export default function ManageAllTripsPage() {
     const urls = [trip.startReadingPhoto, trip.endReadingPhoto].filter(Boolean) as string[];
     const index = urls.indexOf(url);
     setViewUrls(urls);
-    setCurrentUrlIndex(index >= 0 ? index : 0);
+    setCurrentFileIndex(index >= 0 ? index : 0);
     setViewUrl(url);
     setZoom(1);
   };
@@ -1807,4 +1806,3 @@ function ScheduledTripsDialog({
     </Dialog>
   );
 }
-

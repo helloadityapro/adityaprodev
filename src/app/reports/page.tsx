@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -53,7 +52,9 @@ import {
   BookOpen,
   LayoutGrid,
   Fuel,
-  Activity
+  Activity,
+  ClipboardCheck,
+  MessageCircle
 } from 'lucide-react';
 import { format, subDays, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -77,6 +78,7 @@ type DataItem = {
   siteName: string;
   title?: string;
   itemName?: string;
+  tableNumber?: string;
   name?: string;
   fileName?: string;
   createdAt?: any;
@@ -97,6 +99,7 @@ type DataItem = {
   priority?: string;
   urgency?: string;
   startTime?: any;
+  endTime?: any;
   amount?: number;
   poNumber?: string;
   woNumber?: string;
@@ -110,6 +113,7 @@ type DataItem = {
   amountInRs?: number;
   username?: string;
   pickupLocation?: string;
+  comments?: any[];
 };
 
 type UserProfile = {
@@ -184,52 +188,54 @@ export default function ReportsDashboard() {
   const permitsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'permits_to_work');
-    if (isAdmin) return colRef;
-    if (isManager) return query(colRef, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)));
-    return query(colRef, where('siteEngineerId', '==', user.uid));
+    if (isAdmin) return query(colRef, limit(100));
+    return query(colRef, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)), limit(100));
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: permits, isLoading: permitsLoading } = useCollection<DataItem>(permitsQuery);
 
   const dprsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'dprs');
-    if (isAdmin) return colRef;
-    if (isManager) return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)));
-    return query(colRef, where('userId', '==', user.uid));
+    if (isAdmin) return query(colRef, limit(100));
+    return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(100));
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: dprs, isLoading: dprsLoading } = useCollection<DataItem>(dprsQuery);
 
   const movementsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'material_movements');
-    if (isAdmin) return colRef;
-    if (isManager) return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)));
-    return query(colRef, where('userId', '==', user.uid));
+    if (isAdmin) return query(colRef, limit(100));
+    return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(100));
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: movements, isLoading: movementsLoading } = useCollection<DataItem>(movementsQuery);
 
   const requirementsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'requirements');
-    if (isAdmin) return colRef;
-    if (isManager) return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)));
-    return query(colRef, where('userId', '==', user.uid));
+    if (isAdmin) return query(colRef, limit(100));
+    return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(100));
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: requirements, isLoading: requirementsLoading } = useCollection<DataItem>(requirementsQuery);
 
   const tasksQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'tasks');
-    if (isAdmin) return colRef;
-    return query(colRef, or(where('assignedToId', '==', user.uid), where('assignedById', '==', user.uid)));
+    if (isAdmin) return query(colRef, limit(100));
+    return query(colRef, or(where('assignedToId', '==', user.uid), where('assignedById', '==', user.uid)), limit(100));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: tasks, isLoading: tasksLoading } = useCollection<DataItem>(tasksQuery);
 
   const visitsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading || !isAdmin) return null;
-    return query(collection(firestore, 'site_visits'), limit(100));
+    return query(collection(firestore, 'site_visits'), limit(200));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: visits, isLoading: visitsLoading } = useCollection<DataItem>(visitsQuery);
+
+  const checkinstallationQuery = useMemoFirebase(() => {
+    if (!user || isProfileLoading || !isAdmin) return null;
+    return query(collection(firestore, 'installation_checklists'), limit(100));
+  }, [firestore, user, isProfileLoading, isAdmin]);
+  const { data: installationChecklists, isLoading: instLoading } = useCollection<DataItem>(checkinstallationQuery);
 
   const expensesQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading || !isAdmin) return null;
@@ -264,10 +270,10 @@ export default function ReportsDashboard() {
   const usersQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), limit(50)) : null, [firestore, isAdmin]);
   const { data: usersList, isLoading: usersListLoading } = useCollection<DataItem>(usersQuery);
 
-  const vehiclesReqsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'vehicle_assignments'), limit(50)) : null, [firestore, isAdmin]);
+  const vehiclesReqsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'vehicle_assignments'), limit(100)) : null, [firestore, isAdmin]);
   const { data: vehicleReqs, isLoading: vehicleReqsLoading } = useCollection<DataItem>(vehiclesReqsQuery);
 
-  const docsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_documents'), limit(50)) : null, [firestore, isAdmin]);
+  const docsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_documents'), limit(100)) : null, [firestore, isAdmin]);
   const { data: siteDocs, isLoading: docsLoading } = useCollection<DataItem>(docsQuery);
 
   const groupsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_groups'), limit(50)) : null, [firestore, isAdmin]);
@@ -279,7 +285,7 @@ export default function ReportsDashboard() {
   const lmsModulesQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'lms_modules'), limit(50)) : null, [firestore, isAdmin]);
   const { data: lmsModules, isLoading: lmsModulesLoading } = useCollection<DataItem>(lmsModulesQuery);
 
-  const isLoadingTotal = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || (isAdmin && (visitsLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading || usersListLoading || vehicleReqsLoading || docsLoading || groupsLoading || lmsCoursesLoading || lmsModulesLoading));
+  const isLoadingTotal = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || (isAdmin && (visitsLoading || instLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading || usersListLoading || vehicleReqsLoading || docsLoading || groupsLoading || lmsCoursesLoading || lmsModulesLoading));
 
   const stats = React.useMemo(() => {
     if (isLoadingTotal) return null;
@@ -395,29 +401,39 @@ export default function ReportsDashboard() {
       };
 
       permits?.forEach(p => addItemToActivity(p, 'Permit', 'Compliance', ShieldCheck, 'text-blue-600', 'requestDate', 'siteEngineerName', `${p.siteEngineerName} requested a ${p.ptwType} permit for ${p.siteName}`, `/ptw/list?view=${p.id}`));
-      tasks?.forEach(t => addItemToActivity(t, 'Task', 'Operations', CheckSquare, 'text-slate-600', 'createdAt', 'assignedByName', `${t.assignedByName} assigned a task "${t.title}" to ${t.assignedToName} for ${t.siteName}`, `/tasks/list`));
+      tasks?.forEach(t => {
+        if (t.status === 'Completed') addItemToActivity(t, 'Task Finished', 'Operations', CheckCircle2, 'text-green-600', 'updatedAt', 'assignedToName', `${t.assignedToName} finished task: "${t.title}" for ${t.siteName}`, `/tasks/list`);
+        else addItemToActivity(t, 'Task', 'Operations', CheckSquare, 'text-slate-600', 'createdAt', 'assignedByName', `${t.assignedByName} assigned task "${t.title}" to ${t.assignedToName} for ${t.siteName}`, `/tasks/list`);
+      });
       dprs?.forEach(d => addItemToActivity(d, 'DPR', 'Reporting', FileText, 'text-amber-600', 'createdAt', 'userName', `${d.userName} submitted a DPR for ${d.siteName}`, `/dpr/list`));
       movements?.forEach(m => addItemToActivity(m, 'Movement', 'Inventory', ArrowLeftRight, 'text-emerald-600', 'createdAt', 'userName', `${m.userName} recorded a material ${m.movementType} for ${m.itemName} at ${m.siteName}`, `/movements/list`));
       requirements?.forEach(r => addItemToActivity(r, 'Requirement', 'Procurement', ClipboardList, 'text-purple-600', 'createdAt', 'userName', `${r.userName} raised a requirement for ${r.itemName} at ${r.siteName}`, `/requirements/list`));
       expenses?.forEach(e => addItemToActivity(e, 'Expense', 'Finance', Wallet, 'text-indigo-600', 'createdAt', 'userName', `${e.userName} submitted an expense claim: "${e.title}"`, `/expenses/list?view=${e.id}`));
-      visits?.forEach(v => addItemToActivity(v, 'Site Visit', 'Visits', Navigation, 'text-rose-600', 'startTime', 'managerName', `${v.managerName} started a site visit at ${v.siteName}`, `/site-visits/${v.id}`));
+      visits?.forEach(v => {
+        if (v.status === 'completed') addItemToActivity(v, 'Site Visit End', 'Visits', Flag, 'text-rose-700', 'endTime', 'managerName', `${v.managerName} finished a site visit at ${v.siteName}`, `/site-visits/${v.id}`);
+        else addItemToActivity(v, 'Site Visit Start', 'Visits', Navigation, 'text-rose-600', 'startTime', 'managerName', `${v.managerName} started a site visit at ${v.siteName}`, `/site-visits/${v.id}`);
+      });
       pos?.forEach(p => addItemToActivity(p, 'Purchase Order', 'Procurement', ShoppingBag, 'text-blue-700', 'createdAt', 'createdByName', `${p.createdByName} generated a Purchase Order ${p.poNumber} for ${p.siteName}`, `/projects/${p.siteId}?tab=po`));
       wos?.forEach(w => addItemToActivity(w, 'Work Order', 'Procurement', Gavel, 'text-slate-700', 'createdAt', 'createdByName', `${w.createdByName} issued a Work Order ${w.woNumber} for ${w.siteName}`, `/projects/${w.siteId}?tab=wo`));
       payments?.forEach(p => addItemToActivity(p, 'Payment', 'Finance', IndianRupee, 'text-emerald-700', 'date', 'recordedByName', `${p.recordedByName} recorded a payment of ₹${p.amount?.toLocaleString()} against ${p.referenceNumber} for ${p.siteName}`, `/payments/project-wise`));
       redemptions?.forEach(r => addItemToActivity(r, 'Redemption', 'Rewards', CreditCard, 'text-green-600', 'createdAt', 'userName', `${r.userName} requested a points redemption of ₹${r.amountInRs?.toLocaleString()}`, `/settings/rewards`));
+      installationChecklists?.forEach(cl => {
+        addItemToActivity(cl, 'Checklist', 'Quality', ClipboardCheck, 'text-cyan-600', 'createdAt', 'userName', `${cl.userName} submitted an MMS audit for Table ${cl.tableNumber} at ${cl.siteName}`, `/checklists/data`);
+        if (cl.comments && cl.comments.length > 0) {
+           cl.comments.forEach(c => addItemToActivity(c, 'Audit Comment', 'Quality', MessageCircle, 'text-cyan-800', 'createdAt', 'userName', `${c.userName} commented on Table ${cl.tableNumber} audit for ${cl.siteName}`, `/checklists/data`));
+        }
+      });
       
       usersList?.forEach(u => addItemToActivity(u, 'User', 'Registry', UserPlus, 'text-purple-600', 'createdAt', 'username', `New user added to registry: ${u.username}`, `/settings/users`));
       vehicleReqs?.forEach(v => {
-        if (v.status === 'Pending') {
-          addItemToActivity(v, 'Trip Request', 'Fleet', Fuel, 'text-orange-500', 'requestDate', 'userName', `${v.userName} requested a vehicle for trip to ${v.pickupLocation}`, `/vehicles/trips/manage`);
-        } else if (v.status === 'Approved') {
-          addItemToActivity(v, 'Trip Allotted', 'Fleet', CarFront, 'text-blue-500', 'approvalDate', 'userName', `Vehicle allotted to ${v.userName} for trip on ${v.tripDate}`, `/vehicles/trips/manage`);
-        }
+        if (v.status === 'Pending') addItemToActivity(v, 'Trip Request', 'Fleet', Fuel, 'text-orange-500', 'requestDate', 'userName', `${v.userName} requested a vehicle for trip to ${v.pickupLocation}`, `/vehicles/trips/manage`);
+        else if (v.status === 'Approved') addItemToActivity(v, 'Trip Allotted', 'Fleet', CarFront, 'text-blue-500', 'approvalDate', 'userName', `Vehicle ${v.vehicleDetails} allotted to ${v.userName} with driver ${v.driverName}`, `/vehicles/trips/manage`);
+        else if (v.status === 'Ongoing') addItemToActivity(v, 'Trip Start', 'Fleet', PlayCircle, 'text-blue-700', 'startTime', 'userName', `${v.userName} started a journey with ${v.vehicleDetails}`, `/vehicles/trips/manage`);
+        else if (v.status === 'Completed') addItemToActivity(v, 'Trip End', 'Fleet', Flag, 'text-emerald-700', 'endTime', 'userName', `${v.userName} arrived at ${v.dropLocation}. Journey complete.`, `/vehicles/trips/manage`);
       });
       siteDocs?.forEach(doc => addItemToActivity(doc, 'Document', 'Files', FileUp, 'text-sky-600', 'createdAt', 'uploadedByName', `${doc.uploadedByName} uploaded a document "${doc.fileName}" for ${doc.siteName}`, `/documents/${doc.siteId}`));
       siteGroups?.forEach(g => addItemToActivity(g, 'Group', 'Registry', Tags, 'text-pink-600', 'createdAt', 'createdByName', `New site group created: "${g.name}"`, `/projects/groups`));
       lmsCourses?.forEach(c => addItemToActivity(c, 'Course', 'LMS', BookOpen, 'text-indigo-700', 'createdAt', 'createdBy', `New training course published: "${c.title}"`, `/lms/admin`));
-      lmsModules?.forEach(m => addItemToActivity(m, 'Module', 'LMS', LayoutGrid, 'text-indigo-500', 'createdAt', 'createdBy', `New module "${m.title}" added to course curriculum`, `/lms/admin`));
     }
 
     return {
@@ -426,7 +442,7 @@ export default function ReportsDashboard() {
       approvalRate,
       taskProgress,
       requirementUrgency: reqUrgency,
-      recentActivities: aggregatedActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 50),
+      recentActivities: aggregatedActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, 100),
       counts: {
         permits: fPermits.length,
         dprs: fDprs.length,
@@ -435,7 +451,7 @@ export default function ReportsDashboard() {
         tasks: fTasks.length,
       }
     };
-  }, [isLoadingTotal, permits, dprs, movements, requirements, tasks, visits, expenses, pos, wos, payments, redemptions, usersList, vehicleReqs, siteDocs, siteGroups, lmsCourses, lmsModules, selectedSite, timeRange, customStartDate, customEndDate, isAdmin]);
+  }, [isLoadingTotal, permits, dprs, movements, requirements, tasks, visits, installationChecklists, expenses, pos, wos, payments, redemptions, usersList, vehicleReqs, siteDocs, siteGroups, lmsCourses, lmsModules, selectedSite, timeRange, customStartDate, customEndDate, isAdmin]);
 
   if (isLoadingTotal) return <div className="space-y-8 p-4"><Skeleton className="h-10 w-48" /><Skeleton className="h-4 w-96" /><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full rounded-sm" />)}</div></div>;
 
@@ -486,7 +502,6 @@ export default function ReportsDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Row 1: Activity Trend & Compliance Health */}
         <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center gap-2">
@@ -548,7 +563,6 @@ export default function ReportsDashboard() {
           </CardContent>
         </Card>
 
-        {/* Row 2: Task Progress & Requirement Urgency */}
         <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center gap-2">
@@ -593,7 +607,6 @@ export default function ReportsDashboard() {
           </CardContent>
         </Card>
 
-        {/* Administration Audit List - Spans whole row or side */}
         <Card className="rounded-sm border-primary/10 shadow-md flex flex-col h-full overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center justify-between">
@@ -601,7 +614,7 @@ export default function ReportsDashboard() {
                 <History className="h-4 w-4 text-primary" />
                 <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Recent Activities</CardTitle>
               </div>
-              <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase">Latest 50 Actions</Badge>
+              <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase">Latest 100 Actions</Badge>
             </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 overflow-hidden">

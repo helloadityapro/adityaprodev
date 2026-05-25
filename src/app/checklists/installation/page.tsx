@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
-import { collection, doc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ import { format } from "date-fns";
 import imageCompression from 'browser-image-compression';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { sendNotification } from "@/lib/notifications";
 
 const checkItemSchema = z.object({
   remarks: z.string().optional(),
@@ -170,11 +171,13 @@ export default function TableLevelMMSChecklistPage() {
 
       for (const [key, check] of Object.entries(values.checks)) {
         const attachments = [];
-        for (let i = 0; i < check.localFiles.length; i++) {
-          const file = check.localFiles[i];
-          const path = `checklists/mms/${user.uid}/${timestamp}_${key}_${i}_${file.name.replace(/\s+/g, '_')}`;
-          const uploaded = await uploadFile(file, path);
-          attachments.push(uploaded);
+        if (check.localFiles) {
+          for (let i = 0; i < check.localFiles.length; i++) {
+            const file = check.localFiles[i];
+            const path = `checklists/mms/${user.uid}/${timestamp}_${key}_${i}_${file.name.replace(/\s+/g, '_')}`;
+            const uploaded = await uploadFile(file, path);
+            attachments.push(uploaded);
+          }
         }
         finalChecks.push({
           key,
@@ -185,16 +188,18 @@ export default function TableLevelMMSChecklistPage() {
       }
 
       const otherAttachments = [];
-      for (let i = 0; i < values.otherLocalFiles.length; i++) {
-        const file = values.otherLocalFiles[i];
-        const path = `checklists/mms/${user.uid}/${timestamp}_other_${i}_${file.name.replace(/\s+/g, '_')}`;
-        const uploaded = await uploadFile(file, path);
-        otherAttachments.push(uploaded);
+      if (values.otherLocalFiles) {
+        for (let i = 0; i < values.otherLocalFiles.length; i++) {
+          const file = values.otherLocalFiles[i];
+          const path = `checklists/mms/${user.uid}/${timestamp}_other_${i}_${file.name.replace(/\s+/g, '_')}`;
+          const uploaded = await uploadFile(file, path);
+          otherAttachments.push(uploaded);
+        }
       }
 
       const finalTableNumber = values.tableNumber.startsWith("T - ") ? values.tableNumber : `T - ${values.tableNumber}`;
 
-      await addDocumentNonBlocking(collection(firestore, 'installation_checklists'), {
+      const checklistRef = await addDocumentNonBlocking(collection(firestore, 'installation_checklists'), {
         siteId: values.siteId,
         siteName: values.siteName,
         projectCompany: values.projectCompany || "",
@@ -211,6 +216,20 @@ export default function TableLevelMMSChecklistPage() {
         userId: user.uid,
         userName: userProfile.username || user.email,
         createdAt: serverTimestamp(),
+      });
+
+      // Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "New MMS Audit Logged",
+          description: `${userProfile.username} submitted an audit for Table ${finalTableNumber} at ${values.siteName}.`,
+          link: `/checklists/data`,
+          push: false
+        });
       });
 
       toast({ title: "Success", description: "Audit published to registry." });

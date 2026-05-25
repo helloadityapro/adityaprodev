@@ -1,10 +1,9 @@
-
 "use client";
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
-import { doc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,6 +45,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import { Progress } from "@/components/ui/progress";
+import { sendNotification } from "@/lib/notifications";
 
 const PURPOSES = ["Kick-off visit", "Regular visit", "Site team meetup", "Vendor meetup"];
 
@@ -326,6 +326,20 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
         customerNames: customerAvailable === "yes" ? customerNames : "",
         status: 'completed',
         updatedAt: serverTimestamp()
+      });
+
+      // Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "Site Visit Concluded",
+          description: `${visit.managerName} published a final report for "${visit.siteName}".`,
+          link: `/site-visits/${visit.id}`,
+          push: false
+        });
       });
 
       toast({ variant: 'success', title: 'Report Published', description: `Visit to ${visit.siteName} concluded and documented.` });

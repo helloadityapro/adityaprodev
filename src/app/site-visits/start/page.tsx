@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { sendNotification } from "@/lib/notifications";
 
 type Site = {
   id: string;
@@ -98,7 +99,7 @@ export default function StartSiteVisitPage() {
         return;
       }
 
-      await addDocumentNonBlocking(collection(firestore, 'site_visits'), {
+      const visitRef = await addDocumentNonBlocking(collection(firestore, 'site_visits'), {
         siteId: selectedSite.id,
         siteName: selectedSite.name,
         managerId: user.uid,
@@ -110,6 +111,20 @@ export default function StartSiteVisitPage() {
         startLng: location.lng,
         status: 'ongoing',
         createdAt: serverTimestamp()
+      });
+
+      // Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "Site Visit Started",
+          description: `${userProfile.username} checked-in at "${selectedSite.name}".`,
+          link: `/site-visits/${visitRef!.id}`,
+          push: false
+        });
       });
 
       toast({ title: 'Visit Started', description: `Reporting started for ${selectedSite.name}.` });
@@ -158,7 +173,7 @@ export default function StartSiteVisitPage() {
                     placeholder="Search sites..." 
                     className="h-9 w-full border-none focus-visible:ring-0 px-0" 
                     value={siteSearchQuery} 
-                    onChange={(e) => setSiteSearchQuery(e.target.value)}
+                    onChange={(e) => setSiteSearchQuery(e.target.value)} 
                   />
                 </div>
                 <ScrollArea className="h-[200px]">
