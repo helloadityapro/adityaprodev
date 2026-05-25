@@ -192,7 +192,7 @@ export default function ReportsDashboard() {
 
   const filteredSiteList = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
-  // Data Collections - Now ordered by date to ensure the "Latest" 100 actions are correct
+  // Data Collections - Now ordered by date to ensure the "Latest" 500 actions are correct
   const permitsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'permits_to_work');
@@ -394,7 +394,7 @@ export default function ReportsDashboard() {
 
         if (d && (selectedSite === "All Sites" || !item.siteName || item.siteName === selectedSite)) {
           aggregatedActivities.push({
-            id: item.id,
+            id: `${type}-${item.id}-${d.getTime()}`,
             type,
             module,
             icon,
@@ -428,7 +428,7 @@ export default function ReportsDashboard() {
       installationChecklists?.forEach(cl => {
         addItemToActivity(cl, 'Checklist', 'Quality', ClipboardCheck, 'text-cyan-600', 'createdAt', 'userName', `${cl.userName} submitted an MMS audit for Table ${cl.tableNumber} at ${cl.siteName}`, `/checklists/data`);
         if (cl.comments && cl.comments.length > 0) {
-           cl.comments.forEach(c => addItemToActivity({...c, siteName: cl.siteName}, 'Audit Comment', 'Quality', MessageCircle, 'text-cyan-800', 'createdAt', 'userName', `${c.userName} commented on Table ${cl.tableNumber} audit for ${cl.siteName}`, `/checklists/data`));
+           cl.comments.forEach((c, cIdx) => addItemToActivity({...c, id: `${cl.id}-comment-${cIdx}`, siteName: cl.siteName}, 'Audit Comment', 'Quality', MessageCircle, 'text-cyan-800', 'createdAt', 'userName', `${c.userName} commented on Table ${cl.tableNumber} audit for ${cl.siteName}`, `/checklists/data`));
         }
       });
       
@@ -495,7 +495,7 @@ export default function ReportsDashboard() {
             </PopoverTrigger>
             <PopoverContent className="w-[250px] p-0" align="end">
               <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter site..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={siteSearchQuery} onChange={(e) => setSiteSearchQuery(e.target.value)} /></div>
-              <ScrollArea className="h-[200px]"><div className="p-1"><Button variant="ghost" className="w-full justify-start font-bold text-xs h-8" onClick={() => { setSelectedSite("All Sites"); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-3 w-3", selectedSite === "All Sites" ? "opacity-100" : "opacity-0")} />All Sites</Button>{filteredSiteList.map(site => (<Button key={site.id} variant="ghost" className="w-full justify-start font-medium text-xs h-8" onClick={() => { setSelectedSite(site.name); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-3 w-3", selectedSite === site.name ? "opacity-100" : "opacity-0")} /><span className="truncate">{site.name}</span></Button>))}</div></ScrollArea>
+              <ScrollArea className="h-[200px]"><div className="p-1"><Button variant="ghost" className="w-full justify-start font-bold text-xs h-8" onClick={() => { setSelectedSite("All Sites"); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4", selectedSite === "All Sites" ? "opacity-100" : "opacity-0")} />All Sites</Button>{filteredSiteList.map(site => (<Button key={site.id} variant="ghost" className="w-full justify-start font-medium text-xs h-8" onClick={() => { setSelectedSite(site.name); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4", selectedSite === site.name ? "opacity-100" : "opacity-0")} /><span className="truncate">{site.name}</span></Button>))}</div></ScrollArea>
             </PopoverContent>
           </Popover>
         </div>
@@ -571,7 +571,7 @@ export default function ReportsDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+        <Card className="lg:col-span-1 rounded-sm border-primary/10 shadow-md overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center gap-2">
               <CheckSquare className="h-4 w-4 text-primary" />
