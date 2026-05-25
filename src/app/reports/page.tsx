@@ -54,7 +54,10 @@ import {
   Fuel,
   Activity,
   ClipboardCheck,
-  MessageCircle
+  MessageCircle,
+  CheckCircle2,
+  Flag,
+  PlayCircle
 } from 'lucide-react';
 import { format, subDays, isAfter, startOfDay, endOfDay } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -113,6 +116,11 @@ type DataItem = {
   amountInRs?: number;
   username?: string;
   pickupLocation?: string;
+  dropLocation?: string;
+  vehicleDetails?: string;
+  driverName?: string;
+  uploadedByName?: string;
+  createdBy?: string;
   comments?: any[];
 };
 
