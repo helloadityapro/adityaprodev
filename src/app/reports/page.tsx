@@ -192,105 +192,105 @@ export default function ReportsDashboard() {
 
   const filteredSiteList = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
-  // Data Collections
+  // Data Collections - Now ordered by date to ensure the "Latest" 100 actions are correct
   const permitsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'permits_to_work');
-    if (isAdmin) return query(colRef, limit(100));
-    return query(colRef, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)), limit(100));
+    if (isAdmin) return query(colRef, orderBy('requestDate', 'desc'), limit(500));
+    return query(colRef, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: permits, isLoading: permitsLoading } = useCollection<DataItem>(permitsQuery);
 
   const dprsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'dprs');
-    if (isAdmin) return query(colRef, limit(100));
-    return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(100));
+    if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(500));
+    return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: dprs, isLoading: dprsLoading } = useCollection<DataItem>(dprsQuery);
 
   const movementsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'material_movements');
-    if (isAdmin) return query(colRef, limit(100));
-    return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(100));
+    if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(500));
+    return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: movements, isLoading: movementsLoading } = useCollection<DataItem>(movementsQuery);
 
   const requirementsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'requirements');
-    if (isAdmin) return query(colRef, limit(100));
-    return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(100));
+    if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(500));
+    return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin, isManager]);
   const { data: requirements, isLoading: requirementsLoading } = useCollection<DataItem>(requirementsQuery);
 
   const tasksQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'tasks');
-    if (isAdmin) return query(colRef, limit(100));
-    return query(colRef, or(where('assignedToId', '==', user.uid), where('assignedById', '==', user.uid)), limit(100));
+    if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(500));
+    return query(colRef, or(where('assignedToId', '==', user.uid), where('assignedById', '==', user.uid)), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: tasks, isLoading: tasksLoading } = useCollection<DataItem>(tasksQuery);
 
   const visitsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading || !isAdmin) return null;
-    return query(collection(firestore, 'site_visits'), limit(200));
+    return query(collection(firestore, 'site_visits'), orderBy('startTime', 'desc'), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: visits, isLoading: visitsLoading } = useCollection<DataItem>(visitsQuery);
 
   const checkinstallationQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading || !isAdmin) return null;
-    return query(collection(firestore, 'installation_checklists'), limit(100));
+    return query(collection(firestore, 'installation_checklists'), orderBy('createdAt', 'desc'), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: installationChecklists, isLoading: instLoading } = useCollection<DataItem>(checkinstallationQuery);
 
   const expensesQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading || !isAdmin) return null;
-    return query(collection(firestore, 'expenses'), limit(100));
+    return query(collection(firestore, 'expenses'), orderBy('createdAt', 'desc'), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: expenses, isLoading: expensesLoading } = useCollection<DataItem>(expensesQuery);
 
   const posQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading || !isAdmin) return null;
-    return query(collection(firestore, 'project_pos'), limit(100));
+    return query(collection(firestore, 'project_pos'), orderBy('createdAt', 'desc'), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: pos, isLoading: posLoading } = useCollection<DataItem>(posQuery);
 
   const wosQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading || !isAdmin) return null;
-    return query(collection(firestore, 'project_wos'), limit(100));
+    return query(collection(firestore, 'project_wos'), orderBy('createdAt', 'desc'), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: wos, isLoading: wosLoading } = useCollection<DataItem>(wosQuery);
 
   const paymentsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading || !isAdmin) return null;
-    return query(collection(firestore, 'payments'), limit(100));
+    return query(collection(firestore, 'payments'), orderBy('date', 'desc'), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: payments, isLoading: paymentsLoading } = useCollection<DataItem>(paymentsQuery);
 
   const redemptionsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading || !isAdmin) return null;
-    return query(collection(firestore, 'redemption_requests'), limit(100));
+    return query(collection(firestore, 'redemption_requests'), orderBy('createdAt', 'desc'), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: redemptions, isLoading: redemptionsLoading } = useCollection<DataItem>(redemptionsQuery);
 
-  const usersListQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), limit(50)) : null, [firestore, isAdmin]);
+  const usersListQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore, isAdmin]);
   const { data: usersList, isLoading: usersListLoading } = useCollection<DataItem>(usersListQuery);
 
-  const vehiclesReqsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'vehicle_assignments'), limit(100)) : null, [firestore, isAdmin]);
+  const vehiclesReqsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'vehicle_assignments'), orderBy('requestDate', 'desc'), limit(500)) : null, [firestore, isAdmin]);
   const { data: vehicleReqs, isLoading: vehicleReqsLoading } = useCollection<DataItem>(vehiclesReqsQuery);
 
-  const docsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_documents'), limit(100)) : null, [firestore, isAdmin]);
+  const docsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_documents'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore, isAdmin]);
   const { data: siteDocs, isLoading: docsLoading } = useCollection<DataItem>(docsQuery);
 
-  const groupsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_groups'), limit(50)) : null, [firestore, isAdmin]);
+  const groupsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_groups'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore, isAdmin]);
   const { data: siteGroups, isLoading: groupsLoading } = useCollection<DataItem>(groupsQuery);
 
-  const lmsCoursesQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'lms_courses'), limit(50)) : null, [firestore, isAdmin]);
+  const lmsCoursesQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'lms_courses'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore, isAdmin]);
   const { data: lmsCourses, isLoading: lmsCoursesLoading } = useCollection<DataItem>(lmsCoursesQuery);
 
-  const lmsModulesQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'lms_modules'), limit(50)) : null, [firestore, isAdmin]);
+  const lmsModulesQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'lms_modules'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore, isAdmin]);
   const { data: lmsModules, isLoading: lmsModulesLoading } = useCollection<DataItem>(lmsModulesQuery);
 
   const isLoadingTotal = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || (isAdmin && (visitsLoading || instLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading || usersListLoading || vehicleReqsLoading || docsLoading || groupsLoading || lmsCoursesLoading || lmsModulesLoading));
@@ -428,7 +428,7 @@ export default function ReportsDashboard() {
       installationChecklists?.forEach(cl => {
         addItemToActivity(cl, 'Checklist', 'Quality', ClipboardCheck, 'text-cyan-600', 'createdAt', 'userName', `${cl.userName} submitted an MMS audit for Table ${cl.tableNumber} at ${cl.siteName}`, `/checklists/data`);
         if (cl.comments && cl.comments.length > 0) {
-           cl.comments.forEach(c => addItemToActivity(c, 'Audit Comment', 'Quality', MessageCircle, 'text-cyan-800', 'createdAt', 'userName', `${c.userName} commented on Table ${cl.tableNumber} audit for ${cl.siteName}`, `/checklists/data`));
+           cl.comments.forEach(c => addItemToActivity({...c, siteName: cl.siteName}, 'Audit Comment', 'Quality', MessageCircle, 'text-cyan-800', 'createdAt', 'userName', `${c.userName} commented on Table ${cl.tableNumber} audit for ${cl.siteName}`, `/checklists/data`));
         }
       });
       
@@ -626,7 +626,7 @@ export default function ReportsDashboard() {
             </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 overflow-hidden">
-            <ScrollArea className="h-[500px]">
+            <ScrollArea className="h-[600px]">
               <div className="divide-y divide-border/50">
                 {stats.recentActivities.length > 0 ? stats.recentActivities.map((activity) => (
                   <Link key={activity.id} href={activity.link} className="block group">
