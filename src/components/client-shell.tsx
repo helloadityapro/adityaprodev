@@ -313,13 +313,17 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       if (notifications && user) {
           const newDisplayedIds = new Set(displayedNotifIds);
           let wasUpdated = false;
-          
+          const now = Date.now();
+          const freshnessThreshold = 60000; // 60 seconds
+
           notifications.forEach(notif => {
-              // CRITICAL: We only fire toasts for in-app notifications (push: false)
-              // to prevent duplication with the native push notification listener.
-              if (!notif.read && !notif.push && !displayedNotifIds.has(notif.id)) {
+              const createdAt = notif.createdAt?.toDate?.().getTime() || now;
+              const isFresh = (now - createdAt) < freshnessThreshold;
+
+              // Trigger toast if unread and not displayed yet in this session, and is fresh
+              if (!notif.read && !displayedNotifIds.has(notif.id) && isFresh) {
                   const title = notif.title;
-                  const isSuccess = title.includes('Approved') || title.includes('Success') || title.includes('Confirmed') || title.includes('Completed') || title.includes('Earned');
+                  const isSuccess = title.includes('Approved') || title.includes('Success') || title.includes('Confirmed') || title.includes('Completed') || title.includes('Earned') || title.includes('Assigned');
                   const isDestructive = title.includes('Rejected') || title.includes('Error') || title.includes('Cancelled') || title.includes('Removed');
 
                   toast({ 
@@ -342,12 +346,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
                   newDisplayedIds.add(notif.id);
                   wasUpdated = true;
-              } else if (!notif.read && !notif.push) {
-                  // Mark as displayed to keep the session tracking consistent
-                  if (!displayedNotifIds.has(notif.id)) {
-                    newDisplayedIds.add(notif.id);
-                    wasUpdated = true;
-                  }
+              } else if (!notif.read && !displayedNotifIds.has(notif.id)) {
+                  // Mark as processed (but no toast for stale items) to avoid reprocessing
+                  newDisplayedIds.add(notif.id);
+                  wasUpdated = true;
               }
           });
           

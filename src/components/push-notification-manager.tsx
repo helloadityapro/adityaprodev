@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -67,24 +68,10 @@ export function PushNotificationManager() {
         });
 
         receivedListener = await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-          // Foreground handling: The OS won't show a banner, so we show an in-app toast
-          toast({
-            title: notification.title,
-            description: notification.body,
-            variant: notification.title?.includes('Rejected') ? 'destructive' : 'default',
-            action: notification.data?.link ? (
-              <Button 
-                variant="default"
-                size="sm" 
-                className="h-8 rounded-sm font-bold text-[10px] uppercase px-3 shadow-md"
-                onClick={() => {
-                  router.push(notification.data.link);
-                }}
-              >
-                View
-              </Button>
-            ) : undefined
-          });
+          // Note: In-app toasts are now handled by the Firestore listener in ClientShell
+          // for consistency across web and mobile. We suppress mobile-only toasts here
+          // to avoid duplicate alerts.
+          console.log('Push received in foreground:', notification.title);
         });
 
         actionListener = await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
