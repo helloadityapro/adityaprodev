@@ -664,10 +664,10 @@ export default function ChecklistsDataPage() {
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <ClipboardCheck className="h-8 w-8" /> Table Level MMS Data
+        <h1 className="text-xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+          <ClipboardCheck className="h-6 w-6" /> Table Level MMS Data
         </h1>
-        <p className="text-muted-foreground font-medium">Project-wise structural quality audit and verification logs.</p>
+        <p className="text-muted-foreground text-xs font-medium">Project-wise structural quality audit and verification logs.</p>
       </div>
 
       {selectedSiteId === 'all' ? (
