@@ -46,7 +46,7 @@ import {
   Plus,
   FileText,
   ExternalLink,
-  MoreHorizontal
+  MoreVertical
 } from 'lucide-react';
 import { format, subDays, subMonths, subYears } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -60,6 +60,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { sendNotification } from '@/lib/notifications';
 import { useRouter } from 'next/navigation';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type Site = { 
   id: string; 
@@ -118,7 +124,6 @@ export default function ChecklistsDataPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   
-  // Sorting & Advanced Filtering for Audits
   const [auditSortConfig, setAuditSortConfig] = React.useState<{ key: AuditSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [siteSortConfig, setSortConfig] = React.useState<{ key: SiteSortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   
@@ -133,11 +138,9 @@ export default function ChecklistsDataPage() {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isExporting, setIsExporting] = React.useState(false);
   
-  // Drawing states
   const [isUploadingDrawing, setIsUploadingDrawing] = React.useState(false);
   const [deletingDrawing, setDeletingDrawing] = React.useState<Site | null>(null);
 
-  // High-fidelity media viewer state
   const [viewFile, setViewFile] = React.useState<Attachment | null>(null);
   const [viewFiles, setViewFiles] = React.useState<Attachment[]>([]);
   const [currentFileIndex, setCurrentFileIndex] = React.useState(0);
@@ -605,7 +608,6 @@ export default function ChecklistsDataPage() {
         })
       });
 
-      // Notify Checklist Owner if not self
       if (commentingRecord.userId !== user.uid) {
         sendNotification(firestore, {
           userId: commentingRecord.userId,
@@ -616,7 +618,6 @@ export default function ChecklistsDataPage() {
         });
       }
 
-      // Notify Admins
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
@@ -806,55 +807,53 @@ export default function ChecklistsDataPage() {
               <p className="text-muted-foreground text-[8px] md:text-xs font-bold uppercase tracking-[0.2em]">{selectedSiteObj?.projectCompany}</p>
             </div>
             
-            <div className="flex flex-wrap items-center gap-2 md:gap-3">
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                {selectedSiteObj?.drawingUrl ? (
-                  <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-300 w-full sm:w-auto">
+            <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
+              {selectedSiteObj?.drawingUrl ? (
+                <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    asChild
+                    className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary/20 text-primary bg-primary/5 flex-1 sm:flex-none"
+                  >
+                    <a href={selectedSiteObj.drawingUrl} download target="_blank" rel="noopener noreferrer">
+                      <FileText className="h-3.5 w-3.5 mr-1.5" /> View Drawing
+                    </a>
+                  </Button>
+                  {isAdmin && (
                     <Button 
-                      variant="outline" 
-                      size="sm" 
-                      asChild
-                      className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary/20 text-primary bg-primary/5 flex-1 sm:flex-none"
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/10 shrink-0" 
+                      onClick={() => setDeletingDrawing(selectedSiteObj)}
+                      title="Remove Drawing"
                     >
-                      <a href={selectedSiteObj.drawingUrl} download target="_blank" rel="noopener noreferrer">
-                        <FileText className="h-3.5 w-3.5 mr-1.5" /> View Drawing
-                      </a>
+                      <Trash2 className="h-4 w-4" />
                     </Button>
-                    {isAdmin && (
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/10 shrink-0" 
-                        onClick={() => setDeletingDrawing(selectedSiteObj)}
-                        title="Remove Drawing"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="relative w-full sm:w-auto">
-                    <input 
-                      type="file" 
-                      accept=".pdf" 
-                      className="hidden" 
-                      id="drawing-upload" 
-                      onChange={handleDrawingUpload}
-                      disabled={isUploadingDrawing}
-                    />
-                    <Button 
-                      asChild 
-                      disabled={isUploadingDrawing}
-                      className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-md px-4 bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
-                    >
-                      <label htmlFor="drawing-upload" className="cursor-pointer flex items-center justify-center">
-                        {isUploadingDrawing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
-                        Add Drawing PDF
-                      </label>
-                    </Button>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              ) : (
+                <div className="relative flex-1 sm:flex-none">
+                  <input 
+                    type="file" 
+                    accept=".pdf" 
+                    className="hidden" 
+                    id="drawing-upload" 
+                    onChange={handleDrawingUpload}
+                    disabled={isUploadingDrawing}
+                  />
+                  <Button 
+                    asChild 
+                    disabled={isUploadingDrawing}
+                    className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-md px-4 bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
+                  >
+                    <label htmlFor="drawing-upload" className="cursor-pointer flex items-center justify-center">
+                      {isUploadingDrawing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                      Add Drawing PDF
+                    </label>
+                  </Button>
+                </div>
+              )}
 
               <Button 
                 onClick={() => exportToPDF(filteredInst)} 
@@ -885,31 +884,33 @@ export default function ChecklistsDataPage() {
 
               <div className="space-y-1.5">
                 <Label className="text-[9px] md:text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Time Range</Label>
-                <Select value={dateFilter} onValueChange={setDateFilter}>
-                  <SelectTrigger className="h-9 md:h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
-                    <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
-                    <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
-                    <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
-                    <SelectItem value="allTime" className="text-xs font-bold uppercase">All Records</SelectItem>
-                    <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={dateFilter} onValueChange={setDateFilter}>
+                    <SelectTrigger className="h-9 md:h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase flex-1">
+                      <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+                      <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+                      <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+                      <SelectItem value="allTime" className="text-xs font-bold uppercase">All Records</SelectItem>
+                      <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="ghost" size="icon" onClick={clearAuditFilters} className="h-9 md:h-10 w-9 md:w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
+                    <FilterX className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
-              <div className="flex items-end gap-2">
-                {dateFilter === 'custom' ? (
-                  <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-end">
+                {dateFilter === 'custom' && (
+                  <div className="w-full flex gap-2 animate-in fade-in zoom-in-95 duration-200">
                     <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-9 md:h-10 rounded-sm border-primary/20 text-[9px] md:text-[10px]" />
                     <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-9 md:h-10 rounded-sm border-primary/20 text-[9px] md:text-[10px]" />
                   </div>
-                ) : <div className="flex-1" />}
-                <Button variant="ghost" size="icon" onClick={clearAuditFilters} className="h-9 md:h-10 w-9 md:w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
-                  <FilterX className="h-4 w-4" />
-                </Button>
+                )}
               </div>
             </div>
           </div>
@@ -918,37 +919,58 @@ export default function ChecklistsDataPage() {
             {filteredInst.length > 0 ? filteredInst.map((record) => (
               <Card 
                 key={record.id} 
-                className="rounded-sm border-primary/10 shadow-sm overflow-hidden"
+                className="rounded-xl border-primary/5 shadow-sm overflow-hidden bg-card hover:bg-primary/[0.01] active:bg-primary/[0.02] transition-colors cursor-pointer"
                 onClick={() => setViewingInstallation(record)}
               >
-                <CardContent className="p-4 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
-                        {record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}
-                      </span>
-                      <Badge variant="secondary" className="rounded-sm font-black text-[11px] uppercase bg-primary/5 text-primary border-primary/10 w-fit">
-                        {record.tableNumber}
-                      </Badge>
-                    </div>
-                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setCommentingRecord(record)}>
-                        <MessageCircle className="h-4 w-4" />
-                      </Button>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <Badge className="h-10 w-12 rounded-lg bg-primary/5 text-primary border-none flex items-center justify-center font-black text-xs shrink-0">
+                      {record.tableNumber}
+                    </Badge>
+                    <div className="flex flex-col min-w-0 gap-1">
+                      <div className="flex items-center gap-2 text-foreground font-bold">
+                        <User className="h-3 w-3 text-primary/60" />
+                        <span className="text-xs truncate">{record.userName}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
+                          <Calendar className="h-3 w-3" />
+                          {record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yyyy • HH:mm a') : '—'}
+                        </div>
+                        <button 
+                          className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium hover:text-primary transition-colors"
+                          onClick={(e) => { e.stopPropagation(); setCommentingRecord(record); }}
+                        >
+                          <MessageCircle className="h-3 w-3" />
+                          {record.comments?.length || 0} comments
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-primary/5">
-                    <div className="flex items-center gap-2 text-xs font-medium">
-                      <User className="h-3.5 w-3.5 text-primary opacity-50" />
-                      <span className="truncate max-w-[150px]">{record.userName}</span>
-                    </div>
-                    <Badge variant="ghost" className="h-5 px-1.5 gap-1 text-[9px] font-bold text-muted-foreground uppercase">
-                      <MessageCircle className="h-3 w-3" /> {record.comments?.length || 0}
-                    </Badge>
+                  <div className="flex items-center gap-1 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 text-primary rounded-full hover:bg-primary/5" onClick={() => setViewingInstallation(record)}>
+                      <Eye className="h-5 w-5" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground rounded-full hover:bg-muted/50">
+                          <MoreVertical className="h-5 w-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-xl">
+                        <DropdownMenuItem onClick={() => exportToPDF([record])} className="gap-2 cursor-pointer font-medium py-2.5">
+                          <FileDown className="h-4 w-4" /> Export PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setCommentingRecord(record)} className="gap-2 cursor-pointer font-medium py-2.5">
+                          <MessageCircle className="h-4 w-4" /> Add Comment
+                        </DropdownMenuItem>
+                        {(isAdmin || record.userId === user?.uid) && (
+                          <DropdownMenuItem onClick={() => setDeletingRecord(record)} className="gap-2 cursor-pointer font-medium py-2.5 text-destructive focus:text-destructive">
+                            <Trash2 className="h-4 w-4" /> Delete Audit
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </CardContent>
               </Card>
@@ -1288,7 +1310,6 @@ export default function ChecklistsDataPage() {
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
           <DialogHeader className="sr-only"><DialogTitle>Audit Media Detail</DialogTitle><DialogDescription>Visual evidence review</DialogDescription></DialogHeader>
           
-          {/* Top Toolbar */}
           <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-3 md:p-4 bg-gradient-to-b from-black/60 to-transparent no-print">
             <div className="flex items-center gap-2 md:gap-3">
               <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-3.5 w-3.5 md:h-4 md:w-4 text-white" /></div>
@@ -1307,7 +1328,6 @@ export default function ChecklistsDataPage() {
             </div>
           </div>
 
-          {/* Navigation Controls */}
           {viewFiles.length > 1 && (
             <>
               <div className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-50 no-print">
@@ -1319,7 +1339,6 @@ export default function ChecklistsDataPage() {
             </>
           )}
 
-          {/* Canvas Engine */}
           <div 
             ref={containerRef} 
             className={cn(
@@ -1365,7 +1384,6 @@ export default function ChecklistsDataPage() {
             </div>
           </div>
 
-          {/* Footer Metadata */}
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent flex flex-col items-center gap-2 no-print">
             <div className="flex gap-1">
               {viewFiles.map((_, i) => (
