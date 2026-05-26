@@ -131,7 +131,6 @@ export default function ChecklistsDataPage() {
   
   // Drawing states
   const [isUploadingDrawing, setIsUploadingDrawing] = React.useState(false);
-  const [viewingDrawing, setViewingDrawing] = React.useState<Site | null>(null);
   const [deletingDrawing, setDeletingDrawing] = React.useState<Site | null>(null);
 
   // High-fidelity media viewer state
@@ -781,10 +780,12 @@ export default function ChecklistsDataPage() {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => setViewingDrawing(selectedSiteObj)}
+                      asChild
                       className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary bg-primary/5"
                     >
-                      <FileText className="h-3.5 w-3.5 mr-1.5" /> View Table Numbering Drawing
+                      <a href={selectedSiteObj.drawingUrl} download target="_blank" rel="noopener noreferrer">
+                        <FileText className="h-3.5 w-3.5 mr-1.5" /> View Table Numbering Drawing
+                      </a>
                     </Button>
                     {isAdmin && (
                       <Button 
@@ -1057,7 +1058,7 @@ export default function ChecklistsDataPage() {
               {viewingInstallation?.otherRemarks && (
                 <div className="p-6 bg-primary/5 border rounded-sm space-y-6">
                    <div className="space-y-2">
-                      <Label className="text-[9px] font-black uppercase text-primary tracking-widest">Supplementary Observations</Label>
+                      <Label className="text-[9px] font-black uppercase text-primary tracking-widestLabel>
                       <p className="text-sm font-medium leading-relaxed italic text-foreground/80">"{viewingInstallation.otherRemarks}"</p>
                     </div>
 
@@ -1089,36 +1090,6 @@ export default function ChecklistsDataPage() {
             </div>
           </ScrollArea>
           <DialogFooter className="p-4 bg-muted/5 border-t shrink-0"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-11 px-8 w-full sm:w-auto">Close Audit Log</Button></DialogClose></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Drawing View Dialog */}
-      <Dialog open={!!viewingDrawing} onOpenChange={(o) => !o && setViewingDrawing(null)}>
-        <DialogContent className="max-w-5xl w-[98vw] h-[90vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
-          <DialogHeader className="p-4 sm:p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-2 rounded-sm"><FileText className="h-5 w-5 text-primary" /></div>
-              <div>
-                <DialogTitle className="text-base sm:text-lg font-black uppercase tracking-tight">Table Numbering Drawing</DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase">{viewingDrawing?.name}</DialogDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pr-8">
-               <Button variant="outline" size="sm" asChild className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary bg-white shadow-sm">
-                 <a href={viewingDrawing?.drawingUrl} download target="_blank" rel="noopener noreferrer">
-                   <FileDown className="h-3.5 w-3.5 mr-1.5" /> Download PDF
-                 </a>
-               </Button>
-            </div>
-          </DialogHeader>
-          <div className="flex-1 bg-muted relative">
-            <iframe 
-              src={viewingDrawing?.drawingUrl} 
-              className="w-full h-full border-none"
-              title="Table Numbering Drawing"
-            />
-          </div>
-          <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 w-full sm:w-auto">Close Drawing</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
 
