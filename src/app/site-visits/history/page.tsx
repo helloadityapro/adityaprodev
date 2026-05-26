@@ -6,7 +6,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@
 import { collection, query, where, limit, doc, or } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, differenceInMinutes } from "date-fns";
+import { format, differenceInMinutes, subDays, subMonths, subYears } from "date-fns";
 import { 
   History, 
   Timer, 
@@ -37,6 +37,7 @@ import {
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { Label } from "@/components/ui/label";
 
 type SiteVisit = {
   id: string;
@@ -87,6 +88,9 @@ export default function SiteVisitsHistoryPage() {
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
+  const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'startTime', direction: 'desc' });
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -103,27 +107,51 @@ export default function SiteVisitsHistoryPage() {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'site_visits');
     
-    if (isAdmin) return query(colRef, limit(200));
+    if (isAdmin) return query(colRef, limit(500));
 
     if (isManager) {
         return query(
             colRef,
             or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid)),
-            limit(150)
+            limit(300)
         );
     }
     
-    return query(colRef, where('managerId', '==', user.uid), limit(100));
+    return query(colRef, where('managerId', '==', user.uid), limit(200));
   }, [firestore, user, isAdmin, isManager, isProfileLoading]);
 
   const { data: visits, isLoading } = useCollection<SiteVisit>(historyQuery);
 
+  const queryDateRange = React.useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    switch (dateFilter) {
+      case 'today':
+        return { start: todayStr, end: todayStr };
+      case 'yesterday':
+        const yesterday = format(subDays(today, 1), 'yyyy-MM-dd');
+        return { start: yesterday, end: yesterday };
+      case '7days':
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastMonth':
+        return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime':
+        return { start: '1970-01-01', end: '2099-12-31' };
+      case 'custom':
+        return { start: customStart, end: customEnd };
+      default:
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+    }
+  }, [dateFilter, customStart, customEnd]);
+
   const filteredVisits = React.useMemo(() => {
     if (!visits || !userProfile) return [];
     
+    const roleId = userProfile.role ? userProfile.role.toLowerCase().replace(/\s+/g, '-') : 'none';
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
 
     let result = visits;
 
@@ -132,14 +160,20 @@ export default function SiteVisitsHistoryPage() {
       result = result.filter(v => assignedIds.has(v.siteId));
     }
 
+    const { start, end } = queryDateRange;
+
     result = result.filter(v => {
+      const vDate = v.startTime?.toDate?.() || new Date(v.startTime);
+      const vDateStr = format(vDate, 'yyyy-MM-dd');
+
       const matchesSearch = v.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (v.purpose || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (v.managerName || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
+      const matchesDate = vDateStr >= start && vDateStr <= end;
       
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesStatus && matchesDate;
     });
 
     return result.sort((a, b) => {
@@ -168,7 +202,7 @@ export default function SiteVisitsHistoryPage() {
       if (valA > valB) return direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [visits, searchTerm, statusFilter, sortConfig, userProfile, roleConfigs, isSuper]);
+  }, [visits, searchTerm, statusFilter, sortConfig, userProfile, roleConfigs, isSuper, queryDateRange]);
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -185,6 +219,7 @@ export default function SiteVisitsHistoryPage() {
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
+    setDateFilter("7days");
   };
 
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4 max-w-5xl mx-auto"><Skeleton className="h-12 w-48" /><Skeleton className="h-[500px] w-full" /></div>;
@@ -202,34 +237,71 @@ export default function SiteVisitsHistoryPage() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border rounded-sm shadow-sm no-print">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by site, name, or purpose..." 
-            className="pl-10 h-10 rounded-sm border-primary/20 bg-background text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="bg-card p-4 border rounded-sm shadow-sm no-print space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div className="md:col-span-2 space-y-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Context</Label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search by site, name, or purpose..." 
+                className="pl-10 h-11 rounded-sm border-primary/20 bg-background text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Quick Filter</Label>
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+                <Calendar className="h-4 w-4 mr-2 opacity-50" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+                <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
+                <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+                <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+                <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
+                <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Visit Status</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-11 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 bg-background">
+                <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs font-bold uppercase">All Visits</SelectItem>
+                <SelectItem value="ongoing" className="text-xs font-bold uppercase text-amber-600">Ongoing</SelectItem>
+                <SelectItem value="completed" className="text-xs font-bold uppercase text-emerald-600">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px] h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20">
-              <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Status Filter" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs font-bold uppercase">All Visits</SelectItem>
-              <SelectItem value="ongoing" className="text-xs font-bold uppercase text-amber-600">Ongoing</SelectItem>
-              <SelectItem value="completed" className="text-xs font-bold uppercase text-emerald-600">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground rounded-sm" title="Clear Filters">
-            <FilterX className="h-4 w-4" />
-          </Button>
-        </div>
+
+        {dateFilter === 'custom' && (
+          <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-muted/20 rounded-sm border border-dashed animate-in slide-in-from-top-2 duration-300">
+            <div className="flex-1 w-full space-y-1.5">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground">Start Date</Label>
+              <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-10 rounded-sm" />
+            </div>
+            <ArrowRight className="hidden sm:block h-4 w-4 text-muted-foreground mt-6" />
+            <div className="flex-1 w-full space-y-1.5">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground">End Date</Label>
+              <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-10 rounded-sm" />
+            </div>
+            <Button variant="ghost" size="icon" onClick={clearFilters} className="mt-6 text-muted-foreground hover:text-primary">
+              <FilterX className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="md:hidden space-y-4">
