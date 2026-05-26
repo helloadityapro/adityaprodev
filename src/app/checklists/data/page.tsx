@@ -808,6 +808,16 @@ export default function ChecklistsDataPage() {
             </div>
             
             <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
+              <Button 
+                onClick={() => exportToPDF(filteredInst)} 
+                disabled={isExporting || filteredInst.length === 0} 
+                variant="outline" 
+                className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5 flex-1 sm:flex-none"
+              >
+                {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />}
+                Export All (PDF)
+              </Button>
+
               {selectedSiteObj?.drawingUrl ? (
                 <div className="flex items-center gap-2 flex-1 sm:flex-none">
                   <Button 
@@ -848,22 +858,12 @@ export default function ChecklistsDataPage() {
                     className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-md px-4 bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
                   >
                     <label htmlFor="drawing-upload" className="cursor-pointer flex items-center justify-center">
-                      {isUploadingDrawing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                      {isUploadingDrawing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
                       Add Drawing PDF
                     </label>
                   </Button>
                 </div>
               )}
-
-              <Button 
-                onClick={() => exportToPDF(filteredInst)} 
-                disabled={isExporting || filteredInst.length === 0} 
-                variant="outline" 
-                className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5 flex-1 sm:flex-none"
-              >
-                {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />}
-                Export All (PDF)
-              </Button>
             </div>
           </div>
 
@@ -1034,14 +1034,12 @@ export default function ChecklistsDataPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <button 
                           onClick={(e) => { e.stopPropagation(); setCommentingRecord(record); }} 
-                          className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary"
+                          className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary inline-flex items-center px-3 rounded-sm transition-colors"
                         >
                           <MessageCircle className="h-3.5 w-3.5" /> {record.comments?.length || 0}
-                        </Button>
+                        </button>
                       </TableCell>
                       <TableCell className="text-right px-6">
                         <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
