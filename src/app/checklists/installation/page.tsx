@@ -30,7 +30,8 @@ import {
   Trash2,
   Film,
   Plus,
-  CheckCircle2
+  CheckCircle2,
+  ArrowRight
 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -42,6 +43,7 @@ import imageCompression from 'browser-image-compression';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { sendNotification } from "@/lib/notifications";
+import { motion } from "framer-motion";
 
 const checkItemSchema = z.object({
   remarks: z.string().optional(),
@@ -93,6 +95,8 @@ export default function TableLevelMMSChecklistPage() {
   const { toast } = useToast();
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSuccess, setIsSuccess] = React.useState(false);
+  const [submittedTable, setSubmittedTable] = React.useState("");
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
@@ -232,8 +236,9 @@ export default function TableLevelMMSChecklistPage() {
         });
       });
 
+      setSubmittedTable(finalTableNumber);
+      setIsSuccess(true);
       toast({ title: "Success", description: "Audit published to registry." });
-      router.push("/checklists/data");
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
@@ -243,6 +248,57 @@ export default function TableLevelMMSChecklistPage() {
   };
 
   const filteredSites = allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())) || [];
+
+  if (isSuccess) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh] px-4">
+        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-500 rounded-sm shadow-2xl border-emerald-500/20">
+          <CardHeader className="text-center pt-8">
+            <div className="flex justify-center mb-6">
+              <motion.div 
+                initial={{ scale: 0, rotate: -45 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ 
+                  type: "spring", 
+                  stiffness: 260, 
+                  damping: 20,
+                  delay: 0.1 
+                }}
+                className="bg-emerald-500/10 p-6 rounded-full relative"
+              >
+                <CheckCircle2 className="h-16 w-16 text-emerald-600" />
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 1, 0] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="absolute inset-0 bg-emerald-500/20 rounded-full"
+                />
+              </motion.div>
+            </div>
+            <CardTitle className="text-2xl font-black uppercase tracking-tight text-emerald-900">Audit Published</CardTitle>
+            <CardDescription className="text-base font-medium text-emerald-800/70 mt-2 leading-relaxed">
+              The quality verification for <strong className="text-emerald-900">{submittedTable}</strong> has been successfully archived in the site registry.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pb-8 px-8">
+            <Button 
+              className="w-full h-12 text-sm font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20" 
+              onClick={() => router.push("/checklists/data")}
+            >
+              View Site Registry
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="w-full h-10 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-muted/50" 
+              onClick={() => { setIsSuccess(false); form.reset(); }}
+            >
+              Record Next Table
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-20 px-2 sm:px-4">
