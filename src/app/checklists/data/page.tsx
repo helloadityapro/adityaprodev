@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -812,7 +811,7 @@ export default function ChecklistsDataPage() {
                     <Button 
                       asChild 
                       disabled={isUploadingDrawing}
-                      className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-4 bg-background text-primary border-primary/20 hover:bg-primary/5"
+                      className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-4 bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       <label htmlFor="drawing-upload" className="cursor-pointer flex items-center">
                         {isUploadingDrawing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
@@ -1185,7 +1184,7 @@ export default function ChecklistsDataPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Audit Alert */}
+      {/* Delete Audit Record Alert */}
       <AlertDialog open={!!deletingRecord} onOpenChange={(o) => !o && setDeletingRecord(null)}>
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>
