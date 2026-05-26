@@ -784,7 +784,7 @@ export default function ChecklistsDataPage() {
                       className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary bg-primary/5"
                     >
                       <a href={selectedSiteObj.drawingUrl} download target="_blank" rel="noopener noreferrer">
-                        <FileText className="h-3.5 w-3.5 mr-1.5" /> View Table Numbering Drawing
+                        <FileText className="h-3.5 w-3.5 mr-1.5" /> Download Table Numbering Drawing
                       </a>
                     </Button>
                     {isAdmin && (
@@ -1058,7 +1058,7 @@ export default function ChecklistsDataPage() {
               {viewingInstallation?.otherRemarks && (
                 <div className="p-6 bg-primary/5 border rounded-sm space-y-6">
                    <div className="space-y-2">
-                      <Label className="text-[9px] font-black uppercase text-primary tracking-widestLabel>
+                      <Label className="text-[9px] font-black uppercase text-primary tracking-widest">Other Remarks</Label>
                       <p className="text-sm font-medium leading-relaxed italic text-foreground/80">"{viewingInstallation.otherRemarks}"</p>
                     </div>
 
