@@ -64,6 +64,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -924,7 +926,7 @@ export default function ChecklistsDataPage() {
               >
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-4 min-w-0">
-                    <Badge className="h-10 w-12 rounded-lg bg-primary/5 text-primary border-none flex items-center justify-center font-black text-xs shrink-0">
+                    <Badge className="h-10 w-fit min-w-[3rem] px-3 rounded-lg bg-primary/5 text-primary border-none flex items-center justify-center font-black text-xs shrink-0 whitespace-nowrap">
                       {record.tableNumber}
                     </Badge>
                     <div className="flex flex-col min-w-0 gap-1">
