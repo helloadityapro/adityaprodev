@@ -36,6 +36,25 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /sites/{siteId} {
+      allow read: if isSignedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        (!('drawingUrl' in resource.data) || resource.data.drawingUrl == null) && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['drawingUrl', 'drawingName', 'updatedAt'])
+      );
+    }
+
+    match /site_groups/{groupId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /system_settings/access/roles/{roleId} {
+      allow read, write: if isAdmin();
+    }
+
     match /quotes/{quoteId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
@@ -234,8 +253,6 @@ service cloud.firestore {
     }
 
     match /projects/{projectId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /sites/{siteId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /site_groups/{groupId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /notifications/{notifId} { allow read, write: if isSignedIn(); }
     match /point_adjustment_requests/{requestId} { allow read, write: if isAdmin(); }
     match /cleanup_requests/{requestId} { allow read, write: if isAdmin(); }

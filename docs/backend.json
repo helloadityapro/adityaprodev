@@ -53,7 +53,10 @@
         "dcCapacity": { "type": "number" },
         "latitude": { "type": "number" },
         "longitude": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "drawingUrl": { "type": "string", "description": "URL to the Table Numbering Drawing PDF" },
+        "drawingName": { "type": "string", "description": "Original filename of the drawing" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "projectCompany"]
     },

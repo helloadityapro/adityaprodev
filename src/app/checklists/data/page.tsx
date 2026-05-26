@@ -2,8 +2,9 @@
 'use client';
 
 import * as React from 'react';
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking, useFirebaseApp } from '@/firebase';
 import { collection, query, orderBy, doc, limit, arrayUnion, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -42,7 +43,9 @@ import {
   ArrowUp,
   ArrowDown,
   Calendar,
-  Clock
+  Clock,
+  Plus,
+  FileText
 } from 'lucide-react';
 import { format, subDays, subMonths, subYears } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -56,7 +59,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { sendNotification } from '@/lib/notifications';
 
-type Site = { id: string; name: string; projectCompany?: string };
+type Site = { 
+  id: string; 
+  name: string; 
+  projectCompany?: string; 
+  drawingUrl?: string; 
+  drawingName?: string;
+  updatedAt?: any;
+};
 
 type Attachment = {
   url: string;
@@ -97,6 +107,7 @@ type SiteSortKey = 'name' | 'company' | 'count';
 
 export default function ChecklistsDataPage() {
   const firestore = useFirestore();
+  const firebaseApp = useFirebaseApp();
   const { user } = useUser();
   const { toast } = useToast();
   
@@ -119,6 +130,11 @@ export default function ChecklistsDataPage() {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isExporting, setIsExporting] = React.useState(false);
   
+  // Drawing states
+  const [isUploadingDrawing, setIsUploadingDrawing] = React.useState(false);
+  const [viewingDrawing, setViewingDrawing] = React.useState<Site | null>(null);
+  const [deletingDrawing, setDeletingDrawing] = React.useState<Site | null>(null);
+
   // High-fidelity media viewer state
   const [viewFile, setViewFile] = React.useState<Attachment | null>(null);
   const [viewFiles, setViewFiles] = React.useState<Attachment[]>([]);
@@ -268,6 +284,56 @@ export default function ChecklistsDataPage() {
   const SiteSortIcon = ({ column }: { column: SiteSortKey }) => {
     if (siteSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
     return siteSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+  };
+
+  const handleDrawingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedSiteId || selectedSiteId === 'all') return;
+    
+    setIsUploadingDrawing(true);
+    try {
+      const storage = getStorage(firebaseApp);
+      const storagePath = `site_drawings/${selectedSiteId}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const storageRef = ref(storage, storagePath);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+      
+      await new Promise((resolve, reject) => {
+        uploadTask.on('state_changed', null, reject, resolve);
+      });
+      
+      const url = await getDownloadURL(uploadTask.snapshot.ref);
+      
+      await updateDocumentNonBlocking(doc(firestore, 'sites', selectedSiteId), {
+        drawingUrl: url,
+        drawingName: file.name,
+        updatedAt: serverTimestamp()
+      });
+      
+      toast({ title: 'Drawing Uploaded', description: 'Reference document added to site.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+    } finally {
+      setIsUploadingDrawing(false);
+      e.target.value = '';
+    }
+  };
+
+  const confirmDeleteDrawing = async () => {
+    if (!deletingDrawing) return;
+    setIsProcessing(true);
+    try {
+      await updateDocumentNonBlocking(doc(firestore, 'sites', deletingDrawing.id), {
+        drawingUrl: null,
+        drawingName: null,
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: 'Drawing Removed', description: 'Reference document deleted.' });
+      setDeletingDrawing(null);
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Delete Failed', description: error.message });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // PDF Export Logic
@@ -709,6 +775,54 @@ export default function ChecklistsDataPage() {
             </div>
             
             <div className="flex flex-wrap items-center gap-3">
+              {/* Drawing Management */}
+              <div className="flex items-center gap-2">
+                {selectedSiteObj?.drawingUrl ? (
+                  <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-300">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setViewingDrawing(selectedSiteObj)}
+                      className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary bg-primary/5"
+                    >
+                      <FileText className="h-3.5 w-3.5 mr-1.5" /> View Table Numbering Drawing
+                    </Button>
+                    {isAdmin && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/10" 
+                        onClick={() => setDeletingDrawing(selectedSiteObj)}
+                        title="Remove Drawing"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input 
+                      type="file" 
+                      accept=".pdf" 
+                      className="hidden" 
+                      id="drawing-upload" 
+                      onChange={handleDrawingUpload}
+                      disabled={isUploadingDrawing}
+                    />
+                    <Button 
+                      asChild 
+                      disabled={isUploadingDrawing}
+                      className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-4 bg-background text-primary border-primary/20 hover:bg-primary/5"
+                    >
+                      <label htmlFor="drawing-upload" className="cursor-pointer flex items-center">
+                        {isUploadingDrawing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                        Add Drawing PDF
+                      </label>
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               <Button 
                 onClick={() => exportToPDF(filteredInst)} 
                 disabled={isExporting || filteredInst.length === 0} 
@@ -979,6 +1093,36 @@ export default function ChecklistsDataPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Drawing View Dialog */}
+      <Dialog open={!!viewingDrawing} onOpenChange={(o) => !o && setViewingDrawing(null)}>
+        <DialogContent className="max-w-5xl w-[98vw] h-[90vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
+          <DialogHeader className="p-4 sm:p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><FileText className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-base sm:text-lg font-black uppercase tracking-tight">Table Numbering Drawing</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase">{viewingDrawing?.name}</DialogDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pr-8">
+               <Button variant="outline" size="sm" asChild className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary bg-white shadow-sm">
+                 <a href={viewingDrawing?.drawingUrl} download target="_blank" rel="noopener noreferrer">
+                   <FileDown className="h-3.5 w-3.5 mr-1.5" /> Download PDF
+                 </a>
+               </Button>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 bg-muted relative">
+            <iframe 
+              src={viewingDrawing?.drawingUrl} 
+              className="w-full h-full border-none"
+              title="Table Numbering Drawing"
+            />
+          </div>
+          <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 w-full sm:w-auto">Close Drawing</Button></DialogClose></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Comment Dialog */}
       <Dialog open={!!commentingRecord} onOpenChange={(o) => !o && setCommentingRecord(null)}>
         <DialogContent className="max-w-md w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[70vh]">
@@ -1041,7 +1185,7 @@ export default function ChecklistsDataPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Alert */}
+      {/* Delete Audit Alert */}
       <AlertDialog open={!!deletingRecord} onOpenChange={(o) => !o && setDeletingRecord(null)}>
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>
@@ -1060,6 +1204,30 @@ export default function ChecklistsDataPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] h-11 px-8 shadow-lg shadow-destructive/10"
             >
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Confirm Deletion"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Drawing Alert */}
+      <AlertDialog open={!!deletingDrawing} onOpenChange={(o) => !o && setDeletingDrawing(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
+              <Trash2 className="h-5 w-5" /> Remove Site Drawing?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+              Are you sure you want to permanently remove the Table Numbering Drawing for <strong>{deletingDrawing?.name}</strong>? This action cannot be undone and will require a new upload.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11 px-6">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteDrawing} 
+              disabled={isProcessing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] h-11 px-8 shadow-lg shadow-destructive/10"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Confirm Removal"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1103,7 +1271,7 @@ export default function ChecklistsDataPage() {
 
           {/* Canvas Engine */}
           <div 
-            ref={containerRef}
+            ref={containerRef} 
             className={cn(
               "relative w-full h-full flex items-center justify-center overflow-hidden touch-none",
               scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"
