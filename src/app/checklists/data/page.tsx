@@ -568,11 +568,11 @@ export default function ChecklistsDataPage() {
         setIsHeicConverting(true);
         try {
           // 1. Fetch the remote HEIC file as a blob
-          const response = await fetch(viewFile.url);
+          const response = await fetch(viewFile.url, { mode: 'cors' });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const blob = await response.blob();
           
           // 2. Use the existing imageCompression utility to decode HEIC to JPEG
-          // This uses heic2any internally or similar logic
           const convertedBlob = await imageCompression(blob, {
             maxSizeMB: 2,
             maxWidthOrHeight: 1920,
@@ -583,9 +583,11 @@ export default function ChecklistsDataPage() {
           // 3. Create a local URL for the decoded image
           const localUrl = URL.createObjectURL(convertedBlob);
           setConvertedHeicUrl(localUrl);
-        } catch (e) {
+        } catch (e: any) {
           console.error("HEIC decoding failed:", e);
-          toast({ variant: 'destructive', title: 'Format Error', description: 'Could not render high-efficiency image. Please download to view.' });
+          // If fetch/CORS fails, we inform the user it might be a security restriction on legacy files
+          const msg = e.message?.includes('fetch') ? 'Cross-origin security restriction' : 'Decoding failed';
+          toast({ variant: 'destructive', title: 'Format Error', description: `${msg}. Use "View Proof" to open in new tab.` });
         } finally {
           setIsHeicConverting(false);
         }
@@ -1217,7 +1219,7 @@ export default function ChecklistsDataPage() {
                 <div className="p-4 md:p-6 bg-primary/5 border rounded-sm space-y-4 md:space-y-6">
                    <div className="space-y-2">
                       <Label className="text-[9px] font-black uppercase text-primary tracking-widest">Other Remarks</Label>
-                      <p className="text-[10px] md:text-sm font-medium leading-relaxed italic text-foreground/80">"{viewingInstallation.otherRemarks}"</p>
+                      <p className="text-xs md:text-sm font-medium leading-relaxed italic text-foreground/80">"{viewingInstallation.otherRemarks}"</p>
                     </div>
 
                     {viewingInstallation.otherAttachments && viewingInstallation.otherAttachments.length > 0 && (
@@ -1433,20 +1435,46 @@ export default function ChecklistsDataPage() {
                     />
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center gap-4 pointer-events-auto">
+                  <div className="flex flex-col items-center gap-4 pointer-events-auto text-center">
                     {isHeicConverting ? (
                       <div className="bg-white/5 p-12 rounded-sm border border-white/10 flex flex-col items-center gap-4 text-center max-w-sm">
                         <Loader2 className="h-12 w-12 text-primary animate-spin" />
                         <p className="text-white font-bold text-sm uppercase tracking-widest">Decoding High-Efficiency Image</p>
                         <p className="text-white/40 text-[10px] italic">Optimizing display for your browser...</p>
                       </div>
-                    ) : (
+                    ) : convertedHeicUrl ? (
                       <img 
-                        src={convertedHeicUrl || viewFile.url} 
+                        src={convertedHeicUrl} 
                         className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" 
                         alt="Evidence View" 
                         draggable={false}
                       />
+                    ) : (
+                      <>
+                        <img 
+                          src={viewFile.url} 
+                          className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" 
+                          alt="Evidence View" 
+                          draggable={false}
+                          onError={(e) => {
+                            // If direct render fails (likely HEIC without successful local conversion due to CORS)
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                        {/* Fallback for blocked or unsupported legacy formats */}
+                        {(viewFile.name.toLowerCase().endsWith('.heic') || viewFile.name.toLowerCase().endsWith('.heif')) && !isHeicConverting && !convertedHeicUrl && (
+                          <div className="p-8 bg-background border rounded-lg shadow-xl max-w-xs space-y-4">
+                            <AlertCircle className="h-10 w-10 text-primary mx-auto opacity-50" />
+                            <div className="space-y-1">
+                               <p className="text-sm font-bold">Legacy Format Restricted</p>
+                               <p className="text-[10px] text-muted-foreground">Browser security policies may block local decoding of this old record.</p>
+                            </div>
+                            <Button asChild size="sm" className="w-full rounded-sm font-black uppercase text-[10px]">
+                              <a href={viewFile.url} target="_blank" rel="noopener noreferrer">View Proof Directly</a>
+                            </Button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )
