@@ -39,7 +39,7 @@ export default function ProjectChecklistHubPage({ params }: { params: Promise<{ 
   if (!site) return <div className="p-12 text-center italic">Project site not found.</div>;
 
   return (
-    <div className="p-4 sm:p-8 space-y-10 animate-in fade-in duration-500">
+    <div className="p-4 sm:p-8 space-y-8 animate-in fade-in duration-500">
       {/* Back button */}
       <Button 
         variant="link" 
@@ -51,15 +51,15 @@ export default function ProjectChecklistHubPage({ params }: { params: Promise<{ 
       </Button>
 
       {/* Header Section */}
-      <div className="flex items-center gap-5">
-        <div className="bg-primary/10 p-5 rounded-2xl shrink-0 shadow-sm">
-          <Building2 className="h-8 w-8 text-primary" />
+      <div className="flex items-center gap-4">
+        <div className="bg-primary/10 p-3 rounded-lg shrink-0 shadow-sm border border-primary/5">
+          <Building2 className="h-6 w-6 text-primary" />
         </div>
-        <div className="space-y-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-black text-foreground tracking-tight leading-none truncate">
+        <div className="space-y-0.5 min-w-0">
+          <h1 className="text-xl font-black text-foreground tracking-tight leading-none truncate">
             {site.name}
           </h1>
-          <p className="text-sm font-bold text-muted-foreground/70 truncate">
+          <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] truncate">
             {site.projectCompany}
           </p>
         </div>
@@ -68,46 +68,48 @@ export default function ProjectChecklistHubPage({ params }: { params: Promise<{ 
       <Separator className="bg-border/50" />
 
       {/* Checklist Options List */}
-      <div className="space-y-2">
+      <div className="space-y-1">
+        <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.25em] px-1 mb-4">Authorized Checklists</h2>
+        
         {/* Option 1: MMS */}
         <div 
           onClick={() => router.push(`/checklists/data/${siteId}/mms`)}
-          className="group flex items-center justify-between p-4 rounded-2xl border border-transparent hover:bg-muted/5 transition-all cursor-pointer active:scale-[0.98]"
+          className="group flex items-center justify-between p-3 rounded-lg border border-transparent hover:bg-primary/[0.03] hover:border-primary/10 transition-all cursor-pointer active:scale-[0.99]"
         >
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-primary/5 text-primary rounded-2xl group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
-              <LayoutGrid className="h-7 w-7" />
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="p-2.5 bg-muted rounded-md group-hover:bg-primary/10 transition-colors shrink-0">
+              <LayoutGrid className="h-5 w-5 text-primary opacity-70 group-hover:opacity-100" />
             </div>
-            <div className="space-y-0.5">
-              <p className="text-base sm:text-lg font-black text-foreground uppercase tracking-tight">Table Level MMS</p>
-              <p className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-[0.15em]">Structural Audit Logs</p>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">Table Level MMS</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Structural Audit Logs</span>
             </div>
           </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground/30 group-hover:text-primary transition-all group-hover:translate-x-1" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-all group-hover:translate-x-0.5" />
         </div>
 
-        <div className="px-4">
-           <Separator className="opacity-40" />
+        <div className="py-1 px-1">
+           <Separator className="opacity-30" />
         </div>
 
         {/* Option 2: HT Line */}
         <div 
           onClick={() => router.push(`/checklists/data/${siteId}/ht-line`)}
-          className="group flex items-center justify-between p-4 rounded-2xl border border-transparent hover:bg-muted/5 transition-all cursor-pointer active:scale-[0.98]"
+          className="group flex items-center justify-between p-3 rounded-lg border border-transparent hover:bg-muted/50 transition-all cursor-pointer active:scale-[0.99]"
         >
-          <div className="flex items-center gap-4">
-            <div className="p-4 bg-muted text-muted-foreground rounded-2xl group-hover:bg-amber-500 group-hover:text-white transition-all shadow-sm">
-              <Zap className="h-7 w-7" />
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="p-2.5 bg-muted rounded-md shrink-0">
+              <Zap className="h-5 w-5 text-muted-foreground/60" />
             </div>
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-3">
-                <p className="text-base sm:text-lg font-black text-foreground uppercase tracking-tight">HT Line Checklist</p>
-                <Badge className="bg-orange-100 text-orange-600 hover:bg-orange-100 border-none rounded-full h-5 text-[9px] font-black uppercase px-2 shadow-sm tracking-tighter">In Progress</Badge>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-foreground truncate">HT Line Checklist</span>
+                <Badge variant="outline" className="h-4 px-1.5 text-[8px] font-black uppercase bg-amber-50 text-amber-700 border-amber-200 shadow-none shrink-0">In Progress</Badge>
               </div>
-              <p className="text-[10px] sm:text-[11px] font-bold text-muted-foreground uppercase tracking-[0.15em]">HV Transmission Audit</p>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">HV Transmission Audit</span>
             </div>
           </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground/30 group-hover:text-primary transition-all group-hover:translate-x-1" />
+          <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:translate-x-0.5 transition-transform" />
         </div>
       </div>
     </div>
