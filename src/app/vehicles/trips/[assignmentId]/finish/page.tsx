@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp } from '@/firebase';
-import { doc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
+import { sendNotification } from '@/lib/notifications';
 
 export default function FinishTripPage({ params }: { params: Promise<{ assignmentId: string }> }) {
   const { assignmentId } = React.use(params);
@@ -135,6 +136,30 @@ export default function FinishTripPage({ params }: { params: Promise<{ assignmen
         });
       }
 
+      // 3. Notify Requester if they are not the one ending the trip
+      if (trip.userId !== user.uid) {
+        sendNotification(firestore, {
+          userId: trip.userId,
+          title: "Trip Completed",
+          description: `Your trip to ${trip.dropLocation} has concluded successfully.`,
+          link: `/vehicles/trips/manage?view=${assignmentId}`,
+          push: true
+        });
+      }
+
+      // 4. Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "Site Journey Concluded",
+          description: `${trip.userName} finished a trip with ${trip.vehicleDetails}. Distance: ${((endValue - (trip.startReading || 0))).toFixed(1)} KM.`,
+          link: `/vehicles/trips/manage?view=${assignmentId}`,
+        });
+      });
+
       toast({ title: 'Trip Concluded', description: 'Report published. Vehicle is now available for allotment.' });
       router.push('/vehicles/trips/manage');
     } catch (e: any) {
@@ -193,7 +218,7 @@ export default function FinishTripPage({ params }: { params: Promise<{ assignmen
               <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
               <div className="absolute bottom-4 left-0 right-0 flex justify-center items-center gap-4">
                 <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-10 w-10 p-0 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
-                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-2xl border-4 border-white/20 bg-white text-black hover:bg-white/90 transition-transform active:scale-90"><Camera className="h-7 w-7" /></Button>
+                <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-2xl border-4 border-white/20 bg-white text-black hover:bg-white/90 transition-transform active:scale-90"><Camera className="h-7 v-7" /></Button>
                 <div className="w-10" />
               </div>
             </div>

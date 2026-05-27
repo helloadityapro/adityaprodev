@@ -18,7 +18,7 @@ import {
   addDocumentNonBlocking, 
   useCollection 
 } from '@/firebase';
-import { collection, doc, serverTimestamp, query, where } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { 
   Fuel, 
   Loader2, 
@@ -53,6 +53,7 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { Badge } from '@/components/ui/badge';
 import { format, parse } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { sendNotification } from '@/lib/notifications';
 
 const stopSchema = z.object({
   type: z.enum(['Site', 'Other'], { required_error: 'Please select a stop type.' }),
@@ -181,7 +182,7 @@ export default function RequestVehiclePage() {
         { type: values.dropType, location: values.dropLocation, purpose: 'Final Destination' }
       ];
 
-      await addDocumentNonBlocking(collection(firestore, 'vehicle_assignments'), {
+      const assignmentRef = await addDocumentNonBlocking(collection(firestore, 'vehicle_assignments'), {
         userId: user.uid,
         userName: userProfile.username || user.email,
         siteManagerId: userProfile.siteManagerId || null,
@@ -198,6 +199,31 @@ export default function RequestVehiclePage() {
         status: 'Pending',
         requestDate: serverTimestamp(),
       });
+
+      // Notify Manager
+      if (userProfile.siteManagerId) {
+        sendNotification(firestore, {
+          userId: userProfile.siteManagerId,
+          title: "New Vehicle Request",
+          description: `${userProfile.username} requested a vehicle for ${values.tripDate}.`,
+          link: "/vehicles/trips/manage",
+          push: true
+        });
+      }
+
+      // Notify All Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid || adminDoc.id === userProfile.siteManagerId) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "Vehicle Request Logged",
+          description: `Trip Date: ${values.tripDate} • By: ${userProfile.username}`,
+          link: "/vehicles/trips/manage",
+        });
+      });
+
       setSubmittedData({ ...values, destinations: combinedDestinations });
       setIsSuccess(true);
       toast({ title: 'Request Sent', description: 'Administrative approval required.' });

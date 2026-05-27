@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp } from '@/firebase';
-import { doc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { sendNotification } from '@/lib/notifications';
 
 export default function StartTripPage({ params }: { params: Promise<{ assignmentId: string }> }) {
   const { assignmentId } = React.use(params);
@@ -132,6 +133,30 @@ export default function StartTripPage({ params }: { params: Promise<{ assignment
           updatedAt: serverTimestamp()
         });
       }
+
+      // 3. Notify Requester if they are not the one starting the trip
+      if (trip.userId !== user.uid) {
+        sendNotification(firestore, {
+          userId: trip.userId,
+          title: "Trip Started",
+          description: `Your trip to ${trip.dropLocation} has started with ${trip.vehicleDetails}.`,
+          link: `/vehicles/trips/manage?view=${assignmentId}`,
+          push: true
+        });
+      }
+
+      // 4. Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "Site Journey Commenced",
+          description: `${trip.userName} started a trip with ${trip.vehicleDetails}.`,
+          link: `/vehicles/trips/manage?view=${assignmentId}`,
+        });
+      });
 
       toast({ title: 'Trip Started', description: 'Safe driving. Your start time and reading are logged.' });
       router.push('/vehicles/trips/manage');
