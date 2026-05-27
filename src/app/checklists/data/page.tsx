@@ -51,7 +51,14 @@ export default function ChecklistsDataProjectListPage() {
 
   const filteredSortedSites = React.useMemo(() => {
     if (!allSites) return [];
-    let result = allSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
+    
+    // Requirement: Display only those projects/sites for which at least one checklist has been submitted
+    let result = allSites.filter(s => (siteStats[s.id] || 0) > 0);
+
+    // Apply search filter if any
+    if (siteSearchQuery.trim() !== "") {
+      result = result.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
+    }
 
     result.sort((a, b) => {
       const { key, direction } = siteSortConfig;
@@ -114,102 +121,112 @@ export default function ChecklistsDataProjectListPage() {
             />
           </div>
           <Badge variant="secondary" className="rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest px-3 h-7 md:h-8 border-none w-fit">
-            {allSites?.length || 0} Sites Registered
+            {filteredSortedSites.length} Active Sites
           </Badge>
         </div>
 
-        <div className="md:hidden space-y-3">
-          {filteredSortedSites.map(site => {
-            const count = siteStats[site.id] || 0;
-            return (
-              <Card 
-                key={site.id} 
-                className="rounded-sm border-primary/10 shadow-sm active:bg-muted/5 transition-colors cursor-pointer"
-                onClick={() => router.push(`/checklists/data/${site.id}`)}
-              >
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-sm text-primary">
-                      <Building2 className="h-5 w-5" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-bold text-sm text-foreground truncate">{site.name}</span>
-                      <span className="text-[9px] uppercase font-black text-muted-foreground truncate">{site.projectCompany}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0 ml-4">
-                    <Badge variant="outline" className="rounded-sm h-6 px-2 text-[9px] font-bold border-primary/10 bg-primary/5 text-primary">
-                      {count} Audits
-                    </Badge>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/30" />
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        <Card className="hidden md:block rounded-sm border-primary/10 shadow-md overflow-hidden">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead 
-                    className="px-6 cursor-pointer hover:text-primary transition-colors"
-                    onClick={() => handleSiteSort('name')}
+        {filteredSortedSites.length > 0 ? (
+          <>
+            <div className="md:hidden space-y-3">
+              {filteredSortedSites.map(site => {
+                const count = siteStats[site.id] || 0;
+                return (
+                  <Card 
+                    key={site.id} 
+                    className="rounded-sm border-primary/10 shadow-sm active:bg-muted/5 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/checklists/data/${site.id}`)}
                   >
-                    <div className="flex items-center">Project Name <SiteSortIcon column="name" /></div>
-                  </TableHead>
-                  <TableHead 
-                    className="hidden md:table-cell cursor-pointer hover:text-primary transition-colors"
-                    onClick={() => handleSiteSort('company')}
-                  >
-                    <div className="flex items-center">Project Company <SiteSortIcon column="company" /></div>
-                  </TableHead>
-                  <TableHead 
-                    className="text-center cursor-pointer hover:text-primary transition-colors"
-                    onClick={() => handleSiteSort('count')}
-                  >
-                    <div className="flex items-center justify-center">Audits Found <SiteSortIcon column="count" /></div>
-                  </TableHead>
-                  <TableHead className="text-right px-6">Explore</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredSortedSites.map(site => {
-                  const count = siteStats[site.id] || 0;
-                  return (
-                    <TableRow 
-                      key={site.id} 
-                      className="hover:bg-muted/5 cursor-pointer transition-colors group"
-                      onClick={() => router.push(`/checklists/data/${site.id}`)}
-                    >
-                      <TableCell className="px-6 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{site.name}</span>
-                          <span className="text-[10px] md:hidden uppercase font-black text-muted-foreground">{site.projectCompany}</span>
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-sm text-primary">
+                          <Building2 className="h-5 w-5" />
                         </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <span className="text-[10px] uppercase font-black text-muted-foreground">{site.projectCompany}</span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className="rounded-sm h-6 px-2 text-[10px] font-bold border-primary/10 bg-primary/5 text-primary">
-                          {count}
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold text-sm text-foreground truncate">{site.name}</span>
+                          <span className="text-[9px] uppercase font-black text-muted-foreground truncate">{site.projectCompany}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 ml-4">
+                        <Badge variant="outline" className="rounded-sm h-6 px-2 text-[9px] font-bold border-primary/10 bg-primary/5 text-primary">
+                          {count} Audits
                         </Badge>
-                      </TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex items-center justify-end gap-3 text-xs font-black text-foreground">
-                          <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-all group-hover:translate-x-1" />
-                        </div>
-                      </TableCell>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/30" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            <Card className="hidden md:block rounded-sm border-primary/10 shadow-md overflow-hidden">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead 
+                        className="px-6 cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => handleSiteSort('name')}
+                      >
+                        <div className="flex items-center">Project Name <SiteSortIcon column="name" /></div>
+                      </TableHead>
+                      <TableHead 
+                        className="hidden md:table-cell cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => handleSiteSort('company')}
+                      >
+                        <div className="flex items-center">Project Company <SiteSortIcon column="company" /></div>
+                      </TableHead>
+                      <TableHead 
+                        className="text-center cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => handleSiteSort('count')}
+                      >
+                        <div className="flex items-center justify-center">Audits Found <SiteSortIcon column="count" /></div>
+                      </TableHead>
+                      <TableHead className="text-right px-6">Explore</TableHead>
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSortedSites.map(site => {
+                      const count = siteStats[site.id] || 0;
+                      return (
+                        <TableRow 
+                          key={site.id} 
+                          className="hover:bg-muted/5 cursor-pointer transition-colors group"
+                          onClick={() => router.push(`/checklists/data/${site.id}`)}
+                        >
+                          <TableCell className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{site.name}</span>
+                              <span className="text-[10px] md:hidden uppercase font-black text-muted-foreground">{site.projectCompany}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <span className="text-[10px] uppercase font-black text-muted-foreground">{site.projectCompany}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="rounded-sm h-6 px-2 text-[10px] font-bold border-primary/10 bg-primary/5 text-primary">
+                              {count}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            <div className="flex items-center justify-end gap-3 text-xs font-black text-foreground">
+                              <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-all group-hover:translate-x-1" />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed rounded-sm bg-muted/5">
+             <ClipboardCheck className="h-12 w-12 text-muted-foreground/20 mb-4" />
+             <p className="font-black uppercase tracking-widest text-muted-foreground">No active audit logs discovered</p>
+             <p className="text-[10px] text-muted-foreground/60 mt-1 uppercase italic">Sites will appear here as checklists are submitted.</p>
+          </div>
+        )}
       </div>
     </div>
   );
