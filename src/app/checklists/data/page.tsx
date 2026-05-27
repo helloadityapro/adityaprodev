@@ -380,7 +380,7 @@ export default function ChecklistsDataPage() {
           
           pdfDoc.addImage(logoUrl, 'PNG', x, y, renderW, renderH);
         } catch (e) {
-          pdfDoc.addImage(logoUrl, 'PNG', 175, 10, 25, 25);
+          pdfDoc.addImage(logoUrl, 'PNG', 175, 4, 26, 40);
         }
       };
       
@@ -389,7 +389,7 @@ export default function ChecklistsDataPage() {
         if (index > 0) doc.addPage();
         
         const margin = 15;
-        let currY = 25;
+        let currY = 40; // Increased to 40 to avoid overlap with logo area which ends at ~35
         const colWidthLabel = 65;
         const colWidthValue = 115;
         const rowHeight = 8;
@@ -398,7 +398,7 @@ export default function ChecklistsDataPage() {
 
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(14);
-        doc.text('TABLE LEVEL MMS CHECKLIST', margin, currY - 8);
+        doc.text('TABLE LEVEL MMS CHECKLIST', margin, currY - 10);
         
         const drawRow = (label: string, value: string) => {
           doc.setFont('helvetica', 'bold');
@@ -443,7 +443,7 @@ export default function ChecklistsDataPage() {
 
           if (currY + h > 270) {
             doc.addPage();
-            currY = 20;
+            currY = 40; // Reset to 40 on new page too
             addCenteredLogo(doc);
           }
 
@@ -478,7 +478,7 @@ export default function ChecklistsDataPage() {
         
         if (currY + otherH > 270) {
           doc.addPage();
-          currY = 20;
+          currY = 40;
           addCenteredLogo(doc);
         }
 
@@ -508,7 +508,7 @@ export default function ChecklistsDataPage() {
         const drawFooterRow = (label: string, value: string) => {
           if (currY + rowHeight > 270) {
             doc.addPage();
-            currY = 20;
+            currY = 40;
             addCenteredLogo(doc);
           }
           doc.setFont('helvetica', 'bold');
@@ -535,7 +535,7 @@ export default function ChecklistsDataPage() {
 
         if (currY + clientH > 270) {
           doc.addPage();
-          currY = 20;
+          currY = 40;
           addCenteredLogo(doc);
         }
 
@@ -555,7 +555,7 @@ export default function ChecklistsDataPage() {
 
         if (currY + extH > 270) {
           doc.addPage();
-          currY = 20;
+          currY = 40;
           addCenteredLogo(doc);
         }
 
