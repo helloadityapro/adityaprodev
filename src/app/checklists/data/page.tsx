@@ -391,8 +391,8 @@ export default function ChecklistsDataPage() {
 
         currY += 5;
 
-        const col1 = 65;
-        const col2 = 75;
+        const col1 = 55;
+        const col2 = 85;
         const col3 = 40;
 
         doc.setFont('helvetica', 'bold');
@@ -407,7 +407,9 @@ export default function ChecklistsDataPage() {
         doc.setFont('helvetica', 'normal');
         for (const check of record.checks) {
           const remarkLines = doc.splitTextToSize(check.remarks || '—', col2 - 4);
-          const h = Math.max(rowHeight, remarkLines.length * 4 + 4);
+          const attachments = check.attachments || [];
+          const attHeight = attachments.length > 0 ? (attachments.length * 4) + 4 : rowHeight;
+          const h = Math.max(rowHeight, remarkLines.length * 4 + 4, attHeight);
 
           if (currY + h > 270) {
             doc.addPage();
@@ -421,14 +423,24 @@ export default function ChecklistsDataPage() {
           doc.text(remarkLines, margin + col1 + 2, currY + 5.5);
           
           doc.rect(margin + col1 + col2, currY, col3, h);
-          const attCount = check.attachments?.length || 0;
-          doc.text(attCount > 0 ? `YES (${attCount})` : 'NO', margin + col1 + col2 + 2, currY + 5.5);
+          if (attachments.length > 0) {
+            attachments.forEach((att, attIdx) => {
+              const linkY = currY + 5.5 + (attIdx * 4);
+              doc.setTextColor(0, 0, 255);
+              doc.text('View File', margin + col1 + col2 + 2, linkY, { link: { url: att.url } });
+            });
+            doc.setTextColor(0, 0, 0);
+          } else {
+            doc.text('NO', margin + col1 + col2 + 2, currY + 5.5);
+          }
           
           currY += h;
         }
 
         const otherRemLines = doc.splitTextToSize(record.otherRemarks || '—', col2 - 4);
-        const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4);
+        const otherAttachments = record.otherAttachments || [];
+        const otherAttH = otherAttachments.length > 0 ? (otherAttachments.length * 4) + 4 : rowHeight;
+        const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4, otherAttH);
         
         if (currY + otherH > 270) {
           doc.addPage();
@@ -441,8 +453,16 @@ export default function ChecklistsDataPage() {
         doc.text(otherRemLines, margin + col1 + 2, currY + 5.5);
         
         doc.rect(margin + col1 + col2, currY, col3, otherH);
-        const otherAttCount = record.otherAttachments?.length || 0;
-        doc.text(otherAttCount > 0 ? `YES (${otherAttCount})` : 'NO', margin + col1 + col2 + 2, currY + 5.5);
+        if (otherAttachments.length > 0) {
+          otherAttachments.forEach((att, attIdx) => {
+            const linkY = currY + 5.5 + (attIdx * 4);
+            doc.setTextColor(0, 0, 255);
+            doc.text('View File', margin + col1 + col2 + 2, linkY, { link: { url: att.url } });
+          });
+          doc.setTextColor(0, 0, 0);
+        } else {
+          doc.text('NO', margin + col1 + col2 + 2, currY + 5.5);
+        }
         currY += otherH;
 
         currY += 5;
@@ -585,7 +605,6 @@ export default function ChecklistsDataPage() {
           setConvertedHeicUrl(localUrl);
         } catch (e: any) {
           console.error("HEIC decoding failed:", e);
-          // If fetch/CORS fails, we inform the user it might be a security restriction on legacy files
           const msg = e.message?.includes('fetch') ? 'Cross-origin security restriction' : 'Decoding failed';
           toast({ variant: 'destructive', title: 'Format Error', description: `${msg}. Use "View Proof" to open in new tab.` });
         } finally {
@@ -601,7 +620,7 @@ export default function ChecklistsDataPage() {
     return () => {
       if (convertedHeicUrl) URL.revokeObjectURL(convertedHeicUrl);
     };
-  }, [viewFile]);
+  }, [viewFile, toast]);
 
   const nextFile = () => {
     if (viewFiles.length <= 1) return;
@@ -1219,7 +1238,7 @@ export default function ChecklistsDataPage() {
                 <div className="p-4 md:p-6 bg-primary/5 border rounded-sm space-y-4 md:space-y-6">
                    <div className="space-y-2">
                       <Label className="text-[9px] font-black uppercase text-primary tracking-widest">Other Remarks</Label>
-                      <p className="text-xs md:text-sm font-medium leading-relaxed italic text-foreground/80">"{viewingInstallation.otherRemarks}"</p>
+                      <p className="text-sm font-medium leading-relaxed italic text-foreground/80">"{viewingInstallation.otherRemarks}"</p>
                     </div>
 
                     {viewingInstallation.otherAttachments && viewingInstallation.otherAttachments.length > 0 && (
@@ -1470,7 +1489,7 @@ export default function ChecklistsDataPage() {
                                <p className="text-[10px] text-muted-foreground">Browser security policies may block local decoding of this old record.</p>
                             </div>
                             <Button asChild size="sm" className="w-full rounded-sm font-black uppercase text-[10px]">
-                              <a href={viewFile.url} target="_blank" rel="noopener noreferrer">View Proof Directly</a>
+                              <a href={viewFile.url} target="_blank" rel="noopener noreferrer">Download File</a>
                             </Button>
                           </div>
                         )}
