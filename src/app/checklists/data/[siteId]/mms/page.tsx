@@ -45,7 +45,6 @@ import {
   Plus,
   FileText,
   MoreVertical,
-  ExternalLink,
   ChevronRight
 } from 'lucide-react';
 import { format, subDays, subMonths } from 'date-fns';
@@ -58,7 +57,6 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { sendNotification } from '@/lib/notifications';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -112,7 +110,8 @@ type InstallationChecklist = {
 type AuditSortKey = 'date' | 'table' | 'user' | 'comments';
 
 export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteId: string }> }) {
-  const { siteId } = React.use(params);
+  const resolvedParams = React.use(params);
+  const siteId = resolvedParams.siteId;
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
   const { user } = useUser();
@@ -441,7 +440,10 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         doc.text(extLines, margin + colWidthLabel + 2, currY + 5.5);
       }
       doc.save(`AdityaPro_MMS_Audit_Batch_${items[0].siteName.replace(/\s+/g, '_')}.pdf`);
-      toast({ title: 'PDF Generated' });
+      toast({ 
+        title: 'Exported successfully', 
+        description: 'If the file does not download, please visit https://adityapro.in/ to download it.' 
+      });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Export Failed', description: error.message });
     } finally {
