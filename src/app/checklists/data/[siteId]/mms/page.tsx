@@ -45,9 +45,10 @@ import {
   Plus,
   FileText,
   MoreVertical,
-  ExternalLink
+  ExternalLink,
+  ChevronRight
 } from 'lucide-react';
-import { format, subDays, subMonths, subYears } from 'date-fns';
+import { format, subDays, subMonths } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -490,6 +491,63 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     return () => { if (convertedHeicUrl) URL.revokeObjectURL(convertedHeicUrl); };
   }, [viewFile]);
 
+  // Viewport Handlers for Zoom/Pan
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!viewFile || isVideo(viewFile)) return;
+    const delta = e.deltaY > 0 ? -0.2 : 0.2;
+    const newScale = Math.min(Math.max(scale + delta, 1), 4);
+    setScale(newScale);
+    if (newScale === 1) setPosition({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scale <= 1 || (viewFile && isVideo(viewFile))) return;
+    setIsDragging(true);
+    setStartPan({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || scale <= 1) return;
+    const newX = e.clientX - startPan.x;
+    const newY = e.clientY - startPan.y;
+    
+    const limitX = Math.max(0, (window.innerWidth * scale - window.innerWidth) / 2);
+    const limitY = Math.max(0, (window.innerHeight * scale - window.innerHeight) / 2);
+
+    setPosition({
+      x: Math.min(Math.max(newX, -limitX), limitX),
+      y: Math.min(Math.max(newY, -limitY), limitY)
+    });
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
+  const handleDoubleClick = () => {
+    if (viewFile && isVideo(viewFile)) return;
+    if (scale > 1) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    } else {
+      setScale(2);
+    }
+  };
+
+  const nextFile = () => {
+    if (viewFiles.length <= 1) return;
+    const nextIdx = (currentFileIndex + 1) % viewFiles.length;
+    setCurrentFileIndex(nextIdx);
+    setViewFile(viewFiles[nextIdx]);
+    resetViewer();
+  };
+
+  const prevFile = () => {
+    if (viewFiles.length <= 1) return;
+    const prevIdx = (currentFileIndex - 1 + viewFiles.length) % viewFiles.length;
+    setCurrentFileIndex(prevIdx);
+    setViewFile(viewFiles[prevIdx]);
+    resetViewer();
+  };
+
   const handlePostComment = async () => {
     if (!commentingRecord || !newComment.trim() || !user || !userProfile) return;
     setIsProcessing(true);
@@ -633,7 +691,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         </CardContent>
       </Card>
 
-      {/* Reusable Dialogs from existing components logic */}
       <Dialog open={!!viewingInstallation} onOpenChange={(o) => !o && setViewingInstallation(null)}>
         <DialogContent className="max-w-4xl w-[98vw] h-[90vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
           <DialogHeader className="p-4 md:p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
