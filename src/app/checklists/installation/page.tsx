@@ -1,8 +1,7 @@
-
 "use client";
 
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
@@ -138,9 +137,18 @@ export default function TableLevelMMSChecklistPage() {
 
   const uploadFile = async (file: File, path: string): Promise<{url: string, contentType: string, name: string}> => {
     let blob: Blob = file;
-    if (file.type.startsWith('image/')) {
+    const isImage = file.type.startsWith('image/');
+    const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+    
+    if (isImage || isHeic) {
       try {
-        blob = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 1920 });
+        // browser-image-compression handles HEIC to JPEG conversion automatically
+        blob = await imageCompression(file, { 
+          maxSizeMB: 1, 
+          maxWidthOrHeight: 1920,
+          alwaysKeepResolution: true,
+          initialQuality: 0.8
+        });
       } catch (e) {
         console.warn("Compression skipped", e);
       }
@@ -159,7 +167,12 @@ export default function TableLevelMMSChecklistPage() {
         reject, 
         async () => {
           const url = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve({ url, contentType: file.type, name: file.name });
+          // If we converted it, the content type is now image/jpeg
+          resolve({ 
+            url, 
+            contentType: isHeic ? 'image/jpeg' : blob.type, 
+            name: isHeic ? file.name.replace(/\.(heic|heif)$/i, '.jpg') : file.name 
+          });
         }
       );
     });

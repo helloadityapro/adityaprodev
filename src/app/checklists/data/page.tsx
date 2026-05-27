@@ -524,7 +524,13 @@ export default function ChecklistsDataPage() {
   const isImage = (file: Attachment) => {
     const type = file.contentType?.toLowerCase() || '';
     const name = file.name?.toLowerCase() || '';
-    return type.startsWith('image/') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp');
+    return type.startsWith('image/') || 
+           name.endsWith('.jpg') || 
+           name.endsWith('.jpeg') || 
+           name.endsWith('.png') || 
+           name.endsWith('.webp') ||
+           name.endsWith('.heic') ||
+           name.endsWith('.heif');
   };
 
   const resetViewer = () => {
@@ -1373,12 +1379,27 @@ export default function ChecklistsDataPage() {
                     />
                   </div>
                 ) : (
-                  <img 
-                    src={viewFile.url} 
-                    className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" 
-                    alt="Evidence View" 
-                    draggable={false}
-                  />
+                  <div className="flex flex-col items-center gap-4 pointer-events-auto">
+                    {(viewFile.name.toLowerCase().endsWith('.heic') || viewFile.name.toLowerCase().endsWith('.heif')) ? (
+                      <div className="bg-white/5 p-12 rounded-sm border border-white/10 flex flex-col items-center gap-4 text-center max-w-sm">
+                        <ImageIcon className="h-16 w-16 text-white/20" />
+                        <p className="text-white font-bold text-sm">High Efficiency Image (HEIF)</p>
+                        <p className="text-white/60 text-xs italic">This format is not natively viewable in some browsers. Please download to view.</p>
+                        <Button variant="outline" asChild className="h-10 rounded-sm border-white/20 text-white hover:bg-white/5 w-full mt-4">
+                          <a href={viewFile.url} download target="_blank" rel="noopener noreferrer">
+                            <FileDown className="h-4 w-4 mr-2" /> Download Original
+                          </a>
+                        </Button>
+                      </div>
+                    ) : (
+                      <img 
+                        src={viewFile.url} 
+                        className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" 
+                        alt="Evidence View" 
+                        draggable={false}
+                      />
+                    )}
+                  </div>
                 )
               )}
             </div>
