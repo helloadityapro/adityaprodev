@@ -354,7 +354,9 @@ export default function ChecklistsDataPage() {
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
-      const logoUrl = 'https://firebasestorage.googleapis.com/v0/b/studio-2612988795-1d8b2.appspot.com/o/app_assets%2Flogo_pdf.png?alt=media';
+      
+      // Use standard icon.png from public assets
+      const logoUrl = '/icon.png';
       
       for (let index = 0; index < items.length; index++) {
         const record = items[index];
@@ -366,9 +368,10 @@ export default function ChecklistsDataPage() {
         const colWidthValue = 115;
         const rowHeight = 8;
 
-        // Add Logo to top corner
+        // Add Logo to top right corner
         try {
-          doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12);
+          // Placement: Page Width (210) - Margin (15) - Logo Width (30) = 165
+          doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12);
         } catch (e) {
           console.warn("Could not load logo for PDF", e);
         }
@@ -421,7 +424,7 @@ export default function ChecklistsDataPage() {
           if (currY + h > 270) {
             doc.addPage();
             currY = 20;
-            try { doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12); } catch (e) {}
+            try { doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12); } catch (e) {}
           }
 
           doc.rect(margin, currY, col1, h);
@@ -438,6 +441,7 @@ export default function ChecklistsDataPage() {
               doc.text('View File', margin + col1 + col2 + 2, linkY);
               const textWidth = doc.getTextWidth('View File');
               doc.line(margin + col1 + col2 + 2, linkY + 0.5, margin + col1 + col2 + 2 + textWidth, linkY + 0.5);
+              // Adding functional hyperlink
               doc.link(margin + col1 + col2 + 2, linkY - 4, textWidth, 6, { url: att.url });
             });
             doc.setTextColor(0, 0, 0);
@@ -456,7 +460,7 @@ export default function ChecklistsDataPage() {
         if (currY + otherH > 270) {
           doc.addPage();
           currY = 20;
-          try { doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12); } catch (e) {}
+          try { doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12); } catch (e) {}
         }
 
         doc.rect(margin, currY, col1, otherH);
@@ -486,7 +490,7 @@ export default function ChecklistsDataPage() {
           if (currY + rowHeight > 270) {
             doc.addPage();
             currY = 20;
-            try { doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12); } catch (e) {}
+            try { doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12); } catch (e) {}
           }
           doc.setFont('helvetica', 'bold');
           doc.rect(margin, currY, colWidthLabel, rowHeight);
@@ -513,7 +517,7 @@ export default function ChecklistsDataPage() {
         if (currY + clientH > 270) {
           doc.addPage();
           currY = 20;
-          try { doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12); } catch (e) {}
+          try { doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12); } catch (e) {}
         }
 
         doc.setFont('helvetica', 'bold');
@@ -533,7 +537,7 @@ export default function ChecklistsDataPage() {
         if (currY + extH > 270) {
           doc.addPage();
           currY = 20;
-          try { doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12); } catch (e) {}
+          try { doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12); } catch (e) {}
         }
 
         doc.setFont('helvetica', 'bold');
@@ -604,7 +608,6 @@ export default function ChecklistsDataPage() {
       const convertHeic = async () => {
         setIsHeicConverting(true);
         try {
-          // Attempting to fetch with CORS mode
           const response = await fetch(viewFile.url, { mode: 'cors' });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const blob = await response.blob();
@@ -620,7 +623,6 @@ export default function ChecklistsDataPage() {
           setConvertedHeicUrl(localUrl);
         } catch (e: any) {
           console.error("HEIC decoding failed:", e);
-          // If fetch fails, we won't crash the UI but will inform the user
         } finally {
           setIsHeicConverting(false);
         }
@@ -1363,7 +1365,7 @@ export default function ChecklistsDataPage() {
               Are you sure you want to permanently remove this audit log for Table <strong>{deletingRecord?.tableNumber}</strong>? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+          <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-10 md:h-11">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteRecord} 
@@ -1387,7 +1389,7 @@ export default function ChecklistsDataPage() {
               Are you sure you want to permanently remove the Table Numbering Drawing for <strong>{deletingDrawing?.name}</strong>? This action cannot be undone and will require a new upload.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+          <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-10 md:h-11">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={confirmDeleteDrawing} 
