@@ -355,7 +355,6 @@ export default function ChecklistsDataPage() {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
       
-      // Use standard icon.png from public assets
       const logoUrl = '/icon.png';
       
       for (let index = 0; index < items.length; index++) {
@@ -368,10 +367,10 @@ export default function ChecklistsDataPage() {
         const colWidthValue = 115;
         const rowHeight = 8;
 
-        // Add Logo to top right corner
         try {
-          // Placement: Page Width (210) - Margin (15) - Logo Width (30) = 165
-          doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12);
+          // Properly fitted 1:1 logo in the top-right corner
+          // Width: 20mm, Height: 20mm
+          doc.addImage(logoUrl, 'PNG', 175, 10, 20, 20);
         } catch (e) {
           console.warn("Could not load logo for PDF", e);
         }
@@ -424,7 +423,7 @@ export default function ChecklistsDataPage() {
           if (currY + h > 270) {
             doc.addPage();
             currY = 20;
-            try { doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12); } catch (e) {}
+            try { doc.addImage(logoUrl, 'PNG', 175, 10, 20, 20); } catch (e) {}
           }
 
           doc.rect(margin, currY, col1, h);
@@ -441,7 +440,6 @@ export default function ChecklistsDataPage() {
               doc.text('View File', margin + col1 + col2 + 2, linkY);
               const textWidth = doc.getTextWidth('View File');
               doc.line(margin + col1 + col2 + 2, linkY + 0.5, margin + col1 + col2 + 2 + textWidth, linkY + 0.5);
-              // Adding functional hyperlink
               doc.link(margin + col1 + col2 + 2, linkY - 4, textWidth, 6, { url: att.url });
             });
             doc.setTextColor(0, 0, 0);
@@ -460,7 +458,7 @@ export default function ChecklistsDataPage() {
         if (currY + otherH > 270) {
           doc.addPage();
           currY = 20;
-          try { doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12); } catch (e) {}
+          try { doc.addImage(logoUrl, 'PNG', 175, 10, 20, 20); } catch (e) {}
         }
 
         doc.rect(margin, currY, col1, otherH);
@@ -490,7 +488,7 @@ export default function ChecklistsDataPage() {
           if (currY + rowHeight > 270) {
             doc.addPage();
             currY = 20;
-            try { doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12); } catch (e) {}
+            try { doc.addImage(logoUrl, 'PNG', 175, 10, 20, 20); } catch (e) {}
           }
           doc.setFont('helvetica', 'bold');
           doc.rect(margin, currY, colWidthLabel, rowHeight);
@@ -517,7 +515,7 @@ export default function ChecklistsDataPage() {
         if (currY + clientH > 270) {
           doc.addPage();
           currY = 20;
-          try { doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12); } catch (e) {}
+          try { doc.addImage(logoUrl, 'PNG', 175, 10, 20, 20); } catch (e) {}
         }
 
         doc.setFont('helvetica', 'bold');
@@ -537,7 +535,7 @@ export default function ChecklistsDataPage() {
         if (currY + extH > 270) {
           doc.addPage();
           currY = 20;
-          try { doc.addImage(logoUrl, 'PNG', 165, 10, 30, 12); } catch (e) {}
+          try { doc.addImage(logoUrl, 'PNG', 175, 10, 20, 20); } catch (e) {}
         }
 
         doc.setFont('helvetica', 'bold');
