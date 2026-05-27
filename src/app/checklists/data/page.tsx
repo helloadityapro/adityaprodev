@@ -68,6 +68,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import imageCompression from 'browser-image-compression';
 
 type Site = { 
   id: string; 
@@ -150,6 +151,10 @@ export default function ChecklistsDataPage() {
   const [position, setPosition] = React.useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = React.useState(false);
   const [startPan, setStartPan] = React.useState({ x: 0, y: 0 });
+
+  // On-the-fly HEIC conversion state
+  const [convertedHeicUrl, setConvertedHeicUrl] = React.useState<string | null>(null);
+  const [isHeicConverting, setIsHeicConverting] = React.useState(false);
   
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mediaRef = React.useRef<HTMLDivElement>(null);
@@ -536,6 +541,7 @@ export default function ChecklistsDataPage() {
   const resetViewer = () => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
+    setConvertedHeicUrl(null);
   };
 
   const openViewer = (file: Attachment, gallery: Attachment[]) => {
@@ -546,6 +552,54 @@ export default function ChecklistsDataPage() {
     setViewFile(file);
     resetViewer();
   };
+
+  // Effect to handle HEIC conversion on the fly in the viewer
+  React.useEffect(() => {
+    if (!viewFile) {
+        setConvertedHeicUrl(null);
+        return;
+    }
+
+    const name = viewFile.name.toLowerCase();
+    const isHeic = name.endsWith('.heic') || name.endsWith('.heif');
+
+    if (isHeic) {
+      const convertHeic = async () => {
+        setIsHeicConverting(true);
+        try {
+          // 1. Fetch the remote HEIC file as a blob
+          const response = await fetch(viewFile.url);
+          const blob = await response.blob();
+          
+          // 2. Use the existing imageCompression utility to decode HEIC to JPEG
+          // This uses heic2any internally or similar logic
+          const convertedBlob = await imageCompression(blob, {
+            maxSizeMB: 2,
+            maxWidthOrHeight: 1920,
+            initialQuality: 0.9,
+            type: 'image/jpeg'
+          });
+
+          // 3. Create a local URL for the decoded image
+          const localUrl = URL.createObjectURL(convertedBlob);
+          setConvertedHeicUrl(localUrl);
+        } catch (e) {
+          console.error("HEIC decoding failed:", e);
+          toast({ variant: 'destructive', title: 'Format Error', description: 'Could not render high-efficiency image. Please download to view.' });
+        } finally {
+          setIsHeicConverting(false);
+        }
+      };
+      convertHeic();
+    } else {
+      setConvertedHeicUrl(null);
+    }
+
+    // Cleanup local URL on unmount or file change
+    return () => {
+      if (convertedHeicUrl) URL.revokeObjectURL(convertedHeicUrl);
+    };
+  }, [viewFile]);
 
   const nextFile = () => {
     if (viewFiles.length <= 1) return;
@@ -932,7 +986,7 @@ export default function ChecklistsDataPage() {
               >
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-4 min-w-0">
-                    <Badge className="h-10 w-fit min-w-[3rem] px-3 rounded-lg bg-primary/5 text-primary border-none flex items-center justify-center font-black text-xs shrink-0 whitespace-nowrap">
+                    <Badge className="h-10 w-fit min-w-[3.5rem] px-3 rounded-lg bg-primary/5 text-primary border-none flex items-center justify-center font-black text-xs shrink-0 whitespace-nowrap">
                       {record.tableNumber}
                     </Badge>
                     <div className="flex flex-col min-w-0 gap-1">
@@ -1162,7 +1216,7 @@ export default function ChecklistsDataPage() {
               {viewingInstallation?.otherRemarks && (
                 <div className="p-4 md:p-6 bg-primary/5 border rounded-sm space-y-4 md:space-y-6">
                    <div className="space-y-2">
-                      <Label className="text-[8px] md:text-[9px] font-black uppercase text-primary tracking-widest">Other Remarks</Label>
+                      <Label className="text-[9px] font-black uppercase text-primary tracking-widest">Other Remarks</Label>
                       <p className="text-[10px] md:text-sm font-medium leading-relaxed italic text-foreground/80">"{viewingInstallation.otherRemarks}"</p>
                     </div>
 
@@ -1380,20 +1434,15 @@ export default function ChecklistsDataPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-4 pointer-events-auto">
-                    {(viewFile.name.toLowerCase().endsWith('.heic') || viewFile.name.toLowerCase().endsWith('.heif')) ? (
+                    {isHeicConverting ? (
                       <div className="bg-white/5 p-12 rounded-sm border border-white/10 flex flex-col items-center gap-4 text-center max-w-sm">
-                        <ImageIcon className="h-16 w-16 text-white/20" />
-                        <p className="text-white font-bold text-sm">High Efficiency Image (HEIF)</p>
-                        <p className="text-white/60 text-xs italic">This format is not natively viewable in some browsers. Please download to view.</p>
-                        <Button variant="outline" asChild className="h-10 rounded-sm border-white/20 text-white hover:bg-white/5 w-full mt-4">
-                          <a href={viewFile.url} download target="_blank" rel="noopener noreferrer">
-                            <FileDown className="h-4 w-4 mr-2" /> Download Original
-                          </a>
-                        </Button>
+                        <Loader2 className="h-12 w-12 text-primary animate-spin" />
+                        <p className="text-white font-bold text-sm uppercase tracking-widest">Decoding High-Efficiency Image</p>
+                        <p className="text-white/40 text-[10px] italic">Optimizing display for your browser...</p>
                       </div>
                     ) : (
                       <img 
-                        src={viewFile.url} 
+                        src={convertedHeicUrl || viewFile.url} 
                         className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" 
                         alt="Evidence View" 
                         draggable={false}
