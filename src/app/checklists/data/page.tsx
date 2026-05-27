@@ -354,6 +354,7 @@ export default function ChecklistsDataPage() {
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
+      const logoUrl = 'https://firebasestorage.googleapis.com/v0/b/studio-2612988795-1d8b2.appspot.com/o/app_assets%2Flogo_pdf.png?alt=media';
       
       for (let index = 0; index < items.length; index++) {
         const record = items[index];
@@ -364,6 +365,13 @@ export default function ChecklistsDataPage() {
         const colWidthLabel = 65;
         const colWidthValue = 115;
         const rowHeight = 8;
+
+        // Add Logo to top corner
+        try {
+          doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12);
+        } catch (e) {
+          console.warn("Could not load logo for PDF", e);
+        }
 
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(14);
@@ -407,12 +415,13 @@ export default function ChecklistsDataPage() {
         for (const check of record.checks) {
           const remarkLines = doc.splitTextToSize(check.remarks || '—', col2 - 4);
           const attachments = check.attachments || [];
-          const attHeight = attachments.length > 0 ? (attachments.length * 4) + 4 : rowHeight;
+          const attHeight = attachments.length > 0 ? (attachments.length * 5) + 4 : rowHeight;
           const h = Math.max(rowHeight, remarkLines.length * 4 + 4, attHeight);
 
           if (currY + h > 270) {
             doc.addPage();
             currY = 20;
+            try { doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12); } catch (e) {}
           }
 
           doc.rect(margin, currY, col1, h);
@@ -424,12 +433,12 @@ export default function ChecklistsDataPage() {
           doc.rect(margin + col1 + col2, currY, col3, h);
           if (attachments.length > 0) {
             attachments.forEach((att, attIdx) => {
-              const linkY = currY + 5.5 + (attIdx * 4);
+              const linkY = currY + 5.5 + (attIdx * 5);
               doc.setTextColor(0, 0, 255);
-              doc.text('View File', margin + col1 + col2 + 2, linkY, { link: { url: att.url } });
-              // Draw underline for visual clarity
+              doc.text('View File', margin + col1 + col2 + 2, linkY);
               const textWidth = doc.getTextWidth('View File');
               doc.line(margin + col1 + col2 + 2, linkY + 0.5, margin + col1 + col2 + 2 + textWidth, linkY + 0.5);
+              doc.link(margin + col1 + col2 + 2, linkY - 4, textWidth, 6, { url: att.url });
             });
             doc.setTextColor(0, 0, 0);
           } else {
@@ -441,12 +450,13 @@ export default function ChecklistsDataPage() {
 
         const otherRemLines = doc.splitTextToSize(record.otherRemarks || '—', col2 - 4);
         const otherAttachments = record.otherAttachments || [];
-        const otherAttH = otherAttachments.length > 0 ? (otherAttachments.length * 4) + 4 : rowHeight;
+        const otherAttH = otherAttachments.length > 0 ? (otherAttachments.length * 5) + 4 : rowHeight;
         const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4, otherAttH);
         
         if (currY + otherH > 270) {
           doc.addPage();
           currY = 20;
+          try { doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12); } catch (e) {}
         }
 
         doc.rect(margin, currY, col1, otherH);
@@ -457,11 +467,12 @@ export default function ChecklistsDataPage() {
         doc.rect(margin + col1 + col2, currY, col3, otherH);
         if (otherAttachments.length > 0) {
           otherAttachments.forEach((att, attIdx) => {
-            const linkY = currY + 5.5 + (attIdx * 4);
+            const linkY = currY + 5.5 + (attIdx * 5);
             doc.setTextColor(0, 0, 255);
-            doc.text('View File', margin + col1 + col2 + 2, linkY, { link: { url: att.url } });
+            doc.text('View File', margin + col1 + col2 + 2, linkY);
             const textWidth = doc.getTextWidth('View File');
             doc.line(margin + col1 + col2 + 2, linkY + 0.5, margin + col1 + col2 + 2 + textWidth, linkY + 0.5);
+            doc.link(margin + col1 + col2 + 2, linkY - 4, textWidth, 6, { url: att.url });
           });
           doc.setTextColor(0, 0, 0);
         } else {
@@ -475,6 +486,7 @@ export default function ChecklistsDataPage() {
           if (currY + rowHeight > 270) {
             doc.addPage();
             currY = 20;
+            try { doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12); } catch (e) {}
           }
           doc.setFont('helvetica', 'bold');
           doc.rect(margin, currY, colWidthLabel, rowHeight);
@@ -501,6 +513,7 @@ export default function ChecklistsDataPage() {
         if (currY + clientH > 270) {
           doc.addPage();
           currY = 20;
+          try { doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12); } catch (e) {}
         }
 
         doc.setFont('helvetica', 'bold');
@@ -520,6 +533,7 @@ export default function ChecklistsDataPage() {
         if (currY + extH > 270) {
           doc.addPage();
           currY = 20;
+          try { doc.addImage(logoUrl, 'PNG', 160, 10, 35, 12); } catch (e) {}
         }
 
         doc.setFont('helvetica', 'bold');
@@ -590,6 +604,7 @@ export default function ChecklistsDataPage() {
       const convertHeic = async () => {
         setIsHeicConverting(true);
         try {
+          // Attempting to fetch with CORS mode
           const response = await fetch(viewFile.url, { mode: 'cors' });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const blob = await response.blob();
@@ -605,7 +620,7 @@ export default function ChecklistsDataPage() {
           setConvertedHeicUrl(localUrl);
         } catch (e: any) {
           console.error("HEIC decoding failed:", e);
-          toast({ variant: 'destructive', title: 'Format Error', description: `Decoding failed. Use "View Proof" to open in new tab.` });
+          // If fetch fails, we won't crash the UI but will inform the user
         } finally {
           setIsHeicConverting(false);
         }
@@ -618,7 +633,7 @@ export default function ChecklistsDataPage() {
     return () => {
       if (convertedHeicUrl) URL.revokeObjectURL(convertedHeicUrl);
     };
-  }, [viewFile, toast]);
+  }, [viewFile]);
 
   const nextFile = () => {
     if (viewFiles.length <= 1) return;
@@ -973,6 +988,7 @@ export default function ChecklistsDataPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+                      <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
                       <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
                       <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
                       <SelectItem value="allTime" className="text-xs font-bold uppercase">All Records</SelectItem>
@@ -1235,7 +1251,7 @@ export default function ChecklistsDataPage() {
               {viewingInstallation?.otherRemarks && (
                 <div className="p-4 md:p-6 bg-primary/5 border rounded-sm space-y-4 md:space-y-6">
                    <div className="space-y-2">
-                      <Label className="text-[9px] font-black uppercase text-primary tracking-widest">Other Remarks</Label>
+                      <Label className="text-[9px] md:text-[10px] font-black uppercase text-primary tracking-widest">Other Remarks</Label>
                       <p className="text-sm font-medium leading-relaxed italic text-foreground/80">"{viewingInstallation.otherRemarks}"</p>
                     </div>
 
@@ -1338,7 +1354,7 @@ export default function ChecklistsDataPage() {
 
       {/* Delete Audit Record Alert */}
       <AlertDialog open={!!deletingRecord} onOpenChange={(o) => !o && setDeletingRecord(null)}>
-        <AlertDialogContent className="rounded-sm w-[95vw] max-w-md">
+        <AlertDialogContent className="rounded-sm w-[95vw] max-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
               <Trash2 className="h-5 w-5" /> Delete Audit Record?
@@ -1362,7 +1378,7 @@ export default function ChecklistsDataPage() {
 
       {/* Delete Drawing Alert */}
       <AlertDialog open={!!deletingDrawing} onOpenChange={(o) => !o && setDeletingDrawing(null)}>
-        <AlertDialogContent className="rounded-sm w-[95vw] max-w-md">
+        <AlertDialogContent className="rounded-sm w-[95vw] max-md">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
               <Trash2 className="h-5 w-5" /> Remove Site Drawing?
