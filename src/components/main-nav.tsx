@@ -54,7 +54,8 @@ import {
   PackagePlus,
   Database,
   History,
-  CalendarCheck
+  CalendarCheck,
+  Zap
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -728,6 +729,14 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                       <Link href="/checklists/installation">
                         <LayoutGrid className="h-4 w-4" />
                         <span>Table Level MMS</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/ht-line'} onClick={handleMobileClose}>
+                      <Link href="/checklists/ht-line">
+                        <Zap className="h-4 w-4" />
+                        <span>HT Line Checklist</span>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
