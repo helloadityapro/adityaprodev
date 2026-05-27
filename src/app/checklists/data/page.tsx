@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking, useFirebaseApp } from '@/firebase';
 import { collection, query, orderBy, doc, limit, arrayUnion, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -59,7 +60,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { sendNotification } from '@/lib/notifications';
-import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -152,7 +152,6 @@ export default function ChecklistsDataPage() {
   const [isDragging, setIsDragging] = React.useState(false);
   const [startPan, setStartPan] = React.useState({ x: 0, y: 0 });
 
-  // On-the-fly HEIC conversion state
   const [convertedHeicUrl, setConvertedHeicUrl] = React.useState<string | null>(null);
   const [isHeicConverting, setIsHeicConverting] = React.useState(false);
   
@@ -428,6 +427,9 @@ export default function ChecklistsDataPage() {
               const linkY = currY + 5.5 + (attIdx * 4);
               doc.setTextColor(0, 0, 255);
               doc.text('View File', margin + col1 + col2 + 2, linkY, { link: { url: att.url } });
+              // Draw underline for visual clarity
+              const textWidth = doc.getTextWidth('View File');
+              doc.line(margin + col1 + col2 + 2, linkY + 0.5, margin + col1 + col2 + 2 + textWidth, linkY + 0.5);
             });
             doc.setTextColor(0, 0, 0);
           } else {
@@ -458,6 +460,8 @@ export default function ChecklistsDataPage() {
             const linkY = currY + 5.5 + (attIdx * 4);
             doc.setTextColor(0, 0, 255);
             doc.text('View File', margin + col1 + col2 + 2, linkY, { link: { url: att.url } });
+            const textWidth = doc.getTextWidth('View File');
+            doc.line(margin + col1 + col2 + 2, linkY + 0.5, margin + col1 + col2 + 2 + textWidth, linkY + 0.5);
           });
           doc.setTextColor(0, 0, 0);
         } else {
@@ -573,7 +577,6 @@ export default function ChecklistsDataPage() {
     resetViewer();
   };
 
-  // Effect to handle HEIC conversion on the fly in the viewer
   React.useEffect(() => {
     if (!viewFile) {
         setConvertedHeicUrl(null);
@@ -587,12 +590,10 @@ export default function ChecklistsDataPage() {
       const convertHeic = async () => {
         setIsHeicConverting(true);
         try {
-          // 1. Fetch the remote HEIC file as a blob
           const response = await fetch(viewFile.url, { mode: 'cors' });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const blob = await response.blob();
           
-          // 2. Use the existing imageCompression utility to decode HEIC to JPEG
           const convertedBlob = await imageCompression(blob, {
             maxSizeMB: 2,
             maxWidthOrHeight: 1920,
@@ -600,13 +601,11 @@ export default function ChecklistsDataPage() {
             type: 'image/jpeg'
           });
 
-          // 3. Create a local URL for the decoded image
           const localUrl = URL.createObjectURL(convertedBlob);
           setConvertedHeicUrl(localUrl);
         } catch (e: any) {
           console.error("HEIC decoding failed:", e);
-          const msg = e.message?.includes('fetch') ? 'Cross-origin security restriction' : 'Decoding failed';
-          toast({ variant: 'destructive', title: 'Format Error', description: `${msg}. Use "View Proof" to open in new tab.` });
+          toast({ variant: 'destructive', title: 'Format Error', description: `Decoding failed. Use "View Proof" to open in new tab.` });
         } finally {
           setIsHeicConverting(false);
         }
@@ -616,7 +615,6 @@ export default function ChecklistsDataPage() {
       setConvertedHeicUrl(null);
     }
 
-    // Cleanup local URL on unmount or file change
     return () => {
       if (convertedHeicUrl) URL.revokeObjectURL(convertedHeicUrl);
     };
@@ -1007,9 +1005,9 @@ export default function ChecklistsDataPage() {
               >
                 <CardContent className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-4 min-w-0">
-                    <Badge className="h-10 w-fit min-w-[3.5rem] px-3 rounded-lg bg-primary/5 text-primary border-none flex items-center justify-center font-black text-xs shrink-0 whitespace-nowrap">
+                    <div className="h-10 min-w-[3.5rem] px-3 rounded-lg bg-primary/5 text-primary border-none flex items-center justify-center font-black text-xs shrink-0 whitespace-nowrap">
                       {record.tableNumber}
-                    </Badge>
+                    </div>
                     <div className="flex flex-col min-w-0 gap-1">
                       <div className="flex items-center gap-2 text-foreground font-bold">
                         <User className="h-3 w-3 text-primary/60" />
@@ -1062,7 +1060,7 @@ export default function ChecklistsDataPage() {
             )}
           </div>
 
-          <Card className="hidden md:block rounded-sm border-primary/10 shadow-md overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+          <Card className="hidden md:block rounded-sm border-primary/10 shadow-md overflow-hidden animate-in fade-in duration-300">
             <CardHeader className="bg-muted/5 border-b py-4">
               <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-primary" /> Audit Records ({filteredInst.length})
@@ -1475,18 +1473,13 @@ export default function ChecklistsDataPage() {
                           className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" 
                           alt="Evidence View" 
                           draggable={false}
-                          onError={(e) => {
-                            // If direct render fails (likely HEIC without successful local conversion due to CORS)
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
                         />
-                        {/* Fallback for blocked or unsupported legacy formats */}
                         {(viewFile.name.toLowerCase().endsWith('.heic') || viewFile.name.toLowerCase().endsWith('.heif')) && !isHeicConverting && !convertedHeicUrl && (
                           <div className="p-8 bg-background border rounded-lg shadow-xl max-w-xs space-y-4">
                             <AlertCircle className="h-10 w-10 text-primary mx-auto opacity-50" />
                             <div className="space-y-1">
                                <p className="text-sm font-bold">Legacy Format Restricted</p>
-                               <p className="text-[10px] text-muted-foreground">Browser security policies may block local decoding of this old record.</p>
+                               <p className="text-[10px] text-muted-foreground">Browser security policies may block local decoding of this record.</p>
                             </div>
                             <Button asChild size="sm" className="w-full rounded-sm font-black uppercase text-[10px]">
                               <a href={viewFile.url} target="_blank" rel="noopener noreferrer">Download File</a>
