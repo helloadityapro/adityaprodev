@@ -284,18 +284,30 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const exportToPDF = async (items: InstallationChecklist[]) => {
     if (items.length === 0) return;
     setIsExporting(true);
+    
+    // Yield to let the loading state render
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
       const logoUrl = '/icon.png';
 
+      // Load logo once to get properties
+      let logoProps: any = null;
+      try {
+        logoProps = doc.getImageProperties(logoUrl);
+      } catch (e) {
+        console.warn("Logo load failed", e);
+      }
+
       const addCenteredLogo = (pdfDoc: any) => {
+        if (!logoProps) return;
         try {
           const areaSize = 25;
           const startX = 210 - areaSize - 10;
           const startY = 10;
-          const imgProps = pdfDoc.getImageProperties(logoUrl);
-          const ratio = imgProps.width / imgProps.height;
+          const ratio = logoProps.width / logoProps.height;
           let renderW = areaSize;
           let renderH = areaSize;
           if (ratio > 1) renderH = areaSize / ratio;
@@ -311,6 +323,12 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       for (let index = 0; index < items.length; index++) {
         const record = items[index];
         if (index > 0) doc.addPage();
+        
+        // Yield every 3 records to prevent UI freezing on large batches
+        if (index > 0 && index % 3 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+
         const margin = 15;
         let currY = 40;
         const colWidthLabel = 65;
@@ -493,7 +511,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     return () => { if (convertedHeicUrl) URL.revokeObjectURL(convertedHeicUrl); };
   }, [viewFile]);
 
-  // Viewport Handlers for Zoom/Pan
   const handleWheel = (e: React.WheelEvent) => {
     if (!viewFile || isVideo(viewFile)) return;
     const delta = e.deltaY > 0 ? -0.2 : 0.2;
@@ -512,43 +529,15 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     if (!isDragging || scale <= 1) return;
     const newX = e.clientX - startPan.x;
     const newY = e.clientY - startPan.y;
-    
     const limitX = Math.max(0, (window.innerWidth * scale - window.innerWidth) / 2);
     const limitY = Math.max(0, (window.innerHeight * scale - window.innerHeight) / 2);
-
-    setPosition({
-      x: Math.min(Math.max(newX, -limitX), limitX),
-      y: Math.min(Math.max(newY, -limitY), limitY)
-    });
+    setPosition({ x: Math.min(Math.max(newX, -limitX), limitX), y: Math.min(Math.max(newY, -limitY), limitY) });
   };
 
   const handleMouseUp = () => setIsDragging(false);
-
-  const handleDoubleClick = () => {
-    if (viewFile && isVideo(viewFile)) return;
-    if (scale > 1) {
-      setScale(1);
-      setPosition({ x: 0, y: 0 });
-    } else {
-      setScale(2);
-    }
-  };
-
-  const nextFile = () => {
-    if (viewFiles.length <= 1) return;
-    const nextIdx = (currentFileIndex + 1) % viewFiles.length;
-    setCurrentFileIndex(nextIdx);
-    setViewFile(viewFiles[nextIdx]);
-    resetViewer();
-  };
-
-  const prevFile = () => {
-    if (viewFiles.length <= 1) return;
-    const prevIdx = (currentFileIndex - 1 + viewFiles.length) % viewFiles.length;
-    setCurrentFileIndex(prevIdx);
-    setViewFile(viewFiles[prevIdx]);
-    resetViewer();
-  };
+  const handleDoubleClick = () => { if (viewFile && isVideo(viewFile)) return; if (scale > 1) { setScale(1); setPosition({ x: 0, y: 0 }); } else { setScale(2); } };
+  const nextFile = () => { if (viewFiles.length <= 1) return; const nextIdx = (currentFileIndex + 1) % viewFiles.length; setCurrentFileIndex(nextIdx); setViewFile(viewFiles[nextIdx]); resetViewer(); };
+  const prevFile = () => { if (viewFiles.length <= 1) return; const prevIdx = (currentFileIndex - 1 + viewFiles.length) % viewFiles.length; setCurrentFileIndex(prevIdx); setViewFile(viewFiles[prevIdx]); resetViewer(); };
 
   const handlePostComment = async () => {
     if (!commentingRecord || !newComment.trim() || !user || !userProfile) return;
@@ -598,7 +587,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
           <Button onClick={() => exportToPDF(filteredInst)} disabled={isExporting || filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5 flex-1 sm:flex-none">
-            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} Export All (PDF)
+            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} {isExporting ? 'Generating...' : 'Export All (PDF)'}
           </Button>
           {site.drawingUrl ? (
             <div className="flex items-center gap-2 flex-1 sm:flex-none">
@@ -758,7 +747,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           </DialogHeader>
           <div className="flex-1 flex flex-col min-h-0 bg-background">
             <ScrollArea className="flex-1 p-4 md:p-6"><div className="space-y-4 md:space-y-6">{commentingRecord?.comments?.map((comment, i) => (<div key={i} className="flex flex-col gap-1.5 animate-in fade-in"><div className="flex items-center justify-between"><span className="text-[10px] md:text-[11px] font-black text-primary uppercase">{comment.userName}</span><span className="text-[8px] font-mono text-muted-foreground">{format(new Date(comment.createdAt), 'dd MMM, HH:mm')}</span></div><div className="p-2.5 md:p-3 bg-muted/20 border rounded-sm text-left"><p className="text-xs md:text-sm font-medium leading-relaxed italic">"{comment.text}"</p></div></div>))}</div></ScrollArea>
-            <div className="p-4 md:p-6 border-t bg-muted/5 space-y-3 shrink-0"><Label className="text-[10px] font-black uppercase">Post Comment</Label><Textarea placeholder="Type your message..." className="min-h-[60px] rounded-sm bg-background border-primary/20 text-xs md:text-sm" value={newComment} onChange={(e) => setNewComment(e.target.value)} /><div className="flex justify-end gap-2"><Button onClick={handlePostComment} disabled={isProcessing || !newComment.trim()} className="rounded-sm font-black uppercase text-[10px] h-9 md:h-10 px-6">{isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}Send</Button></div></div>
+            <div className="p-4 md:p-6 border-t bg-muted/5 space-y-3 shrink-0"><Label className="text-[10px] font-black uppercase">Post Comment</Label><Textarea placeholder="Type your message..." className="min-h-[60px] rounded-sm bg-background border-primary/20 text-xs md:text-sm" value={newComment} onChange={(e) => setNewComment(e.target.value)} /><div className="flex justify-end gap-2"><Button onClick={handlePostComment} disabled={setIsProcessing} className="rounded-sm font-black uppercase text-[10px] h-9 md:h-10 px-6">{isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5 mr-1.5" />}Send</Button></div></div>
           </div>
         </DialogContent>
       </Dialog>
