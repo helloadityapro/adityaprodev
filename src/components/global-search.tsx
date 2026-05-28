@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -60,6 +59,13 @@ type AccessConfig = {
   ownDataOnly?: boolean;
 };
 
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
+};
+
 export function GlobalSearch() {
   const router = useRouter();
   const firestore = useFirestore();
@@ -85,7 +91,17 @@ export function GlobalSearch() {
   const groupsQuery = useMemoFirebase(() => collection(firestore, 'site_groups'), [firestore]);
   const { data: groups } = useCollection<any>(groupsQuery);
 
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
+  const teamQuery = useMemoFirebase(() => {
+    if (!userProfile || userProfile.role !== 'Site Manager' || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, userProfile?.role]);
+  const { data: teamMembers } = useCollection<any>(teamQuery);
+
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   // Keyboard shortcut listener
   React.useEffect(() => {
@@ -96,7 +112,7 @@ export function GlobalSearch() {
       }
     };
     document.addEventListener('keydown', down);
-    return () => document.removeEventListener('keydown', down);
+    return () => document.addEventListener('keydown', down);
   }, []);
 
   // Debounced search trigger
@@ -130,19 +146,43 @@ export function GlobalSearch() {
       });
     }
 
-    // 1. Sites search (Local)
-    const siteResults: SearchResult[] = [];
+    // 1. Calculate accessible sites set for the search
+    const accessibleIds = new Set<string>();
     if (allSites && userProfile) {
-      const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
-        ? userProfile.ownDataOnly 
-        : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+      if (isAdmin) {
+        allSites.forEach(s => accessibleIds.add(s.id));
+      } else {
+        const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+          ? userProfile.ownDataOnly 
+          : roleConfigs?.find(c => c.id === userProfile.role?.toLowerCase()?.replace(/\s+/g, '-'))?.ownDataOnly ?? false;
 
-      const assignedIds = new Set(userProfile.assignedProjectIds || []);
+        if (isOwnDataOnly) {
+          if (isManager) {
+            // 1. Explicit Overrides
+            allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => accessibleIds.add(o.siteId));
+            // 2. Direct Team Defaults (not overridden elsewhere)
+            teamMembers?.forEach(member => {
+              (member.assignedProjectIds || []).forEach(sid => {
+                const otherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
+                if (!otherOverride) accessibleIds.add(sid);
+              });
+            });
+          } else {
+            (userProfile.assignedProjectIds || []).forEach(id => accessibleIds.add(id));
+          }
+        } else {
+          allSites.forEach(s => accessibleIds.add(s.id));
+        }
+      }
+    }
 
+    // 2. Sites search (Local)
+    const siteResults: SearchResult[] = [];
+    if (allSites) {
       allSites.forEach(s => {
-        const isAuthorized = isAdmin || !isOwnDataOnly || assignedIds.has(s.id);
+        if (!accessibleIds.has(s.id)) return;
         const matchesGroup = !allowedSiteIdsFromGroups || allowedSiteIdsFromGroups.has(s.id);
-        if (!isAuthorized || !matchesGroup) return;
+        if (!matchesGroup) return;
 
         if (!term || s.name.toLowerCase().includes(term) || s.projectCompany.toLowerCase().includes(term)) {
           siteResults.push({
@@ -173,19 +213,10 @@ export function GlobalSearch() {
           const data = d.data();
           const siteId = data.siteId;
 
-          // Access Control
-          if (!isAdmin && userProfile) {
-            const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
-              ? userProfile.ownDataOnly 
-              : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+          // Access Control Check
+          if (!isAdmin && siteId && !accessibleIds.has(siteId)) return;
 
-            if (isOwnDataOnly) {
-              const assignedIds = new Set(userProfile.assignedProjectIds || []);
-              if (siteId && !assignedIds.has(siteId)) return;
-            }
-          }
-
-          // Group Filter
+          // Group Filter Check
           if (allowedSiteIdsFromGroups && siteId && !allowedSiteIdsFromGroups.has(siteId)) return;
 
           const isMatch = !term || fields.some(field => {
@@ -306,7 +337,7 @@ export function GlobalSearch() {
                 <Button variant="ghost" size="sm" className="h-8 rounded-sm font-black uppercase text-[9px] tracking-widest gap-1.5 border border-primary/10">
                   <Tags className="h-3 w-3" />
                   {selectedGroupIds.length === 0 ? "Global Scope" : `${selectedGroupIds.length} Groups Active`}
-                  <ChevronDown className="h-3 w-3 opacity-50" />
+                  <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-56 p-0 rounded-sm border-primary/10 shadow-2xl">

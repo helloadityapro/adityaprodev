@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import * as React from "react";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -42,11 +41,19 @@ type UserProfile = {
   siteManagerId?: string;
   assignedProjectIds?: string[];
   pointsMultiplier?: number;
+  ownDataOnly?: boolean;
 };
 
 type RewardSettings = {
   dprEngineer?: number;
   dprManager?: number;
+};
+
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
 };
 
 export default function SubmitDPRPage() {
@@ -67,6 +74,9 @@ export default function SubmitDPRPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
   // Fetch team members for managers to aggregate sites
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
@@ -80,17 +90,26 @@ export default function SubmitDPRPage() {
         return Array.from(new Map(allSites.map(s => [s.name, s])).values());
     }
     
-    // Aggregated site visibility for Managers
-    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
-    if (isManager && teamMembers) {
-      teamMembers.forEach(member => {
-        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
+    // Strict Dynamics
+    const siteIds = new Set<string>();
+
+    if (isManager) {
+      // 1. Overrides
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      // 2. Team Defaults (if not overridden)
+      teamMembers?.forEach(member => {
+        (member.assignedProjectIds || []).forEach(sid => {
+          const otherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
+          if (!otherOverride) siteIds.add(sid);
+        });
       });
+    } else {
+      (userProfile.assignedProjectIds || []).forEach(id => siteIds.add(id));
     }
 
-    const filtered = allSites.filter(s => assignedIds.has(s.id));
+    const filtered = allSites.filter(s => siteIds.has(s.id));
     return Array.from(new Map(filtered.map(s => [s.name, s])).values());
-  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");

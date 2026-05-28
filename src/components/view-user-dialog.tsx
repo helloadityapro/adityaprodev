@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -359,7 +358,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
                             
                             <div className="flex gap-2">
                               <Button size="sm" className="h-10 text-[10px] font-black uppercase tracking-widest flex-1 shadow-md" onClick={handleSaveMapping} disabled={!selectedManagerId || isSaving}>
-                                {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <ShieldCheck className="h-3 w-3 mr-1.5" />} Confirm Link
+                                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <ShieldCheck className="h-3 w-3 mr-1.5" />} Confirm Link
                               </Button>
                               <Button size="sm" variant="ghost" className="h-10 text-[10px] font-bold uppercase tracking-widest" onClick={() => { setIsMappingMode(false); setManagerSearchQuery(""); setSelectedManagerId(null); }} disabled={isSaving}>Cancel</Button>
                             </div>
@@ -407,7 +406,7 @@ export function ViewUserDialog({ user, open, onOpenChange }: ViewUserDialogProps
 
               {userOverrides && userOverrides.length > 0 && (
                   <div className="space-y-6 pt-10">
-                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 border-b pb-2 text-left">Allocated Site Supervisors</h3>
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 border-b pb-2 text-left">Site Specific Assignments</h3>
                       <div className="divide-y divide-border/30 border rounded-sm overflow-hidden bg-background">
                           {userOverrides.map(override => {
                               const site = allSites?.find(s => s.id === override.siteId);

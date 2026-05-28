@@ -22,6 +22,19 @@ type UserProfile = {
   username: string;
   role: string;
   assignedProjectIds?: string[];
+  ownDataOnly?: boolean;
+};
+
+type AccessConfig = {
+  id: string;
+  ownDataOnly?: boolean;
+};
+
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
 };
 
 export default function DocumentsExplorerPage() {
@@ -31,6 +44,9 @@ export default function DocumentsExplorerPage() {
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
@@ -45,24 +61,44 @@ export default function DocumentsExplorerPage() {
   }, [firestore, user, isManager]);
   const { data: teamMembers, isLoading: teamLoading } = useCollection<UserProfile>(teamQuery);
 
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
   const accessibleSites = React.useMemo(() => {
     if (!allSites || (!userProfile && !isAdmin)) return [];
     
     // Admins see all folders
     if (isAdmin) return allSites;
 
-    // Build a set of all unique project IDs this user should see
-    const assignedIds = new Set<string>(userProfile?.assignedProjectIds || []);
-    
-    // If manager, add all project IDs assigned to their engineers
-    if (isManager && teamMembers) {
-      teamMembers.forEach(member => {
-        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
-      });
+    const isOwnDataOnly = userProfile?.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === userProfile?.role?.toLowerCase()?.replace(/\s+/g, '-'))?.ownDataOnly ?? false;
+
+    if (!isOwnDataOnly) return allSites;
+
+    // Strict Dynamic Access Set
+    const siteIds = new Set<string>();
+
+    if (isManager) {
+      // 1. Explicit Overrides
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      
+      // 2. Direct Team Defaults (if not overridden elsewhere)
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(sid => {
+            const otherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
+            if (!otherOverride) siteIds.add(sid);
+          });
+        });
+      }
+    } else {
+      // Engineer / Driver
+      (userProfile?.assignedProjectIds || []).forEach(id => siteIds.add(id));
     }
 
-    return allSites.filter(site => assignedIds.has(site.id));
-  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
+    return allSites.filter(site => siteIds.has(site.id));
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers, roleConfigs, allOverrides]);
 
   const filteredSites = React.useMemo(() => {
     return accessibleSites.filter(site => 

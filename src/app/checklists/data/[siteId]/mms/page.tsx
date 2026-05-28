@@ -596,7 +596,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="flex flex-col gap-2 w-full sm:w-auto">
           <Button onClick={() => exportToPDF(filteredInst)} disabled={isExporting || filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5 flex-1 sm:flex-none">
-            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} {isExporting ? 'Generating Batch...' : 'Export All (PDF)'}
+            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} {isExporting ? 'Generating PDF...' : 'Export All (PDF)'}
           </Button>
           {isExporting && (
             <div className="w-full sm:w-[200px] space-y-1.5 animate-in fade-in duration-300">

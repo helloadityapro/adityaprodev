@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -443,7 +442,7 @@ export default function TeamMappingPage() {
                           
                           {hasOverrides.length > 0 && (
                             <div className="flex flex-col gap-1 mt-1">
-                               <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">Site Overrides</span>
+                               <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">Site Specific</span>
                                {hasOverrides.map(o => {
                                  const site = allSites?.find(s => s.id === o.siteId);
                                  const mgr = managers.find(m => m.id === o.managerId);
@@ -464,7 +463,7 @@ export default function TeamMappingPage() {
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-sm text-foreground">{eng.username}</span>
                             {hasOverrides.length > 0 && (
-                              <Badge variant="outline" className="text-[7px] h-3 px-1 border-amber-200 text-amber-700 bg-amber-50 font-black uppercase">Site-Specific</Badge>
+                              <Badge variant="outline" className="text-[7px] h-3 px-1 border-amber-200 text-amber-700 bg-amber-50 font-black uppercase">Site Specific</Badge>
                             )}
                           </div>
                           <span className="text-[9px] font-medium text-muted-foreground truncate max-w-[180px]">{eng.email}</span>
@@ -492,7 +491,7 @@ export default function TeamMappingPage() {
                                 className="h-8 rounded-sm font-bold text-[10px] uppercase border-amber-200 text-amber-700 hover:bg-amber-50"
                                 onClick={() => setOverrideEngineer(eng)}
                               >
-                                <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Site Overrides
+                                <ShieldCheck className="h-3.5 w-3.5 mr-1.5" /> Site Specific
                               </Button>
                           </div>
                           <div className="flex items-center gap-1">
@@ -737,7 +736,7 @@ export default function TeamMappingPage() {
       <Dialog open={!!overrideEngineer} onOpenChange={(o) => !o && setOverrideEngineer(null)}>
         <DialogContent className="max-w-2xl rounded-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-black tracking-tight"><Building2 className="h-5 w-5 text-amber-600" /> Site-specific Manager Overrides</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 font-black tracking-tight"><Building2 className="h-5 w-5 text-amber-600" /> Site-Specific Manager Assignments</DialogTitle>
             <DialogDescription className="text-xs font-medium">Assign alternative reporting managers for <strong>{overrideEngineer?.username}</strong> per project site.</DialogDescription>
           </DialogHeader>
           
@@ -774,7 +773,7 @@ export default function TeamMappingPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest px-1">Active Site Overrides</Label>
+              <Label className="text-[10px] font-black uppercase tracking-widest px-1">Active Site Specific Mappings</Label>
               <div className="border rounded-sm overflow-hidden bg-background shadow-sm">
                 <Table>
                   <TableHeader className="bg-muted/30">
@@ -797,14 +796,14 @@ export default function TeamMappingPage() {
                       </TableRow>
                     ))}
                     {!overrides?.some(o => o.engineerId === overrideEngineer?.id) && (
-                      <TableRow><TableCell colSpan={3} className="h-20 text-center text-xs text-muted-foreground italic font-medium uppercase opacity-40">No site-specific overrides defined.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={3} className="h-20 text-center text-xs text-muted-foreground italic font-medium uppercase opacity-40">No site-specific mappings defined.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
               </div>
             </div>
           </div>
-          <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Manager</Button></DialogClose></DialogFooter>
+          <DialogFooter className="p-4 bg-muted/5 border-t shrink-0"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Manager</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
 

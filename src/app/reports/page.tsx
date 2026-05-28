@@ -137,6 +137,13 @@ type Site = {
   name: string;
 };
 
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
+};
+
 type RecentActivity = {
   id: string;
   type: string;
@@ -176,23 +183,43 @@ export default function ReportsDashboard() {
   }, [firestore, user, isManager]);
   const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
   const accessibleSites = React.useMemo(() => {
     if (!allSitesList || !userProfile) return [];
     if (isAdmin) return Array.from(new Map(allSitesList.map(s => [s.name, s])).values());
     
-    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
-    if (isManager && teamMembers) {
-      teamMembers.forEach(member => {
-        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
+    // Strict Sovereignty Calculation for Reporting
+    const siteIds = new Set<string>();
+
+    if (isManager) {
+      // 1. Explicit Overrides
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => {
+        siteIds.add(o.siteId);
       });
+
+      // 2. Default Supervisory Access (if NOT overriden elsewhere)
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(sid => {
+            const otherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
+            if (!otherOverride) {
+              siteIds.add(sid);
+            }
+          });
+        });
+      }
+    } else {
+      (userProfile.assignedProjectIds || []).forEach(id => siteIds.add(id));
     }
 
-    return allSitesList.filter(s => assignedIds.has(s.id));
-  }, [allSitesList, userProfile, isAdmin, isManager, teamMembers]);
+    return allSitesList.filter(s => siteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSitesList, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const filteredSiteList = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
-  // Data Collections - Now ordered by date to ensure the "Latest" 500 actions are correct
+  // Data Collections
   const permitsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'permits_to_work');
@@ -459,7 +486,7 @@ export default function ReportsDashboard() {
         tasks: fTasks.length,
       }
     };
-  }, [isLoadingTotal, permits, dprs, movements, requirements, tasks, visits, installationChecklists, expenses, pos, wos, payments, redemptions, usersList, vehicleReqs, siteDocs, siteGroups, lmsCourses, lmsModules, selectedSite, timeRange, customStartDate, customEndDate, isAdmin]);
+  }, [isLoadingTotal, permits, dprs, movements, requirements, tasks, visits, installationChecklists, expenses, pos, wos, payments, redemptions, usersList, vehicleReqs, siteDocs, siteGroups, lmsCourses, lmsModules, selectedSite, timeRange, customStartDate, customEndDate, isAdmin, accessibleSites]);
 
   if (isLoadingTotal) return <div className="space-y-8 p-4"><Skeleton className="h-10 w-48" /><Skeleton className="h-4 w-96" /><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full rounded-sm" />)}</div></div>;
 

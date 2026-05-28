@@ -341,7 +341,7 @@ export default function ProfilePage() {
                 {userOverrides && userOverrides.length > 0 && (
                     <div className="border-t">
                         <div className="bg-amber-500/5 px-6 py-2 border-b">
-                            <span className="text-[8px] font-black uppercase tracking-widest text-amber-700">Allocated Site Supervisors</span>
+                            <span className="text-[8px] font-black uppercase tracking-widest text-amber-700">Site Specific Supervisors</span>
                         </div>
                         <div className="divide-y max-h-[200px] overflow-y-auto">
                             {userOverrides.map(override => {
@@ -351,9 +351,9 @@ export default function ProfilePage() {
                                     <div key={override.id} className="py-2.5 px-6 flex items-center justify-between hover:bg-muted/5 transition-colors">
                                         <div className="flex flex-col min-w-0">
                                             <span className="text-[10px] font-black text-foreground truncate">{site?.name || 'Unknown Site'}</span>
-                                            <span className="text-[9px] font-bold text-primary uppercase">{manager?.username || 'Override Manager'}</span>
+                                            <span className="text-[9px] font-bold text-primary uppercase">{manager?.username || 'Specific Manager'}</span>
                                         </div>
-                                        <Badge variant="outline" className="text-[7px] font-black uppercase h-3 px-1 border-amber-200 text-amber-700 bg-amber-50">Override</Badge>
+                                        <Badge variant="outline" className="text-[7px] font-black uppercase h-3 px-1 border-amber-200 text-amber-700 bg-amber-50">Specific</Badge>
                                     </div>
                                 );
                             })}
