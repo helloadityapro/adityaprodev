@@ -64,6 +64,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import imageCompression from 'browser-image-compression';
+import { Progress } from "@/components/ui/progress";
 
 type Site = { 
   id: string; 
@@ -131,6 +132,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const [newComment, setNewComment] = React.useState("");
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isExporting, setIsExporting] = React.useState(false);
+  const [generationProgress, setGenerationProgress] = React.useState(0);
   
   const [isUploadingDrawing, setIsUploadingDrawing] = React.useState(false);
   const [deletingDrawing, setDeletingDrawing] = React.useState<Site | null>(null);
@@ -284,6 +286,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const exportToPDF = async (items: InstallationChecklist[]) => {
     if (items.length === 0) return;
     setIsExporting(true);
+    setGenerationProgress(0);
     
     // Yield to let the loading state render
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -324,10 +327,12 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         const record = items[index];
         if (index > 0) doc.addPage();
         
-        // Yield every 3 records to prevent UI freezing on large batches
-        if (index > 0 && index % 3 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 10));
-        }
+        // Update progress
+        setGenerationProgress(Math.round(((index + 1) / items.length) * 100));
+
+        // Non-blocking yield to main thread to prevent UI freeze
+        // Process in small batches or per-item depending on complexity
+        await new Promise(resolve => setTimeout(resolve, 0));
 
         const margin = 15;
         let currY = 40;
@@ -466,6 +471,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       toast({ variant: 'destructive', title: 'Export Failed', description: error.message });
     } finally {
       setIsExporting(false);
+      setGenerationProgress(0);
     }
   };
 
@@ -585,10 +591,22 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       </div>
 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
+        <div className="flex flex-col gap-2 w-full sm:w-auto">
           <Button onClick={() => exportToPDF(filteredInst)} disabled={isExporting || filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5 flex-1 sm:flex-none">
-            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} {isExporting ? 'Generating...' : 'Export All (PDF)'}
+            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} {isExporting ? 'Generating Batch...' : 'Export All (PDF)'}
           </Button>
+          {isExporting && (
+            <div className="w-full sm:w-[200px] space-y-1.5 animate-in fade-in duration-300">
+              <div className="flex justify-between items-center text-[8px] font-black uppercase text-primary tracking-tighter">
+                <span>Rendering Pages</span>
+                <span>{generationProgress}%</span>
+              </div>
+              <Progress value={generationProgress} className="h-1 rounded-none" />
+            </div>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
           {site.drawingUrl ? (
             <div className="flex items-center gap-2 flex-1 sm:flex-none">
               <Button variant="outline" size="sm" asChild className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary/20 text-primary bg-primary/5 flex-1 sm:flex-none">
