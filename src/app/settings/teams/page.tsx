@@ -35,7 +35,8 @@ import {
   ChevronRight,
   Settings2,
   MapPin,
-  Save
+  Save,
+  Truck
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -326,7 +327,7 @@ export default function TeamMappingPage() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-11 rounded-sm bg-background border-primary/10 font-bold text-xs uppercase tracking-tight">
                     {selectedManagerId ? managers?.find(m => m.id === selectedManagerId)?.username : "Select Supervisor..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[300px] p-0" align="start">
@@ -353,7 +354,7 @@ export default function TeamMappingPage() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-11 rounded-sm bg-background border-primary/10 font-bold text-xs uppercase tracking-tight">
                     {selectedEngineerId ? engineers?.find(e => e.id === selectedEngineerId)?.username : "Select Engineer..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[300px] p-0" align="start">
@@ -417,6 +418,9 @@ export default function TeamMappingPage() {
                         </div>
                     </div>
                   </TableHead>
+                  <TableHead className="min-w-[200px] py-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest">Site Names</span>
+                  </TableHead>
                   <TableHead className="text-center w-24">
                     <div className="flex items-center justify-center gap-1 cursor-pointer py-2" onClick={() => handleSort('sites')}>
                         <span className="text-[10px] font-black uppercase tracking-widest">Sites</span>
@@ -469,6 +473,20 @@ export default function TeamMappingPage() {
                           <span className="text-[9px] font-medium text-muted-foreground truncate max-w-[180px]">{eng.email}</span>
                         </div>
                       </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1 max-w-[250px]">
+                          {eng.assignedProjectIds?.length ? eng.assignedProjectIds.map(sid => {
+                            const site = allSites?.find(s => s.id === sid);
+                            return (
+                              <Badge key={sid} variant="outline" className="text-[8px] h-4 px-1.5 border-primary/10 bg-primary/5 text-primary/70 font-bold uppercase whitespace-nowrap">
+                                {site?.name || 'Unknown Site'}
+                              </Badge>
+                            );
+                          }) : (
+                            <span className="text-[10px] text-muted-foreground/30 italic uppercase font-bold">No Sites</span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-center">
                         <Badge variant="outline" className="h-6 w-6 p-0 flex items-center justify-center rounded-sm font-mono font-black text-[10px] bg-primary/5 text-primary border-primary/20">
                           {eng.assignedProjectIds?.length || 0}
@@ -507,7 +525,7 @@ export default function TeamMappingPage() {
                     </TableRow>
                   );
                 }) : (
-                  <TableRow><TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic font-medium">No personnel mappings discovered.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="h-48 text-center text-muted-foreground italic font-medium">No personnel mappings discovered.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
