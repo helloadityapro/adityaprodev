@@ -142,7 +142,6 @@ export default function TableLevelMMSChecklistPage() {
     
     if (isImage || isHeic) {
       try {
-        // browser-image-compression handles HEIC to JPEG conversion automatically
         blob = await imageCompression(file, { 
           maxSizeMB: 1, 
           maxWidthOrHeight: 1920,
@@ -167,7 +166,6 @@ export default function TableLevelMMSChecklistPage() {
         reject, 
         async () => {
           const url = await getDownloadURL(uploadTask.snapshot.ref);
-          // If we converted it, the content type is now image/jpeg
           resolve({ 
             url, 
             contentType: isHeic ? 'image/jpeg' : blob.type, 
@@ -184,6 +182,26 @@ export default function TableLevelMMSChecklistPage() {
     setUploadProgress({});
 
     try {
+      const finalTableNumber = values.tableNumber.startsWith("T - ") ? values.tableNumber : `T - ${values.tableNumber}`;
+
+      // Restriction: Check for duplicate checklist for same table at same site
+      const duplicateQuery = query(
+        collection(firestore, 'installation_checklists'),
+        where('siteId', '==', values.siteId),
+        where('tableNumber', '==', finalTableNumber)
+      );
+      const duplicateSnap = await getDocs(duplicateQuery);
+      
+      if (!duplicateSnap.empty) {
+        toast({ 
+          variant: "destructive", 
+          title: "Duplicate Entry", 
+          description: `An audit for ${finalTableNumber} at this project site already exists in the registry.` 
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
       const timestamp = Date.now();
       const finalChecks: any[] = [];
 
@@ -214,8 +232,6 @@ export default function TableLevelMMSChecklistPage() {
           otherAttachments.push(uploaded);
         }
       }
-
-      const finalTableNumber = values.tableNumber.startsWith("T - ") ? values.tableNumber : `T - ${values.tableNumber}`;
 
       await addDocumentNonBlocking(collection(firestore, 'installation_checklists'), {
         siteId: values.siteId,
@@ -579,7 +595,7 @@ export default function TableLevelMMSChecklistPage() {
               )} />
 
               {watchRepPresent === "Yes" && (
-                <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="space-y-4 animate-in fade-in duration-300">
                   <FormField control={form.control} name="customerRepName" render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Representative Name</FormLabel>

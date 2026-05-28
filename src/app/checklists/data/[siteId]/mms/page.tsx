@@ -291,12 +291,10 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     setIsExporting(true);
     setGenerationProgress(0);
     
-    // Sort items by table number ascending for the export regardless of UI sort
     const sortedItems = [...items].sort((a, b) => 
       a.tableNumber.localeCompare(b.tableNumber, undefined, { numeric: true, sensitivity: 'base' })
     );
 
-    // Yield to let the loading state render
     await new Promise(resolve => setTimeout(resolve, 100));
 
     try {
@@ -304,10 +302,9 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       const doc = new jsPDF('p', 'mm', 'a4');
       const logoUrl = '/icon.png';
 
-      // Load logo once to get properties
       let logoProps: any = null;
       try {
-        logoProps = doc.getImageProperties(logoUrl);
+        logoProps = await doc.getImageProperties(logoUrl);
       } catch (e) {
         console.warn("Logo load failed", e);
       }
@@ -327,7 +324,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           const y = startY + (areaSize - renderH) / 2;
           pdfDoc.addImage(logoUrl, 'PNG', x, y, renderW, renderH);
         } catch (e) {
-          pdfDoc.addImage(logoUrl, 'PNG', 175, 4, 26, 40);
+          pdfDoc.addImage(logoUrl, 'PNG', 175, 10, 25, 25);
         }
       };
       
@@ -335,10 +332,8 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         const record = sortedItems[index];
         if (index > 0) doc.addPage();
         
-        // Update progress
         setGenerationProgress(Math.round(((index + 1) / sortedItems.length) * 100));
 
-        // Non-blocking yield to main thread to prevent UI freeze
         await new Promise(resolve => setTimeout(resolve, 0));
 
         const margin = 15;
@@ -370,7 +365,8 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         drawRow('NUMBER OF MODULES', String(record.moduleCount || '—'));
 
         currY += 5;
-        const col1 = 55; const col2 = 85; const col3 = 40;
+        // Adjusted column widths to align with labels above (65mm for col1)
+        const col1 = 65; const col2 = 80; const col3 = 35;
         doc.setFont('helvetica', 'bold');
         doc.rect(margin, currY, col1, rowHeight);
         doc.text('CHECKS/ AUTHORITIES', margin + 2, currY + 5.5);
