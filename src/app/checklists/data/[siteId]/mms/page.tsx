@@ -120,7 +120,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const router = useRouter();
   
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [auditSortConfig, setAuditSortConfig] = React.useState<{ key: AuditSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+  const [auditSortConfig, setAuditSortConfig] = React.useState<{ key: AuditSortKey; direction: 'asc' | 'desc' }>({ key: 'table', direction: 'asc' });
   
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -196,15 +196,18 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
 
     result.sort((a, b) => {
       const { key, direction } = auditSortConfig;
+
+      if (key === 'table') {
+        const comparison = a.tableNumber.localeCompare(b.tableNumber, undefined, { numeric: true, sensitivity: 'base' });
+        return direction === 'asc' ? comparison : -comparison;
+      }
+
       let valA: any = '';
       let valB: any = '';
 
       if (key === 'date') {
         valA = a.createdAt?.toDate?.()?.getTime() || 0;
         valB = b.createdAt?.toDate?.()?.getTime() || 0;
-      } else if (key === 'table') {
-        valA = a.tableNumber.toLowerCase();
-        valB = b.tableNumber.toLowerCase();
       } else if (key === 'user') {
         valA = a.userName.toLowerCase();
         valB = b.userName.toLowerCase();
@@ -288,6 +291,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     setIsExporting(true);
     setGenerationProgress(0);
     
+    // Sort items by table number ascending for the export regardless of UI sort
+    const sortedItems = [...items].sort((a, b) => 
+      a.tableNumber.localeCompare(b.tableNumber, undefined, { numeric: true, sensitivity: 'base' })
+    );
+
     // Yield to let the loading state render
     await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -323,15 +331,14 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         }
       };
       
-      for (let index = 0; index < items.length; index++) {
-        const record = items[index];
+      for (let index = 0; index < sortedItems.length; index++) {
+        const record = sortedItems[index];
         if (index > 0) doc.addPage();
         
         // Update progress
-        setGenerationProgress(Math.round(((index + 1) / items.length) * 100));
+        setGenerationProgress(Math.round(((index + 1) / sortedItems.length) * 100));
 
         // Non-blocking yield to main thread to prevent UI freeze
-        // Process in small batches or per-item depending on complexity
         await new Promise(resolve => setTimeout(resolve, 0));
 
         const margin = 15;
@@ -462,7 +469,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         doc.rect(margin + colWidthLabel, currY, colWidthValue, extH);
         doc.text(extLines, margin + colWidthLabel + 2, currY + 5.5);
       }
-      doc.save(`AdityaPro_MMS_Audit_Batch_${items[0].siteName.replace(/\s+/g, '_')}.pdf`);
+      doc.save(`AdityaPro_MMS_Audit_Batch_${sortedItems[0].siteName.replace(/\s+/g, '_')}.pdf`);
       toast({ 
         title: 'Exported successfully', 
         description: 'If the file does not download, please visit https://adityapro.in/ to download it.' 
