@@ -25,6 +25,7 @@ import {
   ImageIcon,
   Maximize2,
   ArrowLeft,
+  ArrowRight,
   Film,
   PlayCircle,
   ZoomIn,
