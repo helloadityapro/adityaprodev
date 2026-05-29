@@ -504,7 +504,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
 
   React.useEffect(() => {
     if (!viewFile) return;
-    const name = viewFile.name.toLowerCase();
+    const name = (viewFile.name || "").toLowerCase();
     if (name.endsWith('.heic') || name.endsWith('.heif')) {
       const convertHeic = async () => {
         setIsHeicConverting(true);
@@ -512,9 +512,18 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           const response = await fetch(viewFile.url, { mode: 'cors' });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const blob = await response.blob();
-          const convertedBlob = await imageCompression(blob, { maxSizeMB: 2, maxWidthOrHeight: 1920, initialQuality: 0.9, type: 'image/jpeg' });
+          const convertedBlob = await imageCompression(blob, { 
+            maxSizeMB: 2, 
+            maxWidthOrHeight: 1920, 
+            initialQuality: 0.9, 
+            fileType: 'image/jpeg' 
+          });
           setConvertedHeicUrl(URL.createObjectURL(convertedBlob));
-        } catch (e) { console.error(e); } finally { setIsHeicConverting(false); }
+        } catch (e) { 
+          console.error("HEIC conversion failed:", e); 
+        } finally { 
+          setIsHeicConverting(false); 
+        }
       };
       convertHeic();
     }

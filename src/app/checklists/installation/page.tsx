@@ -146,7 +146,8 @@ export default function TableLevelMMSChecklistPage() {
           maxSizeMB: 1, 
           maxWidthOrHeight: 1920,
           alwaysKeepResolution: true,
-          initialQuality: 0.8
+          initialQuality: 0.8,
+          fileType: 'image/jpeg' // Force conversion to JPEG for universal browser support
         });
       } catch (e) {
         console.warn("Compression skipped", e);
@@ -168,7 +169,7 @@ export default function TableLevelMMSChecklistPage() {
           const url = await getDownloadURL(uploadTask.snapshot.ref);
           resolve({ 
             url, 
-            contentType: isHeic ? 'image/jpeg' : blob.type, 
+            contentType: isHeic ? 'image/jpeg' : (blob.type || 'image/jpeg'), 
             name: isHeic ? file.name.replace(/\.(heic|heif)$/i, '.jpg') : file.name 
           });
         }
