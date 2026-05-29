@@ -45,7 +45,8 @@ import {
   Plus,
   FileText,
   MoreVertical,
-  ChevronRight
+  ChevronRight,
+  ListFilter
 } from 'lucide-react';
 import { format, subDays, subMonths } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -365,7 +366,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         drawRow('NUMBER OF MODULES', String(record.moduleCount || '—'));
 
         currY += 5;
-        // Adjusted column widths to align with labels above (65mm for col1)
         const col1 = 65; const col2 = 80; const col3 = 35;
         doc.setFont('helvetica', 'bold');
         doc.rect(margin, currY, col1, rowHeight);
@@ -574,6 +574,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     } finally { setIsProcessing(false); }
   };
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setDateFilter("7days");
+  };
+
   if (isProfileLoading || siteLoading || instLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
@@ -594,121 +599,145 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             </h2>
             <p className="text-muted-foreground text-[8px] md:text-xs font-bold uppercase tracking-[0.2em]">{site.projectCompany}</p>
           </div>
-          <Badge variant="outline" className="h-8 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 bg-primary/5 text-primary px-4 shadow-sm shrink-0">
-            {filteredInst.length} Audits Filtered
-          </Badge>
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex flex-col gap-2 w-full sm:w-auto">
-          <Button onClick={() => exportToPDF(filteredInst)} disabled={isExporting || filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5 flex-1 sm:flex-none">
-            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} {isExporting ? 'Generating PDF...' : 'Export All (PDF)'}
+      <div className="flex flex-row items-center justify-between gap-4">
+        <div className="flex flex-row items-center gap-2">
+          <Button onClick={() => exportToPDF(filteredInst)} disabled={isExporting || filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5">
+            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} 
+            <span className="hidden sm:inline">Export All (PDF)</span>
+            <span className="sm:hidden">Export All</span>
           </Button>
-          {isExporting && (
-            <div className="w-full sm:w-[200px] space-y-1.5 animate-in fade-in duration-300">
-              <div className="flex justify-between items-center text-[8px] font-black uppercase text-primary tracking-tighter">
-                <span>Rendering Pages</span>
-                <span>{generationProgress}%</span>
-              </div>
-              <Progress value={generationProgress} className="h-1 rounded-none" />
-            </div>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
+
           {site.drawingUrl ? (
-            <div className="flex items-center gap-2 flex-1 sm:flex-none">
-              <Button variant="outline" size="sm" asChild className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary/20 text-primary bg-primary/5 flex-1 sm:flex-none">
-                <a href={site.drawingUrl} download target="_blank" rel="noopener noreferrer"><FileText className="h-3.5 w-3.5 mr-1.5" /> View Drawing</a>
+            <div className="flex items-center gap-1.5">
+              <Button variant="outline" size="sm" asChild className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary/20 text-primary bg-primary/5">
+                <a href={site.drawingUrl} download target="_blank" rel="noopener noreferrer">
+                  <FileText className="h-3.5 w-3.5 mr-1.5" /> 
+                  <span className="hidden sm:inline">View Drawing</span>
+                  <span className="sm:hidden">Drawing</span>
+                </a>
               </Button>
               {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/10" onClick={() => setDeletingDrawing(site)}><Trash2 className="h-4 w-4" /></Button>}
             </div>
           ) : (
-            <div className="relative flex-1 sm:flex-none">
+            <div className="relative">
               <input type="file" accept=".pdf" className="hidden" id="drawing-upload" onChange={handleDrawingUpload} disabled={isUploadingDrawing} />
-              <Button asChild disabled={isUploadingDrawing} className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-md px-4 bg-primary text-primary-foreground w-full sm:w-auto"><label htmlFor="drawing-upload" className="cursor-pointer flex items-center justify-center">{isUploadingDrawing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />} Add Drawing PDF</label></Button>
+              <Button asChild disabled={isUploadingDrawing} className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-md px-4 bg-primary text-primary-foreground">
+                <label htmlFor="drawing-upload" className="cursor-pointer flex items-center justify-center">
+                  {isUploadingDrawing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />} 
+                  Add Drawing
+                </label>
+              </Button>
             </div>
           )}
         </div>
+
+        {isExporting && (
+          <div className="w-[120px] sm:w-[200px] space-y-1.5 animate-in fade-in duration-300">
+            <div className="flex justify-between items-center text-[8px] font-black uppercase text-primary tracking-tighter">
+              <span>Rendering</span>
+              <span>{generationProgress}%</span>
+            </div>
+            <Progress value={generationProgress} className="h-1 rounded-none" />
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm">
-        <div className="md:col-span-2 space-y-1.5">
-          <Label className="text-[9px] md:text-[10px] font-black uppercase text-muted-foreground px-1">Search Table or Auditor</Label>
+      <div className="flex flex-row items-end gap-2 bg-card p-3 border border-primary/10 rounded-sm shadow-sm">
+        <div className="flex-1 space-y-1">
+          <Label className="text-[9px] font-black uppercase text-muted-foreground px-1 hidden xs:block">Search</Label>
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Filter..." className="pl-9 h-9 md:h-10 rounded-sm bg-background border-primary/10 text-xs" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input 
+              placeholder="Table / Auditor..." 
+              className="pl-8 h-9 rounded-sm bg-background border-primary/10 text-xs" 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+            />
           </div>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-[9px] md:text-[10px] font-black uppercase text-muted-foreground px-1">Time Range</Label>
+        <div className="w-[110px] sm:w-[160px] space-y-1 shrink-0">
+          <Label className="text-[9px] font-black uppercase text-muted-foreground px-1 hidden xs:block">Time Range</Label>
           <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="h-9 md:h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase"><Calendar className="h-3.5 w-3.5 mr-2 opacity-50" /><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
-              <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
-              <SelectItem value="allTime" className="text-xs font-bold uppercase">All Records</SelectItem>
-              <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom</SelectItem>
+              <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
+              <SelectItem value="7days" className="text-[10px] font-bold uppercase">Last 7 Days</SelectItem>
+              <SelectItem value="allTime" className="text-[10px] font-bold uppercase">All Records</SelectItem>
+              <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setDateFilter("7days"); }} className="h-9 md:h-10 w-9 md:w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10"><FilterX className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" onClick={clearFilters} className="h-9 w-9 shrink-0 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
+          <FilterX className="h-4 w-4" />
+        </Button>
       </div>
 
-      <div className="md:hidden space-y-3">
-        {filteredInst.map((record) => (
-          <Card key={record.id} className="rounded-xl border-primary/5 shadow-sm overflow-hidden bg-card cursor-pointer" onClick={() => setViewingInstallation(record)}>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="h-10 min-w-[3.5rem] px-3 rounded-lg bg-primary/5 text-primary border-none flex items-center justify-center font-black text-xs shrink-0 whitespace-nowrap">{record.tableNumber}</div>
-                <div className="flex flex-col min-w-0 gap-1">
-                  <div className="flex items-center gap-2 text-foreground font-bold"><User className="h-3 w-3 text-primary/60" /><span className="text-xs truncate">{record.userName}</span></div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium"><Calendar className="h-3 w-3" />{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</div>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-widest">
+            {filteredInst.length} {filteredInst.length === 1 ? 'Audit' : 'Audits'} Found
+          </span>
+        </div>
+
+        <div className="md:hidden space-y-3">
+          {filteredInst.map((record) => (
+            <Card key={record.id} className="rounded-xl border-primary/5 shadow-sm overflow-hidden bg-card cursor-pointer" onClick={() => setViewingInstallation(record)}>
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="h-10 min-w-[3.5rem] px-3 rounded-lg bg-primary/5 text-primary border-none flex items-center justify-center font-black text-xs shrink-0 whitespace-nowrap">{record.tableNumber}</div>
+                  <div className="flex flex-col min-w-0 gap-1">
+                    <div className="flex items-center gap-2 text-foreground font-bold"><User className="h-3 w-3 text-primary/60" /><span className="text-xs truncate">{record.userName}</span></div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium"><Calendar className="h-3 w-3" />{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-1 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" className="h-10 w-10 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-5 w-5" /></Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-xl">
-                    <DropdownMenuItem onClick={() => exportToPDF([record])} className="gap-2 cursor-pointer py-2.5"><FileDown className="h-4 w-4" /> Export PDF</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setCommentingRecord(record)} className="gap-2 cursor-pointer py-2.5"><MessageCircle className="h-4 w-4" /> Add Comment</DropdownMenuItem>
-                    {(isAdmin || record.userId === user?.uid) && <DropdownMenuItem onClick={() => setDeletingRecord(record)} className="gap-2 cursor-pointer py-2.5 text-destructive"><Trash2 className="h-4 w-4" /> Delete</DropdownMenuItem>}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <div className="flex items-center gap-1 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-10 w-10 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-5 w-5" /></Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-xl">
+                      <DropdownMenuItem onClick={() => exportToPDF([record])} className="gap-2 cursor-pointer py-2.5"><FileDown className="h-4 w-4" /> Export PDF</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setCommentingRecord(record)} className="gap-2 cursor-pointer py-2.5"><MessageCircle className="h-4 w-4" /> Add Comment</DropdownMenuItem>
+                      {(isAdmin || record.userId === user?.uid) && <DropdownMenuItem onClick={() => setDeletingRecord(record)} className="gap-2 cursor-pointer py-2.5 text-destructive"><Trash2 className="h-4 w-4" /> Delete</DropdownMenuItem>}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-      <Card className="hidden md:block rounded-sm border-primary/10 shadow-md overflow-hidden">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow>
-                <TableHead className="px-6 cursor-pointer" onClick={() => handleAuditSort('date')}><div className="flex items-center">Date & Time <AuditSortIcon column="date" /></div></TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleAuditSort('table')}><div className="flex items-center">Table Ref <AuditSortIcon column="table" /></div></TableHead>
-                <TableHead className="cursor-pointer" onClick={() => handleAuditSort('user')}><div className="flex items-center">Auditor <AuditSortIcon column="user" /></div></TableHead>
-                <TableHead className="text-center cursor-pointer" onClick={() => handleAuditSort('comments')}><div className="flex items-center justify-center">Comments <AuditSortIcon column="comments" /></div></TableHead>
-                <TableHead className="text-right px-6">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredInst.map((record) => (
-                <TableRow key={record.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setViewingInstallation(record)}>
-                  <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
-                  <TableCell><Badge variant="secondary" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10">{record.tableNumber}</Badge></TableCell>
-                  <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3 w-3 text-primary opacity-50" />{record.userName}</div></TableCell>
-                  <TableCell className="text-center"><button onClick={(e) => { e.stopPropagation(); setCommentingRecord(record); }} className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary inline-flex items-center px-3 rounded-sm transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {record.comments?.length || 0}</button></TableCell>
-                  <TableCell className="text-right px-6"><div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => exportToPDF([record])}><FileDown className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setCommentingRecord(record)}><MessageCircle className="h-4 w-4" /></Button>{(isAdmin || record.userId === user?.uid) && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>}</div></TableCell>
+        <Card className="hidden md:block rounded-sm border-primary/10 shadow-md overflow-hidden">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="px-6 cursor-pointer" onClick={() => handleAuditSort('date')}><div className="flex items-center">Date & Time <AuditSortIcon column="date" /></div></TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleAuditSort('table')}><div className="flex items-center">Table Ref <AuditSortIcon column="table" /></div></TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleAuditSort('user')}><div className="flex items-center">Auditor <AuditSortIcon column="user" /></div></TableHead>
+                  <TableHead className="text-center cursor-pointer" onClick={() => handleAuditSort('comments')}><div className="flex items-center justify-center">Comments <AuditSortIcon column="comments" /></div></TableHead>
+                  <TableHead className="text-right px-6">Action</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {filteredInst.map((record) => (
+                  <TableRow key={record.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setViewingInstallation(record)}>
+                    <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
+                    <TableCell><Badge variant="secondary" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10">{record.tableNumber}</Badge></TableCell>
+                    <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3 w-3 text-primary opacity-50" />{record.userName}</div></TableCell>
+                    <TableCell className="text-center"><button onClick={(e) => { e.stopPropagation(); setCommentingRecord(record); }} className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary inline-flex items-center px-3 rounded-sm transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {record.comments?.length || 0}</button></TableCell>
+                    <TableCell className="text-right px-6"><div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => exportToPDF([record])}><FileDown className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setCommentingRecord(record)}><MessageCircle className="h-4 w-4" /></Button>{(isAdmin || record.userId === user?.uid) && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>}</div></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={!!viewingInstallation} onOpenChange={(o) => !o && setViewingInstallation(null)}>
         <DialogContent className="max-w-4xl w-[98vw] h-[90vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
