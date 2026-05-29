@@ -586,11 +586,18 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         <Button variant="ghost" size="sm" onClick={() => router.push(`/checklists/data/${siteId}`)} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Hub
         </Button>
-        <h2 className="text-lg md:text-2xl font-black text-foreground uppercase tracking-tight flex items-center gap-2 md:gap-3 leading-tight">
-          <Building2 className="h-5 w-5 md:h-6 md:w-6 text-primary shrink-0" />
-          <span className="truncate">{site.name} : MMS Records</span>
-        </h2>
-        <p className="text-muted-foreground text-[8px] md:text-xs font-bold uppercase tracking-[0.2em]">{site.projectCompany}</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1 min-w-0">
+            <h2 className="text-lg md:text-2xl font-black text-foreground uppercase tracking-tight flex items-center gap-2 md:gap-3 leading-tight">
+              <Building2 className="h-5 w-5 md:h-6 md:w-6 text-primary shrink-0" />
+              <span className="truncate">{site.name} : MMS Records</span>
+            </h2>
+            <p className="text-muted-foreground text-[8px] md:text-xs font-bold uppercase tracking-[0.2em]">{site.projectCompany}</p>
+          </div>
+          <Badge variant="outline" className="h-8 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 bg-primary/5 text-primary px-4 shadow-sm shrink-0">
+            {filteredInst.length} Audits Filtered
+          </Badge>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
