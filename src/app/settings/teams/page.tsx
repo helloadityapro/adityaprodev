@@ -140,6 +140,7 @@ export default function TeamMappingPage() {
   // Table filter states
   const [tableEngineerSearch, setTableEngineerSearch] = React.useState('');
   const [tableManagerSearch, setTableManagerSearch] = React.useState('');
+  const [tableSiteSearch, setTableSiteSearch] = React.useState('');
 
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
 
@@ -270,7 +271,12 @@ export default function TeamMappingPage() {
         const manager = managers.find(m => m.id === e.siteManagerId);
         const matchesEngineer = (e.username || '').toLowerCase().includes(tableEngineerSearch.toLowerCase());
         const matchesManager = (manager?.username || '').toLowerCase().includes(tableManagerSearch.toLowerCase());
-        return matchesEngineer && matchesManager;
+        
+        // Filter by assigned site names
+        const engineerSites = e.assignedProjectIds?.map(sid => allSites?.find(s => s.id === sid)?.name || '') || [];
+        const matchesSite = tableSiteSearch === '' || engineerSites.some(name => name.toLowerCase().includes(tableSiteSearch.toLowerCase()));
+        
+        return matchesEngineer && matchesManager && matchesSite;
       })
       .sort((a, b) => {
         const { key, direction } = sortConfig;
@@ -284,7 +290,7 @@ export default function TeamMappingPage() {
         if (valA > valB) return direction === 'asc' ? 1 : -1;
         return 0;
       });
-  }, [engineers, managers, tableEngineerSearch, tableManagerSearch, sortConfig]);
+  }, [engineers, managers, allSites, tableEngineerSearch, tableManagerSearch, tableSiteSearch, sortConfig]);
 
   const availableSitesToAllot = React.useMemo(() => {
     if (!allSites) return [];
@@ -418,8 +424,16 @@ export default function TeamMappingPage() {
                         </div>
                     </div>
                   </TableHead>
-                  <TableHead className="min-w-[200px] py-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest">Site Names</span>
+                  <TableHead className="min-w-[250px]">
+                    <div className="flex flex-col gap-2 py-2">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest">Site Names</span>
+                        </div>
+                        <div className="relative">
+                            <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
+                            <Input placeholder="Filter sites..." className="h-8 pl-7 text-[10px] rounded-sm bg-background border-primary/10" value={tableSiteSearch} onChange={e => setTableSiteSearch(e.target.value)} />
+                        </div>
+                    </div>
                   </TableHead>
                   <TableHead className="text-center w-24">
                     <div className="flex items-center justify-center gap-1 cursor-pointer py-2" onClick={() => handleSort('sites')}>
