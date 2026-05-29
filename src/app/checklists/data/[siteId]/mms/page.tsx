@@ -577,6 +577,8 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const clearFilters = () => {
     setSearchTerm("");
     setDateFilter("7days");
+    setCustomStart(format(new Date(), 'yyyy-MM-dd'));
+    setCustomEnd(format(new Date(), 'yyyy-MM-dd'));
   };
 
   if (isProfileLoading || siteLoading || instLoading) {
@@ -645,36 +647,53 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         )}
       </div>
 
-      <div className="flex flex-row items-end gap-2 bg-card p-3 border border-primary/10 rounded-sm shadow-sm">
-        <div className="flex-1 space-y-1">
-          <Label className="text-[9px] font-black uppercase text-muted-foreground px-1 hidden xs:block">Search</Label>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-            <Input 
-              placeholder="Table / Auditor..." 
-              className="pl-8 h-9 rounded-sm bg-background border-primary/10 text-xs" 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-            />
+      <div className="flex flex-col gap-3 bg-card p-3 border border-primary/10 rounded-sm shadow-sm">
+        <div className="flex flex-row items-end gap-2">
+          <div className="flex-1 space-y-1">
+            <Label className="text-[9px] font-black uppercase text-muted-foreground px-1 hidden xs:block">Search</Label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input 
+                placeholder="Table / Auditor..." 
+                className="pl-8 h-9 rounded-sm bg-background border-primary/10 text-xs" 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+              />
+            </div>
           </div>
+          <div className="w-[110px] sm:w-[160px] space-y-1 shrink-0">
+            <Label className="text-[9px] font-black uppercase text-muted-foreground px-1 hidden xs:block">Time Range</Label>
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
+                <SelectItem value="yesterday" className="text-[10px] font-bold uppercase">Yesterday</SelectItem>
+                <SelectItem value="7days" className="text-[10px] font-bold uppercase">Last 7 Days</SelectItem>
+                <SelectItem value="allTime" className="text-[10px] font-bold uppercase">All Records</SelectItem>
+                <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-9 w-9 shrink-0 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
+            <FilterX className="h-4 w-4" />
+          </Button>
         </div>
-        <div className="w-[110px] sm:w-[160px] space-y-1 shrink-0">
-          <Label className="text-[9px] font-black uppercase text-muted-foreground px-1 hidden xs:block">Time Range</Label>
-          <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
-              <SelectItem value="7days" className="text-[10px] font-bold uppercase">Last 7 Days</SelectItem>
-              <SelectItem value="allTime" className="text-[10px] font-bold uppercase">All Records</SelectItem>
-              <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <Button variant="ghost" size="icon" onClick={clearFilters} className="h-9 w-9 shrink-0 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
-          <FilterX className="h-4 w-4" />
-        </Button>
+
+        {dateFilter === 'custom' && (
+          <div className="flex flex-row items-center gap-2 p-2 bg-primary/5 rounded-sm border border-primary/10 animate-in slide-in-from-top-2 duration-300">
+             <div className="flex-1 space-y-1">
+                <Label className="text-[8px] font-black uppercase text-primary tracking-widest px-1">Start Date</Label>
+                <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-8 text-[10px] rounded-none border-primary/20" />
+             </div>
+             <ArrowRight className="h-3 w-3 text-primary/40 mt-4 shrink-0" />
+             <div className="flex-1 space-y-1">
+                <Label className="text-[8px] font-black uppercase text-primary tracking-widest px-1">End Date</Label>
+                <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-8 text-[10px] rounded-none border-primary/20" />
+             </div>
+          </div>
+        )}
       </div>
 
       <div className="space-y-4">
