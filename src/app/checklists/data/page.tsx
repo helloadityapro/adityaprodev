@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -39,12 +40,15 @@ export default function ChecklistsDataProjectListPage() {
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
   const instQuery = useMemoFirebase(() => collection(firestore, 'installation_checklists'), [firestore]);
-  const { data: instRecords } = useCollection<any>(instQuery);
+  const { data: instRecords, isLoading: instRecordsLoading } = useCollection<any>(instQuery);
 
   const siteStats = React.useMemo(() => {
     const stats: Record<string, number> = {};
-    instRecords?.forEach(r => {
-      stats[r.siteId] = (stats[r.siteId] || 0) + 1;
+    if (!instRecords) return stats;
+    instRecords.forEach(r => {
+      if (r.siteId) {
+        stats[r.siteId] = (stats[r.siteId] || 0) + 1;
+      }
     });
     return stats;
   }, [instRecords]);
@@ -57,7 +61,10 @@ export default function ChecklistsDataProjectListPage() {
 
     // Apply search filter if any
     if (siteSearchQuery.trim() !== "") {
-      result = result.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
+      result = result.filter(s => 
+        s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()) ||
+        (s.projectCompany || '').toLowerCase().includes(siteSearchQuery.toLowerCase())
+      );
     }
 
     result.sort((a, b) => {
@@ -96,8 +103,20 @@ export default function ChecklistsDataProjectListPage() {
     return siteSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
-  if (sitesLoading) {
-    return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
+  if (sitesLoading || instRecordsLoading) {
+    return (
+      <div className="p-4 sm:p-8 space-y-6">
+        <div className="flex flex-col gap-1">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-4 w-96 mt-2" />
+        </div>
+        <div className="space-y-4">
+          <Skeleton className="h-20 w-full rounded-sm" />
+          <Skeleton className="h-20 w-full rounded-sm" />
+          <Skeleton className="h-20 w-full rounded-sm" />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -114,7 +133,7 @@ export default function ChecklistsDataProjectListPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search projects..." 
+              placeholder="Search projects or companies..." 
               className="pl-10 h-10 md:h-11 rounded-sm bg-background border-primary/10 text-sm"
               value={siteSearchQuery}
               onChange={e => setSiteSearchQuery(e.target.value)}
@@ -136,19 +155,19 @@ export default function ChecklistsDataProjectListPage() {
                     className="rounded-sm border-primary/10 shadow-sm active:bg-muted/5 transition-colors cursor-pointer"
                     onClick={() => router.push(`/checklists/data/${site.id}`)}
                   >
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-sm text-primary">
+                    <CardContent className="p-4 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0">
                           <Building2 className="h-5 w-5" />
                         </div>
                         <div className="flex flex-col min-w-0">
-                          <span className="font-bold text-sm text-foreground truncate">{site.name}</span>
-                          <span className="text-[9px] uppercase font-black text-muted-foreground truncate">{site.projectCompany}</span>
+                          <span className="font-bold text-sm text-foreground break-words leading-tight">{site.name}</span>
+                          <span className="text-[9px] uppercase font-black text-muted-foreground break-words mt-1">{site.projectCompany}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 shrink-0 ml-4">
+                      <div className="flex items-center gap-2 shrink-0 ml-auto">
                         <Badge variant="outline" className="rounded-sm h-6 px-2 text-[9px] font-bold border-primary/10 bg-primary/5 text-primary">
-                          {count} Audits
+                          {count}
                         </Badge>
                         <ChevronRight className="h-4 w-4 text-muted-foreground/30" />
                       </div>
@@ -194,13 +213,13 @@ export default function ChecklistsDataProjectListPage() {
                           onClick={() => router.push(`/checklists/data/${site.id}`)}
                         >
                           <TableCell className="px-6 py-4">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{site.name}</span>
-                              <span className="text-[10px] md:hidden uppercase font-black text-muted-foreground">{site.projectCompany}</span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors break-words leading-tight">{site.name}</span>
+                              <span className="text-[10px] md:hidden uppercase font-black text-muted-foreground break-words mt-1">{site.projectCompany}</span>
                             </div>
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
-                            <span className="text-[10px] uppercase font-black text-muted-foreground">{site.projectCompany}</span>
+                            <span className="text-[10px] uppercase font-black text-muted-foreground break-words">{site.projectCompany}</span>
                           </TableCell>
                           <TableCell className="text-center">
                             <Badge variant="outline" className="rounded-sm h-6 px-2 text-[10px] font-bold border-primary/10 bg-primary/5 text-primary">

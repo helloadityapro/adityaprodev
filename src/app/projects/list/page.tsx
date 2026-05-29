@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -147,9 +148,17 @@ export default function ProjectsListPage() {
 
   if (isProfileLoading || sitesLoading || groupsLoading) {
     return (
-      <div className="space-y-8 p-4">
-        <Skeleton className="h-12 w-64" />
-        <Skeleton className="h-96 w-full" />
+      <div className="space-y-8 p-4 sm:p-8">
+        <div className="flex flex-col gap-1">
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-4 w-96 mt-2" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Skeleton className="h-24 w-full rounded-sm" />
+          <Skeleton className="h-24 w-full rounded-sm" />
+          <Skeleton className="h-24 w-full rounded-sm" />
+        </div>
+        <Skeleton className="h-96 w-full rounded-sm" />
       </div>
     );
   }
@@ -298,14 +307,16 @@ export default function ProjectsListPage() {
                           </Button>
                         </TableCell>
                         <TableCell className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-sm text-primary">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0">
                               <Building2 className="h-4 w-4" />
                             </div>
-                            <span className="font-bold text-sm text-foreground">{site.name}</span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors break-words leading-tight">{site.name}</span>
+                            </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs font-medium text-muted-foreground">{site.projectCompany}</TableCell>
+                        <TableCell className="text-xs font-medium text-muted-foreground break-words max-w-[200px]">{site.projectCompany}</TableCell>
                         <TableCell className="text-center font-mono text-xs font-bold text-primary">
                           {formatCapacity(site.acCapacity)} MW
                         </TableCell>
@@ -342,12 +353,12 @@ export default function ProjectsListPage() {
               <CardContent className="p-4 space-y-4">
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 bg-primary/10 rounded-sm text-primary">
+                    <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0">
                       <Building2 className="h-5 w-5" />
                     </div>
                     <div className="flex flex-col min-w-0">
-                      <h3 className="font-bold text-sm leading-tight text-foreground truncate">{site.name}</h3>
-                      <span className="text-[10px] text-muted-foreground uppercase font-black tracking-tight truncate">{site.projectCompany}</span>
+                      <h3 className="font-bold text-sm leading-tight text-foreground break-words">{site.name}</h3>
+                      <span className="text-[10px] text-muted-foreground uppercase font-black tracking-tight break-words mt-1">{site.projectCompany}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -385,4 +396,3 @@ export default function ProjectsListPage() {
     </div>
   );
 }
-
