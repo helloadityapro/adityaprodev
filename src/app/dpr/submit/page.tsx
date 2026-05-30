@@ -77,7 +77,6 @@ export default function SubmitDPRPage() {
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
   const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
 
-  // Fetch team members for managers to aggregate sites
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
     return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
@@ -90,23 +89,20 @@ export default function SubmitDPRPage() {
         return Array.from(new Map(allSites.map(s => [s.name, s])).values());
     }
     
-    // Strict Dynamics
-    const siteIds = new Set<string>();
-
+    // Sovereignty Logic
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
     if (isManager) {
-      // 1. Overrides
       allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
-      // 2. Team Defaults (if not overridden)
-      teamMembers?.forEach(member => {
-        (member.assignedProjectIds || []).forEach(sid => {
-          const otherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
-          if (!otherOverride) siteIds.add(sid);
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(id => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
+            if (!hasOtherOverride) siteIds.add(id);
+          });
         });
-      });
-    } else {
-      (userProfile.assignedProjectIds || []).forEach(id => siteIds.add(id));
+      }
     }
-
+    
     const filtered = allSites.filter(s => siteIds.has(s.id));
     return Array.from(new Map(filtered.map(s => [s.name, s])).values());
   }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
@@ -138,7 +134,6 @@ export default function SubmitDPRPage() {
       const combinedDescription = values.updates.map(u => u.value.trim()).join('\n\n');
       const siteId = accessibleSites.find(s => s.name === values.siteName)?.id;
 
-      // Site-Specific Manager Lookup (Override Logic)
       const overridesQuery = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', siteId || '')));
       const overridesSnap = await getDocs(overridesQuery);
       const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
@@ -154,7 +149,6 @@ export default function SubmitDPRPage() {
         createdAt: serverTimestamp(),
       });
 
-      // Notify Manager
       if (effectiveSiteManagerId && effectiveSiteManagerId !== user.uid) {
         sendNotification(firestore, {
           userId: effectiveSiteManagerId,
@@ -164,7 +158,6 @@ export default function SubmitDPRPage() {
         });
       }
 
-      // Notify All Admins
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
@@ -177,17 +170,14 @@ export default function SubmitDPRPage() {
         });
       });
 
-      // Reward Points Logic for DPR
       const rateEngineer = rewardSettings?.dprEngineer ?? 1.0;
       const rateManager = rewardSettings?.dprManager ?? 0.25;
       const multiplier = userProfile.pointsMultiplier || 1;
       
-      // 1. Award Engineer
       updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
         totalPoints: increment(rateEngineer * multiplier)
       });
 
-      // 2. Award Manager (Inheritance)
       if (effectiveSiteManagerId && effectiveSiteManagerId !== user.uid) {
         updateDocumentNonBlocking(doc(firestore, 'users', effectiveSiteManagerId), {
             totalPoints: increment(rateManager)

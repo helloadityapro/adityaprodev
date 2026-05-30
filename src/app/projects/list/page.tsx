@@ -1,9 +1,8 @@
-
 'use client';
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, doc, arrayUnion, arrayRemove, query, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +57,13 @@ type UserProfile = {
   ownDataOnly?: boolean;
 };
 
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
+};
+
 const formatCapacity = (val: any) => {
   const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
   return isNaN(num) ? "0.000" : num.toFixed(3);
@@ -79,12 +85,22 @@ export default function ProjectsListPage() {
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === "Admin";
+  const isManager = userProfile?.role === "Site Manager";
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
   const groupsQuery = useMemoFirebase(() => collection(firestore, 'site_groups'), [firestore]);
   const { data: groups, isLoading: groupsLoading } = useCollection<any>(groupsQuery);
+
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
   const starredIds = React.useMemo(() => new Set(userProfile?.starredProjectIds || []), [userProfile]);
 
@@ -102,21 +118,30 @@ export default function ProjectsListPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
+    if (isSuper || isAdmin) return allSites;
     
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+      : roleConfigs?.find(c => c.id === (userProfile.role ? userProfile.role.toLowerCase().replace(/\s+/g, '-') : 'none'))?.ownDataOnly ?? false;
 
-    if (isSuper) return allSites;
+    if (!isOwnDataOnly) return allSites;
 
-    let list = allSites;
-    if (isOwnDataOnly) {
-      const assignedIds = new Set(userProfile.assignedProjectIds || []);
-      list = allSites.filter(s => assignedIds.has(s.id));
+    // Sovereignty Logic
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager) {
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(id => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
+            if (!hasOtherOverride) siteIds.add(id);
+          });
+        });
+      }
     }
     
-    return list;
-  }, [allSites, userProfile, roleConfigs, isSuper]);
+    return allSites.filter(s => siteIds.has(s.id));
+  }, [allSites, userProfile, roleConfigs, isSuper, isAdmin, isManager, teamMembers, allOverrides]);
 
   const filteredSites = React.useMemo(() => {
     let result = accessibleSites.filter(s => {
@@ -126,7 +151,6 @@ export default function ProjectsListPage() {
       return matchesSearch && matchesStarred;
     });
 
-    // Apply Group Filtering
     if (selectedGroupIds.length > 0) {
       const allowedSiteIds = new Set<string>();
       groups?.filter(g => selectedGroupIds.includes(g.id)).forEach(g => {
@@ -146,7 +170,7 @@ export default function ProjectsListPage() {
     };
   }, [filteredSites]);
 
-  if (isProfileLoading || sitesLoading || groupsLoading) {
+  if (isProfileLoading || sitesLoading || groupsLoading || overridesLoading) {
     return (
       <div className="space-y-8 p-4 sm:p-8">
         <div className="flex flex-col gap-1">
@@ -174,7 +198,6 @@ export default function ProjectsListPage() {
         <p className="text-muted-foreground text-sm font-medium">Monitoring site assets, Bill of Materials, and inventory compliance.</p>
       </div>
 
-      {/* Analytics Bar - Synchronized with /projects/add layout */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in slide-in-from-top-2 duration-300">
         <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
           <div className="space-y-0.5">
@@ -215,7 +238,6 @@ export default function ProjectsListPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* Group Multi-select Filter */}
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="h-11 rounded-sm font-bold border-primary/20 text-primary bg-background shadow-sm px-4 gap-1.5 min-w-[160px]">
@@ -243,14 +265,8 @@ export default function ProjectsListPage() {
                         <span className="text-xs font-bold uppercase truncate">{group.name}</span>
                       </div>
                     ))}
-                    {(!groups || groups.length === 0) && (
-                      <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground opacity-30">No groups registered</div>
-                    )}
                   </div>
                 </ScrollArea>
-                {selectedGroupIds.length > 0 && (
-                  <Button variant="ghost" onClick={() => setSelectedGroupIds([])} className="w-full rounded-none h-9 text-[9px] font-black uppercase text-primary border-t hover:bg-primary/5">Clear Selection</Button>
-                )}
               </PopoverContent>
             </Popover>
 
@@ -258,10 +274,7 @@ export default function ProjectsListPage() {
               variant={showStarredOnly ? "default" : "outline"} 
               size="sm" 
               onClick={() => setShowStarredOnly(!showStarredOnly)}
-              className={cn(
-                "h-11 rounded-sm font-bold px-6",
-                showStarredOnly ? "" : "text-primary border-primary/20 hover:bg-primary/5"
-              )}
+              className={cn("h-11 rounded-sm font-bold px-6", showStarredOnly ? "" : "text-primary border-primary/20 hover:bg-primary/5")}
             >
               <Star className={cn("h-4 w-4 mr-2", showStarredOnly && "fill-current")} />
               {showStarredOnly ? "Starred Projects" : "View Starred"}
@@ -274,7 +287,6 @@ export default function ProjectsListPage() {
         </div>
       </div>
 
-      {/* Desktop Table View */}
       <div className="hidden md:block">
         <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
           <CardContent className="p-0">
@@ -296,102 +308,28 @@ export default function ProjectsListPage() {
                     return (
                       <TableRow key={site.id} className="hover:bg-muted/5 transition-colors group">
                         <TableCell className="text-center pl-4">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 rounded-sm hover:bg-primary/5" 
-                            onClick={(e) => toggleStar(e, site.id)}
-                            title={isStarred ? "Unstar" : "Star"}
-                          >
-                            <Star className={cn("h-4 w-4 transition-all", isStarred ? "fill-primary text-primary scale-110" : "text-muted-foreground/30 group-hover:text-primary/40")} />
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => toggleStar(e, site.id)}>
+                            <Star className={cn("h-4 w-4 transition-all", isStarred ? "fill-primary text-primary scale-110" : "text-muted-foreground/30")} />
                           </Button>
                         </TableCell>
                         <TableCell className="px-6 py-4">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0">
-                              <Building2 className="h-4 w-4" />
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="font-bold text-sm text-foreground group-hover:text-primary transition-colors break-words leading-tight">{site.name}</span>
-                            </div>
+                            <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0"><Building2 className="h-4 w-4" /></div>
+                            <span className="font-bold text-sm text-foreground break-words leading-tight">{site.name}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-xs font-medium text-muted-foreground break-words max-w-[200px]">{site.projectCompany}</TableCell>
-                        <TableCell className="text-center font-mono text-xs font-bold text-primary">
-                          {formatCapacity(site.acCapacity)} MW
-                        </TableCell>
-                        <TableCell className="text-center font-mono text-xs font-bold text-amber-600">
-                          {formatCapacity(site.dcCapacity)} MWp
-                        </TableCell>
-                        <TableCell className="text-right px-6">
-                          <Button asChild size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-primary group-hover:bg-primary/90">
-                            <Link href={`/projects/${site.id}`}>
-                              Manage Site <ArrowRight className="ml-1.5 h-3 w-3" />
-                            </Link>
-                          </Button>
-                        </TableCell>
+                        <TableCell className="text-center font-mono text-xs font-bold text-primary">{formatCapacity(site.acCapacity)} MW</TableCell>
+                        <TableCell className="text-center font-mono text-xs font-bold text-amber-600">{formatCapacity(site.dcCapacity)} MWp</TableCell>
+                        <TableCell className="text-right px-6"><Button asChild size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-primary"><Link href={`/projects/${site.id}`}>Manage Site <ArrowRight className="ml-1.5 h-3 w-3" /></Link></Button></TableCell>
                       </TableRow>
                     );
-                  }) : (
-                    <TableRow>
-                      <TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No matching projects discovered</TableCell>
-                    </TableRow>
-                  )}
+                  }) : <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No matching projects discovered</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Mobile-Responsive Card List */}
-      <div className="md:hidden space-y-4">
-        {filteredSites.length > 0 ? filteredSites.map((site) => {
-          const isStarred = starredIds.has(site.id);
-          return (
-            <Card key={site.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => router.push(`/projects/${site.id}`)}>
-              <CardContent className="p-4 space-y-4">
-                <div className="flex justify-between items-start gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0">
-                      <Building2 className="h-5 w-5" />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <h3 className="font-bold text-sm leading-tight text-foreground break-words">{site.name}</h3>
-                      <span className="text-[10px] text-muted-foreground uppercase font-black tracking-tight break-words mt-1">{site.projectCompany}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 rounded-sm" 
-                      onClick={(e) => toggleStar(e, site.id)}
-                    >
-                      <Star className={cn("h-5 w-5 transition-all", isStarred ? "fill-primary text-primary scale-110" : "text-muted-foreground/30")} />
-                    </Button>
-                    <ArrowRight className="h-4 w-4 text-primary shrink-0" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-2 bg-muted/30 rounded-sm border border-primary/5">
-                    <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-0.5">AC Cap</p>
-                    <p className="text-xs font-black text-primary font-mono">{formatCapacity(site.acCapacity)} MW</p>
-                  </div>
-                  <div className="p-2 bg-muted/30 rounded-sm border border-primary/5">
-                    <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-0.5">DC Cap</p>
-                    <p className="text-xs font-black text-amber-600 font-mono">{formatCapacity(site.dcCapacity)} MWp</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        }) : (
-          <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-            {showStarredOnly ? "You haven't starred any projects yet." : "No projects found matching your search."}
-          </div>
-        )}
       </div>
     </div>
   );

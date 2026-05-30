@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -51,6 +50,13 @@ type UserProfile = {
   siteManagerId?: string;
 };
 
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
+};
+
 export default function RecordUtilisationPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -58,12 +64,22 @@ export default function RecordUtilisationPage() {
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
+
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
@@ -93,8 +109,6 @@ export default function RecordUtilisationPage() {
   React.useEffect(() => {
     if (selectedSiteId) {
       const fetchAvailable = async () => {
-        // Updated: Removed the inequality filter (stockLevel > 0) to avoid composite index requirement.
-        // We now filter the results in-memory.
         const q = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId));
         const snap = await getDocs(q);
         const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem));
@@ -116,12 +130,10 @@ export default function RecordUtilisationPage() {
 
     setIsSubmitting(true);
     try {
-      // Site-Specific Manager Lookup (Override Logic)
       const overridesQuery = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', values.siteId)));
       const overridesSnap = await getDocs(overridesQuery);
       const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
 
-      // 1. Log Utilisation Record
       await addDocumentNonBlocking(collection(firestore, 'material_utilisations'), {
         ...values,
         unit: selectedItem.unit,
@@ -131,7 +143,6 @@ export default function RecordUtilisationPage() {
         createdAt: serverTimestamp()
       });
 
-      // 2. Update Inventory (Decrement Stock, Increment Utilised)
       const invRef = doc(firestore, 'project_inventory', selectedItem.id);
       updateDocumentNonBlocking(invRef, {
         stockLevel: increment(-values.quantity),
@@ -151,9 +162,23 @@ export default function RecordUtilisationPage() {
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
     if (isAdmin) return allSites;
-    const assignedIds = new Set(userProfile.assignedProjectIds || []);
-    return allSites.filter(s => assignedIds.has(s.id));
-  }, [allSites, userProfile, isAdmin]);
+
+    // Sovereignty Logic
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager) {
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(id => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
+            if (!hasOtherOverride) siteIds.add(id);
+          });
+        });
+      }
+    }
+
+    return allSites.filter(s => siteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
   const filteredMaterials = availableMaterials.filter(m => m.itemName.toLowerCase().includes(itemSearchQuery.toLowerCase()));
@@ -267,8 +292,8 @@ export default function RecordUtilisationPage() {
               )} />
 
               {selectedItem && (
-                <div className="p-4 bg-primary/5 rounded-sm border border-primary/10 flex items-center gap-3">
-                  <AlertCircle className="h-5 w-5 text-primary shrink-0" />
+                <div className="p-4 bg-primary/5 rounded-sm border border-primary/10 flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Submitting this will reduce available <strong>{selectedItem.itemName}</strong> stock by <strong>{form.watch('quantity')} {selectedItem.unit}</strong> and mark it as utilised.
                   </p>

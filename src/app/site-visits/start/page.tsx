@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -10,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Check, ChevronsUpDown, Loader2, Navigation, MapPin, AlertCircle, UserCircle2 } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, Navigation, MapPin, AlertCircle, UserCircle2, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +22,21 @@ type Site = {
   name: string;
 };
 
+type UserProfile = {
+  id: string;
+  username: string;
+  role: string;
+  siteManagerId?: string;
+  assignedProjectIds?: string[];
+};
+
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
+};
+
 export default function StartSiteVisitPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -30,11 +44,21 @@ export default function StartSiteVisitPage() {
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
+
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
   const [selectedSite, setSelectedSite] = React.useState<Site | null>(null);
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
@@ -43,12 +67,24 @@ export default function StartSiteVisitPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-    // Admins and Super Admins can visit any site in the registry
     if (isAdmin) return allSites;
     
-    const assignedIds = userProfile.assignedProjectIds || [];
-    return allSites.filter(s => assignedIds.includes(s.id));
-  }, [allSites, userProfile, isAdmin]);
+    // Sovereignty Logic
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager) {
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(id => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
+            if (!hasOtherOverride) siteIds.add(id);
+          });
+        });
+      }
+    }
+    
+    return allSites.filter(s => siteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
@@ -82,7 +118,6 @@ export default function StartSiteVisitPage() {
     }
 
     try {
-      // Check for existing ongoing visits for the current user
       const ongoingQuery = query(
         collection(firestore, 'site_visits'), 
         where('managerId', '==', user.uid), 
@@ -114,7 +149,6 @@ export default function StartSiteVisitPage() {
         createdAt: serverTimestamp()
       });
 
-      // Notify Admins
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
@@ -189,7 +223,7 @@ export default function StartSiteVisitPage() {
                       <span className="truncate">{site.name}</span>
                     </Button>
                   )) : (
-                    <div className="p-4 text-center text-sm text-muted-foreground italic">No {isAdmin ? "" : "authorized"} sites found.</div>
+                    <div className="p-4 text-center text-sm text-muted-foreground italic">No authorized sites found.</div>
                   )}
                 </ScrollArea>
               </PopoverContent>

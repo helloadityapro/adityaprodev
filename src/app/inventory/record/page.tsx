@@ -90,6 +90,13 @@ type AccessConfig = {
   ownDataOnly?: boolean;
 };
 
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
+};
+
 export default function RecordMovementPage() {
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
@@ -105,12 +112,22 @@ export default function RecordMovementPage() {
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
+
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
@@ -148,16 +165,13 @@ export default function RecordMovementPage() {
 
   const selectedSiteId = React.useMemo(() => allSites?.find(s => s.name === watchSiteName)?.id, [allSites, watchSiteName]);
 
-  // Fetch contextual data when site changes
   React.useEffect(() => {
     if (selectedSiteId) {
       const fetchData = async () => {
-        // 1. Fetch approved BoM
         const bomQ = query(collection(firestore, 'project_boms'), where('siteId', '==', selectedSiteId), where('status', '==', 'Approved'));
         const bomSnap = await getDocs(bomQ);
         setApprovedBomItems(bomSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoMItem)));
 
-        // 2. Fetch approved POs for inward supplier restriction
         const poQ = query(collection(firestore, 'project_pos'), where('siteId', '==', selectedSiteId), where('status', '==', 'Accepted'));
         const poSnap = await getDocs(poQ);
         setApprovedPOs(poSnap.docs.map(d => ({ id: d.id, ...d.data() } as PurchaseOrder)));
@@ -166,7 +180,6 @@ export default function RecordMovementPage() {
     }
   }, [selectedSiteId, firestore]);
 
-  // Fetch source site inventory for transfers
   React.useEffect(() => {
     if (sourceOrDestinationType === 'Site' && watchSource) {
       const sourceSiteId = allSites?.find(s => s.name === watchSource)?.id;
@@ -181,7 +194,6 @@ export default function RecordMovementPage() {
     }
   }, [sourceOrDestinationType, watchSource, allSites, firestore]);
 
-  // Reset items if source changes
   React.useEffect(() => {
     form.setValue("items", [{ itemName: "", quantity: 0, unit: "Numbers" }]);
   }, [watchSource, sourceOrDestinationType, form]);
@@ -203,7 +215,6 @@ export default function RecordMovementPage() {
     let list: { name: string; unit: string; make: string }[] = [];
 
     if (movementType === 'Inward' && sourceOrDestinationType === 'Supplier') {
-      // Show only items from approved POs for this supplier
       const selectedSupplierId = allSuppliers?.find(s => s.name === watchSource)?.id;
       const supplierPOs = approvedPOs.filter(po => po.supplierId === selectedSupplierId);
       const itemNames = new Set<string>();
@@ -219,7 +230,6 @@ export default function RecordMovementPage() {
         }
       });
     } else if (sourceOrDestinationType === 'Site') {
-      // Show only items available in Source Site's inventory
       const sourceSiteName = movementType === 'Outward' ? watchSiteName : watchSource;
       const sourceSiteId = allSites?.find(s => s.name === sourceSiteName)?.id;
       
@@ -259,7 +269,6 @@ export default function RecordMovementPage() {
       const isTransfer = values.sourceOrDestinationType === 'Site';
       const status = isTransfer ? 'Pending' : 'Recorded';
 
-      // Find receiving manager for transfers
       let receivingManagerId = null;
       if (isTransfer) {
         const destSiteName = values.movementType === 'Outward' ? values.sourceOrDestination : values.siteName;
@@ -288,7 +297,6 @@ export default function RecordMovementPage() {
           createdAt: serverTimestamp()
         });
 
-        // Only update inventory immediately if NOT a transfer
         if (!isTransfer) {
           const invQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId), where('itemName', '==', item.itemName));
           const invSnap = await getDocs(invQuery);
@@ -329,17 +337,25 @@ export default function RecordMovementPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
-      ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
-
-    if (isSuper) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-    if (isOwnDataOnly || !isAdmin) {
-      const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
-      return allSites.filter(s => assignedIds.has(s.id));
+    if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+    
+    // Sovereignty Logic
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager) {
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(id => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
+            if (!hasOtherOverride) siteIds.add(id);
+          });
+        });
+      }
     }
-    return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-  }, [allSites, userProfile, isAdmin, isSuper, roleConfigs]);
+    
+    const filtered = allSites.filter(s => siteIds.has(s.id));
+    return Array.from(new Map(filtered.map(s => [s.name, s])).values());
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
@@ -541,7 +557,7 @@ export default function RecordMovementPage() {
                       )} />
                       <div className="grid grid-cols-2 gap-4">
                         <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 bg-background font-mono" /></FormControl><FormMessage /></FormItem>)} />
-                        <FormItem><FormLabel>Unit</FormLabel><Input readOnly value={form.watch(`items.${index}.unit`) || "Numbers"} className="h-10 bg-muted/20 cursor-not-allowed font-bold" /></FormItem>
+                        <FormItem><FormLabel>Unit</Label><Input readOnly value={form.watch(`items.${index}.unit`) || "Numbers"} className="h-10 bg-muted/20 cursor-not-allowed font-bold" /></FormItem>
                       </div>
                     </CardContent>
                   </Card>

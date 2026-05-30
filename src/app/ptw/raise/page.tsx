@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react"
@@ -64,6 +63,13 @@ type UserProfile = {
   assignedProjectIds?: string[];
 };
 
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
+};
+
 const formatCapacity = (val: any) => {
   const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
   return isNaN(num) ? "0.000" : num.toFixed(3);
@@ -97,6 +103,9 @@ export default function RaisePtwPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
   const userRole = userProfile?.role || "";
   const isAdmin = isSuperAdmin(user?.email) || userRole === 'Admin';
   const isManager = userRole === 'Site Manager';
@@ -113,16 +122,29 @@ export default function RaisePtwPage() {
       return Array.from(new Map(allSites.map(site => [site.name, site])).values());
     }
     
-    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
-    if (isManager && teamMembers) {
-      teamMembers.forEach(member => {
-        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
-      });
+    // Use Sovereignty Calculation
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+
+    if (isManager) {
+      // 1. Overrides
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      
+      // 2. Team Inheritance
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(sid => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
+            if (!hasOtherOverride) {
+              siteIds.add(sid);
+            }
+          });
+        });
+      }
     }
 
-    const filtered = allSites.filter(s => assignedIds.has(s.id));
+    const filtered = allSites.filter(s => siteIds.has(s.id));
     return Array.from(new Map(filtered.map(site => [site.name, site])).values());
-  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const [selectedSite, setSelectedSite] = React.useState<Site | null>(null);
   const [files, setFiles] = React.useState<File[]>([]);
@@ -314,7 +336,6 @@ export default function RaisePtwPage() {
       
       const targetStatus = (userRole === 'Site Engineer' || isCorrectionMode) ? "Pending" : "ManagerApproved";
 
-      // Site-Specific Manager Lookup (Override Logic)
       const overridesQuery = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', selectedSite.id)));
       const overridesSnap = await getDocs(overridesQuery);
       const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || (isCorrectionMode ? permitToCorrect?.siteManagerId : null) || null);
@@ -330,7 +351,6 @@ export default function RaisePtwPage() {
         submissionIndex: currentSubmissionIndex
       };
 
-      // Find authorized Admins for this PTW type
       const selectedType = ptwTypes?.find(t => t.name === values.ptwType);
       const authorizedAdminIds = selectedType?.authorizedAdminIds || (selectedType?.authorizedAdminId ? [selectedType.authorizedAdminId] : []);
 
@@ -367,7 +387,6 @@ export default function RaisePtwPage() {
         }
       }
 
-      // Notify Admins
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
@@ -410,7 +429,7 @@ export default function RaisePtwPage() {
     }
   }
 
-  if (isProfileLoading || isLoadingPermit || ptwTypesLoading || sitesLoading) {
+  if (isProfileLoading || isLoadingPermit || ptwTypesLoading || sitesLoading || overridesLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-9 w-72" />

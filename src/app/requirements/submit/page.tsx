@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -8,7 +7,7 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
 import { collection, doc, serverTimestamp, query, where, getDocs, and } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +56,13 @@ type UserProfile = {
   assignedProjectIds?: string[];
 };
 
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
+};
+
 export default function SubmitRequirementPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -71,6 +77,9 @@ export default function SubmitRequirementPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
     return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
@@ -82,15 +91,24 @@ export default function SubmitRequirementPage() {
     if (isAdmin) {
         return Array.from(new Map(allSites.map(s => [s.name, s])).values());
     }
-    const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
-    if (isManager && teamMembers) {
-      teamMembers.forEach(member => {
-        (member.assignedProjectIds || []).forEach(id => assignedIds.add(id));
-      });
+    
+    // Sovereignty Logic
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager) {
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(id => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
+            if (!hasOtherOverride) siteIds.add(id);
+          });
+        });
+      }
     }
-    const filtered = allSites.filter(s => assignedIds.has(s.id));
+    
+    const filtered = allSites.filter(s => siteIds.has(s.id));
     return Array.from(new Map(filtered.map(s => [s.name, s])).values());
-  }, [allSites, userProfile, isAdmin, isManager, teamMembers]);
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
@@ -235,7 +253,7 @@ export default function SubmitRequirementPage() {
                           placeholder="Search sites..." 
                           className="h-9 w-full border-none focus-visible:ring-0 px-0" 
                           value={siteSearchQuery} 
-                          onChange={(e) => setSiteSearchQuery(e.target.value)}
+                          onChange={(e) => setSiteSearchQuery(e.target.value)} 
                         />
                       </div>
                       <ScrollArea className="h-[200px]">

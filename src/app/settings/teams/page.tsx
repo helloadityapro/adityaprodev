@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, getDocs, writeBatch, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { collection, doc, query, where, getDocs, writeBatch, serverTimestamp, arrayUnion, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -36,7 +36,8 @@ import {
   Settings2,
   MapPin,
   Save,
-  Truck
+  Truck,
+  RefreshCw
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -118,7 +119,6 @@ export default function TeamMappingPage() {
   const [editManagerSearch, setEditManagerSearch] = React.useState("");
   const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
   
-  // Site Access Dialog States
   const [siteAccessUser, setSiteAccessUser] = React.useState<User | null>(null);
   const [localSiteIds, setLocalSiteIds] = React.useState<string[]>([]);
   const [siteSearch, setSiteSearch] = React.useState("");
@@ -128,21 +128,59 @@ export default function TeamMappingPage() {
   const [isAddingOverride, setIsAddingOverride] = React.useState(false);
   const [isUpdatingLink, setIsUpdatingLink] = React.useState(false);
   const [isUpdatingSites, setIsUpdatingSites] = React.useState(false);
+  const [isReconciling, setIsReconciling] = React.useState(false);
   const [newOverrideSiteId, setNewOverrideSiteId] = React.useState<string | "">("");
   const [newOverrideManagerId, setNewOverrideManagerId] = React.useState<string | "">("");
 
-  // Search/Popover States
   const [isManagerPopoverOpen, setIsManagerPopoverOpen] = React.useState(false);
   const [managerSearchQuery, setManagerSearchQuery] = React.useState("");
   const [isEngineerPopoverOpen, setIsEngineerPopoverOpen] = React.useState(false);
   const [engineerSearchQuery, setEngineerSearchQuery] = React.useState("");
 
-  // Table filter states
   const [tableEngineerSearch, setTableEngineerSearch] = React.useState('');
   const [tableManagerSearch, setTableManagerSearch] = React.useState('');
   const [tableSiteSearch, setTableSiteSearch] = React.useState('');
 
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'manager', direction: 'asc' });
+
+  const syncManagerSites = async (managerId: string) => {
+    try {
+      const q = query(collection(firestore, 'users'), where('siteManagerId', '==', managerId));
+      const snap = await getDocs(q);
+      
+      const allTeamSites = new Set<string>();
+      snap.docs.forEach(d => {
+          const data = d.data();
+          const sites = data.assignedProjectIds || [];
+          sites.forEach((id: string) => allTeamSites.add(id));
+      });
+
+      const ovQ = query(collection(firestore, 'team_mapping_overrides'), where('managerId', '==', managerId));
+      const ovSnap = await getDocs(ovQ);
+      ovSnap.docs.forEach(d => allTeamSites.add(d.data().siteId));
+
+      const managerRef = doc(firestore, 'users', managerId);
+      updateDocumentNonBlocking(managerRef, { assignedProjectIds: Array.from(allTeamSites) });
+    } catch (e) {
+      console.error("Manager inheritance sync failed", e);
+    }
+  };
+
+  const handleRecconcileAllAccess = async () => {
+    if (!isAdmin || !allUsers || !overrides) return;
+    setIsReconciling(true);
+    try {
+        const managersList = allUsers.filter(u => u.role === 'Admin' || u.role === 'Site Manager');
+        for (const manager of managersList) {
+            await syncManagerSites(manager.id);
+        }
+        toast({ title: 'Global Access Synced', description: 'All reporting lines and overrides have been reconciled.' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Sync Failed', description: e.message });
+    } finally {
+        setIsReconciling(false);
+    }
+  };
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -161,6 +199,9 @@ export default function TeamMappingPage() {
           siteManagerId: selectedManagerId,
           role: 'Site Engineer'
         });
+        
+        await syncManagerSites(selectedManagerId);
+        
         toast({ title: 'Team Link Created', description: 'Default reporting line established.' });
         setSelectedEngineerId(null);
         setSelectedManagerId(null);
@@ -175,11 +216,16 @@ export default function TeamMappingPage() {
     if (!editingLinkUser || !editManagerId) return;
     setIsUpdatingLink(true);
     try {
+      const oldManagerId = editingLinkUser.siteManagerId;
       const userRef = doc(firestore, 'users', editingLinkUser.id);
       updateDocumentNonBlocking(userRef, {
         siteManagerId: editManagerId,
         updatedAt: serverTimestamp()
       });
+
+      await syncManagerSites(editManagerId);
+      if (oldManagerId) await syncManagerSites(oldManagerId);
+
       toast({ title: 'Mapping Updated', description: `Reporting line for ${editingLinkUser.username} has been changed.` });
       setEditingLinkUser(null);
       setEditManagerId(null);
@@ -201,6 +247,10 @@ export default function TeamMappingPage() {
         managerId: newOverrideManagerId,
         createdAt: serverTimestamp()
       });
+
+      await syncManagerSites(newOverrideManagerId);
+      if (overrideEngineer.siteManagerId) await syncManagerSites(overrideEngineer.siteManagerId);
+
       toast({ title: 'Override Created', description: 'Site-specific manager assigned.' });
       setNewOverrideSiteId("");
       setNewOverrideManagerId("");
@@ -208,25 +258,6 @@ export default function TeamMappingPage() {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
       setIsAddingOverride(false);
-    }
-  };
-
-  const syncManagerSites = async (managerId: string, updatedEngineerId: string, updatedEngineerSites: string[]) => {
-    try {
-      const q = query(collection(firestore, 'users'), where('siteManagerId', '==', managerId));
-      const snap = await getDocs(q);
-      
-      const allTeamSites = new Set<string>();
-      snap.docs.forEach(d => {
-          const data = d.data();
-          const sites = data.id === updatedEngineerId ? updatedEngineerSites : (data.assignedProjectIds || []);
-          sites.forEach((id: string) => allTeamSites.add(id));
-      });
-
-      const managerRef = doc(firestore, 'users', managerId);
-      updateDocumentNonBlocking(managerRef, { assignedProjectIds: Array.from(allTeamSites) });
-    } catch (e) {
-      console.error("Manager inheritance sync failed", e);
     }
   };
 
@@ -238,7 +269,7 @@ export default function TeamMappingPage() {
       updateDocumentNonBlocking(userRef, { assignedProjectIds: localSiteIds });
 
       if (siteAccessUser.role === 'Site Engineer' && siteAccessUser.siteManagerId) {
-        await syncManagerSites(siteAccessUser.siteManagerId, siteAccessUser.id, localSiteIds);
+        await syncManagerSites(siteAccessUser.siteManagerId);
       }
 
       toast({ title: 'Access Updated', description: `Site permissions for ${siteAccessUser.username} saved.` });
@@ -250,17 +281,30 @@ export default function TeamMappingPage() {
     }
   };
 
-  const handleRemoveOverride = (id: string) => {
-    deleteDocumentNonBlocking(doc(firestore, 'team_mapping_overrides', id));
-    toast({ title: 'Override Removed' });
+  const handleRemoveOverride = async (override: MappingOverride) => {
+    try {
+      deleteDocumentNonBlocking(doc(firestore, 'team_mapping_overrides', override.id));
+      await syncManagerSites(override.managerId);
+      const eng = allUsers?.find(u => u.id === override.engineerId);
+      if (eng?.siteManagerId) await syncManagerSites(eng.siteManagerId);
+      toast({ title: 'Override Removed' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    }
   };
 
-  const handleConfirmDeleteMapping = () => {
+  const handleConfirmDeleteMapping = async () => {
     if (!userToDelete) return;
-    const ref = doc(firestore, 'users', userToDelete.id);
-    updateDocumentNonBlocking(ref, { siteManagerId: null });
-    toast({ title: 'Mapping Removed', description: `Default reporting line for ${userToDelete.username} has been removed.` });
-    setUserToDelete(null);
+    try {
+      const oldManagerId = userToDelete.siteManagerId;
+      const ref = doc(firestore, 'users', userToDelete.id);
+      updateDocumentNonBlocking(ref, { siteManagerId: null });
+      if (oldManagerId) await syncManagerSites(oldManagerId);
+      toast({ title: 'Mapping Removed', description: `Default reporting line for ${userToDelete.username} has been removed.` });
+      setUserToDelete(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    }
   };
 
   const filteredMappings = React.useMemo(() => {
@@ -271,8 +315,6 @@ export default function TeamMappingPage() {
         const manager = managers.find(m => m.id === e.siteManagerId);
         const matchesEngineer = (e.username || '').toLowerCase().includes(tableEngineerSearch.toLowerCase());
         const matchesManager = (manager?.username || '').toLowerCase().includes(tableManagerSearch.toLowerCase());
-        
-        // Filter by assigned site names
         const engineerSites = e.assignedProjectIds?.map(sid => allSites?.find(s => s.id === sid)?.name || '') || [];
         const matchesSite = tableSiteSearch === '' || engineerSites.some(name => name.toLowerCase().includes(tableSiteSearch.toLowerCase()));
         
@@ -313,8 +355,16 @@ export default function TeamMappingPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-foreground uppercase">Teams & Site Access</h1>
-        <p className="text-muted-foreground font-medium">Manage reporting structures and site authorizations. Engineer sites sync to managers automatically.</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-black tracking-tight text-foreground uppercase">Teams & Site Access</h1>
+            <p className="text-muted-foreground font-medium">Manage reporting structures and site authorizations. Engineer sites sync to managers automatically.</p>
+          </div>
+          <Button variant="outline" onClick={handleRecconcileAllAccess} disabled={isReconciling} className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary">
+            {isReconciling ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+            Reconcile All Access
+          </Button>
+        </div>
       </div>
 
       <Card className="rounded-sm border-primary/10 bg-primary/[0.02] shadow-sm">
@@ -643,7 +693,6 @@ export default function TeamMappingPage() {
           </DialogHeader>
           
           <div className="p-6 space-y-8 flex-1 overflow-hidden flex flex-col">
-            {/* Search Site Bar */}
             <div className="p-5 bg-blue-50/40 border border-blue-100 rounded-xl space-y-3 shrink-0">
               <Label className="text-[10px] font-black uppercase text-blue-600/80 tracking-widest px-1">Select Site to Add</Label>
               <Popover open={isSiteSearchOpen} onOpenChange={setIsSiteSearchOpen}>
@@ -697,7 +746,6 @@ export default function TeamMappingPage() {
               </Popover>
             </div>
 
-            {/* List of Authorized Sites */}
             <div className="space-y-3 flex-1 flex flex-col min-h-0">
               <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1 shrink-0">Authorized Site Access</Label>
               <div className="border rounded-xl flex-1 flex flex-col overflow-hidden bg-white shadow-inner">
@@ -764,11 +812,11 @@ export default function TeamMappingPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Override Dialog */}
+      {/* Site Specific Override Dialog */}
       <Dialog open={!!overrideEngineer} onOpenChange={(o) => !o && setOverrideEngineer(null)}>
         <DialogContent className="max-w-2xl rounded-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-black tracking-tight"><Building2 className="h-5 w-5 text-amber-600" /> Site-Specific Manager Assignments</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 font-black tracking-tight"><Building2 className="h-5 w-5 text-amber-600" /> Site Specific Manager Assignments</DialogTitle>
             <DialogDescription className="text-xs font-medium">Assign alternative reporting managers for <strong>{overrideEngineer?.username}</strong> per project site.</DialogDescription>
           </DialogHeader>
           
@@ -821,7 +869,7 @@ export default function TeamMappingPage() {
                         <TableCell className="text-xs font-bold py-3 px-4">{allSites?.find(s => s.id === o.siteId)?.name || 'Unknown Site'}</TableCell>
                         <TableCell className="text-xs font-semibold text-primary">{managers.find(m => m.id === o.managerId)?.username || 'Unknown Manager'}</TableCell>
                         <TableCell className="text-right pr-4">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemoveOverride(o.id)}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemoveOverride(o)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </TableCell>
@@ -860,4 +908,9 @@ export default function TeamMappingPage() {
       </AlertDialog>
     </div>
   );
+}
+
+function SortIcon({ column, config }: { column: SortKey, config: { key: SortKey; direction: 'asc' | 'desc' } }) {
+  if (config.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+  return config.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
 }
