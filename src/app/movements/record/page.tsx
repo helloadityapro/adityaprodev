@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -577,7 +576,7 @@ export default function RecordMovementPage() {
                         </FormItem>
                       )} />
                       <div className="grid grid-cols-2 gap-4">
-                        <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 bg-background font-mono" /></FormControl><FormMessage /></FormItem>)} />
                         <FormItem><FormLabel>Unit</FormLabel><Input readOnly value={form.watch(`items.${index}.unit`) || "Numbers"} className="h-10 bg-muted/20 cursor-not-allowed font-bold" /></FormItem>
                       </div>
                     </CardContent>
