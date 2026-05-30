@@ -104,7 +104,7 @@ export default function RaisePtwPage() {
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
-  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+  const { data: allOverrides, isLoading: overridesLoading } = useCollection<MappingOverride>(overridesQuery);
 
   const userRole = userProfile?.role || "";
   const isAdmin = isSuperAdmin(user?.email) || userRole === 'Admin';
