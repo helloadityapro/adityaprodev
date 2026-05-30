@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -53,7 +52,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, arrayUnion, getDoc, increment, or, and } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, arrayUnion, getDoc, increment, or, and, getDocs } from "firebase/firestore";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -68,6 +67,7 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { sendNotification } from "@/lib/notifications";
+import { slugifyRole } from '@/lib/access-control';
 
 type Attachment = { 
   url: string; 
@@ -120,6 +120,13 @@ type RewardSettings = {
 type AccessConfig = {
   id: string;
   ownDataOnly?: boolean;
+};
+
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
 };
 
 type SortKey = 'serialNumber' | 'ptwType' | 'siteName' | 'requestDate' | 'status';
@@ -228,6 +235,7 @@ export default function PtwListPage() {
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === "Admin";
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
+  const isManager = userProfile?.role === "Site Manager";
 
   const permitsQuery = useMemoFirebase(() => {
     if (!userRole || !user || isProfileLoading) return null;
@@ -245,8 +253,52 @@ export default function PtwListPage() {
   const usersQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), where('role', '==', 'Site Engineer')) : null, [firestore, isAdmin]);
   const { data: engineers } = useCollection<{ username: string, id: string }>(usersQuery);
 
-  const sitesQuery = useMemoFirebase(() => isAdmin ? collection(firestore, 'sites') : null, [firestore, isAdmin]);
-  const { data: sites } = useCollection<{ name: string, id: string }>(sitesQuery);
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: allSites } = useCollection<{ name: string, id: string, projectCompany: string }>(sitesQuery);
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
+
+  const accessibleSiteIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    if (!userProfile || !allSites) return ids;
+    if (isAdmin) {
+      allSites.forEach(s => ids.add(s.id));
+      return ids;
+    }
+
+    const roleId = userProfile.role ? slugifyRole(userProfile.role) : 'none';
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
+
+    if (!isOwnDataOnly) {
+      allSites.forEach(s => ids.add(s.id));
+      return ids;
+    }
+
+    if (isManager) {
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => ids.add(o.siteId));
+      teamMembers?.forEach(member => {
+        (member.assignedProjectIds || []).forEach(sid => {
+          const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
+          if (!hasOtherOverride) ids.add(sid);
+        });
+      });
+    } else {
+      (userProfile.assignedProjectIds || []).forEach(id => ids.add(id));
+    }
+    return ids;
+  }, [userProfile, isAdmin, allSites, roleConfigs, isManager, allOverrides, teamMembers]);
 
   const queryDateRange = React.useMemo(() => {
     const today = new Date();
@@ -279,9 +331,14 @@ export default function PtwListPage() {
     const hiddenIds = userProfile.hiddenPermitIds || [];
     let list = permits.filter(p => !hiddenIds.includes(p.id));
 
-    if (userProfile.ownDataOnly && !isSuper) {
-      const assignedIds = new Set(userProfile.assignedProjectIds || []);
-      list = list.filter(p => assignedIds.has(p.siteId));
+    // Dynamic Sovereignty Filtering
+    const roleId = userProfile.role ? slugifyRole(userProfile.role) : 'none';
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
+
+    if (isOwnDataOnly && !isSuper) {
+      list = list.filter(p => accessibleSiteIds.has(p.siteId));
     }
 
     const { start, end } = queryDateRange;
@@ -310,7 +367,7 @@ export default function PtwListPage() {
         }
         return direction === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
       });
-  }, [permits, statusFilter, userFilter, siteFilter, searchTerm, sortConfig, userProfile, isSuper, queryDateRange]);
+  }, [permits, statusFilter, userFilter, siteFilter, searchTerm, sortConfig, userProfile, isSuper, queryDateRange, roleConfigs, accessibleSiteIds]);
 
   const stats = React.useMemo(() => {
     return {
@@ -328,11 +385,11 @@ export default function PtwListPage() {
   }, [engineers, userSearchQuery]);
 
   const filteredSitesListForFilter = React.useMemo(() => {
-    if (!sites) return [];
-    return sites.filter(site => 
+    if (!allSites) return [];
+    return allSites.filter(site => 
       site.name.toLowerCase().includes(siteSearchQuery.toLowerCase())
     );
-  }, [sites, siteSearchQuery]);
+  }, [allSites, siteSearchQuery]);
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -674,13 +731,15 @@ export default function PtwListPage() {
             <ScrollArea className="w-full">
               <div className="min-w-[800px]">
                 <Table>
-                  <TableHeader><TableRow className="bg-muted/30">
-                    <TableHead className="px-6 cursor-pointer hover:bg-muted/5" onClick={() => handleSort('serialNumber')}><div className="flex items-center">Serial & Site <SortIcon column="serialNumber" /></div></TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('ptwType')}><div className="flex items-center">Type <SortIcon column="ptwType" /></div></TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('status')}><div className="flex items-center">Status <SortIcon column="status" /></div></TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('requestDate')}><div className="flex items-center">Request Date <SortIcon column="requestDate" /></div></TableHead>
-                    <TableHead className="text-right px-6">Action</TableHead>
-                  </TableRow></TableHeader>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="px-6 cursor-pointer hover:bg-muted/5" onClick={() => handleSort('serialNumber')}><div className="flex items-center">Serial & Site <SortIcon column="serialNumber" /></div></TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('ptwType')}><div className="flex items-center">Type <SortIcon column="ptwType" /></div></TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('status')}><div className="flex items-center">Status <SortIcon column="status" /></div></TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('requestDate')}><div className="flex items-center">Request Date <SortIcon column="requestDate" /></div></TableHead>
+                      <TableHead className="text-right px-6">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
                     {filteredPermits.map(permit => (
                       <TableRow key={permit.id} className="hover:bg-muted/5 cursor-pointer" onClick={() => setDetailsPermit(permit)}>

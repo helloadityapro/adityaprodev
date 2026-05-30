@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, getDocs, writeBatch, serverTimestamp, arrayUnion, getDoc } from 'firebase/firestore';
+import { collection, doc, query, where, getDocs, writeBatch, serverTimestamp, arrayUnion, getDoc, and } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -152,7 +152,13 @@ export default function TeamMappingPage() {
       snap.docs.forEach(d => {
           const data = d.data();
           const sites = data.assignedProjectIds || [];
-          sites.forEach((id: string) => allTeamSites.add(id));
+          sites.forEach((id: string) => {
+            // Only add if NO other manager is an override for this engineer on this site
+            const hasOtherOverride = overrides?.some(o => o.engineerId === d.id && o.siteId === id && o.managerId !== managerId);
+            if (!hasOtherOverride) {
+              allTeamSites.add(id);
+            }
+          });
       });
 
       const ovQ = query(collection(firestore, 'team_mapping_overrides'), where('managerId', '==', managerId));

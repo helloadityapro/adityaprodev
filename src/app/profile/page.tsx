@@ -341,7 +341,7 @@ export default function ProfilePage() {
                 {userOverrides && userOverrides.length > 0 && (
                     <div className="border-t">
                         <div className="bg-amber-500/5 px-6 py-2 border-b">
-                            <span className="text-[8px] font-black uppercase tracking-widest text-amber-700">Site Specific Supervisors</span>
+                            <span className="text-[8px] font-black uppercase tracking-widest text-amber-700">Site Specific Assignments</span>
                         </div>
                         <div className="divide-y max-h-[200px] overflow-y-auto">
                             {userOverrides.map(override => {

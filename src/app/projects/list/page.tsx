@@ -33,6 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { slugifyRole } from '@/lib/access-control';
 
 type Site = {
   id: string;
@@ -94,7 +95,7 @@ export default function ProjectsListPage() {
   const { data: groups, isLoading: groupsLoading } = useCollection<any>(groupsQuery);
 
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
-  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+  const { data: allOverrides, isLoading: overridesLoading } = useCollection<MappingOverride>(overridesQuery);
 
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
@@ -120,24 +121,30 @@ export default function ProjectsListPage() {
     if (!allSites || !userProfile) return [];
     if (isSuper || isAdmin) return allSites;
     
+    const roleId = userProfile.role ? slugifyRole(userProfile.role) : 'none';
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === (userProfile.role ? userProfile.role.toLowerCase().replace(/\s+/g, '-') : 'none'))?.ownDataOnly ?? false;
+      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
 
     if (!isOwnDataOnly) return allSites;
 
     // Sovereignty Logic
-    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    const siteIds = new Set<string>();
+
     if (isManager) {
+      // 1. Explicit Overrides
       allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      // 2. Default Team Inheritance (minus overrides to others)
       if (teamMembers) {
         teamMembers.forEach(member => {
-          (member.assignedProjectIds || []).forEach(id => {
-            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
-            if (!hasOtherOverride) siteIds.add(id);
+          (member.assignedProjectIds || []).forEach(sid => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
+            if (!hasOtherOverride) siteIds.add(sid);
           });
         });
       }
+    } else {
+      (userProfile.assignedProjectIds || []).forEach(id => siteIds.add(id));
     }
     
     return allSites.filter(s => siteIds.has(s.id));
