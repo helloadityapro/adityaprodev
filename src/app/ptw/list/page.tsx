@@ -119,6 +119,7 @@ type RewardSettings = {
 
 type AccessConfig = {
   id: string;
+  allowedPageKeys: string[];
   ownDataOnly?: boolean;
 };
 
@@ -220,7 +221,6 @@ export default function PtwListPage() {
   const [viewFiles, setViewFiles] = React.useState<Attachment[]>([]);
   const [currentFileIndex, setCurrentFileIndex] = React.useState(0);
   
-  // Gallery Engine State
   const [scale, setScale] = React.useState(1);
   const [position, setPosition] = React.useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = React.useState(false);
@@ -268,37 +268,33 @@ export default function PtwListPage() {
   }, [firestore, user, isManager]);
   const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
-  const accessibleSiteIds = React.useMemo(() => {
-    const ids = new Set<string>();
-    if (!userProfile || !allSites) return ids;
-    if (isAdmin) {
-      allSites.forEach(s => ids.add(s.id));
-      return ids;
-    }
-
+  const accessibleSites = React.useMemo(() => {
+    if (!allSites || !userProfile) return [];
+    if (isAdmin) return allSites;
+    
     const roleId = userProfile.role ? slugifyRole(userProfile.role) : 'none';
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
       : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
 
-    if (!isOwnDataOnly) {
-      allSites.forEach(s => ids.add(s.id));
-      return ids;
-    }
+    if (!isOwnDataOnly) return allSites;
 
+    const siteIds = new Set<string>();
     if (isManager) {
-      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => ids.add(o.siteId));
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
       teamMembers?.forEach(member => {
         (member.assignedProjectIds || []).forEach(sid => {
           const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
-          if (!hasOtherOverride) ids.add(sid);
+          if (!hasOtherOverride) siteIds.add(sid);
         });
       });
     } else {
-      (userProfile.assignedProjectIds || []).forEach(id => ids.add(id));
+      (userProfile.assignedProjectIds || []).forEach(id => siteIds.add(id));
     }
-    return ids;
-  }, [userProfile, isAdmin, allSites, roleConfigs, isManager, allOverrides, teamMembers]);
+    return allSites.filter(s => siteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites, userProfile, roleConfigs, isAdmin, isManager, teamMembers, allOverrides]);
+
+  const accessibleSiteIds = React.useMemo(() => new Set(accessibleSites.map(s => s.id)), [accessibleSites]);
 
   const queryDateRange = React.useMemo(() => {
     const today = new Date();
@@ -385,11 +381,10 @@ export default function PtwListPage() {
   }, [engineers, userSearchQuery]);
 
   const filteredSitesListForFilter = React.useMemo(() => {
-    if (!allSites) return [];
-    return allSites.filter(site => 
+    return accessibleSites.filter(site => 
       site.name.toLowerCase().includes(siteSearchQuery.toLowerCase())
     );
-  }, [allSites, siteSearchQuery]);
+  }, [accessibleSites, siteSearchQuery]);
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -460,19 +455,6 @@ export default function PtwListPage() {
       push: true
     });
 
-    // Notify Admins
-    const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
-    const adminDocs = await getDocs(adminsQuery);
-    adminDocs.forEach(adminDoc => {
-      sendNotification(firestore, {
-        userId: adminDoc.id,
-        title: "Permit Status Updated",
-        description: `Permit ${permit.serialNumber} (${permit.siteName}) was updated to ${targetStatus} by ${userProfile.username}.`,
-        link: `/ptw/list?view=${permit.id}`,
-        push: true
-      });
-    });
-
     toast({ title: "Updated", description: `Permit status set to ${targetStatus}.` });
   };
 
@@ -525,11 +507,8 @@ export default function PtwListPage() {
     if (!isDragging || scale <= 1) return;
     const newX = e.clientX - startPan.x;
     const newY = e.clientY - startPan.y;
-    
-    // Improved clamping logic
     const limitX = Math.max(0, (window.innerWidth * scale - window.innerWidth) / 2);
     const limitY = Math.max(0, (window.innerHeight * scale - window.innerHeight) / 2);
-
     setPosition({
       x: Math.min(Math.max(newX, -limitX), limitX),
       y: Math.min(Math.max(newY, -limitY), limitY)
@@ -626,8 +605,8 @@ export default function PtwListPage() {
           </div>
         </div>
 
-        {isAdmin && (
-          <div className="flex items-center gap-2 w-full no-wrap">
+        <div className="flex items-center gap-2 w-full no-wrap">
+          {isAdmin && (
             <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" className="flex-1 h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
@@ -656,37 +635,37 @@ export default function PtwListPage() {
                 </ScrollArea>
               </PopoverContent>
             </Popover>
+          )}
 
-            <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="flex-1 h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
-                  <span className="truncate">{siteFilter === 'all' ? "All Sites" : siteFilter}</span>
-                  <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[240px] p-0" align="start">
-                <div className="flex items-center border-b px-3">
-                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                  <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" value={siteSearchQuery} onChange={(e) => setSiteSearchQuery(e.target.value)} />
-                </div>
-                <ScrollArea className="h-[200px]">
-                  <div className="p-1">
-                    <Button variant="ghost" className="w-full justify-start font-bold text-xs rounded-sm h-9" onClick={() => { setSiteFilter('all'); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}>
-                      <Check className={cn("mr-2 h-3 w-3", siteFilter === 'all' ? "opacity-100" : "opacity-0")} />
-                      All Sites
+          <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox" className="flex-1 h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
+                <span className="truncate">{siteFilter === 'all' ? "All Accessible Sites" : siteFilter}</span>
+                <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[240px] p-0" align="start">
+              <div className="flex items-center border-b px-3">
+                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" value={siteSearchQuery} onChange={(e) => setSiteSearchQuery(e.target.value)} />
+              </div>
+              <ScrollArea className="h-[200px]">
+                <div className="p-1">
+                  <Button variant="ghost" className="w-full justify-start font-bold text-xs rounded-sm h-9" onClick={() => { setSiteFilter('all'); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}>
+                    <Check className={cn("mr-2 h-3 w-3", siteFilter === 'all' ? "opacity-100" : "opacity-0")} />
+                    All Accessible Sites
+                  </Button>
+                  {filteredSitesListForFilter.map(site => (
+                    <Button key={site.id} variant="ghost" className="w-full justify-start font-medium text-xs rounded-sm h-9" onClick={() => { setSiteFilter(site.name); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}>
+                      <Check className={cn("mr-2 h-4 w-4 text-primary", siteFilter === site.name ? "opacity-100" : "opacity-0")} />
+                      {site.name}
                     </Button>
-                    {filteredSitesListForFilter.map(site => (
-                      <Button key={site.id} variant="ghost" className="w-full justify-start font-medium text-xs rounded-sm h-9" onClick={() => { setSiteFilter(site.name); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}>
-                        <Check className={cn("mr-2 h-4 w-4 text-primary", siteFilter === site.name ? "opacity-100" : "opacity-0")} />
-                        {site.name}
-                      </Button>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
+                  ))}
+                </div>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+        </div>
 
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 no-print">
           {[{ id: 'all', label: 'All Status' }, { id: 'Pending', label: 'Pending Manager' }, { id: 'ManagerApproved', label: 'Pending Admin' }, { id: 'Approved', label: 'Approved' }, { id: 'Rejected', label: 'Rejected' }].map(s => (
@@ -788,7 +767,7 @@ export default function PtwListPage() {
             {detailsPermit && (
               <div id="printable-permit-area" className="p-4 sm:p-8 space-y-8 sm:space-y-12 pb-20">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 p-3 sm:p-4 bg-muted/20 border rounded-sm"><div className="space-y-1 min-w-0"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Site Name</Label><p className="text-[11px] sm:text-xs font-bold truncate">{detailsPermit.siteName}</p></div><div className="space-y-1 min-w-0"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">PtW Type</Label><p className="text-[11px] sm:text-xs font-bold truncate">{detailsPermit.ptwType}</p></div><div className="space-y-1"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Status</Label><div><StatusBadge permit={detailsPermit} /></div></div><div className="space-y-1"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Submitted</Label><p className="text-[10px] sm:text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p></div></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10"><div className="space-y-6 sm:space-y-8"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"><div className="p-3 sm:p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3"><div className="p-2 bg-primary/10 rounded-full text-primary"><User className="h-3.5 w-3.5" /></div><div className="flex flex-col"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Raised By</Label><p className="text-[11px] sm:text-xs font-black">{detailsPermit.siteEngineerName || 'N/A'}</p></div></div><div className="p-3 sm:p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3"><div className="p-2 bg-green-500/10 rounded-full text-green-600"><ShieldCheck className="h-3.5 w-3.5" /></div><div className="flex flex-col"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Approved By</Label><p className="text-[11px] sm:text-xs font-black">{detailsPermit.timeline?.find(t => t.status === 'Approved')?.userName || detailsPermit.timeline?.find(t => t.status === 'ManagerApproved')?.userName || 'Awaiting'}</p></div></div></div><div className="space-y-2"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-center gap-2"><FileText className="h-3 w-3" /> Work Description</Label><div className="p-4 sm:p-6 bg-primary/[0.02] border-2 border-primary/5 rounded-sm text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-medium italic shadow-inner">"{detailsPermit.descriptionOfWork}"</div></div></div><div className="space-y-6 sm:space-y-8"><div className="space-y-2"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-center gap-2"><MapPin className="h-3 w-3" /> Verified GPS Coordinates</Label>{detailsPermit.latitude ? (<div className="p-3 sm:p-4 bg-primary/5 border-2 border-primary/10 rounded-sm flex items-center justify-between shadow-sm group hover:border-primary/30 transition-all"><div className="flex flex-col gap-0.5"><span className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-tighter">Site Position Stamped</span><span className="font-mono text-[10px] sm:text-xs font-black text-primary">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude?.toFixed(6)}</span></div><Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 rounded-sm no-print border-primary/20 bg-white text-primary" asChild><a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></a></Button></div>) : (<div className="p-4 bg-muted/20 border border-dashed rounded-sm text-center"><p className="text-xs italic text-muted-foreground font-medium">GPS location data not attached.</p></div>)}</div></div></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10"><div className="space-y-6 sm:space-y-8"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"><div className="p-3 sm:p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3"><div className="p-2 bg-primary/10 rounded-full text-primary"><User className="h-3.5 w-3.5" /></div><div className="flex flex-col"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Raised By</Label><p className="text-[11px] sm:text-xs font-black">{detailsPermit.siteEngineerName || 'N/A'}</p></div></div><div className="p-3 sm:p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3"><div className="p-2 bg-green-500/10 rounded-full text-green-600"><ShieldCheck className="h-3.5 w-3.5" /></div><div className="flex flex-col"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Approved By</Label><p className="text-[11px] sm:text-xs font-black">{detailsPermit.timeline?.find(t => t.status === 'Approved')?.userName || detailsPermit.timeline?.find(t => t.status === 'ManagerApproved')?.userName || 'Awaiting'}</p></div></div></div><div className="space-y-2"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-gap-2"><FileText className="h-3 w-3" /> Work Description</Label><div className="p-4 sm:p-6 bg-primary/[0.02] border-2 border-primary/5 rounded-sm text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-medium italic shadow-inner">"{detailsPermit.descriptionOfWork}"</div></div></div><div className="space-y-6 sm:space-y-8"><div className="space-y-2"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-gap-2"><MapPin className="h-3 w-3" /> Verified GPS Coordinates</Label>{detailsPermit.latitude ? (<div className="p-3 sm:p-4 bg-primary/5 border-2 border-primary/10 rounded-sm flex items-center justify-between shadow-sm group hover:border-primary/30 transition-all"><div className="flex flex-col gap-0.5"><span className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-tighter">Site Position Stamped</span><span className="font-mono text-[10px] sm:text-xs font-black text-primary">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude?.toFixed(6)}</span></div><Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 rounded-sm no-print border-primary/20 bg-white text-primary" asChild><a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></a></Button></div>) : (<div className="p-4 bg-muted/20 border border-dashed rounded-sm text-center"><p className="text-xs italic text-muted-foreground font-medium">GPS location data not attached.</p></div>)}</div></div></div>
                 <Separator />
                 <div className="space-y-4 sm:space-y-6"><div className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5 text-primary" /><h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-foreground">Attachments</h3></div>{detailsPermit.attachments && detailsPermit.attachments.length > 0 ? (<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">{detailsPermit.attachments.map((file, idx) => (<div key={idx} className="group relative aspect-square rounded-sm overflow-hidden border bg-muted flex flex-col items-center justify-center">{isImage(file) ? (<><img src={file.url} alt={file.name} className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105" onClick={() => openViewer(file, detailsPermit.attachments!)}/><div className="absolute inset-0 bg-black/40 group-hover:opacity-100 flex items-center justify-center pointer-events-none"><Maximize2 className="h-5 w-5 text-white" /></div><div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">{file.name}</div></>) : isVideo(file) ? (<div className="relative w-full h-full bg-slate-900 flex flex-col items-center justify-center cursor-pointer group" onClick={() => openViewer(file, detailsPermit.attachments!)}><Film className="h-8 w-8 sm:h-10 sm:w-10 text-white opacity-40" /><div className="absolute inset-0 bg-black/40 group-hover:opacity-100 transition-opacity flex items-center justify-center"><PlayCircle className="h-6 w-6 sm:h-8 sm:w-8 text-white" /></div><div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">Video: {file.name}</div></div>) : (<div className="flex flex-col items-center justify-between p-2 h-full w-full bg-background border"><div className="flex-1 flex flex-col items-center justify-center gap-1.5"><FileText className={cn("h-6 w-6 sm:h-8 sm:w-8", file.contentType?.includes('pdf') ? "text-red-500" : "text-blue-500")} /><span className="text-[7px] sm:text-[8px] font-bold uppercase text-center line-clamp-2">{file.name}</span></div><Button variant="secondary" size="sm" className="w-full h-5 sm:h-6 text-[7px] sm:text-[8px] font-bold uppercase rounded-none mt-1" asChild><a href={file.url} target="_blank" rel="noopener noreferrer">View File</a></Button></div>)}</div>))}</div>) : (<div className="p-8 sm:p-12 text-center border-2 border-dashed rounded-sm bg-muted/5"><ImageIcon className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/20 mx-auto mb-2 sm:mb-3" /><p className="text-[10px] sm:text-xs text-muted-foreground font-bold uppercase tracking-widest italic">No files attached to this permit.</p></div>)}</div>
                 <Separator />
@@ -812,12 +791,9 @@ export default function PtwListPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Modern High-Fidelity Media Viewer Overlay */}
       <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { resetViewer(); setViewFile(null); setViewFiles([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
           <DialogHeader className="sr-only"><DialogTitle>Media Audit</DialogTitle><DialogDescription>Visual evidence review</DialogDescription></DialogHeader>
-          
-          {/* Top Toolbar */}
           <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent no-print">
             <div className="flex items-center gap-3">
               <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
@@ -826,7 +802,6 @@ export default function PtwListPage() {
                 <span className="text-[8px] font-bold text-white/60 uppercase">{currentFileIndex + 1} of {viewFiles.length} </span>
               </div>
             </div>
-
             <div className="flex items-center gap-1.5">
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button>
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button>
@@ -835,8 +810,6 @@ export default function PtwListPage() {
               <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/10 hover:bg-red-500 text-white border-none transition-colors"><X className="h-5 w-5" /></Button></DialogClose>
             </div>
           </div>
-
-          {/* Navigation Controls */}
           {viewFiles.length > 1 && (
             <>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
@@ -847,60 +820,13 @@ export default function PtwListPage() {
               </div>
             </>
           )}
-
-          {/* Canvas Engine */}
-          <div 
-            ref={containerRef}
-            className={cn(
-              "relative w-full h-full flex items-center justify-center overflow-hidden touch-none",
-              scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"
-            )}
-            onWheel={handleWheel}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onDoubleClick={handleDoubleClick}
-          >
-            <div 
-              ref={mediaRef}
-              className={cn(
-                "transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit",
-                isDragging && "transition-none"
-              )}
-              style={{ 
-                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-              }}
-            >
-              {viewFile && (
-                isVideo(viewFile) ? (
-                  <div className="pointer-events-auto">
-                    <video 
-                      src={viewFile.url} 
-                      controls 
-                      autoPlay 
-                      className="max-w-[90vw] max-h-[80vh] shadow-2xl rounded-sm" 
-                    />
-                  </div>
-                ) : (
-                  <img 
-                    src={viewFile.url} 
-                    className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" 
-                    alt="Evidence View" 
-                    draggable={false}
-                  />
-                )
-              )}
+          <div ref={containerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDoubleClick={handleDoubleClick}>
+            <div ref={mediaRef} className={cn("transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit", isDragging && "transition-none")} style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
+              {viewFile && (isVideo(viewFile) ? (<div className="pointer-events-auto"><video src={viewFile.url} controls autoPlay className="max-w-[90vw] max-h-[80vh] shadow-2xl rounded-sm" /></div>) : (<img src={viewFile.url} className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" alt="Evidence View" draggable={false} />))}
             </div>
           </div>
-
-          {/* Footer Metadata */}
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent flex flex-col items-center gap-2 no-print">
-            <div className="flex gap-1">
-              {viewFiles.map((_, i) => (
-                <div key={i} className={cn("h-1 w-4 rounded-full transition-all", i === currentFileIndex ? "bg-primary w-8" : "bg-white/20")} />
-              ))}
-            </div>
+            <div className="flex gap-1">{viewFiles.map((_, i) => (<div key={i} className={cn("h-1 w-4 rounded-full transition-all", i === currentFileIndex ? "bg-primary w-8" : "bg-white/20")} />))}</div>
           </div>
         </DialogContent>
       </Dialog>

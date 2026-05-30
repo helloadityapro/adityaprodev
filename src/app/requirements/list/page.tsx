@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -60,6 +59,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
+import { slugifyRole } from "@/lib/access-control";
 
 type TimelineEntry = {
   action: string;
@@ -94,6 +94,13 @@ type Requirement = {
 type AccessConfig = {
   id: string;
   ownDataOnly?: boolean;
+};
+
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
 };
 
 const LOGISTICS_STATUSES = ["Ordered", "Dispatched", "In-transit", "Delivered"] as const;
@@ -133,7 +140,7 @@ export default function RequirementListPage() {
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
-  const [activeTab, setActiveTab] = React.useState("all");
+  const [siteFilter, setSiteFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
@@ -150,23 +157,55 @@ export default function RequirementListPage() {
   const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: allSites } = useCollection<{ name: string, id: string }>(sitesQuery);
+
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
-  const isProcurementRole = userProfile?.role === "Assistant Manager - Purchase & Supply Chain";
-  const isProcurementDept = userProfile?.department === 'Procurement and Supply-chain';
-  const isProcurement = isProcurementDept || isProcurementRole;
+  const isProcurement = userProfile?.department === 'Procurement and Supply-chain' || userProfile?.role === "Assistant Manager - Purchase & Supply Chain";
+
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
+
+  const accessibleSites = React.useMemo(() => {
+    if (!allSites || !userProfile) return [];
+    if (isAdmin) return allSites;
+    
+    const roleId = userProfile.role ? slugifyRole(userProfile.role) : 'none';
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
+
+    if (!isOwnDataOnly) return allSites;
+
+    const siteIds = new Set<string>();
+    if (isManager) {
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      teamMembers?.forEach(member => {
+        (member.assignedProjectIds || []).forEach(sid => {
+          const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
+          if (!hasOtherOverride) siteIds.add(sid);
+        });
+      });
+    } else {
+      (userProfile.assignedProjectIds || []).forEach(id => siteIds.add(id));
+    }
+    return allSites.filter(s => siteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites, userProfile, roleConfigs, isAdmin, isManager, teamMembers, allOverrides]);
+
+  const accessibleSiteIds = React.useMemo(() => new Set(accessibleSites.map(s => s.id)), [accessibleSites]);
 
   const requirementsQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
-    const colRef = collection(firestore, 'requirements');
-    
-    if (isAdmin || isProcurement) return query(colRef, limit(1000));
-    if (isManager) {
-        return query(colRef, or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid)));
-    }
-    return query(colRef, where('userId', '==', user.uid));
-  }, [firestore, user, userProfile, isAdmin, isManager, isProcurement]);
+    return query(collection(firestore, 'requirements'), limit(1000));
+  }, [firestore, user, userProfile]);
 
   const { data: requirements, isLoading: reqsLoading } = useCollection<Requirement>(requirementsQuery);
 
@@ -179,39 +218,33 @@ export default function RequirementListPage() {
       case 'yesterday': return { start: format(subDays(today, 1), 'yyyy-MM-dd'), end: format(subDays(today, 1), 'yyyy-MM-dd') };
       case '7days': return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
       case 'lastMonth': return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
-      case 'custom': return { start: startDate || '1970-01-01', end: endDate || '2099-12-31' };
       default: return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
     }
-  }, [dateFilter, startDate, endDate]);
+  }, [dateFilter]);
 
   const sortedAndFilteredReqs = React.useMemo(() => {
     if (!requirements || !userProfile) return [];
     
-    const roleId = userProfile.role ? userProfile.role.toLowerCase().replace(/\s+/g, '-') : 'none';
-    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
-      ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
-
     let result = requirements;
 
-    if (isOwnDataOnly && !isSuper && !isProcurement) {
-      const assignedIds = new Set(userProfile.assignedProjectIds || []);
-      result = result.filter(req => assignedIds.has(req.siteId));
+    if (!isAdmin && !isProcurement) {
+      result = result.filter(req => accessibleSiteIds.has(req.siteId) || req.userId === user?.uid);
     }
 
     const { start, end } = queryDateRange;
 
     result = result.filter(req => {
+      const rDate = req.createdAt?.toDate?.() || new Date(req.createdAt);
+      const rDateStr = format(rDate, 'yyyy-MM-dd');
       const matchesSearch = req.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (req.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (req.itemName || '').toLowerCase().includes(searchTerm.toLowerCase());
       
-      const rDate = req.createdAt?.toDate?.() || new Date(req.createdAt);
-      const rDateStr = format(rDate, 'yyyy-MM-dd');
       const matchesDate = rDateStr >= start && rDateStr <= end;
       const matchesStatus = statusFilter === 'all' || req.status === statusFilter;
+      const matchesSite = siteFilter === 'all' || req.siteName === siteFilter;
       
-      return matchesSearch && matchesDate && matchesStatus;
+      return matchesSearch && matchesDate && matchesStatus && matchesSite;
     });
 
     return result.sort((a, b) => {
@@ -219,7 +252,7 @@ export default function RequirementListPage() {
         const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
     });
-  }, [requirements, searchTerm, statusFilter, queryDateRange, userProfile, roleConfigs, isSuper, isProcurement]);
+  }, [requirements, searchTerm, statusFilter, siteFilter, queryDateRange, userProfile, isAdmin, isProcurement, accessibleSiteIds, user]);
 
   const handleAction = async (remarks: string) => {
     if (!actionState || !user || !userProfile) return;
@@ -252,19 +285,6 @@ export default function RequirementListPage() {
         });
     }
 
-    // Notify Admins
-    const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
-    const adminDocs = await getDocs(adminsQuery);
-    adminDocs.forEach(adminDoc => {
-      sendNotification(firestore, {
-        userId: adminDoc.id,
-        title: "Requirement Processed",
-        description: `Requirement for "${req.itemName}" at "${req.siteName}" updated to ${targetStatus} by ${userProfile.username}.`,
-        link: "/requirements/list",
-        push: true
-      });
-    });
-
     toast({ title: "Status Updated", description: `Requirement set to ${targetStatus}.` });
     setActionState(null);
   };
@@ -279,15 +299,6 @@ export default function RequirementListPage() {
     const urgency = formData.get('urgency') as any;
     const expectedDate = formData.get('expectedDate') as string;
 
-    const timelineEntry: TimelineEntry = {
-      action: "Modified",
-      status: editingReq.status,
-      remarks: `Details corrected by requester.`,
-      userName: userProfile.username || user.email || 'System',
-      userId: user.uid,
-      timestamp: new Date().toISOString()
-    };
-
     try {
       updateDocumentNonBlocking(doc(firestore, 'requirements', editingReq.id), {
         quantity,
@@ -295,7 +306,7 @@ export default function RequirementListPage() {
         expectedDate,
         editedBy: userProfile.username || user.email || 'Unknown',
         editedAt: serverTimestamp(),
-        timeline: arrayUnion(timelineEntry)
+        timeline: arrayUnion({ action: "Modified", status: editingReq.status, remarks: `Details corrected by requester.`, userName: userProfile.username, userId: user.uid, timestamp: new Date().toISOString() })
       });
       toast({ title: "Updated", description: "Requirement details modified." });
       setEditingReq(null);
@@ -315,22 +326,15 @@ export default function RequirementListPage() {
   const handleDelete = async () => {
     if (!deletingReq || !firestore) return;
     deleteDocumentNonBlocking(doc(firestore, 'requirements', deletingReq.id));
-    toast({ title: "Request Removed", description: "Requirement record deleted." });
+    toast({ title: "Request Removed" });
     setDeletingReq(null);
   };
 
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
+    setSiteFilter("all");
     setDateFilter("7days");
-    setStartDate("");
-    setEndDate("");
-  };
-
-  const urgencyConfig = {
-    High: "bg-red-100 text-red-800 border-red-200",
-    Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    Low: "bg-blue-100 text-blue-800 border-blue-200",
   };
 
   if (isProfileLoading || reqsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
@@ -344,18 +348,13 @@ export default function RequirementListPage() {
         <p className="text-muted-foreground text-sm font-medium">Monitoring site material demands across all authorized locations.</p>
       </div>
 
-      <div className="flex flex-col gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+      <div className="flex flex-col gap-4 bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="md:col-span-2 space-y-1.5">
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Search Personnel or Material</Label>
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search..." 
-                className="pl-10 h-11 rounded-sm bg-background border-primary/10 text-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+              <Input placeholder="Search..." className="pl-10 h-11 rounded-sm bg-background border-primary/10 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
           
@@ -364,26 +363,32 @@ export default function RequirementListPage() {
             <Select value={dateFilter} onValueChange={setDateFilter}>
               <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
                 <Calendar className="h-4 w-4 mr-2 opacity-50" />
-                <SelectValue placeholder="Range" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
                 <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
                 <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
                 <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
-                <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="flex items-end gap-2">
-            {dateFilter === 'custom' && (
-              <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95 duration-200">
-                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-11 rounded-sm border-primary/20 text-xs" />
-                <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-11 rounded-sm border-primary/20 text-xs" />
-              </div>
-            )}
-            <Button variant="ghost" size="icon" className="h-11 w-11 rounded-sm text-muted-foreground border border-transparent hover:border-primary/10" onClick={clearFilters}>
+            <div className="flex-1 space-y-1.5">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Filter by Site</Label>
+              <Select value={siteFilter} onValueChange={setSiteFilter}>
+                <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+                  <Building2 className="h-4 w-4 mr-2 opacity-50" />
+                  <SelectValue placeholder="All Sites" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs font-bold uppercase">All Accessible Sites</SelectItem>
+                  {accessibleSites.map(s => <SelectItem key={s.id} value={s.name} className="text-xs font-bold uppercase">{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="ghost" size="icon" className="h-11 w-11 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
               <FilterX className="h-4 w-4" />
             </Button>
           </div>
@@ -391,14 +396,7 @@ export default function RequirementListPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           {['all', 'Pending', 'ManagerApproved', 'Approved', 'Rejected', 'Ordered', 'Delivered'].map(s => (
-            <Badge 
-              key={s} 
-              onClick={() => setStatusFilter(s)}
-              className={cn(
-                "cursor-pointer font-bold text-[10px] h-7 px-3 rounded-sm uppercase tracking-tighter transition-all",
-                statusFilter === s ? "bg-primary text-white border-none shadow-md" : "bg-muted text-muted-foreground hover:bg-primary/5"
-              )}
-            >
+            <Badge key={s} onClick={() => setStatusFilter(s)} className={cn("cursor-pointer font-bold text-[10px] h-7 px-3 rounded-sm uppercase tracking-tighter transition-all", statusFilter === s ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
               {s === 'all' ? 'All Status' : s}
             </Badge>
           ))}
@@ -412,101 +410,28 @@ export default function RequirementListPage() {
           const canAdminAct = (isAdmin || isProcurement) && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
           const canLogisticsAct = (isAdmin || isManager || isProcurement) && (["Approved", "Ordered", "Dispatched", "In-transit"].includes(req.status));
 
-          const lastTimeline = req.timeline && req.timeline.length > 0 ? req.timeline[req.timeline.length - 1] : null;
-
           return (
             <Card key={req.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
               <CardContent className="p-4 space-y-4">
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex flex-col gap-1 min-w-0">
                     <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-1.5">
-                      <Calendar className="h-3 w-3" />
-                      Requested {formatTimestamp(req.createdAt)}
+                      <Calendar className="h-3 w-3" /> {formatTimestamp(req.createdAt)}
                     </span>
                     <h3 className="font-bold text-sm leading-tight text-foreground truncate">{req.itemName}</h3>
                   </div>
-                  <Badge variant="outline" className={cn("rounded-sm text-[9px] font-black uppercase shrink-0 px-2 h-5", (urgencyConfig as any)[req.urgency] || urgencyConfig.Medium)}>
-                    {req.urgency}
-                  </Badge>
+                  <Badge variant="outline" className={cn("rounded-sm text-[9px] font-black uppercase shrink-0 px-2 h-5", req.urgency === 'High' ? "bg-red-50 text-red-700 border-red-200" : "bg-blue-50 text-blue-700")}>{req.urgency}</Badge>
                 </div>
-                
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-tight truncate max-w-[150px]">
-                      <Building2 className="h-3.5 w-3.5 text-primary/60" />
-                      <span>{req.siteName}</span>
-                    </div>
-                    <StatusBadge status={req.status} />
-                  </div>
-
-                  {lastTimeline && (
-                    <div className="bg-primary/[0.03] p-2 rounded-sm border border-primary/5 space-y-1">
-                      <p className="text-[8px] font-black uppercase text-primary/60 tracking-wider">Latest Action</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-foreground">{lastTimeline.userName}</span>
-                        <span className="text-[9px] font-mono text-muted-foreground">{formatTimestamp(lastTimeline.timestamp)}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between py-2 border-y border-primary/5">
-                    <div className="flex flex-col">
-                      <span className="text-[8px] font-black text-muted-foreground uppercase">Target Date</span>
-                      <span className="text-xs font-bold">{req.expectedDate}</span>
-                    </div>
-                    <span className="text-sm font-black text-primary">{req.quantity} {req.unit}</span>
-                  </div>
-                </div>
-
+                <div className="flex items-center justify-between"><div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-tight truncate max-w-[150px]"><Building2 className="h-3.5 w-3.5 text-primary/60" /><span>{req.siteName}</span></div><StatusBadge status={req.status} /></div>
+                <div className="flex items-center justify-between py-2 border-y border-primary/5"><div className="flex flex-col"><span className="text-[8px] font-black text-muted-foreground uppercase">Target Date</span><span className="text-xs font-bold">{req.expectedDate}</span></div><span className="text-sm font-black text-primary">{req.quantity} {req.unit}</span></div>
                 <div className="flex items-center justify-between pt-2">
-                  <div className="flex gap-2 items-center">
-                    {(canManagerAct || canAdminAct) && (
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve">
-                          <CircleCheck className="h-5 w-5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: 'Rejected' })} title="Reject">
-                          <CircleX className="h-5 w-5" />
-                        </Button>
-                      </div>
-                    )}
-                    {canLogisticsAct && (
-                      <Select defaultValue={req.status} onValueChange={(val) => setActionState({ req, targetStatus: val })}>
-                        <SelectTrigger className="w-[120px] h-8 text-[10px] font-bold rounded-sm border-primary/20"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Approved" className="text-[10px] font-bold">Approved</SelectItem>
-                            {LOGISTICS_STATUSES.map(opt => (<SelectItem key={opt} value={opt} className="text-[10px] font-medium">{opt}</SelectItem>))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(req)} title="WhatsApp">
-                      <MessageCircle className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm" onClick={() => setHistoryReq(req)} title="Timeline">
-                      <History className="h-4 w-4" />
-                    </Button>
-                    {isOwner && req.status === 'Pending' && (
-                      <>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingReq(req)} title="Edit">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingReq(req)} title="Delete">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                  <div className="flex gap-1">{(canManagerAct || canAdminAct) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })}><CircleCheck className="h-5 w-5" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setActionState({ req, targetStatus: 'Rejected' })}><CircleX className="h-5 w-5" /></Button></>)}</div>
+                  <div className="flex gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(req)}><MessageCircle className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm" onClick={() => setHistoryReq(req)}><History className="h-4 w-4" /></Button>{isOwner && req.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingReq(req)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingReq(req)}><Trash2 className="h-4 w-4" /></Button></>)}</div>
                 </div>
               </CardContent>
             </Card>
           );
-        }) : (
-          <div className="text-center py-20 text-muted-foreground italic bg-muted/10 rounded-sm border border-dashed">
-            No matching requirements discovered
-          </div>
-        )}
+        }) : <div className="text-center py-20 text-muted-foreground italic">No matching records found.</div>}
       </div>
 
       <div className="hidden md:block">
@@ -533,84 +458,26 @@ export default function RequirementListPage() {
                     const canAdminAct = (isAdmin || isProcurement) && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
                     const canLogisticsAct = (isAdmin || isManager || isProcurement) && (["Approved", "Ordered", "Dispatched", "In-transit"].includes(req.status));
 
-                    const lastTimeline = req.timeline && req.timeline.length > 0 ? req.timeline[req.timeline.length - 1] : null;
-
                     return (
                       <TableRow key={req.id} className="hover:bg-muted/5 transition-colors">
-                        <TableCell className="px-6 font-mono text-[10px] font-bold text-muted-foreground whitespace-nowrap">
-                            {formatTimestamp(req.createdAt)}
-                        </TableCell>
-                        <TableCell>
-                            <div className="font-bold text-sm text-foreground">{req.siteName}</div>
-                            <div className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter mt-0.5">{req.userName}</div>
-                        </TableCell>
-                        <TableCell>
-                            <div className="text-sm font-semibold whitespace-pre-wrap max-w-xs">{req.itemName}</div>
-                        </TableCell>
-                        <TableCell>
-                            <Badge variant="outline" className={cn("rounded-sm text-[9px] font-black uppercase h-5 px-1.5", (urgencyConfig as any)[req.urgency] || urgencyConfig.Medium)}>
-                                {req.urgency}
-                            </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                            <div className="font-mono font-black text-sm text-primary">{req.quantity}</div>
-                            <div className="text-[10px] text-muted-foreground uppercase font-bold">{req.unit}</div>
-                        </TableCell>
-                        <TableCell className="text-xs font-bold text-muted-foreground">
-                            {req.expectedDate}
-                        </TableCell>
-                        <TableCell>
-                            <div className="flex flex-col gap-1.5">
-                              <StatusBadge status={req.status} />
-                              {lastTimeline && (
-                                <div className="flex flex-col gap-0.5 px-1">
-                                  <span className="text-[8px] font-black uppercase text-primary/60 tracking-tight">{lastTimeline.action}</span>
-                                  <div className="flex items-center gap-1.5 text-[8px] font-bold text-muted-foreground uppercase">
-                                    <User className="h-2 w-2" /> {lastTimeline.userName}
-                                    <Clock className="h-2 w-2 ml-1" /> {formatTimestamp(lastTimeline.timestamp)}
-                                  </div>
-                                </div>
-                              )}
-                              {canLogisticsAct && (
-                                <Select defaultValue={req.status} onValueChange={(val) => setActionState({ req, targetStatus: val })}>
-                                    <SelectTrigger className="w-[120px] h-7 text-[10px] font-bold rounded-sm border-primary/20 bg-muted/10"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Approved" className="text-[10px] font-bold">Approved</SelectItem>
-                                        {LOGISTICS_STATUSES.map(opt => (<SelectItem key={opt} value={opt} className="text-[10px] font-medium">{opt}</SelectItem>))}
-                                    </SelectContent>
-                                </Select>
-                              )}
-                            </div>
-                        </TableCell>
+                        <TableCell className="px-6 font-mono text-[10px] font-bold text-muted-foreground whitespace-nowrap">{formatTimestamp(req.createdAt)}</TableCell>
+                        <TableCell><div className="font-bold text-sm text-foreground">{req.siteName}</div><div className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter mt-0.5">{req.userName}</div></TableCell>
+                        <TableCell><div className="text-sm font-semibold whitespace-pre-wrap max-w-xs">{req.itemName}</div></TableCell>
+                        <TableCell><Badge variant="outline" className={cn("rounded-sm text-[9px] font-black uppercase h-5 px-1.5", req.urgency === 'High' ? "bg-red-50 text-red-700 border-red-200" : "bg-blue-50 text-blue-700")}>{req.urgency}</Badge></TableCell>
+                        <TableCell className="text-center"><div className="font-mono font-black text-sm text-primary">{req.quantity}</div><div className="text-[10px] text-muted-foreground uppercase font-bold">{req.unit}</div></TableCell>
+                        <TableCell className="text-xs font-bold text-muted-foreground">{req.expectedDate}</TableCell>
+                        <TableCell><div className="flex flex-col gap-1.5"><StatusBadge status={req.status} />{canLogisticsAct && (<Select defaultValue={req.status} onValueChange={(val) => setActionState({ req, targetStatus: val })}><SelectTrigger className="w-[120px] h-7 text-[10px] font-bold rounded-sm border-primary/20"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Approved" className="text-[10px] font-bold">Approved</SelectItem>{LOGISTICS_STATUSES.map(opt => (<SelectItem key={opt} value={opt} className="text-[10px] font-medium">{opt}</SelectItem>))}</SelectContent></Select>)}</div></TableCell>
                         <TableCell className="text-right px-6">
                             <div className="flex justify-end items-center gap-1">
-                                {(canManagerAct || canAdminAct) && (
-                                  <div className="flex gap-1">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve">
-                                      <CircleCheck className="h-5 w-5" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:bg-red-50 rounded-sm" onClick={() => setActionState({ req, targetStatus: 'Rejected' })} title="Reject">
-                                      <CircleX className="h-5 w-5" />
-                                    </Button>
-                                  </div>
-                                )}
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => handleWhatsAppShare(req)} title="WhatsApp">
-                                  <MessageCircle className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted rounded-sm" onClick={() => setHistoryReq(req)} title="Timeline"><History className="h-4 w-4" /></Button>
-                                {isOwner && req.status === 'Pending' && (
-                                    <div className="flex gap-1">
-                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/5 rounded-sm" onClick={() => setEditingReq(req)} title="Edit"><Pencil className="h-4 w-4" /></Button>
-                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/5 rounded-sm" onClick={() => setDeletingReq(req)} title="Delete"><Trash2 className="h-4 w-4" /></Button>
-                                    </div>
-                                )}
+                                {(canManagerAct || canAdminAct) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })}><CircleCheck className="h-5 w-5" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setActionState({ req, targetStatus: 'Rejected' })}><CircleX className="h-5 w-5" /></Button></>)}
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(req)}><MessageCircle className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted rounded-sm" onClick={() => setHistoryReq(req)}><History className="h-4 w-4" /></Button>
+                                {isOwner && req.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingReq(req)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingReq(req)}><Trash2 className="h-4 w-4" /></Button></>)}
                             </div>
                         </TableCell>
                       </TableRow>
                     );
-                  }) : (
-                    <TableRow><TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic">No requirements logged</TableCell></TableRow>
-                  )}
+                  }) : <TableRow><TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic">No requirements logged</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </div>
@@ -619,107 +486,12 @@ export default function RequirementListPage() {
       </div>
 
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
-        <DialogContent className="rounded-sm max-w-md">
-          <DialogHeader>
-            <DialogTitle className="uppercase tracking-tight font-black">Process Authorization</DialogTitle>
-            <DialogDescription>Setting final lifecycle status to: <strong>{actionState?.targetStatus}</strong>.</DialogDescription>
-          </DialogHeader>
-          <div className="py-6 space-y-3">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Feedback / Remarks</Label>
-            <Textarea id="action-remarks-input" placeholder="Explain the rationale for this status update..." className="min-h-[120px] rounded-sm focus-visible:ring-primary/20" />
-          </div>
-          <DialogFooter className="gap-2">
-            <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold h-11 px-6 uppercase text-[10px]">Cancel</Button></DialogClose>
-            <Button 
-              className={cn("rounded-sm font-black h-11 px-8 uppercase text-[10px] tracking-widest shadow-lg", actionState?.targetStatus === 'Rejected' ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700")}
-              onClick={() => handleAction((document.getElementById('action-remarks-input') as HTMLTextAreaElement)?.value || "")}
-            >
-              Confirm Status
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+        <DialogContent className="rounded-sm max-w-md"><DialogHeader><DialogTitle className="uppercase tracking-tight font-black">Process Authorization</DialogTitle><DialogDescription>Setting final lifecycle status to: <strong>{actionState?.targetStatus}</strong>.</DialogDescription></DialogHeader><div className="py-6 space-y-3"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Feedback / Remarks</Label><Textarea id="action-remarks-input" placeholder="Enter remarks..." className="min-h-[120px] rounded-sm" /></div><DialogFooter className="gap-2"><DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose><Button className={cn("rounded-sm font-black uppercase text-[10px]", actionState?.targetStatus === 'Rejected' ? "bg-red-600" : "bg-green-600")} onClick={() => handleAction((document.getElementById('action-remarks-input') as HTMLTextAreaElement)?.value || "")}>Confirm Status</Button></DialogFooter></DialogContent>
       </Dialog>
 
       <Dialog open={!!historyReq} onOpenChange={(o) => !o && setHistoryReq(null)}>
-        <DialogContent className="rounded-sm max-lg p-0 overflow-hidden border-none shadow-2xl bg-background">
-          <DialogHeader className="p-6 bg-primary/5 border-b">
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-2 rounded-sm"><History className="h-5 w-5 text-primary" /></div>
-              <DialogTitle className="text-xl font-black uppercase tracking-tight">Lifecycle Audit</DialogTitle>
-            </div>
-            <DialogDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Item: {historyReq?.itemName}</DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[450px]">
-            <div className="p-8 space-y-8 relative border-l-2 border-muted ml-8 my-4">
-              {historyReq?.timeline?.map((entry, idx) => (
-                <div key={idx} className="relative">
-                  <div className="absolute -left-[39px] top-1 h-3 w-3 rounded-full bg-primary ring-4 ring-background shadow-sm" />
-                  <div className="flex flex-col gap-1.5 text-left">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-black text-primary uppercase tracking-tight">{entry.action} — {entry.userName}</span>
-                      <p className="text-[9px] text-muted-foreground font-mono font-bold uppercase">{entry.timestamp ? format(new Date(entry.timestamp), 'dd MMM yy HH:mm') : '—'}</p>
-                    </div>
-                    <p className="text-xs font-medium leading-relaxed italic text-foreground/80">"{entry.remarks}"</p>
-                    <StatusBadge status={entry.status} className="w-fit mt-1 h-4 px-1.5" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-          <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 w-full">Close Audit</Button></DialogClose></DialogFooter>
-        </DialogContent>
+        <DialogContent className="rounded-sm max-lg p-0 overflow-hidden flex flex-col h-[70vh] shadow-2xl border-none"><DialogHeader className="p-6 bg-primary/5 border-b"><DialogTitle className="text-xl font-black uppercase tracking-tight">Lifecycle Audit</DialogTitle></DialogHeader><ScrollArea className="flex-1"><div className="p-8 space-y-8 relative border-l-2 border-muted ml-8 my-4">{historyReq?.timeline?.map((entry, idx) => (<div key={idx} className="relative"><div className="absolute -left-[39px] top-1 h-3 w-3 rounded-full bg-primary ring-4 ring-background" /><div className="flex flex-col gap-1.5 text-left"><span className="text-[11px] font-black text-primary uppercase tracking-tight">{entry.action} — {entry.userName}</span><p className="text-[9px] text-muted-foreground font-mono font-bold uppercase">{formatTimestamp(entry.timestamp)}</p><p className="text-xs font-medium italic text-foreground/80">"{entry.remarks}"</p><StatusBadge status={entry.status} className="w-fit mt-1 h-4 px-1.5" /></div></div>))}</div></ScrollArea><DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 w-full">Close Audit</Button></DialogClose></DialogFooter></DialogContent>
       </Dialog>
-
-      <Dialog open={!!editingReq} onOpenChange={(o) => !o && setEditingReq(null)}>
-        <DialogContent className="rounded-sm max-w-md p-0 overflow-hidden border-none shadow-2xl bg-background">
-            <DialogHeader className="p-6 bg-primary/5 border-b">
-                <DialogTitle className="text-xl font-black uppercase tracking-tight">Modify Requirement</DialogTitle>
-                <DialogDescription className="text-xs font-medium">Refining request for <strong>{editingReq?.itemName}</strong>.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleEditSave} className="p-6 space-y-6">
-                <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Authorized Quantity ({editingReq?.unit})</Label>
-                    <Input name="quantity" type="number" step="0.01" defaultValue={editingReq?.quantity} required className="rounded-sm font-mono h-11" />
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Urgency Scale</Label>
-                      <Select name="urgency" defaultValue={editingReq?.urgency}>
-                          <SelectTrigger className="rounded-sm h-11"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                              <SelectItem value="High" className="text-red-600 font-bold">High</SelectItem>
-                              <SelectItem value="Medium" className="font-bold">Medium</SelectItem>
-                              <SelectItem value="Low" className="font-bold">Low</SelectItem>
-                          </SelectContent>
-                      </Select>
-                  </div>
-                  <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Expected Date</Label>
-                      <Input name="expectedDate" type="date" defaultValue={editingReq?.expectedDate} required className="rounded-sm h-11" />
-                  </div>
-                </div>
-                <DialogFooter className="pt-4 border-t gap-3">
-                    <Button type="button" variant="outline" onClick={() => setEditingReq(null)} disabled={isSaving} className="rounded-sm font-bold uppercase text-[10px] h-11 flex-1">Cancel</Button>
-                    <Button type="submit" disabled={isSaving} className="rounded-sm font-black uppercase text-[10px] h-11 flex-1 shadow-lg">
-                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
-                    </Button>
-                </DialogFooter>
-            </form>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={!!deletingReq} onOpenChange={(o) => !o && setDeletingReq(null)}>
-        <AlertDialogContent className="rounded-sm max-md">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="uppercase font-black tracking-tight text-destructive flex items-center gap-2"><Trash2 className="h-5 w-5" /> Confirm Removal</AlertDialogTitle>
-              <AlertDialogDescription className="text-sm font-medium leading-relaxed">Permanently withdraw this material request?</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-10 px-6">Back</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] h-10 px-6 shadow-md">Confirm Deletion</AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

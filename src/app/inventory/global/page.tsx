@@ -1,9 +1,8 @@
-
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, orderBy, doc } from "firebase/firestore";
+import { collection, query, orderBy, doc, where } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +14,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { slugifyRole } from "@/lib/access-control";
 
 type InventoryItem = {
   id: string;
@@ -30,6 +30,13 @@ type InventoryItem = {
 type AccessConfig = {
   id: string;
   ownDataOnly?: boolean;
+};
+
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
 };
 
 const formatTimestamp = (ts: any) => {
@@ -49,7 +56,53 @@ export default function GlobalInventoryPage() {
   const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: allSites } = useCollection<{ name: string, id: string }>(sitesQuery);
+
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
   const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
+
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<any>(teamQuery);
+
+  const accessibleSiteIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    if (!allSites || !userProfile) return ids;
+    if (isAdmin) {
+      allSites.forEach(s => ids.add(s.id));
+      return ids;
+    }
+    
+    const roleId = userProfile.role ? slugifyRole(userProfile.role) : 'none';
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
+
+    if (!isOwnDataOnly) {
+      allSites.forEach(s => ids.add(s.id));
+      return ids;
+    }
+
+    if (isManager) {
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => ids.add(o.siteId));
+      teamMembers?.forEach(member => {
+        (member.assignedProjectIds || []).forEach(sid => {
+          const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
+          if (!hasOtherOverride) ids.add(sid);
+        });
+      });
+    } else {
+      (userProfile.assignedProjectIds || []).forEach(id => ids.add(id));
+    }
+    return ids;
+  }, [allSites, userProfile, roleConfigs, isAdmin, isManager, teamMembers, allOverrides]);
 
   const inventoryQuery = useMemoFirebase(() => 
     query(collection(firestore, 'project_inventory'), orderBy('siteName', 'asc')), 
@@ -58,24 +111,19 @@ export default function GlobalInventoryPage() {
   const { data: inventory, isLoading } = useCollection<InventoryItem>(inventoryQuery);
 
   const filteredInventory = React.useMemo(() => {
-    if (!inventory || !userProfile) return [];
-
-    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
-      ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
-
+    if (!inventory) return [];
+    
     let list = inventory;
 
-    if (isOwnDataOnly && !isSuper) {
-      const assignedIds = new Set(userProfile.assignedProjectIds || []);
-      list = list.filter(item => assignedIds.has(item.siteId));
+    if (!isAdmin) {
+      list = list.filter(item => accessibleSiteIds.has(item.siteId));
     }
 
     return list.filter(item => 
       item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.siteName.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [inventory, searchTerm, userProfile, roleConfigs, isSuper]);
+  }, [inventory, searchTerm, isAdmin, accessibleSiteIds]);
 
   const handleExport = () => {
     if (filteredInventory.length === 0) return;
