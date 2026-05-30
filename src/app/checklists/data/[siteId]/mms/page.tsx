@@ -207,16 +207,9 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       let valA: any = '';
       let valB: any = '';
 
-      if (key === 'date') {
-        valA = a.createdAt?.toDate?.()?.getTime() || 0;
-        valB = b.createdAt?.toDate?.()?.getTime() || 0;
-      } else if (key === 'user') {
-        valA = a.userName.toLowerCase();
-        valB = b.userName.toLowerCase();
-      } else if (key === 'comments') {
-        valA = a.comments?.length || 0;
-        valB = b.comments?.length || 0;
-      }
+      if (key === 'date') { valA = a.createdAt?.toDate?.()?.getTime() || 0; valB = b.createdAt?.toDate?.()?.getTime() || 0; }
+      else if (key === 'user') { valA = a.userName.toLowerCase(); valB = b.userName.toLowerCase(); }
+      else if (key === 'comments') { valA = a.comments?.length || 0; valB = b.comments?.length || 0; }
 
       if (valA < valB) return direction === 'asc' ? -1 : 1;
       if (valA > valB) return direction === 'asc' ? 1 : -1;
@@ -818,6 +811,44 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                       )}
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {viewingInstallation?.otherRemarks || (viewingInstallation?.otherAttachments && viewingInstallation.otherAttachments.length > 0) ? (
+                <div className="space-y-6 pt-6 border-t border-dashed">
+                  <Label className="text-[9px] md:text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4" /> Additional Observations
+                  </Label>
+                  <div className="p-4 sm:p-6 bg-muted/5 border rounded-sm space-y-4">
+                    {viewingInstallation.otherRemarks && (
+                      <p className="text-sm italic text-foreground/80 leading-relaxed">"{viewingInstallation.otherRemarks}"</p>
+                    )}
+                    {viewingInstallation.otherAttachments && viewingInstallation.otherAttachments.length > 0 && (
+                      <div className="flex flex-wrap gap-3">
+                        {viewingInstallation.otherAttachments.map((file, fIdx) => (
+                          <div key={fIdx} className="relative aspect-video w-24 md:w-40 rounded-sm overflow-hidden border shadow-sm shrink-0 bg-muted cursor-pointer" onClick={() => openViewer(file, viewingInstallation.otherAttachments!)}>
+                            {isVideo(file) ? <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Film className="h-6 w-6 md:h-8 md:w-8 text-white opacity-40" /><PlayCircle className="absolute h-6 w-6 md:h-8 md:w-8 text-white" /></div> : <img src={file.url} className="w-full h-full object-cover" alt={file.name} />}
+                            <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Maximize2 className="h-4 w-4 text-white" /></div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="space-y-4 pt-6 border-t border-dashed">
+                <Label className="text-[9px] md:text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" /> Compliance Undertaking
+                </Label>
+                <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-sm flex items-start gap-3">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-emerald-900 leading-relaxed">
+                      Confirmed: I, {viewingInstallation?.userName}, hereby undertake and confirm that the information provided above is true and accurate as of the date of submission.
+                    </p>
+                    <p className="text-[8px] font-black text-emerald-700 uppercase tracking-tighter">Digitally Verified on {viewingInstallation?.createdAt ? format(viewingInstallation.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : '—'}</p>
+                  </div>
                 </div>
               </div>
             </div>
