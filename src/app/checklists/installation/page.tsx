@@ -45,7 +45,7 @@ import { sendNotification } from "@/lib/notifications";
 import { motion } from "framer-motion";
 
 const checkItemSchema = z.object({
-  remarks: z.string().optional(),
+  remarks: z.string().min(1, "Findings/Remarks are required for this check"),
   localFiles: z.array(z.any()).default([]),
 });
 
@@ -54,7 +54,9 @@ const installationSchema = z.object({
   siteName: z.string(),
   projectCompany: z.string().optional(),
   tableNumber: z.string().min(1, "Table Number is required"),
-  tableSize: z.string().min(1, "Size of Table is required"),
+  tableSize: z.string()
+    .min(1, "Size of Table is required")
+    .refine(val => !val.includes(" "), "Spaces are not allowed in Size of Table"),
   columnCount: z.coerce.number().min(1, "Number of Columns is required"),
   moduleCount: z.coerce.number().min(1, "Number of Modules is required"),
   checks: z.object({
@@ -73,6 +75,22 @@ const installationSchema = z.object({
   undertaking: z.boolean().refine(val => val === true, {
     message: "You must agree to the undertaking."
   }),
+}).refine(data => {
+  if (data.customerRepPresent === "Yes" && (!data.customerRepName || data.customerRepName.trim() === "")) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Representative Name is required when present",
+  path: ["customerRepName"]
+}).refine(data => {
+  if (data.customerRepPresent === "Yes" && (!data.customerRepRemarks || data.customerRepRemarks.trim() === "")) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Representative feedback is required when present",
+  path: ["customerRepRemarks"]
 });
 
 type Site = { id: string; name: string; projectCompany?: string };
@@ -147,7 +165,7 @@ export default function TableLevelMMSChecklistPage() {
           maxWidthOrHeight: 1920,
           alwaysKeepResolution: true,
           initialQuality: 0.8,
-          fileType: 'image/jpeg' // Force conversion to JPEG for universal browser support
+          fileType: 'image/jpeg' 
         });
       } catch (e) {
         console.warn("Compression skipped", e);
@@ -185,7 +203,6 @@ export default function TableLevelMMSChecklistPage() {
     try {
       const finalTableNumber = values.tableNumber.startsWith("T - ") ? values.tableNumber : `T - ${values.tableNumber}`;
 
-      // Restriction: Check for duplicate checklist for same table at same site
       const duplicateQuery = query(
         collection(firestore, 'installation_checklists'),
         where('siteId', '==', values.siteId),
@@ -253,7 +270,6 @@ export default function TableLevelMMSChecklistPage() {
         createdAt: serverTimestamp(),
       });
 
-      // Notify Admins
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
@@ -336,7 +352,7 @@ export default function TableLevelMMSChecklistPage() {
         <h1 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <ClipboardCheck className="h-7 w-7" /> Table Level MMS Audit
         </h1>
-        <p className="text-muted-foreground font-medium text-sm">Comprehensive field verification for solar tables.</p>
+        <p className="text-muted-foreground font-medium text-sm">Comprehensive field verification for solar tables. All fields except Additional Feedback are mandatory.</p>
       </div>
 
       <Form {...form}>
@@ -350,7 +366,7 @@ export default function TableLevelMMSChecklistPage() {
             <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField control={form.control} name="siteId" render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Project Name</FormLabel>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Project Name *</FormLabel>
                   <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -398,7 +414,7 @@ export default function TableLevelMMSChecklistPage() {
 
               <FormField control={form.control} name="tableNumber" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Table Number</FormLabel>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Table Number *</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <span className="absolute left-3 top-3 text-sm font-bold text-muted-foreground">T - </span>
@@ -411,13 +427,13 @@ export default function TableLevelMMSChecklistPage() {
 
               <FormField control={form.control} name="tableSize" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Size of Table</FormLabel>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Size of Table * (No Spaces)</FormLabel>
                   <FormControl>
                     <Input 
                       placeholder="e.g. 2P36" 
                       {...field} 
                       className="h-11 rounded-sm" 
-                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                      onChange={(e) => field.onChange(e.target.value.toUpperCase().replace(/\s+/g, ''))}
                     />
                   </FormControl>
                   <FormMessage />
@@ -427,14 +443,14 @@ export default function TableLevelMMSChecklistPage() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="columnCount" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Columns</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Columns *</FormLabel>
                     <FormControl><Input type="number" {...field} className="h-11 rounded-sm" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="moduleCount" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Modules</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Modules *</FormLabel>
                     <FormControl><Input type="number" {...field} className="h-11 rounded-sm" /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -445,14 +461,14 @@ export default function TableLevelMMSChecklistPage() {
 
           <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
             <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest">Verification Points</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-widest">Verification Points *</CardTitle>
             </CardHeader>
             <CardContent className="p-0 divide-y">
               {Object.keys(CHECK_LABELS).map((key) => (
                 <div key={key} className="p-4 sm:p-6 space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">
-                      {(CHECK_LABELS as any)[key]}
+                      {(CHECK_LABELS as any)[key]} *
                     </Label>
                     
                     <FormField control={form.control} name={`checks.${key}.localFiles` as any} render={({ field: { value, onChange } }) => (
@@ -508,7 +524,12 @@ export default function TableLevelMMSChecklistPage() {
                     )} />
                   </div>
                   <FormField control={form.control} name={`checks.${key}.remarks` as any} render={({ field }) => (
-                    <FormControl><Textarea placeholder="Enter findings..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm" /></FormControl>
+                    <FormControl>
+                      <div className="space-y-1">
+                        <Textarea placeholder="Enter mandatory findings..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm" />
+                        <FormMessage />
+                      </div>
+                    </FormControl>
                   )} />
                 </div>
               ))}
@@ -517,7 +538,7 @@ export default function TableLevelMMSChecklistPage() {
 
           <Card className="rounded-sm shadow-md border-primary/10">
             <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest">Additional Feedback</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-widest">Additional Feedback (Optional)</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
               <FormField control={form.control} name="otherRemarks" render={({ field }) => (
@@ -580,12 +601,12 @@ export default function TableLevelMMSChecklistPage() {
 
           <Card className="rounded-sm shadow-md border-primary/10">
             <CardHeader className="bg-muted/5 border-b py-4">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest">Customer Verification</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-widest">Customer Verification *</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-6">
               <FormField control={form.control} name="customerRepPresent" render={({ field }) => (
                 <FormItem className="space-y-3">
-                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Is a Representative of Project Customer present at site?</FormLabel>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Is a Representative of Project Customer present at site? *</FormLabel>
                   <FormControl>
                     <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6">
                       <div className="flex items-center space-x-2"><RadioGroupItem value="Yes" id="rep-yes" /><Label htmlFor="rep-yes" className="font-bold cursor-pointer text-xs">Yes</Label></div>
@@ -599,7 +620,7 @@ export default function TableLevelMMSChecklistPage() {
                 <div className="space-y-4 animate-in fade-in duration-300">
                   <FormField control={form.control} name="customerRepName" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Representative Name</FormLabel>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Representative Name *</FormLabel>
                       <FormControl>
                         <Input placeholder="Full name" {...field} className="h-11 rounded-sm" />
                       </FormControl>
@@ -608,7 +629,7 @@ export default function TableLevelMMSChecklistPage() {
                   )} />
                   <FormField control={form.control} name="customerRepRemarks" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Representative Feedback</FormLabel>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Representative Feedback *</FormLabel>
                       <FormControl><Textarea placeholder="Client comments..." rows={3} {...field} className="rounded-sm bg-muted/5 text-sm" /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -624,8 +645,8 @@ export default function TableLevelMMSChecklistPage() {
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-4 sm:p-6 rounded-sm bg-primary/5 border border-primary/20">
                   <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="mt-1" /></FormControl>
                   <div className="space-y-1">
-                    <FormLabel className="text-xs sm:text-sm text-foreground leading-relaxed cursor-pointer">
-                      I, {userProfile?.username || user?.email}, hereby undertake and confirm that the information provided above is true and accurate as of {format(new Date(), 'dd MMMM yyyy')}.
+                    <FormLabel className="text-xs sm:text-sm text-foreground leading-relaxed cursor-pointer font-bold">
+                      I, {userProfile?.username || user?.email}, hereby undertake and confirm that the information provided above is true and accurate as of {format(new Date(), 'dd MMMM yyyy')}. *
                     </FormLabel>
                     <FormMessage />
                   </div>
