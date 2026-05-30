@@ -269,16 +269,28 @@ export default function RecordMovementPage() {
       const isTransfer = values.sourceOrDestinationType === 'Site';
       const status = isTransfer ? 'Pending' : 'Recorded';
 
+      // 1. Resolve Effective Recording Manager (respecting overrides)
+      const recordingOverridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', selectedSiteId)));
+      const recordingOverridesSnap = await getDocs(recordingOverridesQ);
+      const effectiveSiteManagerId = !recordingOverridesSnap.empty ? recordingOverridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
+
+      // 2. Resolve Effective Receiving Manager for Transfers (respecting overrides)
       let receivingManagerId = null;
       if (isTransfer) {
         const destSiteName = values.movementType === 'Outward' ? values.sourceOrDestination : values.siteName;
         const destSiteId = allSites?.find(s => s.name === destSiteName)?.id;
         
         if (destSiteId) {
-          const usersQ = query(collection(firestore, 'users'), where('role', '==', 'Site Manager'));
-          const usersSnap = await getDocs(usersQ);
-          const manager = usersSnap.docs.find(d => (d.data().assignedProjectIds || []).includes(destSiteId));
-          receivingManagerId = manager?.id || null;
+          const receivingOverridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', destSiteId)));
+          const receivingOverridesSnap = await getDocs(receivingOverridesQ);
+          if (!receivingOverridesSnap.empty) {
+            receivingManagerId = receivingOverridesSnap.docs[0].data().managerId;
+          } else {
+            const usersQ = query(collection(firestore, 'users'), where('role', '==', 'Site Manager'));
+            const usersSnap = await getDocs(usersQ);
+            const manager = usersSnap.docs.find(d => (d.data().assignedProjectIds || []).includes(destSiteId));
+            receivingManagerId = manager?.id || null;
+          }
         }
       }
 
@@ -292,6 +304,7 @@ export default function RecordMovementPage() {
           userId: user.uid,
           userName: userProfile.username,
           siteId: selectedSiteId,
+          siteManagerId: effectiveSiteManagerId,
           status,
           receivingManagerId,
           createdAt: serverTimestamp()

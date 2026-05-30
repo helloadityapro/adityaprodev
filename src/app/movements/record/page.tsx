@@ -91,6 +91,13 @@ type AccessConfig = {
   ownDataOnly?: boolean;
 };
 
+type MappingOverride = {
+  id: string;
+  engineerId: string;
+  siteId: string;
+  managerId: string;
+};
+
 export default function RecordMovementPage() {
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
@@ -106,12 +113,22 @@ export default function RecordMovementPage() {
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
+
+  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
@@ -260,17 +277,28 @@ export default function RecordMovementPage() {
       const isTransfer = values.sourceOrDestinationType === 'Site';
       const status = isTransfer ? 'Pending' : 'Recorded';
 
-      // Find receiving manager for transfers
+      // 1. Resolve Effective Recording Manager (respecting overrides)
+      const recordingOverridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', selectedSiteId)));
+      const recordingOverridesSnap = await getDocs(recordingOverridesQ);
+      const effectiveSiteManagerId = !recordingOverridesSnap.empty ? recordingOverridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
+
+      // 2. Resolve Effective Receiving Manager for Transfers (respecting overrides)
       let receivingManagerId = null;
       if (isTransfer) {
         const destSiteName = values.movementType === 'Outward' ? values.sourceOrDestination : values.siteName;
         const destSiteId = allSites?.find(s => s.name === destSiteName)?.id;
         
         if (destSiteId) {
-          const usersQ = query(collection(firestore, 'users'), where('role', '==', 'Site Manager'));
-          const usersSnap = await getDocs(usersQ);
-          const manager = usersSnap.docs.find(d => (d.data().assignedProjectIds || []).includes(destSiteId));
-          receivingManagerId = manager?.id || null;
+          const receivingOverridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', destSiteId)));
+          const receivingOverridesSnap = await getDocs(receivingOverridesQ);
+          if (!receivingOverridesSnap.empty) {
+            receivingManagerId = receivingOverridesSnap.docs[0].data().managerId;
+          } else {
+            const usersQ = query(collection(firestore, 'users'), where('role', '==', 'Site Manager'));
+            const usersSnap = await getDocs(usersQ);
+            const manager = usersSnap.docs.find(d => (d.data().assignedProjectIds || []).includes(destSiteId));
+            receivingManagerId = manager?.id || null;
+          }
         }
       }
 
@@ -284,6 +312,7 @@ export default function RecordMovementPage() {
           userId: user.uid,
           userName: userProfile.username,
           siteId: selectedSiteId,
+          siteManagerId: effectiveSiteManagerId,
           status,
           receivingManagerId,
           createdAt: serverTimestamp()
@@ -327,10 +356,9 @@ export default function RecordMovementPage() {
       }
 
       // Notify Site Manager if recorder is an engineer
-      const managerId = userProfile.siteManagerId;
-      if (managerId && managerId !== receivingManagerId) {
+      if (effectiveSiteManagerId && effectiveSiteManagerId !== receivingManagerId && effectiveSiteManagerId !== user.uid) {
         sendNotification(firestore, {
-          userId: managerId,
+          userId: effectiveSiteManagerId,
           title: "Material Movement Logged",
           description: `${userProfile.username} recorded a ${values.movementType.toLowerCase()} log for ${values.siteName}.`,
           link: "/movements/list",
@@ -341,7 +369,7 @@ export default function RecordMovementPage() {
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
-        if (adminDoc.id === user.uid || adminDoc.id === receivingManagerId || adminDoc.id === managerId) return;
+        if (adminDoc.id === user.uid || adminDoc.id === receivingManagerId || adminDoc.id === effectiveSiteManagerId) return;
         sendNotification(firestore, {
           userId: adminDoc.id,
           title: "New Movement Log",
@@ -365,17 +393,25 @@ export default function RecordMovementPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
-      ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
-
-    if (isSuper) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-    if (isOwnDataOnly || !isAdmin) {
-      const assignedIds = new Set<string>(userProfile.assignedProjectIds || []);
-      return allSites.filter(s => assignedIds.has(s.id));
+    if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+    
+    // Sovereignty Logic
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager) {
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(id => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
+            if (!hasOtherOverride) siteIds.add(id);
+          });
+        });
+      }
     }
-    return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-  }, [allSites, userProfile, isAdmin, isSuper, roleConfigs]);
+    
+    const filtered = allSites.filter(s => siteIds.has(s.id));
+    return Array.from(new Map(filtered.map(s => [s.name, s])).values());
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
@@ -455,8 +491,7 @@ export default function RecordMovementPage() {
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input placeholder="Search suppliers..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
-                        </div>
+                          <Input placeholder="Search suppliers..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} /></div>
                         <ScrollArea className="h-[200px]">
                           {filteredSuppliers.map(s => (
                             <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}>
@@ -570,7 +605,7 @@ export default function RecordMovementPage() {
                           <FormLabel>Authorized Item</FormLabel>
                           <Popover open={openItemPopoverIndex === index} onOpenChange={o => setOpenItemPopoverIndex(o ? index : null)}>
                             <PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-auto min-h-10 bg-background text-left", !itemField.value && "text-muted-foreground")}><span className="truncate whitespace-normal">{itemField.value || "Search contextual materials..."}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
-                            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-10 text-xs py-2 px-3 text-left whitespace-normal flex items-start gap-2" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} /><span className="flex-1 break-words leading-relaxed">{lookup.name}</span></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No matching authorized items found for this context.</div>)}</div></ScrollArea></PopoverContent>
+                            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-10 text-xs py-2 px-3 text-left whitespace-normal flex items-start gap-2" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} /><span className="flex-1 break-words leading-relaxed">{lookup.name}</span></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No matching authorized items found for this context.</div>)}</div></ScrollArea></PopoverContent>
                           </Popover>
                           <FormMessage />
                         </FormItem>

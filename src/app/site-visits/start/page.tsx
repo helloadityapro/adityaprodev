@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, getDocs, and } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -135,12 +135,17 @@ export default function StartSiteVisitPage() {
         return;
       }
 
+      // Resolve Effective Manager for this site (respecting overrides)
+      const overridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', selectedSite.id)));
+      const overridesSnap = await getDocs(overridesQ);
+      const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
+
       const visitRef = await addDocumentNonBlocking(collection(firestore, 'site_visits'), {
         siteId: selectedSite.id,
         siteName: selectedSite.name,
         managerId: user.uid,
         managerName: userProfile.username || user.email,
-        siteManagerId: userProfile.siteManagerId || null,
+        siteManagerId: effectiveSiteManagerId,
         department: userProfile.department || null,
         startTime: serverTimestamp(),
         startLat: location.lat,
