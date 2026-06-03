@@ -186,7 +186,7 @@ export default function SiteVisitsHistoryPage() {
 
     const { start, end } = queryDateRange;
 
-    result = list.filter(v => {
+    const result = list.filter(v => {
       const vDate = v.startTime?.toDate?.() || new Date(v.startTime);
       const vDateStr = format(vDate, 'yyyy-MM-dd');
 

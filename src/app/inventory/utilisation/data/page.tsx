@@ -6,7 +6,7 @@ import { collection, query, orderBy, doc, limit, where } from "firebase/firestor
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
+import { format, subDays, subMonths } from "date-fns";
 import { 
   History, 
   Search, 
@@ -274,6 +274,9 @@ export default function UtilisationDataPage() {
               ))}
             </SelectContent>
           </Select>
+          <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-10 border-primary/20 text-primary bg-primary/5">
+            {filteredData.length} Records
+          </Badge>
           <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground rounded-sm"><FilterX className="h-4 w-4" /></Button>
         </div>
       </div>
