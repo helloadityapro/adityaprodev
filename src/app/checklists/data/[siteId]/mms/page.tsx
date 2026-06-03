@@ -124,7 +124,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const [searchTerm, setSearchTerm] = React.useState("");
   const [auditSortConfig, setAuditSortConfig] = React.useState<{ key: AuditSortKey; direction: 'asc' | 'desc' }>({ key: 'table', direction: 'asc' });
   
-  const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [dateFilter, setDateFilter] = React.useState<string>("allTime");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
@@ -177,7 +177,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       case 'lastMonth': return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
       case 'allTime': return { start: '1970-01-01', end: '2099-12-31' };
       case 'custom': return { start: customStart, end: customEnd };
-      default: return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      default: return { start: '1970-01-01', end: '2099-12-31' };
     }
   }, [dateFilter, customStart, customEnd]);
 
@@ -579,7 +579,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
 
   const clearFilters = () => {
     setSearchTerm("");
-    setDateFilter("7days");
+    setDateFilter("allTime");
     setCustomStart(format(new Date(), 'yyyy-MM-dd'));
     setCustomEnd(format(new Date(), 'yyyy-MM-dd'));
   };
@@ -671,10 +671,10 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="allTime" className="text-[10px] font-bold uppercase">All Records</SelectItem>
                 <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
                 <SelectItem value="yesterday" className="text-[10px] font-bold uppercase">Yesterday</SelectItem>
                 <SelectItem value="7days" className="text-[10px] font-bold uppercase">Last 7 Days</SelectItem>
-                <SelectItem value="allTime" className="text-[10px] font-bold uppercase">All Records</SelectItem>
                 <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom Range</SelectItem>
               </SelectContent>
             </Select>
@@ -871,7 +871,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
 
       <AlertDialog open={!!deletingRecord} onOpenChange={(o) => !o && setDeletingRecord(null)}>
         <AlertDialogContent className="rounded-sm w-[95vw] max-md">
-          <AlertDialogHeader><AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase">Delete Record?</AlertDialogTitle><AlertDialogDescription className="text-xs md:text-sm">Permanently remove this audit log for Table <strong>{deletingRecord?.tableNumber}</strong>? This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">Delete Record?</AlertDialogTitle><AlertDialogDescription className="text-xs md:text-sm">Permanently remove this audit log for Table <strong>{deletingRecord?.tableNumber}</strong>? This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-10">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteRecord} disabled={isProcessing} className="bg-destructive text-white rounded-sm font-black uppercase text-[10px] h-10">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Confirm Delete"}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
