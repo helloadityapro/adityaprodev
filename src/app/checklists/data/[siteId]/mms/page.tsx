@@ -864,7 +864,15 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           </DialogHeader>
           <div className="flex-1 flex flex-col min-h-0 bg-background">
             <ScrollArea className="flex-1 p-4 md:p-6"><div className="space-y-4 md:space-y-6">{commentingRecord?.comments?.map((comment, i) => (<div key={i} className="flex flex-col gap-1.5 animate-in fade-in"><div className="flex items-center justify-between"><span className="text-[10px] md:text-[11px] font-black text-primary uppercase">{comment.userName}</span><span className="text-[8px] font-mono text-muted-foreground">{format(new Date(comment.createdAt), 'dd MMM, HH:mm')}</span></div><div className="p-2.5 md:p-3 bg-muted/20 border rounded-sm text-left"><p className="text-xs md:text-sm font-medium leading-relaxed italic">"{comment.text}"</p></div></div>))}</div></ScrollArea>
-            <div className="p-4 md:p-6 border-t bg-muted/5 space-y-3 shrink-0"><Label className="text-[10px] font-black uppercase">Post Comment</Label><Textarea placeholder="Type your message..." className="min-h-[60px] rounded-sm bg-background border-primary/20 text-xs md:text-sm" value={newComment} onChange={(e) => setNewComment(e.target.value)} /><div className="flex justify-end gap-2"><Button onClick={handlePostComment} disabled={setIsProcessing} className="rounded-sm font-black uppercase text-[10px] h-9 md:h-10 px-6">{isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5 mr-1.5" />}Send</Button></div></div>
+            <div className="p-4 md:p-6 border-t bg-muted/5 space-y-3 shrink-0">
+              <Label className="text-[10px] font-black uppercase">Post Comment</Label>
+              <Textarea placeholder="Type your message..." className="min-h-[60px] rounded-sm bg-background border-primary/20 text-xs md:text-sm" value={newComment} onChange={(e) => setNewComment(e.target.value)} />
+              <div className="flex justify-end gap-2">
+                <Button onClick={handlePostComment} disabled={isProcessing} className="rounded-sm font-black uppercase text-[10px] h-9 md:h-10 px-6">
+                  {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}Send
+                </Button>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
