@@ -679,11 +679,6 @@ export default function ReportsDashboard() {
               </div>
             </ScrollArea>
           </CardContent>
-          <CardFooter className="bg-muted/5 border-t p-3">
-            <Button variant="ghost" size="sm" className="w-full h-7 text-[9px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary" asChild>
-              <Link href="/ptw/activities">View Full Audit Trail <ArrowRight className="ml-1.5 h-3 w-3" /></Link>
-            </Button>
-          </CardFooter>
         </Card>
       </div>
     </div>
