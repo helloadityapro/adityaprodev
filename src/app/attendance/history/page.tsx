@@ -5,7 +5,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@
 import { collection, query, where, limit, doc, or, orderBy } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, differenceInMinutes, subDays } from "date-fns";
+import { format, differenceInMinutes, subDays, subMonths } from "date-fns";
 import { MapPin, History, Search, User, Timer, LogIn, LogOut, ImageIcon, X, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, PlayCircle, Film, FilterX, Calendar } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -81,16 +81,19 @@ export default function AttendanceHistoryPage() {
   const showPersonnelColumn = isAdmin || isManager;
 
   const queryDateRange = React.useMemo(() => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    if (dateFilter === 'today') return { start: today, end: today };
-    if (dateFilter === '7days') return { start: format(subDays(new Date(), 7), 'yyyy-MM-dd'), end: today };
-    return { start: customStart, end: customEnd };
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    if (dateFilter === 'today') return { start: todayStr, end: todayStr };
+    if (dateFilter === '7days') return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+    if (dateFilter === 'lastMonth') return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+    if (dateFilter === 'custom') return { start: customStart, end: customEnd };
+    return { start: '1970-01-01', end: '2099-12-31' };
   }, [dateFilter, customStart, customEnd]);
 
   const attendanceQuery = useMemoFirebase(() => {
     if (!user || !userProfile || isProfileLoading) return null;
     const colRef = collection(firestore, 'attendance');
-    const { start } = queryDateRange;
+    const { start, end } = queryDateRange;
     
     // 1. "Today" filter: Equality on date works without complex indices
     if (dateFilter === 'today') {
@@ -98,9 +101,13 @@ export default function AttendanceHistoryPage() {
       return query(colRef, where('userId', '==', user.uid), where('date', '==', start), limit(500));
     }
 
-    // 2. History filters ("7days", "custom"):
+    // 2. History filters ("7days", "lastMonth", "custom"):
     // We avoid combining 'where' and 'orderBy' on different fields to prevent missing index errors.
+    // To ensure Custom Range works well, we try to fetch as many records as possible for the user.
     if (isAdmin) {
+      // For Admin, we sort by checkInTime globally. 
+      // If they specify a custom range, we'll rely on the 1000 record window for now, 
+      // or we can query by date if we ignore the global order.
       return query(colRef, orderBy('checkInTime', 'desc'), limit(1000));
     }
     
@@ -166,6 +173,7 @@ export default function AttendanceHistoryPage() {
     const { start, end } = queryDateRange;
 
     const filtered = entries.filter(e => {
+      // Robust string-based date comparison
       const matchesDate = e.date >= start && e.date <= end;
       const matchesSearch = e.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            e.date.includes(searchTerm);
@@ -228,7 +236,7 @@ export default function AttendanceHistoryPage() {
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Name or date (yyyy-mm-dd)..." 
+              placeholder="Search by name or date..." 
               className="pl-8 rounded-sm border-primary/20 h-10 bg-background text-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -246,6 +254,7 @@ export default function AttendanceHistoryPage() {
             <SelectContent>
               <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
               <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+              <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
               <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
             </SelectContent>
           </Select>
@@ -275,7 +284,7 @@ export default function AttendanceHistoryPage() {
           <Card key={entry.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden">
             <CardContent className="p-4 space-y-4">
               <div className="flex justify-between items-start">
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 min-w-0">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase">{formatDate(entry.checkInTime)}</span>
                   {showPersonnelColumn && <h3 className="font-bold text-sm flex items-center gap-1.5"><User className="h-3 w-3 text-primary" /> {entry.userName}</h3>}
                 </div>
