@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
@@ -165,6 +165,7 @@ export default function TableLevelMMSChecklistPage() {
           maxWidthOrHeight: 1920,
           alwaysKeepResolution: true,
           initialQuality: 0.8,
+          useWebWorker: true,
           fileType: 'image/jpeg' 
         });
       } catch (e) {
@@ -182,14 +183,23 @@ export default function TableLevelMMSChecklistPage() {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
         }, 
-        reject, 
-        async () => {
-          const url = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve({ 
-            url, 
-            contentType: isHeic ? 'image/jpeg' : (blob.type || 'image/jpeg'), 
-            name: isHeic ? file.name.replace(/\.(heic|heif)$/i, '.jpg') : file.name 
-          });
+        (error) => {
+          console.error("Storage Error:", error);
+          reject(error);
+        }, 
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref)
+            .then((url) => {
+              resolve({ 
+                url, 
+                contentType: isHeic ? 'image/jpeg' : (blob.type || 'image/jpeg'), 
+                name: isHeic ? file.name.replace(/\.(heic|heif)$/i, '.jpg') : file.name 
+              });
+            })
+            .catch((err) => {
+              console.error("GetDownloadURL Error:", err);
+              reject(err);
+            });
         }
       );
     });
@@ -221,37 +231,39 @@ export default function TableLevelMMSChecklistPage() {
       }
 
       const timestamp = Date.now();
-      const finalChecks: any[] = [];
 
-      for (const [key, check] of Object.entries(values.checks)) {
+      // Parallelize Category Processing
+      const checksPromises = Object.entries(values.checks).map(async ([key, check]) => {
         const attachments = [];
-        if (check.localFiles) {
-          for (let i = 0; i < check.localFiles.length; i++) {
-            const file = check.localFiles[i];
+        if (check.localFiles && check.localFiles.length > 0) {
+          const filePromises = (check.localFiles as File[]).map((file, i) => {
             const path = `checklists/mms/${user.uid}/${timestamp}_${key}_${i}_${file.name.replace(/\s+/g, '_')}`;
-            const uploaded = await uploadFile(file, path);
-            attachments.push(uploaded);
-          }
+            return uploadFile(file, path);
+          });
+          const uploaded = await Promise.all(filePromises);
+          attachments.push(...uploaded);
         }
-        finalChecks.push({
+        return {
           key,
           label: (CHECK_LABELS as any)[key],
           remarks: check.remarks || "",
           attachments
-        });
-      }
+        };
+      });
+
+      const finalChecks = await Promise.all(checksPromises);
 
       const otherAttachments = [];
-      if (values.otherLocalFiles) {
-        for (let i = 0; i < values.otherLocalFiles.length; i++) {
-          const file = values.otherLocalFiles[i];
+      if (values.otherLocalFiles && values.otherLocalFiles.length > 0) {
+        const otherPromises = (values.otherLocalFiles as File[]).map((file, i) => {
           const path = `checklists/mms/${user.uid}/${timestamp}_other_${i}_${file.name.replace(/\s+/g, '_')}`;
-          const uploaded = await uploadFile(file, path);
-          otherAttachments.push(uploaded);
-        }
+          return uploadFile(file, path);
+        });
+        const otherUploaded = await Promise.all(otherPromises);
+        otherAttachments.push(...otherUploaded);
       }
 
-      await addDocumentNonBlocking(collection(firestore, 'installation_checklists'), {
+      addDocumentNonBlocking(collection(firestore, 'installation_checklists'), {
         siteId: values.siteId,
         siteName: values.siteName,
         projectCompany: values.projectCompany || "",
@@ -286,7 +298,12 @@ export default function TableLevelMMSChecklistPage() {
       setIsSuccess(true);
       toast({ title: "Success", description: "Audit published to registry." });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Error", description: e.message });
+      console.error("MMS Submission Error:", e);
+      toast({ 
+        variant: "destructive", 
+        title: "Submission Error", 
+        description: e.message || "Failed to finalize audit record. Please check your connection." 
+      });
     } finally {
       setIsSubmitting(false);
       setUploadProgress({});
