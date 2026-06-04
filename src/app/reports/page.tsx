@@ -302,7 +302,7 @@ export default function ReportsDashboard() {
   const usersListQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore, isAdmin]);
   const { data: usersList, isLoading: usersListLoading } = useCollection<DataItem>(usersListQuery);
 
-  const vehiclesReqsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'vehicle_assignments'), orderBy('requestDate', 'desc'), limit(500)) : null, [firestore, isAdmin]);
+  const vehicleReqsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'vehicle_assignments'), orderBy('requestDate', 'desc'), limit(500)) : null, [firestore, isAdmin]);
   const { data: vehicleReqs, isLoading: vehicleReqsLoading } = useCollection<DataItem>(vehicleReqsQuery);
 
   const docsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_documents'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore, isAdmin]);
