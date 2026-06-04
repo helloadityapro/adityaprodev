@@ -30,7 +30,8 @@ import {
   Film,
   Plus,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  FileImage
 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -155,18 +156,17 @@ export default function TableLevelMMSChecklistPage() {
 
   const uploadFile = async (file: File, path: string): Promise<{url: string, contentType: string, name: string}> => {
     let blob: Blob = file;
-    const isImage = file.type.startsWith('image/');
-    const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+    // Only compress standard web images, leave HEIC/Originals alone as per requirements
+    const isCompressible = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp';
     
-    if (isImage || isHeic) {
+    if (isCompressible) {
       try {
         blob = await imageCompression(file, { 
           maxSizeMB: 1, 
           maxWidthOrHeight: 1920,
           alwaysKeepResolution: true,
           initialQuality: 0.8,
-          useWebWorker: true,
-          fileType: 'image/jpeg' 
+          useWebWorker: true
         });
       } catch (e) {
         console.warn("Compression skipped", e);
@@ -192,8 +192,8 @@ export default function TableLevelMMSChecklistPage() {
             .then((url) => {
               resolve({ 
                 url, 
-                contentType: isHeic ? 'image/jpeg' : (blob.type || 'image/jpeg'), 
-                name: isHeic ? file.name.replace(/\.(heic|heif)$/i, '.jpg') : file.name 
+                contentType: file.type || 'application/octet-stream', 
+                name: file.name 
               });
             })
             .catch((err) => {
@@ -493,20 +493,23 @@ export default function TableLevelMMSChecklistPage() {
                         <FormControl>
                           <div className="flex flex-col gap-3">
                             <div className="flex flex-wrap items-center gap-2">
-                              {(value || []).map((file: File, fIdx: number) => (
-                                <Badge key={fIdx} variant="secondary" className="h-8 gap-1.5 pl-2 pr-1 rounded-sm bg-primary/5 text-primary border-primary/20">
-                                  {file.type.startsWith('video/') ? <Film className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
-                                  <span className="text-[9px] font-black truncate max-w-[80px]">{file.name}</span>
-                                  <Button 
-                                    type="button"
-                                    variant="ghost" size="icon" 
-                                    className="h-5 w-5 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
-                                    onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </Badge>
-                              ))}
+                              {(value || []).map((file: File, fIdx: number) => {
+                                const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+                                return (
+                                  <Badge key={fIdx} variant="secondary" className="h-8 gap-1.5 pl-2 pr-1 rounded-sm bg-primary/5 text-primary border-primary/20">
+                                    {file.type.startsWith('video/') ? <Film className="h-3 w-3" /> : isHeic ? <FileImage className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                                    <span className="text-[9px] font-black truncate max-w-[80px]">{file.name}</span>
+                                    <Button 
+                                      type="button"
+                                      variant="ghost" size="icon" 
+                                      className="h-5 w-5 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
+                                      onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </Badge>
+                                );
+                              })}
                               
                               <label className="cursor-pointer">
                                 <div className="flex items-center justify-center gap-2 px-3 h-8 rounded-sm border border-dashed border-primary/30 bg-background text-primary hover:bg-primary/5 transition-colors text-[9px] font-black uppercase tracking-widest">
@@ -515,7 +518,7 @@ export default function TableLevelMMSChecklistPage() {
                                 <input 
                                   type="file" 
                                   multiple 
-                                  accept="image/*,video/*" 
+                                  accept="image/*,video/*,.heic,.heif" 
                                   className="hidden" 
                                   onChange={(e) => {
                                     const newFiles = Array.from(e.target.files || []);
@@ -570,29 +573,40 @@ export default function TableLevelMMSChecklistPage() {
                   <FormControl>
                     <div className="space-y-4 p-6 border-2 border-dashed rounded-sm bg-muted/5">
                       <div className="flex flex-wrap gap-4 justify-center">
-                        {(value || []).map((file: File, fIdx: number) => (
-                          <div key={fIdx} className="relative group w-24 h-24 rounded-sm overflow-hidden border bg-background flex items-center justify-center">
-                            {file.type.startsWith('image/') ? (
-                              <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" />
-                            ) : (
-                              <Film className="h-8 w-8 text-primary opacity-40" />
-                            )}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                               <Button 
-                                type="button"
-                                variant="destructive" size="icon" className="h-7 w-7 rounded-full" 
-                                onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}
-                               >
-                                 <Trash2 className="h-3.5 w-3.5" />
-                               </Button>
-                            </div>
-                            {uploadProgress[file.name] !== undefined && (
-                              <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary/20">
-                                <Progress value={uploadProgress[file.name]} className="h-full rounded-none" />
+                        {(value || []).map((file: File, fIdx: number) => {
+                          const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+                          const isVideo = file.type.startsWith('video/');
+                          const isImage = file.type.startsWith('image/') && !isHeic;
+
+                          return (
+                            <div key={fIdx} className="relative group w-24 h-24 rounded-sm overflow-hidden border bg-background flex flex-col items-center justify-center gap-1">
+                              {isImage ? (
+                                <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" />
+                              ) : isVideo ? (
+                                <Film className="h-8 w-8 text-primary opacity-40" />
+                              ) : (
+                                <>
+                                  <FileImage className="h-8 w-8 text-primary opacity-40" />
+                                  <span className="text-[8px] font-black uppercase text-muted-foreground">HEIC</span>
+                                </>
+                              )}
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                 <Button 
+                                  type="button"
+                                  variant="destructive" size="icon" className="h-7 w-7 rounded-full" 
+                                  onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}
+                                 >
+                                   <Trash2 className="h-3.5 w-3.5" />
+                                 </Button>
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              {uploadProgress[file.name] !== undefined && (
+                                <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary/20">
+                                  <Progress value={uploadProgress[file.name]} className="h-full rounded-none" />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
 
                         <label className="flex flex-col items-center justify-center w-24 h-24 cursor-pointer border border-dashed border-primary/30 rounded-sm hover:bg-primary/5 transition-colors">
                           <Plus className="h-6 w-6 text-primary" />
@@ -600,7 +614,7 @@ export default function TableLevelMMSChecklistPage() {
                           <input 
                             type="file" 
                             multiple 
-                            accept="image/*,video/*" 
+                            accept="image/*,video/*,.heic,.heif" 
                             className="hidden" 
                             onChange={(e) => {
                               const newFiles = Array.from(e.target.files || []);

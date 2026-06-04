@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking, useFirebaseApp } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, useFirebaseApp } from '@/firebase';
 import { collection, query, doc, limit, arrayUnion, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -47,7 +47,9 @@ import {
   FileText,
   MoreVertical,
   ChevronRight,
-  ListFilter
+  ListFilter,
+  FileImage,
+  Download
 } from 'lucide-react';
 import { format, subDays, subMonths } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -65,7 +67,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import imageCompression from 'browser-image-compression';
 import { Progress } from "@/components/ui/progress";
 
 type Site = { 
@@ -146,9 +147,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const [position, setPosition] = React.useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = React.useState(false);
   const [startPan, setStartPan] = React.useState({ x: 0, y: 0 });
-
-  const [convertedHeicUrl, setConvertedHeicUrl] = React.useState<string | null>(null);
-  const [isHeicConverting, setIsHeicConverting] = React.useState(false);
   
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mediaRef = React.useRef<HTMLDivElement>(null);
@@ -484,7 +482,12 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     return type.startsWith('image/') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp') || name.endsWith('.heic') || name.endsWith('.heif');
   };
 
-  const resetViewer = () => { setScale(1); setPosition({ x: 0, y: 0 }); setConvertedHeicUrl(null); };
+  const isHeic = (file: Attachment) => {
+    const name = (file.name || "").toLowerCase();
+    return name.endsWith('.heic') || name.endsWith('.heif');
+  };
+
+  const resetViewer = () => { setScale(1); setPosition({ x: 0, y: 0 }); };
 
   const openViewer = (file: Attachment, gallery: Attachment[]) => {
     const mediaFiles = gallery.filter(a => isImage(a) || isVideo(a));
@@ -495,36 +498,8 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     resetViewer();
   };
 
-  React.useEffect(() => {
-    if (!viewFile) return;
-    const name = (viewFile.name || "").toLowerCase();
-    if (name.endsWith('.heic') || name.endsWith('.heif')) {
-      const convertHeic = async () => {
-        setIsHeicConverting(true);
-        try {
-          const response = await fetch(viewFile.url, { mode: 'cors' });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const blob = await response.blob();
-          const convertedBlob = await imageCompression(blob, { 
-            maxSizeMB: 2, 
-            maxWidthOrHeight: 1920, 
-            initialQuality: 0.9, 
-            fileType: 'image/jpeg' 
-          });
-          setConvertedHeicUrl(URL.createObjectURL(convertedBlob));
-        } catch (e) { 
-          console.error("HEIC conversion failed:", e); 
-        } finally { 
-          setIsHeicConverting(false); 
-        }
-      };
-      convertHeic();
-    }
-    return () => { if (convertedHeicUrl) URL.revokeObjectURL(convertedHeicUrl); };
-  }, [viewFile]);
-
   const handleWheel = (e: React.WheelEvent) => {
-    if (!viewFile || isVideo(viewFile)) return;
+    if (!viewFile || isVideo(viewFile) || isHeic(viewFile)) return;
     const delta = e.deltaY > 0 ? -0.2 : 0.2;
     const newScale = Math.min(Math.max(scale + delta, 1), 4);
     setScale(newScale);
@@ -532,7 +507,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (scale <= 1 || (viewFile && isVideo(viewFile))) return;
+    if (scale <= 1 || (viewFile && (isVideo(viewFile) || isHeic(viewFile)))) return;
     setIsDragging(true);
     setStartPan({ x: e.clientX - position.x, y: e.clientY - position.y });
   };
@@ -547,7 +522,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   };
 
   const handleMouseUp = () => setIsDragging(false);
-  const handleDoubleClick = () => { if (viewFile && isVideo(viewFile)) return; if (scale > 1) { setScale(1); setPosition({ x: 0, y: 0 }); } else { setScale(2); } };
+  const handleDoubleClick = () => { if (viewFile && (isVideo(viewFile) || isHeic(viewFile))) return; if (scale > 1) { setScale(1); setPosition({ x: 0, y: 0 }); } else { setScale(2); } };
   const nextFile = () => { if (viewFiles.length <= 1) return; const nextIdx = (currentFileIndex + 1) % viewFiles.length; setCurrentFileIndex(nextIdx); setViewFile(viewFiles[nextIdx]); resetViewer(); };
   const prevFile = () => { if (viewFiles.length <= 1) return; const prevIdx = (currentFileIndex - 1 + viewFiles.length) % viewFiles.length; setCurrentFileIndex(prevIdx); setViewFile(viewFiles[prevIdx]); resetViewer(); };
 
@@ -894,7 +869,26 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           {viewFiles.length > 1 && (<><div className="absolute left-2 top-1/2 -translate-y-1/2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-6 w-6" /></Button></div><div className="absolute right-2 top-1/2 -translate-y-1/2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-6 w-6" /></Button></div></>)}
           <div ref={containerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDoubleClick={handleDoubleClick}>
             <div ref={mediaRef} className={cn("transition-transform duration-200 ease-out flex items-center justify-center pointer-events-none w-fit h-fit", isDragging && "transition-none")} style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
-              {viewFile && (isVideo(viewFile) ? <div className="pointer-events-auto"><video src={viewFile.url} controls autoPlay className="max-w-[90vw] max-h-[80vh] shadow-2xl rounded-sm" /></div> : (isHeicConverting ? <div className="bg-white/5 p-12 rounded-sm flex flex-col items-center gap-4 text-center"><Loader2 className="h-12 w-12 text-primary animate-spin" /><p className="text-white font-bold text-sm uppercase">Decoding HEIC Image</p></div> : <img src={convertedHeicUrl || viewFile.url} className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm" alt="Evidence" />))}
+              {viewFile && (
+                isVideo(viewFile) ? (
+                  <div className="pointer-events-auto"><video src={viewFile.url} controls autoPlay className="max-w-[90vw] max-h-[80vh] shadow-2xl rounded-sm" /></div>
+                ) : isHeic(viewFile) ? (
+                  <div className="bg-white/5 p-12 rounded-sm flex flex-col items-center gap-6 text-center pointer-events-auto">
+                    <FileImage className="h-16 w-16 text-primary opacity-20" />
+                    <div className="space-y-2">
+                      <p className="text-white font-black text-sm uppercase tracking-widest">HEIC Media Unsupported</p>
+                      <p className="text-white/40 text-xs max-w-[200px]">This file format cannot be previewed directly in your browser.</p>
+                    </div>
+                    <Button asChild className="rounded-sm font-bold uppercase text-[10px] tracking-widest">
+                      <a href={viewFile.url} download={viewFile.name}>
+                        <Download className="h-3.5 w-3.5 mr-2" /> Download Original File
+                      </a>
+                    </Button>
+                  </div>
+                ) : (
+                  <img src={viewFile.url} className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm" alt="Evidence" />
+                )
+              )}
             </div>
           </div>
         </DialogContent>
