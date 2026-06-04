@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, query, where, or, doc, orderBy, limit, getDocs } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   BarChart, 
@@ -190,16 +190,13 @@ export default function ReportsDashboard() {
     if (!allSitesList || !userProfile) return [];
     if (isAdmin) return Array.from(new Map(allSitesList.map(s => [s.name, s])).values());
     
-    // Strict Sovereignty Calculation for Reporting
     const siteIds = new Set<string>();
 
     if (isManager) {
-      // 1. Explicit Overrides
       allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => {
         siteIds.add(o.siteId);
       });
 
-      // 2. Default Supervisory Access (if NOT overriden elsewhere)
       if (teamMembers) {
         teamMembers.forEach(member => {
           (member.assignedProjectIds || []).forEach(sid => {
@@ -225,7 +222,7 @@ export default function ReportsDashboard() {
     const colRef = collection(firestore, 'permits_to_work');
     if (isAdmin) return query(colRef, orderBy('requestDate', 'desc'), limit(500));
     return query(colRef, or(where('siteManagerId', '==', user.uid), where('siteEngineerId', '==', user.uid)), limit(500));
-  }, [firestore, user, isProfileLoading, isAdmin, isManager]);
+  }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: permits, isLoading: permitsLoading } = useCollection<DataItem>(permitsQuery);
 
   const dprsQuery = useMemoFirebase(() => {
@@ -233,7 +230,7 @@ export default function ReportsDashboard() {
     const colRef = collection(firestore, 'dprs');
     if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(500));
     return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(500));
-  }, [firestore, user, isProfileLoading, isAdmin, isManager]);
+  }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: dprs, isLoading: dprsLoading } = useCollection<DataItem>(dprsQuery);
 
   const movementsQuery = useMemoFirebase(() => {
@@ -241,7 +238,7 @@ export default function ReportsDashboard() {
     const colRef = collection(firestore, 'material_movements');
     if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(500));
     return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(500));
-  }, [firestore, user, isProfileLoading, isAdmin, isManager]);
+  }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: movements, isLoading: movementsLoading } = useCollection<DataItem>(movementsQuery);
 
   const requirementsQuery = useMemoFirebase(() => {
@@ -249,7 +246,7 @@ export default function ReportsDashboard() {
     const colRef = collection(firestore, 'requirements');
     if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(500));
     return query(colRef, or(where('siteManagerId', '==', user.uid), where('userId', '==', user.uid)), limit(500));
-  }, [firestore, user, isProfileLoading, isAdmin, isManager]);
+  }, [firestore, user, isProfileLoading, isAdmin]);
   const { data: requirements, isLoading: requirementsLoading } = useCollection<DataItem>(requirementsQuery);
 
   const tasksQuery = useMemoFirebase(() => {
@@ -306,13 +303,13 @@ export default function ReportsDashboard() {
   const { data: usersList, isLoading: usersListLoading } = useCollection<DataItem>(usersListQuery);
 
   const vehiclesReqsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'vehicle_assignments'), orderBy('requestDate', 'desc'), limit(500)) : null, [firestore, isAdmin]);
-  const { data: vehicleReqs, isLoading: vehicleReqsLoading } = useCollection<DataItem>(vehiclesReqsQuery);
+  const { data: vehicleReqs, isLoading: vehicleReqsLoading } = useCollection<DataItem>(vehicleReqsQuery);
 
   const docsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_documents'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore, isAdmin]);
   const { data: siteDocs, isLoading: docsLoading } = useCollection<DataItem>(docsQuery);
 
-  const groupsQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_groups'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore, isAdmin]);
-  const { data: siteGroups, isLoading: groupsLoading } = useCollection<DataItem>(groupsQuery);
+  const groupsQueryData = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'site_groups'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore, isAdmin]);
+  const { data: siteGroups, isLoading: groupsLoading } = useCollection<DataItem>(groupsQueryData);
 
   const lmsCoursesQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'lms_courses'), orderBy('createdAt', 'desc'), limit(500)) : null, [firestore, isAdmin]);
   const { data: lmsCourses, isLoading: lmsCoursesLoading } = useCollection<DataItem>(lmsCoursesQuery);
@@ -488,24 +485,24 @@ export default function ReportsDashboard() {
     };
   }, [isLoadingTotal, permits, dprs, movements, requirements, tasks, visits, installationChecklists, expenses, pos, wos, payments, redemptions, usersList, vehicleReqs, siteDocs, siteGroups, lmsCourses, lmsModules, selectedSite, timeRange, customStartDate, customEndDate, isAdmin, accessibleSites]);
 
-  if (isLoadingTotal) return <div className="space-y-8 p-4"><Skeleton className="h-10 w-48" /><Skeleton className="h-4 w-96" /><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full rounded-sm" />)}</div></div>;
+  if (isLoadingTotal) return <div className="space-y-8 p-4"><Skeleton className="h-10 w-48" /><Skeleton className="h-4 w-96" /><div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-5 gap-4">{[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-32 w-full rounded-sm" />)}</div></div>;
 
   if (!stats) return null;
 
   return (
-    <div className="space-y-8 pb-12 animate-in fade-in duration-500">
+    <div className="space-y-6 md:space-y-8 pb-12 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-primary" />
-            <h1>Operational Reports</h1>
+            <h1 className="text-xl md:text-3xl font-black uppercase tracking-tight">Operational Reports</h1>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Platform-wide analytical summaries and performance tracking.</p>
+          <p className="text-muted-foreground text-[10px] md:text-sm font-medium">Analytical summaries and real-time performance tracking.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={timeRange.toString()} onValueChange={(val) => setTimeRange(parseInt(val))}>
-            <SelectTrigger className="w-[140px] h-8 rounded-sm font-black uppercase text-[10px] tracking-widest bg-secondary border-none">
-              <Calendar className="mr-1.5 h-3 w-3" /><SelectValue placeholder="Time Range" />
+            <SelectTrigger className="w-[120px] sm:w-[140px] h-9 rounded-sm font-black uppercase text-[10px] tracking-widest bg-secondary border-none">
+              <Calendar className="mr-1.5 h-3 w-3" /><SelectValue placeholder="Range" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="0" className="text-[10px] font-black uppercase">Today</SelectItem>
@@ -516,69 +513,92 @@ export default function ReportsDashboard() {
           </Select>
           <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="rounded-sm font-bold border-primary/20 text-primary h-8 px-3">
-                <Filter className="mr-1.5 h-3 w-3" />{selectedSite}<ChevronsUpDown className="ml-2 h-3 w-3 opacity-50" />
+              <Button variant="outline" size="sm" className="rounded-sm font-bold border-primary/20 text-primary h-9 px-3 min-w-[140px]">
+                <Filter className="mr-1.5 h-3 w-3 shrink-0" />
+                <span className="truncate max-w-[100px]">{selectedSite}</span>
+                <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[250px] p-0" align="end">
-              <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter site..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={siteSearchQuery} onChange={(e) => setSiteSearchQuery(e.target.value)} /></div>
-              <ScrollArea className="h-[200px]"><div className="p-1"><Button variant="ghost" className="w-full justify-start font-bold text-xs h-8" onClick={() => { setSelectedSite("All Sites"); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4", selectedSite === "All Sites" ? "opacity-100" : "opacity-0")} />All Sites</Button>{filteredSiteList.map(site => (<Button key={site.id} variant="ghost" className="w-full justify-start font-medium text-xs h-8" onClick={() => { setSelectedSite(site.name); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4", selectedSite === site.name ? "opacity-100" : "opacity-0")} /><span className="truncate">{site.name}</span></Button>))}</div></ScrollArea>
+              <div className="flex items-center border-b px-3">
+                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                <Input 
+                  placeholder="Filter site..." 
+                  className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
+                  value={siteSearchQuery} 
+                  onChange={(e) => setSiteSearchQuery(e.target.value)} 
+                />
+              </div>
+              <ScrollArea className="h-[200px]">
+                <div className="p-1">
+                  <Button variant="ghost" className="w-full justify-start font-bold text-xs h-9" onClick={() => { setSelectedSite("All Sites"); setIsSitePopoverOpen(false); }}>
+                    <Check className={cn("mr-2 h-4 w-4", selectedSite === "All Sites" ? "opacity-100" : "opacity-0")} />
+                    All Sites
+                  </Button>
+                  {filteredSiteList.map(site => (
+                    <Button key={site.id} variant="ghost" className="w-full justify-start font-medium text-xs h-9" onClick={() => { setSelectedSite(site.name); setIsSitePopoverOpen(false); }}>
+                      <Check className={cn("mr-2 h-4 w-4", selectedSite === site.name ? "opacity-100" : "opacity-0")} />
+                      <span className="truncate">{site.name}</span>
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
             </PopoverContent>
           </Popover>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <SummaryCard title="Permits" value={stats.counts.permits} icon={ShieldCheck} description="Compliance logs" color="blue" />
-        <SummaryCard title="Reports" value={stats.counts.dprs} icon={FileText} description="Activity updates" color="amber" />
-        <SummaryCard title="Material Logs" value={stats.counts.movements} icon={ArrowLeftRight} description="Stock movements" color="emerald" />
-        <SummaryCard title="Requirements" value={stats.counts.requirements} icon={ClipboardList} description="Site requests" color="purple" />
-        <SummaryCard title="Tasks" value={stats.counts.tasks} icon={CheckSquare} description="Work items" color="slate" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+        <SummaryCard title="Permits" value={stats.counts.permits} icon={ShieldCheck} description="Compliance" color="blue" />
+        <SummaryCard title="Reports" value={stats.counts.dprs} icon={FileText} description="DPRs" color="amber" />
+        <SummaryCard title="Material Logs" value={stats.counts.movements} icon={ArrowLeftRight} description="Flow" color="emerald" />
+        <SummaryCard title="Requirements" value={stats.counts.requirements} icon={ClipboardList} description="Requests" color="purple" />
+        <SummaryCard title="Tasks" value={stats.counts.tasks} icon={CheckSquare} description="Work" color="slate" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" />
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Document Activity Trend</CardTitle>
+              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Volume Trend</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="pt-8 px-6">
-            <div className="h-[300px] w-full">
+          <CardContent className="pt-8 px-2 sm:px-6">
+            <div className="h-[250px] sm:h-[300px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.dailyTrend}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
+                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#64748b'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#64748b'}} />
                   <RechartsTooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} />
-                  <Legend iconType="circle" wrapperStyle={{paddingTop: '20px', fontSize: '10px', fontWeight: 900, textTransform: 'uppercase'}} />
-                  <Bar dataKey="permits" name="PERMITS" fill="#3b82f6" radius={[2, 2, 0, 0]} barSize={10} />
-                  <Bar dataKey="reports" name="REPORTS" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={10} />
-                  <Bar dataKey="movements" name="MOVEMENTS" fill="#10b981" radius={[2, 2, 0, 0]} barSize={10} />
+                  <Legend iconType="circle" wrapperStyle={{paddingTop: '20px', fontSize: '9px', fontWeight: 900, textTransform: 'uppercase'}} />
+                  <Bar dataKey="permits" name="PTW" fill="#3b82f6" radius={[2, 2, 0, 0]} barSize={8} />
+                  <Bar dataKey="reports" name="DPR" fill="#f59e0b" radius={[2, 2, 0, 0]} barSize={8} />
+                  <Bar dataKey="movements" name="INV" fill="#10b981" radius={[2, 2, 0, 0]} barSize={8} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden flex flex-col h-full">
+        <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden flex flex-col h-full min-h-[350px]">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-primary" />
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Compliance Health</CardTitle>
+              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Permit Health</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col items-center justify-center pt-8">
-            <div className="h-[250px] w-full relative">
+            <div className="h-[220px] w-full relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={stats.permitDistribution}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
+                    innerRadius={55}
+                    outerRadius={75}
                     paddingAngle={5}
                     dataKey="value"
                   >
@@ -587,12 +607,12 @@ export default function ReportsDashboard() {
                     ))}
                   </Pie>
                   <RechartsTooltip />
-                  <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{fontSize: '9px', fontWeight: 900, paddingTop: '10px'}} />
+                  <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{fontSize: '8px', fontWeight: 900, paddingTop: '10px'}} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
-                <span className="text-[8px] font-black text-muted-foreground uppercase tracking-tighter">PTW APPROVAL RATE</span>
-                <span className="text-3xl font-black text-primary">{stats.approvalRate}%</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-6">
+                <span className="text-[7px] font-black text-muted-foreground uppercase tracking-tighter">APPROVAL</span>
+                <span className="text-2xl font-black text-primary">{stats.approvalRate}%</span>
               </div>
             </div>
           </CardContent>
@@ -602,18 +622,18 @@ export default function ReportsDashboard() {
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center gap-2">
               <CheckSquare className="h-4 w-4 text-primary" />
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Task Progress Analysis</CardTitle>
+              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Task Completion</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="pt-8 px-6">
+          <CardContent className="pt-8 px-4 sm:px-6">
             <div className="h-[200px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.taskProgress} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                   <XAxis type="number" hide />
-                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#64748b'}} />
                   <RechartsTooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} />
-                  <Bar dataKey="value" radius={[0, 2, 2, 0]} barSize={25} />
+                  <Bar dataKey="value" radius={[0, 2, 2, 0]} barSize={20} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -624,57 +644,61 @@ export default function ReportsDashboard() {
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center gap-2">
               <ClipboardList className="h-4 w-4 text-primary" />
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Requirement Urgency</CardTitle>
+              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Urgency Levels</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="pt-8 px-6">
+          <CardContent className="pt-8 px-4 sm:px-6">
             <div className="h-[200px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.requirementUrgency}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#64748b'}} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fontWeight: 700, fill: '#64748b'}} />
                   <YAxis hide />
                   <RechartsTooltip cursor={{fill: 'rgba(0,0,0,0.02)'}} />
-                  <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={50} />
+                  <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={40} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-3 rounded-sm border-primary/10 shadow-md flex flex-col h-full overflow-hidden">
+        <Card className="lg:col-span-3 rounded-sm border-primary/10 shadow-md flex flex-col h-full max-h-[700px] overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <History className="h-4 w-4 text-primary" />
-                <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Recent Activities</CardTitle>
+                <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Audit Log Feed</CardTitle>
               </div>
-              <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase">Latest 100 Actions</Badge>
+              <Badge variant="outline" className="h-5 px-1.5 text-[8px] font-black uppercase">Recent Activity</Badge>
             </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 overflow-hidden">
-            <ScrollArea className="h-[600px]">
+            <ScrollArea className="h-full">
               <div className="divide-y divide-border/50">
                 {stats.recentActivities.length > 0 ? stats.recentActivities.map((activity) => (
                   <Link key={activity.id} href={activity.link} className="block group">
-                    <div className="p-3 hover:bg-primary/[0.03] transition-colors space-y-1 cursor-pointer">
+                    <div className="p-4 hover:bg-primary/[0.03] transition-colors space-y-1 cursor-pointer">
                       <div className="flex items-start justify-between gap-3">
                         <div className={cn("p-1.5 rounded-sm bg-muted shrink-0 group-hover:bg-primary/10 transition-colors", activity.color)}>
                           <activity.icon className="h-3.5 w-3.5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[11px] font-bold text-foreground leading-tight group-hover:text-primary transition-colors">{activity.sentence}</p>
-                          <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-tight mt-0.5">{activity.module}</p>
+                          <div className="flex items-center gap-2 mt-1 opacity-60">
+                            <span className="text-[9px] font-black uppercase tracking-tight">{activity.module}</span>
+                            <span className="h-1 w-1 rounded-full bg-border" />
+                            <span className="text-[9px] font-bold truncate max-w-[120px]">{activity.siteName}</span>
+                          </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-[8px] font-mono font-bold text-muted-foreground">{format(activity.timestamp, 'HH:mm')}</p>
-                          <p className="text-[8px] font-medium text-muted-foreground/40">{format(activity.timestamp, 'dd MMM')}</p>
+                          <p className="text-[8px] font-mono font-black text-muted-foreground">{format(activity.timestamp, 'HH:mm')}</p>
+                          <p className="text-[8px] font-bold text-muted-foreground/40 uppercase">{format(activity.timestamp, 'dd MMM')}</p>
                         </div>
                       </div>
                     </div>
                   </Link>
                 )) : (
-                  <div className="p-12 text-center text-muted-foreground italic text-[10px] uppercase font-bold opacity-30">No activity logs found for this period.</div>
+                  <div className="p-20 text-center text-muted-foreground italic text-[10px] uppercase font-bold opacity-30">No log items to display</div>
                 )}
               </div>
             </ScrollArea>
@@ -689,8 +713,16 @@ function SummaryCard({ title, value, icon: Icon, description, color }: { title: 
   const colors = { blue: 'bg-blue-500/10 text-blue-600 border-blue-200', amber: 'bg-amber-500/10 text-amber-600 border-amber-200', emerald: 'bg-emerald-500/10 text-emerald-600 border-emerald-200', purple: 'bg-purple-500/10 text-purple-600 border-purple-200', slate: 'bg-slate-500/10 text-slate-600 border-slate-200' };
   return (
     <Card className="rounded-sm border-primary/10 shadow-sm hover:shadow-md transition-all">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle><div className={cn("p-1.5 rounded-sm border", colors[color])}><Icon className="h-3.5 w-3.5" /></div></CardHeader>
-      <CardContent><div className="text-3xl font-black tracking-tight">{value}</div><p className="text-[10px] text-muted-foreground mt-1 font-medium italic line-clamp-1">"{description}"</p></CardContent>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 p-3 md:p-4">
+        <CardTitle className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <div className={cn("p-1 rounded-sm border shrink-0", colors[color])}>
+          <Icon className="h-3 w-3 md:h-3.5 md:w-3.5" />
+        </div>
+      </CardHeader>
+      <CardContent className="p-3 md:p-4 pt-0">
+        <div className="text-xl md:text-2xl font-black tracking-tight">{value}</div>
+        <p className="text-[8px] md:text-[9px] text-muted-foreground mt-1 font-bold uppercase tracking-tighter truncate opacity-60">{description}</p>
+      </CardContent>
     </Card>
   );
 }
