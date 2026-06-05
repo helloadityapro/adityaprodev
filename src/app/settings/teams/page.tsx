@@ -37,7 +37,10 @@ import {
   MapPin,
   Save,
   Truck,
-  RefreshCw
+  RefreshCw,
+  MoreVertical,
+  Mail,
+  User as UserIcon
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -58,6 +61,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Separator } from '@/components/ui/separator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type User = {
   id: string;
@@ -153,7 +162,6 @@ export default function TeamMappingPage() {
           const data = d.data();
           const sites = data.assignedProjectIds || [];
           sites.forEach((id: string) => {
-            // Only add if NO other manager is an override for this engineer on this site
             const hasOtherOverride = overrides?.some(o => o.engineerId === d.id && o.siteId === id && o.managerId !== managerId);
             if (!hasOtherOverride) {
               allTeamSites.add(id);
@@ -359,12 +367,12 @@ export default function TeamMappingPage() {
   if (!isAdmin) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 md:space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-3xl font-black tracking-tight text-foreground uppercase">Teams & Site Access</h1>
-            <p className="text-muted-foreground font-medium">Manage reporting structures and site authorizations. Engineer sites sync to managers automatically.</p>
+            <h1 className="text-xl md:text-3xl font-black tracking-tight text-foreground uppercase">Teams & Site Access</h1>
+            <p className="text-muted-foreground font-medium text-xs md:text-sm">Manage reporting structures and site authorizations. Engineer sites sync to managers automatically.</p>
           </div>
           <Button variant="outline" onClick={handleRecconcileAllAccess} disabled={isReconciling} className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary">
             {isReconciling ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
@@ -374,21 +382,20 @@ export default function TeamMappingPage() {
       </div>
 
       <Card className="rounded-sm border-primary/10 bg-primary/[0.02] shadow-sm">
-        <CardHeader className="py-4">
+        <CardHeader className="py-4 px-4 sm:px-6 border-b bg-muted/10">
           <div className="flex items-center gap-2">
             <UserPlus className="h-4 w-4 text-primary" />
-            <h2 className="text-[10px] font-black uppercase text-primary tracking-widest">Map Site Engineer to Manager</h2>
+            <h2 className="text-[10px] font-black uppercase text-primary tracking-widest leading-none">Map Site Engineer to Manager</h2>
           </div>
-          <CardDescription className="text-xs font-medium">Assign an engineer to a supervisor. Sites assigned to the engineer will sync to the manager.</CardDescription>
         </CardHeader>
-        <CardContent className="pb-8">
+        <CardContent className="p-4 sm:p-6 pb-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">
             <div className="lg:col-span-4 space-y-2">
-              <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Supervisor (Site Manager)</Label>
+              <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter px-1">Supervisor (Site Manager)</Label>
               <Popover open={isManagerPopoverOpen} onOpenChange={setIsManagerPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-11 rounded-sm bg-background border-primary/10 font-bold text-xs uppercase tracking-tight">
-                    {selectedManagerId ? managers?.find(m => m.id === selectedManagerId)?.username : "Select Supervisor..."}
+                    <span className="truncate">{selectedManagerId ? managers?.find(m => m.id === selectedManagerId)?.username : "Select Supervisor..."}</span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -411,11 +418,11 @@ export default function TeamMappingPage() {
             </div>
 
             <div className="lg:col-span-4 space-y-2">
-              <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Site Engineer</Label>
+              <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter px-1">Site Engineer</Label>
               <Popover open={isEngineerPopoverOpen} onOpenChange={setIsEngineerPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-11 rounded-sm bg-background border-primary/10 font-bold text-xs uppercase tracking-tight">
-                    {selectedEngineerId ? engineers?.find(e => e.id === selectedEngineerId)?.username : "Select Engineer..."}
+                    <span className="truncate">{selectedEngineerId ? engineers?.find(e => e.id === selectedEngineerId)?.username : "Select Engineer..."}</span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -447,52 +454,130 @@ export default function TeamMappingPage() {
       </Card>
 
       <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-        <CardHeader className="bg-muted/5 border-b py-6">
-          <CardTitle className="text-xl font-black uppercase tracking-tight">Organization Teams</CardTitle>
-          <CardDescription className="text-xs font-medium">View all reporting relationships and manage individual site access levels.</CardDescription>
+        <CardHeader className="bg-muted/5 border-b p-4 md:p-6 space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+                <CardTitle className="text-lg md:text-xl font-black uppercase tracking-tight">Organization Directory</CardTitle>
+                <CardDescription className="text-xs font-medium">Reporting structures and individual site access registry.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+                <Badge variant="outline" className="h-9 px-4 rounded-sm font-black text-[10px] uppercase border-primary/10 bg-primary/5 text-primary">
+                    {filteredMappings.length} Active Mappings
+                </Badge>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+             <div className="relative group">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Input 
+                    placeholder="Filter Supervisor..." 
+                    className="h-9 pl-8 text-[11px] font-bold rounded-sm border-primary/10" 
+                    value={tableManagerSearch} 
+                    onChange={e => setTableManagerSearch(e.target.value)} 
+                />
+             </div>
+             <div className="relative group">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Input 
+                    placeholder="Filter Engineer..." 
+                    className="h-9 pl-8 text-[11px] font-bold rounded-sm border-primary/10" 
+                    value={tableEngineerSearch} 
+                    onChange={e => setTableEngineerSearch(e.target.value)} 
+                />
+             </div>
+             <div className="relative group">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Input 
+                    placeholder="Filter by Site..." 
+                    className="h-9 pl-8 text-[11px] font-bold rounded-sm border-primary/10" 
+                    value={tableSiteSearch} 
+                    onChange={e => setTableSiteSearch(e.target.value)} 
+                />
+             </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          {/* Mobile Card List View */}
+          <div className="md:hidden divide-y divide-border/50">
+            {filteredMappings.length > 0 ? filteredMappings.map((eng) => {
+                const hasOverrides = overrides?.filter(o => o.engineerId === eng.id) || [];
+                const defaultManager = managers.find(m => m.id === eng.siteManagerId);
+
+                return (
+                    <div key={eng.id} className="p-4 space-y-4 bg-card active:bg-muted/5 transition-colors">
+                        <div className="flex justify-between items-start">
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="font-bold text-sm text-foreground truncate">{eng.username}</h3>
+                                    {hasOverrides.length > 0 && <Badge variant="outline" className="text-[7px] h-3 px-1 border-amber-200 text-amber-700 bg-amber-50 font-black uppercase">Overrides</Badge>}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground uppercase font-black tracking-tight truncate opacity-60">{eng.email}</p>
+                            </div>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2"><MoreVertical className="h-4 w-4" /></Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem onClick={() => handleOpenSiteAccess(eng)} className="gap-2"><Building2 className="h-3.5 w-3.5" /> Manage Sites</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setOverrideEngineer(eng)} className="gap-2"><ShieldCheck className="h-3.5 w-3.5" /> Site Overrides</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setEditingLinkUser(eng)} className="gap-2"><Pencil className="h-3.5 w-3.5" /> Edit Reporting</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setUserToDelete(eng)} className="gap-2 text-destructive"><Trash2 className="h-3.5 w-3.5" /> Remove Link</DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 p-3 bg-muted/20 rounded-sm">
+                            <div className="space-y-1">
+                                <span className="text-[8px] font-black uppercase text-muted-foreground/60 tracking-widest">Primary Supervisor</span>
+                                <div className="flex items-center gap-2">
+                                    <UserCog className="h-3 w-3 text-primary opacity-50" />
+                                    <span className="text-xs font-bold text-foreground">{defaultManager?.username || "Unassigned"}</span>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-1">
+                                <span className="text-[8px] font-black uppercase text-muted-foreground/60 tracking-widest">Site Authorizations ({eng.assignedProjectIds?.length || 0})</span>
+                                <div className="flex flex-wrap gap-1">
+                                    {eng.assignedProjectIds?.slice(0, 3).map(sid => (
+                                        <Badge key={sid} variant="outline" className="text-[8px] h-4 px-1 border-primary/10 bg-background text-primary/60 font-bold uppercase truncate max-w-[100px]">
+                                            {allSites?.find(s => s.id === sid)?.name || '...'}
+                                        </Badge>
+                                    ))}
+                                    {eng.assignedProjectIds && eng.assignedProjectIds.length > 3 && <span className="text-[8px] font-bold text-muted-foreground/60">+{eng.assignedProjectIds.length - 3}</span>}
+                                    {(!eng.assignedProjectIds || eng.assignedProjectIds.length === 0) && <span className="text-[10px] italic text-muted-foreground/30">None</span>}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }) : (
+                <div className="p-12 text-center text-muted-foreground italic text-xs uppercase font-bold opacity-30">No mappings discovered</div>
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block">
             <Table>
-              <TableHeader className="bg-muted/30">
+              <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
                 <TableRow>
-                  <TableHead className="px-6 min-w-[250px]">
-                    <div className="flex flex-col gap-2 py-2">
-                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('manager')}>
-                            <span className="text-[10px] font-black uppercase tracking-widest">Supervisor Hierarchy</span>
-                            {sortConfig.key === 'manager' && (sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                        </div>
-                        <div className="relative">
-                            <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
-                            <Input placeholder="Filter supervisor..." className="h-8 pl-7 text-[10px] rounded-sm bg-background border-primary/10" value={tableManagerSearch} onChange={e => setTableManagerSearch(e.target.value)} />
-                        </div>
+                  <TableHead className="px-6 min-w-[220px]">
+                    <div className="flex items-center gap-2 cursor-pointer py-4" onClick={() => handleSort('manager')}>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Supervisor Hierarchy</span>
+                        {sortConfig.key === 'manager' && (sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
                     </div>
                   </TableHead>
                   <TableHead className="min-w-[200px]">
-                    <div className="flex flex-col gap-2 py-2">
-                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort('engineer')}>
-                            <span className="text-[10px] font-black uppercase tracking-widest">Engineer Name</span>
-                            {sortConfig.key === 'engineer' && (sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                        </div>
-                        <div className="relative">
-                            <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
-                            <Input placeholder="Filter..." className="h-8 pl-7 text-[10px] rounded-sm bg-background border-primary/10" value={tableEngineerSearch} onChange={e => setTableEngineerSearch(e.target.value)} />
-                        </div>
+                    <div className="flex items-center gap-2 cursor-pointer py-4" onClick={() => handleSort('engineer')}>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Engineer Name</span>
+                        {sortConfig.key === 'engineer' && (sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
                     </div>
                   </TableHead>
                   <TableHead className="min-w-[250px]">
-                    <div className="flex flex-col gap-2 py-2">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-widest">Site Names</span>
-                        </div>
-                        <div className="relative">
-                            <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
-                            <Input placeholder="Filter sites..." className="h-8 pl-7 text-[10px] rounded-sm bg-background border-primary/10" value={tableSiteSearch} onChange={e => setTableSiteSearch(e.target.value)} />
-                        </div>
-                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Site Names</span>
                   </TableHead>
                   <TableHead className="text-center w-24">
-                    <div className="flex items-center justify-center gap-1 cursor-pointer py-2" onClick={() => handleSort('sites')}>
+                    <div className="flex items-center justify-center gap-1 cursor-pointer py-4" onClick={() => handleSort('sites')}>
                         <span className="text-[10px] font-black uppercase tracking-widest">Sites</span>
                         {sortConfig.key === 'sites' && (sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
                     </div>
@@ -605,34 +690,35 @@ export default function TeamMappingPage() {
 
       {/* Edit Team Link Dialog */}
       <Dialog open={!!editingLinkUser} onOpenChange={(o) => !o && setEditingLinkUser(null)}>
-        <DialogContent className="max-w-md w-[95vw] rounded-xl p-0 border-none shadow-2xl bg-white animate-in zoom-in-95 duration-200">
-          <DialogHeader className="p-6 pb-2 shrink-0 text-left space-y-2">
+        <DialogContent className="max-w-md w-[95vw] rounded-sm p-0 border-none shadow-2xl bg-background flex flex-col h-[80vh] sm:h-auto max-h-[90vh]">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 text-left space-y-2">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-50 text-primary rounded-lg">
+              <div className="p-2.5 bg-blue-50 text-primary rounded-sm">
                 <Pencil className="h-5 w-5" />
               </div>
-              <DialogTitle className="text-xl font-black tracking-tight text-slate-900">Edit Team Link</DialogTitle>
+              <DialogTitle className="text-xl font-black uppercase tracking-tight">Edit Team Link</DialogTitle>
             </div>
-            <DialogDescription className="text-xs font-medium text-slate-500 leading-relaxed">
-              Reassign <strong className="text-slate-700">{editingLinkUser?.username}</strong> to a different supervisor.
+            <DialogDescription className="text-xs font-medium leading-relaxed">
+              Reassign <strong className="text-foreground">{editingLinkUser?.username}</strong> to a different supervisor.
             </DialogDescription>
           </DialogHeader>
-          <div className="p-6 space-y-6">
-            <div className="space-y-3 text-left">
-              <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Assign New Supervisor</Label>
+          <div className="p-6 space-y-6 flex-1 overflow-hidden flex flex-col">
+            <div className="space-y-3 text-left shrink-0">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Assign New Supervisor</Label>
               <div className="relative group">
-                <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input 
                   placeholder="Search name or email..." 
-                  className="h-12 pl-10 rounded-lg border-slate-200 bg-slate-50/30 focus-visible:ring-primary/20 text-sm font-medium"
+                  className="h-10 pl-9 rounded-sm border-primary/20 bg-background focus-visible:ring-primary/20 text-sm font-medium"
                   value={editManagerSearch}
                   onChange={e => setEditManagerSearch(e.target.value)}
                 />
               </div>
+            </div>
 
-              <div className="border rounded-lg overflow-hidden bg-white shadow-inner">
-                <ScrollArea className="h-[220px]">
-                  <div className="divide-y divide-slate-50">
+            <div className="border rounded-sm overflow-hidden flex-1 flex flex-col bg-background shadow-inner">
+                <ScrollArea className="flex-1">
+                  <div className="divide-y">
                     {managers.filter(m => 
                       m.username?.toLowerCase().includes(editManagerSearch.toLowerCase()) || 
                       m.email?.toLowerCase().includes(editManagerSearch.toLowerCase())
@@ -643,95 +729,94 @@ export default function TeamMappingPage() {
                         onClick={() => setEditManagerId(m.id)}
                         className={cn(
                           "w-full flex items-center gap-4 p-4 text-left transition-all",
-                          editManagerId === m.id ? "bg-blue-50" : "hover:bg-slate-50"
+                          editManagerId === m.id ? "bg-primary/5" : "hover:bg-muted/5"
                         )}
                       >
                         <div className="h-8 w-8 flex items-center justify-center shrink-0">
                           {editManagerId === m.id ? (
                             <Check className="h-4 w-4 text-primary" />
                           ) : (
-                            <div className="h-1.5 w-1.5 rounded-full bg-slate-200" />
+                            <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/20" />
                           )}
                         </div>
                         <div className="flex flex-col min-w-0">
-                          <span className={cn("text-sm font-bold truncate leading-tight", editManagerId === m.id ? "text-primary" : "text-slate-700")}>{m.username}</span>
-                          <span className="text-[10px] font-mono text-slate-400 uppercase truncate mt-0.5">{m.email}</span>
+                          <span className={cn("text-sm font-bold truncate leading-tight", editManagerId === m.id ? "text-primary" : "text-foreground")}>{m.username}</span>
+                          <span className="text-[10px] font-mono text-muted-foreground uppercase truncate mt-0.5">{m.email}</span>
                         </div>
                       </button>
                     ))}
                   </div>
                 </ScrollArea>
-              </div>
             </div>
           </div>
 
-          <div className="p-6 bg-slate-50/50 border-t flex items-center justify-between gap-4">
+          <DialogFooter className="p-4 bg-muted/5 border-t flex items-center justify-between gap-3 shrink-0 flex-col sm:flex-row">
             <DialogClose asChild>
-              <Button variant="outline" className="flex-1 rounded-lg font-bold text-slate-600 border-slate-200 h-11 bg-white hover:bg-white hover:text-slate-900 transition-colors">
+              <Button variant="outline" className="w-full sm:flex-1 rounded-sm font-bold uppercase text-[10px] h-11 tracking-widest">
                 Cancel
               </Button>
             </DialogClose>
             <Button 
               disabled={!editManagerId || isUpdatingLink} 
               onClick={handleUpdateLink}
-              className="flex-1 rounded-lg font-bold h-11 bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-[0.98]"
+              className="w-full sm:flex-1 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg tracking-widest"
             >
-              {isUpdatingLink ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-              Confirm
+              {isUpdatingLink ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Confirm Change
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Manage Site Access Dialog */}
       <Dialog open={!!siteAccessUser} onOpenChange={(o) => !o && setSiteAccessUser(null)}>
-        <DialogContent className="max-w-2xl w-[95vw] rounded-xl p-0 border-none shadow-2xl bg-white animate-in zoom-in-95 duration-200">
+        <DialogContent className="max-w-2xl w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background h-[95vh] sm:h-auto sm:max-h-[90vh] flex flex-col">
           <DialogHeader className="p-6 pb-2 shrink-0 text-left space-y-2">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-blue-50 text-primary rounded-lg">
+              <div className="p-2.5 bg-primary/10 text-primary rounded-sm">
                 <MapPin className="h-5 w-5" />
               </div>
-              <DialogTitle className="text-xl font-black tracking-tight text-slate-900">Manage Site Access</DialogTitle>
+              <DialogTitle className="text-xl font-black uppercase tracking-tight">Manage Site Access</DialogTitle>
             </div>
-            <DialogDescription className="text-xs font-medium text-slate-500 leading-relaxed">
-              Assign sites to <strong className="text-slate-700">{siteAccessUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
+            <DialogDescription className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 leading-relaxed">
+              Assign sites to <strong className="text-foreground">{siteAccessUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="p-6 space-y-8 flex-1 overflow-hidden flex flex-col">
-            <div className="p-5 bg-blue-50/40 border border-blue-100 rounded-xl space-y-3 shrink-0">
-              <Label className="text-[10px] font-black uppercase text-blue-600/80 tracking-widest px-1">Select Site to Add</Label>
+          <div className="p-6 space-y-6 flex-1 overflow-hidden flex flex-col">
+            <div className="p-4 bg-primary/[0.03] border border-primary/10 rounded-sm space-y-3 shrink-0">
+              <Label className="text-[10px] font-black uppercase text-primary/80 tracking-widest px-1">Select Site to Add</Label>
               <Popover open={isSiteSearchOpen} onOpenChange={setIsSiteSearchOpen}>
                 <PopoverTrigger asChild>
                   <Button 
                     variant="outline" 
                     role="combobox" 
                     className={cn(
-                      "w-full justify-between h-12 rounded-lg border-slate-200 bg-white font-medium text-sm text-left shadow-sm",
-                      "hover:bg-slate-50 hover:border-primary/30 transition-all px-4"
+                      "w-full justify-between h-11 rounded-sm border-primary/20 bg-background font-bold text-xs text-left",
+                      "hover:bg-primary/5 transition-all px-4"
                     )}
                   >
-                    <span className="truncate">Select project site...</span>
+                    <span className="truncate">Search project site...</span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-lg shadow-2xl border-slate-200" align="start">
-                  <div className="flex items-center border-b px-3 py-2 bg-slate-50/50">
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-sm shadow-2xl border-primary/10" align="start">
+                  <div className="flex items-center border-b px-3 py-2 bg-muted/20">
                     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50 text-primary" />
                     <Input 
-                      placeholder="Search project sites..." 
-                      className="h-9 w-full border-none focus-visible:ring-0 bg-transparent px-0 text-sm font-medium"
+                      placeholder="Search sites..." 
+                      className="h-8 w-full border-none focus-visible:ring-0 bg-transparent px-0 text-sm font-medium"
                       value={siteSearch}
                       onChange={e => setSiteSearch(e.target.value)}
                     />
                   </div>
-                  <ScrollArea className="h-[220px]">
+                  <ScrollArea className="h-[200px]">
                     <div className="p-1">
                       {availableSitesToAllot.length > 0 ? availableSitesToAllot.map(site => (
                         <Button 
                           key={site.id} 
                           variant="ghost" 
-                          className="w-full justify-start h-auto py-3 px-4 text-left rounded-md mb-0.5 hover:bg-blue-50 hover:text-primary group"
+                          className="w-full justify-start h-auto py-2.5 px-3 text-left rounded-sm mb-0.5 hover:bg-primary/5 hover:text-primary group"
                           onClick={() => {
                             setLocalSiteIds(prev => [...prev, site.id]);
                             setSiteSearch("");
@@ -740,11 +825,11 @@ export default function TeamMappingPage() {
                         >
                           <div className="flex flex-col min-w-0">
                             <span className="font-bold text-sm truncate">{site.name}</span>
-                            <span className="text-[10px] uppercase font-bold opacity-50 truncate group-hover:opacity-100">{site.projectCompany}</span>
+                            <span className="text-[9px] uppercase font-bold opacity-50 truncate group-hover:opacity-100">{site.projectCompany}</span>
                           </div>
                         </Button>
                       )) : (
-                        <div className="p-8 text-center text-xs font-medium text-slate-400 italic">No available sites discovered</div>
+                        <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground/40 italic leading-relaxed">No available sites discovered</div>
                       )}
                     </div>
                   </ScrollArea>
@@ -752,14 +837,14 @@ export default function TeamMappingPage() {
               </Popover>
             </div>
 
-            <div className="space-y-3 flex-1 flex flex-col min-h-0">
-              <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1 shrink-0">Authorized Site Access</Label>
-              <div className="border rounded-xl flex-1 flex flex-col overflow-hidden bg-white shadow-inner">
+            <div className="space-y-2 flex-1 flex flex-col min-h-0">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-widest px-1 shrink-0">Authorized Site Access</Label>
+              <div className="border rounded-sm flex-1 flex flex-col overflow-hidden bg-background shadow-inner">
                 <Table>
-                  <TableHeader className="bg-slate-50 sticky top-0 z-10">
-                    <TableRow className="hover:bg-transparent border-b-slate-100">
-                      <TableHead className="text-[9px] font-black uppercase text-slate-400 h-9 px-5">Site Name</TableHead>
-                      <TableHead className="text-[9px] font-black uppercase text-slate-400 h-9">Company</TableHead>
+                  <TableHeader className="bg-muted/30 sticky top-0 z-10">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-[9px] font-black uppercase tracking-widest h-9 px-5">Site Name</TableHead>
+                      <TableHead className="text-[9px] font-black uppercase tracking-widest h-9">Company</TableHead>
                       <TableHead className="w-12 h-9"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -773,24 +858,24 @@ export default function TeamMappingPage() {
                       {localSiteIds.length > 0 ? localSiteIds.map(sid => {
                         const site = allSites?.find(s => s.id === sid);
                         return (
-                          <TableRow key={sid} className="hover:bg-slate-50 transition-colors border-b-slate-50 last:border-0 group">
-                            <TableCell className="px-5 py-4 font-black text-[13px] text-slate-800">{site?.name || '—'}</TableCell>
-                            <TableCell className="text-xs font-medium text-slate-400">{site?.projectCompany || '—'}</TableCell>
+                          <TableRow key={sid} className="hover:bg-muted/5 transition-colors border-b-border/30 last:border-0 group">
+                            <TableCell className="px-5 py-3 font-bold text-sm">{site?.name || '—'}</TableCell>
+                            <TableCell className="text-[10px] font-medium text-muted-foreground uppercase">{site?.projectCompany || '—'}</TableCell>
                             <TableCell className="text-right pr-5">
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
-                                className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                                className="h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm"
                                 onClick={() => setLocalSiteIds(prev => prev.filter(id => id !== sid))}
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <X className="h-3.5 w-3.5" />
                               </Button>
                             </TableCell>
                           </TableRow>
                         );
                       }) : (
                         <TableRow>
-                          <TableCell colSpan={3} className="h-40 text-center text-xs font-medium text-slate-400 italic">No project sites assigned to this account.</TableCell>
+                          <TableCell colSpan={3} className="h-40 text-center text-xs font-medium text-muted-foreground/40 italic uppercase font-bold tracking-widest">No project sites assigned</TableCell>
                         </TableRow>
                       )}
                     </TableBody>
@@ -800,102 +885,108 @@ export default function TeamMappingPage() {
             </div>
           </div>
 
-          <div className="p-6 bg-slate-50/50 border-t flex items-center justify-between gap-4 shrink-0">
+          <DialogFooter className="p-4 bg-muted/5 border-t flex items-center justify-between gap-3 shrink-0 flex-col sm:flex-row">
             <DialogClose asChild>
-              <Button variant="outline" className="flex-1 rounded-lg font-bold text-slate-600 border-slate-200 h-11 bg-white hover:bg-white hover:text-slate-900">
+              <Button variant="outline" className="w-full sm:flex-1 rounded-sm font-bold uppercase text-[10px] h-11 tracking-widest">
                 Cancel
               </Button>
             </DialogClose>
             <Button 
               disabled={isUpdatingSites} 
               onClick={handleSaveSiteAccess}
-              className="flex-1 rounded-lg font-bold h-11 bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-[0.98]"
+              className="w-full sm:flex-1 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg tracking-widest"
             >
               {isUpdatingSites ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               Save Updates
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Site Specific Override Dialog */}
       <Dialog open={!!overrideEngineer} onOpenChange={(o) => !o && setOverrideEngineer(null)}>
-        <DialogContent className="max-w-2xl rounded-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-black tracking-tight"><Building2 className="h-5 w-5 text-amber-600" /> Site Specific Manager Assignments</DialogTitle>
-            <DialogDescription className="text-xs font-medium">Assign alternative reporting managers for <strong>{overrideEngineer?.username}</strong> per project site.</DialogDescription>
+        <DialogContent className="max-w-2xl w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background h-[90vh] sm:h-auto sm:max-h-[90vh] flex flex-col">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 text-left">
+            <div className="flex items-center gap-3">
+                <ShieldCheck className="h-5 w-5 text-amber-600" />
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Site Specific Overrides</DialogTitle>
+            </div>
+            <DialogDescription className="text-xs font-medium mt-1">Assign alternative reporting managers for <strong>{overrideEngineer?.username}</strong> per project site.</DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-6 py-4">
-            <div className="p-4 bg-amber-50 border border-amber-100 rounded-sm space-y-4 shadow-inner">
-              <Label className="text-[10px] font-black uppercase text-amber-800 tracking-[0.2em]">New Allocation Override</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-[9px] uppercase font-black text-muted-foreground">Target Project Site</Label>
-                  <Select value={newOverrideSiteId} onValueChange={setNewOverrideSiteId}>
-                    <SelectTrigger className="h-10 bg-white border-amber-200"><SelectValue placeholder="Choose Site..." /></SelectTrigger>
-                    <SelectContent>
-                      {allSites?.filter(s => overrideEngineer?.assignedProjectIds?.includes(s.id)).map(s => (
-                        <SelectItem key={s.id} value={s.id} className="text-xs font-bold">{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <ScrollArea className="flex-1">
+            <div className="p-6 space-y-8">
+              <div className="p-4 bg-amber-50/50 border border-amber-100 rounded-sm space-y-4 shadow-inner">
+                <Label className="text-[10px] font-black uppercase text-amber-800 tracking-[0.2em]">New Allocation Override</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] uppercase font-black text-muted-foreground">Target Project Site</Label>
+                    <Select value={newOverrideSiteId} onValueChange={setNewOverrideSiteId}>
+                      <SelectTrigger className="h-10 bg-background border-amber-200"><SelectValue placeholder="Choose Site..." /></SelectTrigger>
+                      <SelectContent>
+                        {allSites?.filter(s => overrideEngineer?.assignedProjectIds?.includes(s.id)).map(s => (
+                          <SelectItem key={s.id} value={s.id} className="text-xs font-bold">{s.name}</SelectItem>
+                        ))}
+                        {!allSites?.some(s => overrideEngineer?.assignedProjectIds?.includes(s.id)) && <SelectItem value="none" disabled>No assigned sites</SelectItem>}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] uppercase font-black text-muted-foreground">Designated Manager</Label>
+                    <Select value={newOverrideManagerId} onValueChange={setNewOverrideManagerId}>
+                      <SelectTrigger className="h-10 bg-background border-amber-200"><SelectValue placeholder="Choose Manager..." /></SelectTrigger>
+                      <SelectContent>
+                        {managers.map(m => (
+                          <SelectItem key={m.id} value={m.id} className="text-xs font-bold">{m.username}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[9px] uppercase font-black text-muted-foreground">Designated Manager</Label>
-                  <Select value={newOverrideManagerId} onValueChange={setNewOverrideManagerId}>
-                    <SelectTrigger className="h-10 bg-white border-amber-200"><SelectValue placeholder="Choose Manager..." /></SelectTrigger>
-                    <SelectContent>
-                      {managers.map(m => (
-                        <SelectItem key={m.id} value={m.id} className="text-xs font-bold">{m.username}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Button onClick={handleAddOverride} disabled={!newOverrideSiteId || !newOverrideManagerId || isAddingOverride} className="w-full bg-amber-600 hover:bg-amber-700 h-11 font-black uppercase text-[10px] tracking-widest shadow-md">
+                  {isAddingOverride ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />} Establish Mapping Override
+                </Button>
               </div>
-              <Button onClick={handleAddOverride} disabled={!newOverrideSiteId || !newOverrideManagerId || isAddingOverride} className="w-full bg-amber-600 hover:bg-amber-700 h-11 font-black uppercase text-[10px] tracking-widest shadow-md">
-                {isAddingOverride ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />} Establish Mapping Override
-              </Button>
-            </div>
 
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest px-1">Active Site Specific Mappings</Label>
-              <div className="border rounded-sm overflow-hidden bg-background shadow-sm">
-                <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest h-9 px-4">Project Location</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase tracking-widest h-9">Mapped Manager</TableHead>
-                      <TableHead className="text-right h-9"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {overrides?.filter(o => o.engineerId === overrideEngineer?.id).map(o => (
-                      <TableRow key={o.id} className="group hover:bg-muted/5 transition-colors">
-                        <TableCell className="text-xs font-bold py-3 px-4">{allSites?.find(s => s.id === o.siteId)?.name || 'Unknown Site'}</TableCell>
-                        <TableCell className="text-xs font-semibold text-primary">{managers.find(m => m.id === o.managerId)?.username || 'Unknown Manager'}</TableCell>
-                        <TableCell className="text-right pr-4">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemoveOverride(o)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </TableCell>
+              <div className="space-y-3">
+                <Label className="text-[10px] font-black uppercase tracking-widest px-1 text-muted-foreground/60">Active Site Specific Mappings</Label>
+                <div className="border rounded-sm overflow-hidden bg-background shadow-sm">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest h-9 px-4">Project Location</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase tracking-widest h-9">Mapped Manager</TableHead>
+                        <TableHead className="text-right h-9"></TableHead>
                       </TableRow>
-                    ))}
-                    {!overrides?.some(o => o.engineerId === overrideEngineer?.id) && (
-                      <TableRow><TableCell colSpan={3} className="h-20 text-center text-xs text-muted-foreground italic font-medium uppercase opacity-40">No site-specific mappings defined.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {overrides?.filter(o => o.engineerId === overrideEngineer?.id).map(o => (
+                        <TableRow key={o.id} className="group hover:bg-muted/5 transition-colors">
+                          <TableCell className="text-xs font-bold py-3 px-4">{allSites?.find(s => s.id === o.siteId)?.name || 'Unknown Site'}</TableCell>
+                          <TableCell className="text-xs font-semibold text-primary">{managers.find(m => m.id === o.managerId)?.username || 'Unknown Manager'}</TableCell>
+                          <TableCell className="text-right pr-4">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" onClick={() => handleRemoveOverride(o)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {!overrides?.some(o => o.engineerId === overrideEngineer?.id) && (
+                        <TableRow><TableCell colSpan={3} className="h-20 text-center text-xs text-muted-foreground italic font-medium uppercase opacity-40">No site-specific mappings defined.</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </div>
-          </div>
-          <DialogFooter className="p-4 bg-muted/5 border-t shrink-0"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Manager</Button></DialogClose></DialogFooter>
+          </ScrollArea>
+          <DialogFooter className="p-4 bg-muted/5 border-t shrink-0"><DialogClose asChild><Button variant="outline" className="w-full sm:w-auto rounded-sm font-black uppercase text-[10px] h-11 px-8 tracking-widest">Close Manager</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Mapping Confirmation */}
       <AlertDialog open={!!userToDelete} onOpenChange={(o) => !o && setUserToDelete(null)}>
-        <AlertDialogContent className="rounded-sm">
+        <AlertDialogContent className="rounded-sm max-md w-[95vw]">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-destructive flex items-center gap-2 font-black uppercase tracking-tight">
               <Trash2 className="h-5 w-5" /> Remove Reporting Line
@@ -904,9 +995,9 @@ export default function TeamMappingPage() {
               Are you sure you want to remove the default supervisor mapping for <strong>{userToDelete?.username}</strong>? This user will become unassigned until a new link is created.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDeleteMapping} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px]">
+          <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11 sm:flex-1">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteMapping} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px] h-11 sm:flex-1">
               Confirm Removal
             </AlertDialogAction>
           </AlertDialogFooter>
