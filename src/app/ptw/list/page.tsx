@@ -48,7 +48,9 @@ import {
   Search,
   ZoomIn,
   ZoomOut,
-  RotateCcw
+  RotateCcw,
+  Forward,
+  UserCog
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking } from "@/firebase";
@@ -215,6 +217,10 @@ export default function PtwListPage() {
 
   const [actionState, setActionState] = React.useState<{ permit: Permit, status: 'Approved' | 'Rejected' | 'ManagerApproved' } | null>(null);
   const [detailsPermit, setDetailsPermit] = React.useState<Permit | null>(null);
+  const [forwardingPermit, setForwardingPermit] = React.useState<Permit | null>(null);
+  const [newManagerId, setNewManagerId] = React.useState<string | null>(null);
+  const [isForwarding, setIsForwarding] = React.useState(false);
+  const [managerForwardSearch, setManagerForwardSearch] = React.useState("");
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'requestDate', direction: 'desc' });
   
   const [viewFile, setViewFile] = React.useState<Attachment | null>(null);
@@ -252,6 +258,9 @@ export default function PtwListPage() {
 
   const usersQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), where('role', '==', 'Site Engineer')) : null, [firestore, isAdmin]);
   const { data: engineers } = useCollection<{ username: string, id: string }>(usersQuery);
+
+  const managersQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), where('role', '==', 'Site Manager')) : null, [firestore, isAdmin]);
+  const { data: managersList } = useCollection<any>(managersQuery);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<{ name: string, id: string, projectCompany: string }>(sitesQuery);
@@ -456,6 +465,48 @@ export default function PtwListPage() {
     });
 
     toast({ title: "Updated", description: `Permit status set to ${targetStatus}.` });
+  };
+
+  const handleForwardPermit = async () => {
+    if (!forwardingPermit || !newManagerId || !user) return;
+    setIsForwarding(true);
+    try {
+        const newManager = managersList?.find((m: any) => m.id === newManagerId);
+        const permitRef = doc(firestore, 'permits_to_work', forwardingPermit.id);
+        
+        const timelineEntry: TimelineEntry = {
+            status: 'Pending',
+            timestamp: new Date(),
+            userId: user.uid,
+            userName: userProfile?.username || 'Admin',
+            userRole: 'Admin',
+            remarks: `Permit reassigned to ${newManager?.username || 'new manager'} by Administration.`,
+            action: 'Forwarded'
+        };
+
+        await updateDocumentNonBlocking(permitRef, {
+            siteManagerId: newManagerId,
+            timeline: arrayUnion({ ...timelineEntry, timestamp: new Date() }),
+            updatedAt: serverTimestamp()
+        });
+
+        sendNotification(firestore, {
+            userId: newManagerId,
+            title: "Permit Forwarded to You",
+            description: `Admin forwarded permit ${forwardingPermit.serialNumber} for your review.`,
+            link: `/ptw/list?view=${forwardingPermit.id}`,
+            push: true
+        });
+
+        toast({ title: 'Permit Forwarded', description: `Reassigned to ${newManager?.username}.` });
+        setForwardingPermit(null);
+        setNewManagerId(null);
+        setManagerForwardSearch("");
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Forward Failed', description: e.message });
+    } finally {
+        setIsForwarding(false);
+    }
   };
 
   const openViewer = (file: Attachment, allAttachments: Attachment[]) => {
@@ -688,6 +739,11 @@ export default function PtwListPage() {
               </div>
               <div className="pt-2 border-t border-primary/5 flex justify-end items-center gap-2">
                 <WhatsAppUpdateEngineer permit={permit} />
+                {isAdmin && permit.status === 'Pending' && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setForwardingPermit(permit); }} title="Forward to another Manager">
+                    <Forward className="h-4 w-4" />
+                  </Button>
+                )}
                 {permit.status === 'Rejected' && (
                   <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-amber-600 rounded-sm" title="Resubmit">
                     <Link href={`/ptw/raise?correct=${permit.id}`} onClick={(e) => e.stopPropagation()}>
@@ -729,6 +785,11 @@ export default function PtwListPage() {
                         <TableCell className="text-right px-6">
                           <div className="flex justify-end gap-1">
                             <WhatsAppUpdateEngineer permit={permit} />
+                            {isAdmin && permit.status === 'Pending' && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setForwardingPermit(permit); }} title="Forward to another Manager">
+                                <Forward className="h-4 w-4" />
+                              </Button>
+                            )}
                             {permit.status === 'Rejected' && (
                               <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-amber-600 rounded-sm" title="Resubmit with Corrections">
                                 <Link href={`/ptw/raise?correct=${permit.id}`} onClick={(e) => e.stopPropagation()}>
@@ -757,6 +818,71 @@ export default function PtwListPage() {
           <DialogHeader className="text-left space-y-2"><DialogTitle className="text-xl font-black tracking-tight">Process Decision</DialogTitle><DialogDescription className="text-xs font-medium">Process permit {actionState?.permit?.serialNumber}</DialogDescription></DialogHeader>
           <div className="py-6 space-y-2"><Label className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">Action Remarks</Label><Textarea id="action-remarks" placeholder="Provide feedback or justification..." className="min-h-[120px] rounded-sm" /></div>
           <DialogFooter className="flex flex-col sm:flex-row gap-3"><DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-12 font-bold rounded-sm text-xs">Cancel</Button></DialogClose><Button className={cn("w-full sm:flex-1 h-12 font-bold rounded-sm text-xs", actionState?.status === 'Rejected' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white')} onClick={() => { const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || ""; if (remarks.trim()) { handleAction(actionState!.permit, actionState!.status as any, remarks); setActionState(null); } else { toast({ variant: 'destructive', title: 'Remarks Required' }); } }}>Confirm {actionState?.status === 'Rejected' ? 'Rejection' : 'Approval'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!forwardingPermit} onOpenChange={(o) => !o && setForwardingPermit(null)}>
+        <DialogContent className="max-w-md w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 text-left">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2.5 rounded-sm"><Forward className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Forward Permit</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Reassign Manager Approval</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="p-6 space-y-6">
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Select New Site Manager</Label>
+              <div className="relative group">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Input 
+                  placeholder="Search managers..." 
+                  className="h-11 pl-10 rounded-sm border-primary/20 bg-background font-medium"
+                  value={managerForwardSearch}
+                  onChange={e => setManagerForwardSearch(e.target.value)}
+                />
+              </div>
+            </div>
+            
+            <div className="border rounded-sm overflow-hidden bg-background shadow-inner">
+              <ScrollArea className="h-[250px]">
+                <div className="divide-y">
+                  {managersList?.filter((m: any) => m.username?.toLowerCase().includes(managerForwardSearch.toLowerCase()) || m.email?.toLowerCase().includes(managerForwardSearch.toLowerCase())).map((m: any) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setNewManagerId(m.id)}
+                      className={cn(
+                        "w-full flex items-center gap-4 p-4 text-left transition-all",
+                        newManagerId === m.id ? "bg-primary/5" : "hover:bg-muted/5"
+                      )}
+                    >
+                      <div className="h-8 w-8 flex items-center justify-center shrink-0">
+                        {newManagerId === m.id ? <Check className="h-4 w-4 text-primary" /> : <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/20" />}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className={cn("text-sm font-bold truncate leading-tight", newManagerId === m.id ? "text-primary" : "text-foreground")}>{m.username}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground uppercase truncate mt-0.5">{m.email}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 flex flex-col sm:flex-row">
+            <DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-12 font-bold uppercase text-[10px] rounded-sm">Cancel</Button></DialogClose>
+            <Button 
+              disabled={!newManagerId || isForwarding} 
+              onClick={handleForwardPermit}
+              className="w-full sm:flex-1 h-12 font-black uppercase text-[10px] rounded-sm shadow-xl"
+            >
+              {isForwarding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <UserCog className="h-4 w-4 mr-2" />}
+              Forward Permit
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
