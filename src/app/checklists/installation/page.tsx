@@ -232,35 +232,34 @@ export default function TableLevelMMSChecklistPage() {
 
       const timestamp = Date.now();
 
-      // Parallelize Category Processing
-      const checksPromises = Object.entries(values.checks).map(async ([key, check]) => {
+      // Sequential Processing of Categories and Files to prevent storage/retry-limit-exceeded errors on site internet
+      const finalChecks = [];
+      for (const [key, check] of Object.entries(values.checks)) {
         const attachments = [];
         if (check.localFiles && check.localFiles.length > 0) {
-          const filePromises = (check.localFiles as File[]).map((file, i) => {
+          for (let i = 0; i < check.localFiles.length; i++) {
+            const file = check.localFiles[i];
             const path = `checklists/mms/${user.uid}/${timestamp}_${key}_${i}_${file.name.replace(/\s+/g, '_')}`;
-            return uploadFile(file, path);
-          });
-          const uploaded = await Promise.all(filePromises);
-          attachments.push(...uploaded);
+            const uploaded = await uploadFile(file, path);
+            attachments.push(uploaded);
+          }
         }
-        return {
+        finalChecks.push({
           key,
           label: (CHECK_LABELS as any)[key],
           remarks: check.remarks || "",
           attachments
-        };
-      });
-
-      const finalChecks = await Promise.all(checksPromises);
+        });
+      }
 
       const otherAttachments = [];
       if (values.otherLocalFiles && values.otherLocalFiles.length > 0) {
-        const otherPromises = (values.otherLocalFiles as File[]).map((file, i) => {
+        for (let i = 0; i < values.otherLocalFiles.length; i++) {
+          const file = values.otherLocalFiles[i];
           const path = `checklists/mms/${user.uid}/${timestamp}_other_${i}_${file.name.replace(/\s+/g, '_')}`;
-          return uploadFile(file, path);
-        });
-        const otherUploaded = await Promise.all(otherPromises);
-        otherAttachments.push(...otherUploaded);
+          const uploaded = await uploadFile(file, path);
+          otherAttachments.push(uploaded);
+        }
       }
 
       addDocumentNonBlocking(collection(firestore, 'installation_checklists'), {
