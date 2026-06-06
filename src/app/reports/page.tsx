@@ -494,7 +494,7 @@ export default function ReportsDashboard() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-primary" />
+            <TrendingUp className="h-6 w-6 text-primary" />
             <h1 className="text-xl md:text-3xl font-black uppercase tracking-tight">Operational Reports</h1>
           </div>
           <p className="text-muted-foreground text-[10px] md:text-sm font-medium">Analytical summaries and real-time performance tracking.</p>

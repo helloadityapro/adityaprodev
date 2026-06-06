@@ -6,8 +6,6 @@ import {
   ChevronDown,
   FolderOpen,
   BookOpen,
-  FileBarChart,
-  CalendarDays,
   Trophy,
   LayoutDashboard,
   MapPin,
@@ -55,7 +53,9 @@ import {
   Database,
   History,
   CalendarCheck,
-  Zap
+  Zap,
+  FileBarChart,
+  CalendarDays
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -132,7 +132,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Dashboard" isActive={pathname === '/reports'} className="rounded-sm" onClick={handleMobileClose}>
                 <Link href="/reports">
-                  <FileBarChart className="h-4 w-4 text-primary" />
+                  <TrendingUp className="h-4 w-4 text-primary" />
                   <span className="font-bold">Dashboard</span>
                 </Link>
               </SidebarMenuButton>
