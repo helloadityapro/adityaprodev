@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -34,7 +33,9 @@ import {
   Navigation,
   Save,
   ChevronUp,
-  ArrowUp
+  ArrowUp,
+  Globe,
+  Building2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -48,7 +49,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Progress } from "@/components/ui/progress";
 import { sendNotification } from "@/lib/notifications";
 
-const PURPOSES = ["Kick-off visit", "Regular visit", "Site team meetup", "Vendor meetup"];
+const PURPOSES = ["Kick-off visit", "Regular visit", "Site team meetup", "Vendor meetup", "General Inspection", "Maintenance Check"];
 
 type TaskItem = {
   text: string;
@@ -171,7 +172,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
       navigator.geolocation.getCurrentPosition(
         (position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude }),
         () => {
-          toast({ variant: 'destructive', title: 'GPS Error', description: 'Location access required for site audit.' });
+          toast({ variant: 'destructive', title: 'GPS Error', description: 'Location access required for audit verification.' });
           resolve(null);
         },
         { enableHighAccuracy: true, timeout: 5000 }
@@ -262,7 +263,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
         tasks: finalTasks.filter(t => t.text.trim() !== "" || t.photoUrl),
         updatedAt: serverTimestamp()
       });
-      toast({ title: 'Draft Saved', description: 'Action items updated. Visit remains ongoing.' });
+      toast({ title: 'Draft Saved', description: 'Action items updated. Status remains active.' });
       router.push('/site-visits/active');
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Save Failed', description: e.message });
@@ -284,7 +285,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
     }
 
     if (customerAvailable === 'yes' && !customerNames.trim()) {
-      toast({ variant: 'destructive', title: 'Missing Info', description: 'Please provide the names of the customer representatives.' });
+      toast({ variant: 'destructive', title: 'Missing Info', description: 'Please provide the names of the persons met.' });
       return;
     }
 
@@ -335,14 +336,14 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
       adminDocs.forEach(adminDoc => {
         sendNotification(firestore, {
           userId: adminDoc.id,
-          title: "Site Visit Concluded",
-          description: `${visit.managerName} published a final report for "${visit.siteName}".`,
+          title: "Presence Concluded",
+          description: `${visit.managerName} published a final audit for "${visit.siteName}".`,
           link: `/site-visits/${visit.id}`,
           push: true
         });
       });
 
-      toast({ variant: 'success', title: 'Report Published', description: `Visit to ${visit.siteName} concluded and documented.` });
+      toast({ variant: 'success', title: 'Report Published', description: `Audit for ${visit.siteName} concluded and documented.` });
       router.push('/site-visits/history');
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Submission Failed', description: e.message });
@@ -357,19 +358,22 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
     return (
       <div className="p-8 flex flex-col items-center justify-center text-center gap-4 min-h-[60vh]">
         <CheckCircle2 className="h-16 w-16 text-green-500" />
-        <h2 className="text-2xl font-bold">Visit Completed</h2>
-        <p className="text-muted-foreground">The visit report for {visit.siteName} has already been published.</p>
+        <h2 className="text-2xl font-bold">Audit Completed</h2>
+        <p className="text-muted-foreground">The report for {visit.siteName} has already been published.</p>
         <Button onClick={() => router.push('/site-visits/history')} className="rounded-sm font-bold shadow-md">View History</Button>
       </div>
     );
   }
 
+  const isSite = visit.locationType !== 'other';
+  const labelPrefix = isSite ? "Site" : "Location";
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto pb-20 px-2 sm:px-4">
       <div className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2 text-xl sm:text-2xl">
-          <Navigation className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-          Continue Site Visit
+          {isSite ? <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-primary" /> : <Globe className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />}
+          Continue {isSite ? "Site Visit" : "Field Presence"}
         </h1>
         <p className="text-muted-foreground text-xs sm:text-sm">Documenting presence and activities at <strong>{visit.siteName}</strong>.</p>
       </div>
@@ -381,12 +385,12 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-1">
                 <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                  <Plus className="h-4 w-4 text-primary" /> Action Items / Task Checklist
+                  <Plus className="h-4 w-4 text-primary" /> Action Items / Findings
                 </CardTitle>
-                <CardDescription className="text-[10px] font-bold text-muted-foreground uppercase">Log current activities and findings</CardDescription>
+                <CardDescription className="text-[10px] font-bold text-muted-foreground uppercase">Log current activities and observations</CardDescription>
               </div>
               <Button variant="outline" size="sm" onClick={addTask} className="text-primary font-bold h-9 sm:h-8 px-3 border-primary/20 bg-white w-full sm:w-auto">
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Action
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Observation
               </Button>
             </div>
           </CardHeader>
@@ -395,7 +399,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
               <div key={idx} className="space-y-3 p-3 sm:p-4 border rounded-sm bg-muted/5 relative group animate-in slide-in-from-top-1">
                 <div className="flex gap-2">
                   <Input 
-                    placeholder={`Activity item #${idx + 1}...`} 
+                    placeholder={`Describe finding #${idx + 1}...`} 
                     value={task.text} 
                     onChange={e => updateTaskText(idx, e.target.value)}
                     className="rounded-sm flex-1 bg-background h-10 sm:h-11"
@@ -440,7 +444,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                       />
                       <Button variant="outline" size="sm" asChild className="h-9 sm:h-8 text-[10px] font-bold rounded-sm cursor-pointer border-primary/20 text-primary hover:bg-primary/5 w-full sm:w-auto">
                         <label htmlFor={`task-photo-${idx}`}>
-                          <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Attach Photo
+                          <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Attach Proof
                         </label>
                       </Button>
                     </div>
@@ -466,7 +470,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                   onClick={handleProceedToFinal}
                   disabled={isSubmitting || tasks.every(t => t.text.trim() === "")}
                 >
-                  Complete Visit <ArrowRight className="ml-2 h-5 w-5" />
+                  Conclude {isSite ? 'Visit' : 'Presence'} <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               )}
             </div>
@@ -484,16 +488,16 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
               className="space-y-6 animate-in slide-in-from-bottom-4 duration-500"
             >
               <div className="flex items-center justify-between px-1">
-                <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-amber-200 uppercase font-black px-3 h-7 rounded-sm text-[9px]">Final Submission Required</Badge>
+                <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-amber-200 uppercase font-black px-3 h-7 rounded-sm text-[9px]">Final Audit Required</Badge>
                 <Button variant="ghost" onClick={() => { setIsFinalizing(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-muted-foreground font-bold h-7 px-2 text-[10px] uppercase">
-                  <ArrowUp className="mr-1.5 h-3 w-3" /> Edit Tasks
+                  <ArrowUp className="mr-1.5 h-3 w-3" /> Edit Actions
                 </Button>
               </div>
 
               <Card className="rounded-sm shadow-md overflow-hidden border-primary/10">
                 <CardHeader className="bg-primary/5 py-4 border-b p-4">
                   <CardTitle className="text-xs sm:text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                    <Camera className="h-4 w-4 text-primary" /> Mandatory Selfie Audit
+                    <Camera className="h-4 w-4 text-primary" /> Mandatory Presence Verification
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6">
@@ -514,7 +518,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                           {uploadProgress['Verification Selfie'] !== undefined && (
                             <div className="flex flex-col gap-1">
                               <div className="flex justify-between text-[10px] font-bold uppercase tracking-tight text-primary">
-                                <span>Uploading selfie...</span>
+                                <span>Uploading verification...</span>
                                 <span>{Math.round(uploadProgress['Verification Selfie'])}%</span>
                               </div>
                               <Progress value={uploadProgress['Verification Selfie']} className="h-1.5" />
@@ -522,7 +526,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                           )}
                           {!isSubmitting && (
                             <Button variant="destructive" size="sm" className="w-full h-8 rounded-sm text-[10px] font-bold uppercase" onClick={() => setSelfie(null)}>
-                              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Retake Photo
+                              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Retake Audit Photo
                             </Button>
                           )}
                         </div>
@@ -532,7 +536,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                     {!selfie && !isCameraActive && (
                       <Button onClick={() => startCamera()} variant="outline" className="w-full max-w-sm h-32 border-dashed border-2 rounded-sm flex flex-col gap-2 hover:bg-primary/5 transition-all text-primary">
                         <Camera className="h-8 w-8" />
-                        <span className="font-bold uppercase text-[10px] tracking-widest">Open Camera for Audit</span>
+                        <span className="font-bold uppercase text-[10px] tracking-widest">Verify Presence</span>
                       </Button>
                     )}
                   </div>
@@ -540,10 +544,10 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
               </Card>
 
               <Card className="rounded-sm shadow-md border-primary/10">
-                <CardHeader className="p-4"><CardTitle className="text-sm uppercase font-bold tracking-widest">Final Report Metadata</CardTitle></CardHeader>
+                <CardHeader className="p-4"><CardTitle className="text-sm uppercase font-bold tracking-widest">Audit Context</CardTitle></CardHeader>
                 <CardContent className="p-4 sm:p-6 space-y-6">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Purpose of Visit</Label>
+                    <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Primary Purpose</Label>
                     <Select value={purpose} onValueChange={setPurpose}>
                       <SelectTrigger className="rounded-sm h-11"><SelectValue placeholder="Select purpose" /></SelectTrigger>
                       <SelectContent>
@@ -553,12 +557,12 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Detailed Narrative Summary</Label>
-                    <Textarea placeholder="Detail the progress, findings, or critical discussions..." rows={4} value={details} onChange={e => setDetails(e.target.value)} className="rounded-sm text-sm" />
+                    <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Summary Narrative</Label>
+                    <Textarea placeholder={`Describe the overall ${isSite ? 'site' : 'field'} findings, progress or discussions...`} rows={4} value={details} onChange={e => setDetails(e.target.value)} className="rounded-sm text-sm" />
                   </div>
 
                   <div className="space-y-4 p-4 bg-primary/[0.02] rounded-sm border border-primary/10">
-                    <Label className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 text-primary"><Users className="h-4 w-4" /> Customer Available?</Label>
+                    <Label className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 text-primary"><Users className="h-4 w-4" /> Personnel/Contact Available?</Label>
                     <RadioGroup value={customerAvailable} onValueChange={setCustomerAvailable} className="flex gap-6 mt-1">
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="yes" id="c-yes" /><Label htmlFor="c-yes" className="font-bold cursor-pointer text-xs">Yes</Label>
@@ -569,7 +573,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                     </RadioGroup>
                     {customerAvailable === 'yes' && (
                       <div className="space-y-2 mt-4 animate-in fade-in duration-300">
-                        <Label className="text-[9px] font-black uppercase text-muted-foreground">Persons met during visit</Label>
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground">Names of persons met</Label>
                         <Input placeholder="Enter names..." value={customerNames} onChange={e => setCustomerNames(e.target.value)} className="rounded-sm bg-background h-10" />
                       </div>
                     )}
@@ -581,7 +585,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                     onClick={onSubmitFinalReport}
                     disabled={isSubmitting || !selfie || !purpose || details.trim().length < 10}
                   >
-                    {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> DISPATCHING...</> : <><Send className="mr-2 h-4 w-4" /> CONCLUDE & PUBLISH REPORT</>}
+                    {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> DISPATCHING...</> : <><Send className="mr-2 h-4 w-4" /> CONCLUDE & PUBLISH AUDIT</>}
                   </Button>
                 </CardFooter>
               </Card>

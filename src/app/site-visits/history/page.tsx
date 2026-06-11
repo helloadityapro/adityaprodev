@@ -51,6 +51,7 @@ type SiteVisit = {
   endTime?: any;
   purpose?: string;
   status: 'ongoing' | 'completed';
+  locationType?: 'site' | 'other';
 };
 
 type AccessConfig = {
@@ -180,7 +181,7 @@ export default function SiteVisitsHistoryPage() {
 
     if (!isAdmin) {
       list = list.filter(v => 
-        accessibleSiteIds.has(v.siteId) || v.managerId === user?.uid
+        accessibleSiteIds.has(v.siteId) || v.managerId === user?.uid || v.locationType === 'other'
       );
     }
 
@@ -238,13 +239,11 @@ export default function SiteVisitsHistoryPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2">
-            <History className="h-8 w-8 text-primary" /> {isAdmin ? "Global Visit Logs" : "Visit Data Hub"}
-          </h1>
-          <p className="text-muted-foreground">Historical records of site presence from authorized project locations.</p>
-        </div>
+      <div className="flex flex-col gap-1">
+        <h1 className="flex items-center gap-2">
+          <History className="h-8 w-8 text-primary" /> {isAdmin ? "Global Presence Logs" : "Presence Data Hub"}
+        </h1>
+        <p className="text-muted-foreground">Historical records of presence logs from authorized locations.</p>
       </div>
 
       <div className="bg-card p-4 border rounded-sm shadow-sm no-print space-y-4">
@@ -300,7 +299,7 @@ export default function SiteVisitsHistoryPage() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('startTime')}><div className="flex items-center">Start Date & Time <SortIcon column="startTime" /></div></TableHead>
-                  <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('siteName')}><div className="flex items-center">Project Site <SortIcon column="siteName" /></div></TableHead>
+                  <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('siteName')}><div className="flex items-center">Location Name <SortIcon column="siteName" /></div></TableHead>
                   {(isAdmin || isManager) && (<TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('managerName')}><div className="flex items-center">Personnel <SortIcon column="managerName" /></div></TableHead>)}
                   <TableHead>Purpose</TableHead>
                   <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('duration')}><div className="flex items-center">Duration <SortIcon column="duration" /></div></TableHead>
@@ -312,7 +311,12 @@ export default function SiteVisitsHistoryPage() {
                 {filteredVisits.length > 0 ? filteredVisits.map((visit) => (
                   <TableRow key={visit.id} className="hover:bg-muted/5 transition-colors group">
                     <TableCell className="font-mono text-xs font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
-                    <TableCell className="font-black text-sm">{visit.siteName}</TableCell>
+                    <TableCell className="font-black text-sm">
+                      <div className="flex items-center gap-2">
+                        {visit.locationType === 'other' ? <Globe className="h-3 w-3 text-primary/40" /> : <Building2 className="h-3 w-3 text-primary/40" />}
+                        {visit.siteName}
+                      </div>
+                    </TableCell>
                     {(isAdmin || isManager) && (
                       <TableCell>
                         <div className="flex flex-col gap-1">
@@ -324,9 +328,9 @@ export default function SiteVisitsHistoryPage() {
                     <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">{visit.purpose || '—'}</Badge></TableCell>
                     <TableCell><div className="flex items-center gap-1.5 text-xs font-bold text-primary"><Timer className="h-3 w-3" />{calculateDurationStr(visit.startTime, visit.endTime)}</div></TableCell>
                     <TableCell><Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{visit.status}</Badge></TableCell>
-                    <TableCell className="text-right px-6"><Button variant="ghost" size="sm" asChild className="rounded-sm text-primary"><Link href={`/site-visits/${visit.id}`}><FileText className="h-4 w-4 mr-1.5" />View Report</Link></Button></TableCell>
+                    <TableCell className="text-right px-6"><Button variant="ghost" size="sm" asChild className="rounded-sm text-primary"><Link href={`/site-visits/${visit.id}`}><FileText className="h-4 w-4 mr-1.5" />View Audit</Link></Button></TableCell>
                   </TableRow>
-                )) : <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No visit records found.</TableCell></TableRow>}
+                )) : <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No records discovered.</TableCell></TableRow>}
               </TableBody>
             </Table>
           </div>

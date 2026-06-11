@@ -34,7 +34,8 @@ import {
   Calendar,
   Clock,
   ShieldCheck,
-  Activity
+  Activity,
+  Globe
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +71,7 @@ type SiteVisit = {
   customerAvailable?: boolean;
   customerNames?: string;
   status: 'ongoing' | 'completed';
+  locationType?: 'site' | 'other';
 };
 
 const formatTimestamp = (ts: any) => {
@@ -202,11 +204,13 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
   if (!visit) return (
     <div className="flex flex-col items-center justify-center py-32 text-center">
       <FileText className="h-16 w-16 text-muted-foreground/20 mb-4" />
-      <h2 className="text-xl font-bold">Visit Report Not Found</h2>
-      <p className="text-muted-foreground mt-2">The requested audit log does not exist or has been removed.</p>
+      <h2 className="text-xl font-bold">Audit Report Not Found</h2>
+      <p className="text-muted-foreground mt-2">The requested report does not exist or has been removed.</p>
       <Button variant="outline" className="mt-6" onClick={() => router.push('/site-visits/history')}>Back to History</Button>
     </div>
   );
+
+  const isSite = visit.locationType !== 'other';
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-20 px-4">
@@ -252,7 +256,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
             
             <div className="flex flex-col md:items-end gap-2 shrink-0">
               <div className="p-4 bg-white/80 backdrop-blur rounded-sm border border-primary/10 shadow-sm text-center min-w-[160px]">
-                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Trip Duration</p>
+                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Total Duration</p>
                 <div className="flex items-center justify-center gap-2 text-primary font-black text-2xl">
                   <Timer className="h-6 w-6" />
                   {calculateDuration(visit.startTime, visit.endTime)}
@@ -275,7 +279,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {visit.selfieUrl ? (
                   <div className="space-y-2">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Verification Selfie</Label>
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Verification Audit Photo</Label>
                     <div className="relative aspect-square sm:aspect-[4/3] rounded-sm overflow-hidden border-2 border-primary/5 shadow-md bg-muted group cursor-pointer" onClick={() => openViewer(visit.selfieUrl!)}>
                       {isVideoUrl(visit.selfieUrl) ? (
                         <div className="w-full h-full bg-slate-900 flex items-center justify-center">
@@ -293,16 +297,16 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
                 ) : (
                   <div className="p-6 border-2 border-dashed rounded-sm bg-muted/5 flex flex-col items-center justify-center text-center opacity-40">
                     <ImageIcon className="h-8 w-8 mb-2" />
-                    <p className="text-[10px] font-black uppercase">No Media</p>
+                    <p className="text-[10px] font-black uppercase">No Audit Proof</p>
                   </div>
                 )}
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">GPS Coordinates</Label>
+                    <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">GPS Audit Trail</Label>
                     <div className="space-y-2">
                       <div className="p-3 bg-muted/20 border rounded-sm flex items-center justify-between group text-[11px] font-mono font-bold">
-                        <span>Entry: {visit.startLat.toFixed(5)}, {visit.startLng.toFixed(5)}</span>
+                        <span>Arrival: {visit.startLat.toFixed(5)}, {visit.startLng.toFixed(5)}</span>
                         <Button variant="ghost" size="icon" className="h-6 w-6 text-primary no-print" asChild>
                           <a href={`https://www.google.com/maps/search/?api=1&query=${visit.startLat},${visit.startLng}`} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="h-3 w-3" />
@@ -311,7 +315,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
                       </div>
                       {visit.endLat && (
                         <div className="p-3 bg-muted/20 border rounded-sm flex items-center justify-between group text-[11px] font-mono font-bold">
-                          <span>Exit: {visit.endLat.toFixed(5)}, {visit.endLng.toFixed(5)}</span>
+                          <span>Departure: {visit.endLat.toFixed(5)}, {visit.endLng.toFixed(5)}</span>
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-primary no-print" asChild>
                             <a href={`https://www.google.com/maps/search/?api=1&query=${visit.endLat},${visit.endLng}`} target="_blank" rel="noopener noreferrer">
                               <ExternalLink className="h-3 w-3" />
@@ -324,8 +328,8 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
 
                   {visit.customerAvailable && (
                     <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-sm">
-                      <Label className="text-[9px] font-black uppercase text-emerald-700 block mb-1">Customer Present</Label>
-                      <p className="text-xs font-black text-emerald-900 leading-tight">{visit.customerNames || 'Confirmed'}</p>
+                      <Label className="text-[9px] font-black uppercase text-emerald-700 block mb-1">Contact Verification</Label>
+                      <p className="text-xs font-black text-emerald-900 leading-tight">{visit.customerNames || 'Confirmed present'}</p>
                     </div>
                   )}
                 </div>
@@ -336,11 +340,11 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
             <div className="space-y-6">
               <div className="flex items-center gap-2 border-b pb-2">
                 <Navigation className="h-4 w-4 text-primary" />
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Visit Narrative</h3>
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Audit Summary</h3>
               </div>
               <div className="space-y-4">
                 <div className="flex flex-col gap-1.5">
-                  <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Purpose of Visit</Label>
+                  <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Purpose</Label>
                   <p className="text-sm font-black text-primary leading-tight uppercase">{visit.purpose || 'General Management'}</p>
                 </div>
                 <div className="p-5 bg-card border rounded-sm shadow-inner min-h-[120px]">
@@ -360,7 +364,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
             <div className="flex items-center justify-between gap-4 border-b pb-2">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Activity & Findings Proof</h3>
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Activity Proof & Evidence</h3>
               </div>
               <Badge variant="secondary" className="rounded-full px-3 py-0.5 h-5 text-[10px] font-bold bg-muted text-muted-foreground border-none">
                 {visit.tasks?.length || 0} Items Logged
@@ -386,13 +390,10 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
                             <PlayCircle className="absolute h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                           </div>
                         ) : (
-                          <img src={task.photoUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt={`Task Proof ${i+1}`} />
+                          <img src={task.photoUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt={`Evidence ${i+1}`} />
                         )}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors no-print">
                           <Maximize2 className="h-6 w-6 text-white opacity-0 group-hover:opacity-100" />
-                        </div>
-                        <div className="absolute top-2 right-2 bg-black/40 backdrop-blur-md px-2 py-1 rounded-sm text-[8px] font-black text-white uppercase tracking-widest opacity-80">
-                          Proof Attachment
                         </div>
                       </div>
                     ) : (
@@ -406,7 +407,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
             ) : (
               <div className="py-20 text-center border-2 border-dashed rounded-sm bg-muted/5">
                 <Activity className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
-                <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">No specific action items documented</p>
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">No activity items documented</p>
               </div>
             )}
           </div>
@@ -416,7 +417,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
         
         <CardFooter className="bg-muted/5 p-8 flex flex-col items-center justify-center text-center gap-2">
           <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em]">End of Official Audit Record</p>
-          <p className="text-[8px] text-muted-foreground/40 font-mono">Digitally signed and time-stamped by Aditya Pro Engine</p>
+          <p className="text-[8px] text-muted-foreground/40 font-mono">Verified and archived by Aditya Pro Engine</p>
         </CardFooter>
       </Card>
 
@@ -425,7 +426,6 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
           <DialogHeader className="sr-only">
             <DialogTitle>Audit Media Detail</DialogTitle>
-            <DialogDescription>Enlarged view of site audit proof.</DialogDescription>
           </DialogHeader>
           
           <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
