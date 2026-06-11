@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -72,8 +71,13 @@ export default function StartSiteVisitPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-    if (isAdmin) return allSites;
     
+    // Special Authorization: Admins AND Liaison & Documents department see all sites
+    if (isAdmin || userProfile.department === "Liaison & Documents") {
+      return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
+    }
+    
+    // Sovereignty Logic for Engineers and Managers
     const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
     if (isManager) {
       allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
@@ -87,7 +91,8 @@ export default function StartSiteVisitPage() {
       }
     }
     
-    return allSites.filter(s => siteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+    const filtered = allSites.filter(s => siteIds.has(s.id));
+    return Array.from(new Map(filtered.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
