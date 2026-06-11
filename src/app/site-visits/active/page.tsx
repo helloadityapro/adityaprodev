@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { cn } from "@/lib/utils";
 
 type SiteVisit = {
   id: string;
