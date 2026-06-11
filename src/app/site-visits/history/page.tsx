@@ -20,7 +20,8 @@ import {
   ArrowUp, 
   ArrowDown, 
   FilterX, 
-  ListFilter 
+  ListFilter,
+  Globe
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
