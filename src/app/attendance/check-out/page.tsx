@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useFirestore, useUser, useMemoFirebase, useCollection, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
-import { collection, doc, query, where, limit, serverTimestamp } from "firebase/firestore";
+import { useFirestore, useUser, useMemoFirebase, useCollection, useFirebaseApp } from "@/firebase";
+import { collection, doc, query, where, limit, serverTimestamp, updateDoc } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -172,7 +172,9 @@ export default function CheckOutPage() {
       const selfieUrl = await getDownloadURL(selfieRef);
 
       const entryRef = doc(firestore, 'attendance', currentEntry.id);
-      updateDocumentNonBlocking(entryRef, {
+      
+      // FIX: Wait for the document update to complete before showing success
+      await updateDoc(entryRef, {
         checkOutTime: serverTimestamp(),
         checkOutLat: location.lat,
         checkOutLng: location.lng,
@@ -248,10 +250,10 @@ export default function CheckOutPage() {
                   <Zap className="h-3 w-3 fill-white" /> Exit Audit Live
                 </Badge>
               </div>
-              <div className="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-6">
-                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-12 w-12 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg backdrop-blur-md"><SwitchCamera className="h-6 w-6" /></Button>
+              <div className="absolute bottom-6 left-0 right-0 flex justify-center items-center gap-4">
+                <Button onClick={toggleCamera} variant="secondary" size="icon" className="rounded-full h-10 w-10 p-0 bg-black/40 text-white border-white/20 hover:bg-black/60 shadow-lg"><SwitchCamera className="h-5 w-5" /></Button>
                 <Button onClick={capturePhoto} className="rounded-full h-14 w-14 p-0 shadow-lg border-4 border-emerald-500/20 bg-white text-black hover:bg-white/90 transition-all active:scale-90 scale-110"><Camera className="h-8 w-8" /></Button>
-                <div className="w-12" />
+                <div className="w-10" />
               </div>
             </div>
 

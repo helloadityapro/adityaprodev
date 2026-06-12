@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, useFirebaseApp, useCollection } from "@/firebase";
-import { collection, doc, serverTimestamp, query, where, limit, getDocs } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useFirebaseApp, useCollection } from "@/firebase";
+import { collection, doc, serverTimestamp, query, where, limit, getDocs, addDoc } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -190,7 +190,8 @@ export default function CheckInPage() {
         createdAt: serverTimestamp()
       };
 
-      addDocumentNonBlocking(collection(firestore, 'attendance'), checkInData);
+      // FIX: Wait for the document to be created before proceeding to show success
+      await addDoc(collection(firestore, 'attendance'), checkInData);
 
       try {
         await Haptics.impact({ style: ImpactStyle.Light });

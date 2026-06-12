@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, doc, limit, Timestamp, arrayUnion, getDoc } from 'firebase/firestore';
-import { format, isAfter, setHours, setMinutes, parseISO, endOfDay, isBefore } from 'date-fns';
+import { collection, query, where, doc, limit, Timestamp, arrayUnion, getDoc, updateDoc } from 'firebase/firestore';
+import { format, isAfter, setHours, setMinutes, parseISO, endOfDay, isBefore, startOfDay } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useRouter, usePathname } from 'next/navigation';
@@ -37,7 +37,7 @@ export function AttendanceGate() {
   // Reset reminders on date rollover
   React.useEffect(() => {
     setCheckInReminderCount(0);
-    checkOutReminderCount;
+    setCheckOutReminderCount(0);
     setLastReminderTime(0);
   }, [currentDate]);
 
@@ -93,8 +93,6 @@ export function AttendanceGate() {
     };
   }, []);
 
-  const todayStr = currentDate;
-
   const activeQuery = useMemoFirebase(() => {
     if (!user) return null;
     return query(
@@ -109,14 +107,15 @@ export function AttendanceGate() {
 
   const todayFinishedQuery = useMemoFirebase(() => {
     if (!user) return null;
+    // Note: This still uses currentDate state for the broad filter, which is fine for reminders
     return query(
       collection(firestore, 'attendance'),
       where('userId', '==', user.uid),
-      where('date', '==', todayStr),
+      where('date', '==', currentDate),
       where('status', '==', 'completed'),
       limit(1)
     );
-  }, [user, firestore, todayStr]);
+  }, [user, firestore, currentDate]);
 
   const { data: todayFinished, isLoading: isFinishedLoading } = useCollection(todayFinishedQuery);
 
@@ -127,6 +126,7 @@ export function AttendanceGate() {
   React.useEffect(() => {
     if (!user || !activeSessions || activeSessions.length === 0) return;
     const session = activeSessions[0];
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
     if (session.date !== todayStr) return;
 
     const trackLocation = () => {
@@ -138,6 +138,8 @@ export function AttendanceGate() {
 
         // Fetch fresh data to check if we've moved significantly
         const snap = await getDoc(sessionRef);
+        if (!snap.exists()) return;
+        
         const data = snap.data();
         const lastPoints = data?.trackingPoints || [];
         const lastPoint = lastPoints[lastPoints.length - 1];
@@ -166,28 +168,39 @@ export function AttendanceGate() {
     trackLocation();
     const interval = setInterval(trackLocation, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [user, activeSessions, todayStr, firestore]);
+  }, [user, activeSessions, firestore]);
 
   React.useEffect(() => {
     if (isActiveLoading || isFinishedLoading || !user || isWaitingForCelebration) return;
     if (pathname.startsWith('/attendance')) return;
 
     const now = new Date();
+    const todayStr = format(now, 'yyyy-MM-dd');
     const activeSession = activeSessions?.[0];
     const hasCompletedToday = todayFinished && todayFinished.length > 0;
 
-    if (activeSession && activeSession.date !== todayStr) {
+    // CRITICAL FIX: Only auto-close if the session date is strictly BEFORE today.
+    // Using !== previously caused immediate checkouts on rollovers because of state lag.
+    if (activeSession && activeSession.date < todayStr) {
       const ref = doc(firestore, 'attendance', activeSession.id);
       const sessionDate = parseISO(activeSession.date);
       const dayEnd = endOfDay(sessionDate);
-      updateDocumentNonBlocking(ref, {
-        status: 'completed',
-        checkOutTime: Timestamp.fromDate(dayEnd),
-        checkOutLat: activeSession.checkInLat || 0, 
-        checkOutLng: activeSession.checkInLng || 0,
-        checkOutType: 'System CheckOut',
-        remarks: 'System CheckOut: Automatic cycle reset at start of new day.'
-      });
+      
+      const performCleanup = async () => {
+        try {
+          await updateDoc(ref, {
+            status: 'completed',
+            checkOutTime: Timestamp.fromDate(dayEnd),
+            checkOutLat: activeSession.checkInLat || 0, 
+            checkOutLng: activeSession.checkInLng || 0,
+            checkOutType: 'System CheckOut',
+            remarks: 'System CheckOut: Automatic cycle reset at start of new day.'
+          });
+        } catch (e) {
+          console.error("Attendance cleanup failed", e);
+        }
+      };
+      performCleanup();
       return;
     }
 
@@ -226,7 +239,7 @@ export function AttendanceGate() {
         setShowCheckOut(true);
       }
     }
-  }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, user, todayStr, pathname, firestore, isWaitingForCelebration, checkInReminderCount, checkOutReminderCount, lastReminderTime, showCheckIn, showCheckOut]);
+  }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, user, pathname, firestore, isWaitingForCelebration, checkInReminderCount, checkOutReminderCount, lastReminderTime, showCheckIn, showCheckOut]);
 
   const handleLater = (type: 'in' | 'out') => {
     if (type === 'in') {
