@@ -329,7 +329,7 @@ export default function SiteVisitsHistoryPage() {
                     <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">{visit.purpose || '—'}</Badge></TableCell>
                     <TableCell><div className="flex items-center gap-1.5 text-xs font-bold text-primary"><Timer className="h-3 w-3" />{calculateDurationStr(visit.startTime, visit.endTime)}</div></TableCell>
                     <TableCell><Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{visit.status}</Badge></TableCell>
-                    <TableCell className="text-right px-6"><Button variant="ghost" size="sm" asChild className="rounded-sm text-primary"><Link href={`/site-visits/${visit.id}`}><FileText className="h-4 w-4 mr-1.5" />View Audit</Link></Button></TableCell>
+                    <TableCell className="text-right px-6"><Button variant="ghost" size="sm" asChild className="rounded-sm text-primary"><Link href={`/site-visits/${visit.id}`}><FileText className="h-4 w-4 mr-1.5" />View Report</Link></Button></TableCell>
                   </TableRow>
                 )) : <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No records discovered.</TableCell></TableRow>}
               </TableBody>

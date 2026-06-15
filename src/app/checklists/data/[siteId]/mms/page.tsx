@@ -372,8 +372,8 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         for (const check of record.checks) {
           const remarkLines = doc.splitTextToSize(check.remarks || '—', col2 - 4);
           const attachments = check.attachments || [];
-          const attHeight = attachments.length > 0 ? (attachments.length * 5) + 4 : rowHeight;
-          const h = Math.max(rowHeight, remarkLines.length * 4 + 4, attHeight);
+          const iHeight = attachments.length > 0 ? (attachments.length * 5) + 4 : rowHeight;
+          const h = Math.max(rowHeight, remarkLines.length * 4 + 4, iHeight);
           if (currY + h > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
           doc.rect(margin, currY, col1, h);
           doc.text(check.label.toUpperCase(), margin + 2, currY + 5.5);
@@ -754,9 +754,12 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           </DialogHeader>
           <ScrollArea className="flex-1">
             <div className="p-4 md:p-8 space-y-8 md:space-y-10 text-left">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                 <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Personnel</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.userName}</p></div>
                 <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Status</Label><div><Badge className="bg-green-600 text-white font-black uppercase text-[7px] md:text-[8px] border-none px-2 h-4 md:h-5">Verified</Badge></div></div>
+                <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Table Config</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.tableSize || '—'}</p></div>
+                <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Columns</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.columnCount || '—'}</p></div>
+                <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Modules</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.moduleCount || '—'}</p></div>
                 <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Customer Present</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.customerRepPresent ? `Yes (${viewingInstallation.customerRepName})` : 'No'}</p></div>
                 <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Timestamp</Label><p className="text-[10px] md:text-xs font-mono font-bold">{viewingInstallation?.createdAt ? format(viewingInstallation.createdAt.toDate(), 'dd MMM yy, HH:mm') : '—'}</p></div>
               </div>
