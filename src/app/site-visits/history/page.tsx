@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Label } from "@/components/ui/label";
 import { slugifyRole } from "@/lib/access-control";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 type SiteVisit = {
   id: string;
@@ -230,8 +231,8 @@ export default function SiteVisitsHistoryPage() {
   };
 
   const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const clearFilters = () => {
@@ -362,7 +363,7 @@ export default function SiteVisitsHistoryPage() {
                 <div className="min-w-[800px]">
                   <Table>
                     <TableHeader>
-                      <TableRow className="bg-muted/30">
+                      <TableRow>
                         <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('startTime')}><div className="flex items-center">Start Date & Time <SortIcon column="startTime" /></div></TableHead>
                         <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('siteName')}><div className="flex items-center">Location Name <SortIcon column="siteName" /></div></TableHead>
                         {(isAdmin || isManager) && (<TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('managerName')}><div className="flex items-center">Personnel <SortIcon column="managerName" /></div></TableHead>)}
