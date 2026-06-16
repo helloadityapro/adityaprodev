@@ -38,7 +38,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
+import Link from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { slugifyRole } from "@/lib/access-control";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -97,10 +97,10 @@ const calculateDurationStr = (start: any, end: any) => {
 export default function SiteVisitsHistoryPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const router = useRouter();
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
-  const [siteFilter, setSiteFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [locationTab, setLocationTab] = React.useState<string>("site");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -201,12 +201,11 @@ export default function SiteVisitsHistoryPage() {
         (v.managerName || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
-      const matchesSite = siteFilter === 'all' || v.siteName === siteFilter;
       const matchesDate = vDateStr >= start && vDateStr <= end;
       
       const matchesLocation = v.locationType === locationTab || (locationTab === 'site' && (!v.locationType || v.locationType === 'site'));
       
-      return matchesSearch && matchesStatus && matchesSite && matchesDate && matchesLocation;
+      return matchesSearch && matchesStatus && matchesDate && matchesLocation;
     });
 
     return result.sort((a, b) => {
@@ -221,7 +220,7 @@ export default function SiteVisitsHistoryPage() {
       if (valA > valB) return direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [visits, searchTerm, statusFilter, siteFilter, sortConfig, userProfile, isAdmin, accessibleSiteIds, user, queryDateRange, locationTab]);
+  }, [visits, searchTerm, statusFilter, sortConfig, userProfile, isAdmin, accessibleSiteIds, user, queryDateRange, locationTab]);
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -238,7 +237,6 @@ export default function SiteVisitsHistoryPage() {
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
-    setSiteFilter("all");
     setDateFilter("7days");
   };
 
@@ -253,13 +251,13 @@ export default function SiteVisitsHistoryPage() {
         <p className="text-muted-foreground">Historical records of presence logs from authorized locations.</p>
       </div>
 
-      <div className="bg-card p-4 border rounded-sm shadow-sm no-print space-y-4">
+      <div className="bg-card p-4 border rounded-sm shadow-sm no-print">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="md:col-span-2 space-y-1.5">
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Context</Label>
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search..." className="pl-10 h-11 rounded-sm border-primary/10 bg-background text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <Input placeholder="Search personnel or location..." className="pl-10 h-11 rounded-sm border-primary/10 bg-background text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
           <div className="space-y-1.5">
@@ -276,27 +274,40 @@ export default function SiteVisitsHistoryPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Filter by Site</Label>
-            <Select value={siteFilter} onValueChange={setSiteFilter}>
-              <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase"><Building2 className="h-4 w-4 mr-2 opacity-50" /><SelectValue placeholder="All Sites" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs font-bold uppercase">All Accessible Sites</SelectItem>
-                {accessibleSites.map(s => <SelectItem key={s.id} value={s.name} className="text-xs font-bold uppercase">{s.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="flex items-end gap-2">
+            <div className="flex-1 space-y-1.5">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Filter by Status</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+                  <ListFilter className="h-4 w-4 mr-2 opacity-50" />
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
+                  <SelectItem value="ongoing" className="text-xs font-bold uppercase">Ongoing</SelectItem>
+                  <SelectItem value="completed" className="text-xs font-bold uppercase">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="ghost" size="icon" onClick={clearFilters} title="Clear Filters" className="h-11 w-11 rounded-sm border border-transparent hover:border-primary/10">
+              <FilterX className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-        <div className="flex items-center justify-between pt-2 border-t border-border/50">
-          <div className="flex gap-2">
-            {['all', 'ongoing', 'completed'].map(s => (
-              <Badge key={s} onClick={() => setStatusFilter(s)} className={cn("cursor-pointer font-bold text-[10px] h-7 px-3 rounded-sm uppercase tracking-tighter transition-all", statusFilter === s ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
-                {s === 'all' ? 'All Status' : s}
-              </Badge>
-            ))}
+        
+        {dateFilter === 'custom' && (
+          <div className="flex items-center gap-4 pt-4 border-t border-border/50 mt-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex-1 space-y-1">
+              <Label className="text-[10px] font-black uppercase text-primary tracking-widest px-1">Start Range</Label>
+              <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-10 rounded-sm border-primary/20 text-xs" />
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground mt-4 shrink-0" />
+            <div className="flex-1 space-y-1">
+              <Label className="text-[10px] font-black uppercase text-primary tracking-widest px-1">End Range</Label>
+              <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-10 rounded-sm border-primary/20 text-xs" />
+            </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={clearFilters} title="Clear Filters"><FilterX className="h-4 w-4" /></Button>
-        </div>
+        )}
       </div>
 
       <div className="space-y-4">
