@@ -38,7 +38,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { cn } from "@/lib/utils";
-import Link from "next/navigation";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Label } from "@/components/ui/label";
 import { slugifyRole } from "@/lib/access-control";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -240,6 +241,93 @@ export default function SiteVisitsHistoryPage() {
     setDateFilter("7days");
   };
 
+  function renderResults() {
+    return (
+      <>
+        <div className="md:hidden space-y-4">
+          {filteredVisits.length > 0 ? filteredVisits.map(visit => (
+            <Card key={visit.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => router.push(`/site-visits/${visit.id}`)}>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{formatTimestamp(visit.startTime)}</span>
+                    <h3 className="font-bold text-sm leading-tight text-foreground line-clamp-2">{visit.siteName}</h3>
+                  </div>
+                  <Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{visit.status}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground truncate mr-4">
+                    <User className="h-3.5 w-3.5 text-primary/60" />
+                    <span>{visit.managerName}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-primary shrink-0">
+                    <Timer className="h-3.5 w-3.5" />
+                    {calculateDurationStr(visit.startTime, visit.endTime)}
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-primary/5 flex justify-end">
+                  <Button variant="ghost" size="sm" className="h-8 rounded-sm text-primary text-[10px] font-bold uppercase tracking-widest">
+                    View Report <ArrowRight className="ml-1.5 h-3 w-3" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )) : <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No records discovered for this category.</div>}
+        </div>
+
+        <div className="hidden md:block">
+          <Card className="rounded-sm overflow-hidden border-primary/10">
+            <CardContent className="p-0">
+              <ScrollArea className="w-full">
+                <div className="min-w-[800px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('startTime')}><div className="flex items-center">Start Date & Time <SortIcon column="startTime" /></div></TableHead>
+                        <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('siteName')}><div className="flex items-center">Location Name <SortIcon column="siteName" /></div></TableHead>
+                        {(isAdmin || isManager) && (<TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('managerName')}><div className="flex items-center">Personnel <SortIcon column="managerName" /></div></TableHead>)}
+                        <TableHead>Purpose</TableHead>
+                        <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('duration')}><div className="flex items-center">Duration <SortIcon column="duration" /></div></TableHead>
+                        <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('status')}><div className="flex items-center">Status <SortIcon column="status" /></div></TableHead>
+                        <TableHead className="text-right px-6">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredVisits.length > 0 ? filteredVisits.map((visit) => (
+                        <TableRow key={visit.id} className="hover:bg-muted/5 transition-colors group" onClick={() => router.push(`/site-visits/${visit.id}`)}>
+                          <TableCell className="font-mono text-xs font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
+                          <TableCell className="font-black text-sm">
+                            <div className="flex items-center gap-2">
+                              {visit.locationType === 'other' ? <Globe className="h-3 w-3 text-primary/40" /> : <Building2 className="h-3 w-3 text-primary/40" />}
+                              {visit.siteName}
+                            </div>
+                          </TableCell>
+                          {(isAdmin || isManager) && (
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2 text-xs font-bold"><User className="h-3 w-3 text-primary" />{visit.managerName}</div>
+                                {visit.department && (<Badge className="w-fit text-[8px] h-4 font-black uppercase rounded-sm border-none bg-slate-900 text-white flex items-center gap-1 px-1.5"><Building2 className="h-3 w-3" /> {visit.department}</Badge>)}
+                              </div>
+                            </TableCell>
+                          )}
+                          <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">{visit.purpose || '—'}</Badge></TableCell>
+                          <TableCell><div className="flex items-center gap-1.5 text-xs font-bold text-primary"><Timer className="h-3 w-3" />{calculateDurationStr(visit.startTime, visit.endTime)}</div></TableCell>
+                          <TableCell><Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{visit.status}</Badge></TableCell>
+                          <TableCell className="text-right px-6"><Button variant="ghost" size="sm" asChild className="rounded-sm text-primary"><Link href={`/site-visits/${visit.id}`}><FileText className="h-4 w-4 mr-1.5" />View Report</Link></Button></TableCell>
+                        </TableRow>
+                      )) : <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No records discovered in this category.</TableCell></TableRow>}
+                    </TableBody>
+                  </Table>
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4 max-w-5xl mx-auto"><Skeleton className="h-12 w-48" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
@@ -332,91 +420,5 @@ export default function SiteVisitsHistoryPage() {
       </div>
     </div>
   );
-
-  function renderResults() {
-    return (
-      <>
-        <div className="md:hidden space-y-4">
-          {filteredVisits.length > 0 ? filteredVisits.map(visit => (
-            <Card key={visit.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => router.push(`/site-visits/${visit.id}`)}>
-              <CardContent className="p-4 space-y-4">
-                <div className="flex justify-between items-start gap-4">
-                  <div className="flex flex-col gap-1 min-w-0">
-                    <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{formatTimestamp(visit.startTime)}</span>
-                    <h3 className="font-bold text-sm leading-tight text-foreground line-clamp-2">{visit.siteName}</h3>
-                  </div>
-                  <Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{visit.status}</Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground truncate mr-4">
-                    <User className="h-3.5 w-3.5 text-primary/60" />
-                    <span>{visit.managerName}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-primary shrink-0">
-                    <Timer className="h-3.5 w-3.5" />
-                    {calculateDurationStr(visit.startTime, visit.endTime)}
-                  </div>
-                </div>
-                <div className="pt-2 border-t border-primary/5 flex justify-end">
-                  <Button variant="ghost" size="sm" className="h-8 rounded-sm text-primary text-[10px] font-bold uppercase tracking-widest">
-                    View Report <ArrowRight className="ml-1.5 h-3 w-3" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )) : <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">No records discovered for this category.</div>}
-        </div>
-
-        <div className="hidden md:block">
-          <Card className="rounded-sm overflow-hidden border-primary/10">
-            <CardContent className="p-0">
-              <ScrollArea className="w-full">
-                <div className="min-w-[800px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('startTime')}><div className="flex items-center">Start Date & Time <SortIcon column="startTime" /></div></TableHead>
-                        <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('siteName')}><div className="flex items-center">Location Name <SortIcon column="siteName" /></div></TableHead>
-                        {(isAdmin || isManager) && (<TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('managerName')}><div className="flex items-center">Personnel <SortIcon column="managerName" /></div></TableHead>)}
-                        <TableHead>Purpose</TableHead>
-                        <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('duration')}><div className="flex items-center">Duration <SortIcon column="duration" /></div></TableHead>
-                        <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('status')}><div className="flex items-center">Status <SortIcon column="status" /></div></TableHead>
-                        <TableHead className="text-right px-6">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredVisits.length > 0 ? filteredVisits.map((visit) => (
-                        <TableRow key={visit.id} className="hover:bg-muted/5 transition-colors group">
-                          <TableCell className="font-mono text-xs font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
-                          <TableCell className="font-black text-sm">
-                            <div className="flex items-center gap-2">
-                              {visit.locationType === 'other' ? <Globe className="h-3 w-3 text-primary/40" /> : <Building2 className="h-3 w-3 text-primary/40" />}
-                              {visit.siteName}
-                            </div>
-                          </TableCell>
-                          {(isAdmin || isManager) && (
-                            <TableCell>
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2 text-xs font-bold"><User className="h-3 w-3 text-primary" />{visit.managerName}</div>
-                                {visit.department && (<Badge className="w-fit text-[8px] h-4 font-black uppercase rounded-sm border-none bg-slate-900 text-white flex items-center gap-1 px-1.5"><Building2 className="h-3 w-3" /> {visit.department}</Badge>)}
-                              </div>
-                            </TableCell>
-                          )}
-                          <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">{visit.purpose || '—'}</Badge></TableCell>
-                          <TableCell><div className="flex items-center gap-1.5 text-xs font-bold text-primary"><Timer className="h-3 w-3" />{calculateDurationStr(visit.startTime, visit.endTime)}</div></TableCell>
-                          <TableCell><Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{visit.status}</Badge></TableCell>
-                          <TableCell className="text-right px-6"><Button variant="ghost" size="sm" asChild className="rounded-sm text-primary"><Link href={`/site-visits/${visit.id}`}><FileText className="h-4 w-4 mr-1.5" />View Report</Link></Button></TableCell>
-                        </TableRow>
-                      )) : <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No records discovered in this category.</TableCell></TableRow>}
-                    </TableBody>
-                  </Table>
-                </div>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </div>
-      </>
-    );
-  }
 }
+
