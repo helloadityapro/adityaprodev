@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
@@ -48,7 +48,7 @@ import { motion } from "framer-motion";
 
 const checkItemSchema = z.object({
   status: z.enum(["OK", "NOT OK", "Pending"], { required_error: "Selection required" }),
-  remarks: z.string().min(1, "Findings/Remarks are required for this check"),
+  remarks: z.string().optional().default(""), // Remarks no longer mandatory
   localFiles: z.array(z.any()).default([]),
 });
 
@@ -56,7 +56,7 @@ const installationSchema = z.object({
   siteId: z.string().min(1, "Site is required"),
   siteName: z.string(),
   projectCompany: z.string().optional(),
-  tableNumber: z.string().min(1, "Table Number is required"),
+  tableNumber: z.string().min(1, "Table Number is required").regex(/^\d+$/, "Strictly digits only"), // Strictly digits
   tableSize: z.string()
     .min(1, "Size of Table is required")
     .refine(val => !val.includes(" "), "Spaces are not allowed in Size of Table"),
@@ -160,10 +160,11 @@ export default function TableLevelMMSChecklistPage() {
     let blob: Blob = file;
     const isCompressible = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp';
     
+    // Robust compression for high size images on weak networks
     if (isCompressible) {
       try {
         blob = await imageCompression(file, { 
-          maxSizeMB: 1, 
+          maxSizeMB: 0.8, // Reduced slightly for better transfer reliability
           maxWidthOrHeight: 1920,
           alwaysKeepResolution: true,
           initialQuality: 0.8,
@@ -233,6 +234,7 @@ export default function TableLevelMMSChecklistPage() {
 
       const timestamp = Date.now();
 
+      // Sequential uploads for maximum robustness on weak networks
       const finalChecks = [];
       for (const [key, check] of Object.entries(values.checks)) {
         const attachments = [];
@@ -369,7 +371,7 @@ export default function TableLevelMMSChecklistPage() {
         <h1 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <ClipboardCheck className="h-7 w-7" /> Table Level MMS Audit
         </h1>
-        <p className="text-muted-foreground font-medium text-sm">Comprehensive field verification for solar tables. All fields except Additional Feedback are mandatory.</p>
+        <p className="text-muted-foreground font-medium text-sm">Comprehensive field verification for solar tables. Status checkboxes are mandatory.</p>
       </div>
 
       <Form {...form}>
@@ -431,11 +433,16 @@ export default function TableLevelMMSChecklistPage() {
 
               <FormField control={form.control} name="tableNumber" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Table Number *</FormLabel>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Table Number * (Digits Only)</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <span className="absolute left-3 top-3 text-sm font-bold text-muted-foreground">T - </span>
-                      <Input placeholder="101" {...field} className="h-11 rounded-sm pl-10" />
+                      <Input 
+                        placeholder="101" 
+                        {...field} 
+                        className="h-11 rounded-sm pl-10" 
+                        onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))} // Strictly digits
+                      />
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -604,7 +611,7 @@ export default function TableLevelMMSChecklistPage() {
                     <FormField control={form.control} name={`checks.${key}.remarks` as any} render={({ field }) => (
                       <FormControl>
                         <div className="space-y-1">
-                          <Textarea placeholder="Enter mandatory findings..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm" />
+                          <Textarea placeholder="Enter findings (Optional)..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm" />
                           <FormMessage />
                         </div>
                       </FormControl>
