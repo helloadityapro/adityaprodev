@@ -127,15 +127,6 @@ type InstallationChecklist = {
 
 type AuditSortKey = 'date' | 'table' | 'user' | 'comments' | 'status';
 
-const CHECK_LABELS = {
-  moduleNutBolt: "Module Nut-bolt Tightness",
-  mmsNutBolt: "MMS Nut-Bolt Tightness",
-  crackedModules: "Module Condition/Cracks",
-  cableDressing: "Cable Dressing",
-  cappingCondition: "Capping Condition",
-  earthingCondition: "Earthing Condition",
-};
-
 export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteId: string }> }) {
   const resolvedParams = React.use(params);
   const siteId = resolvedParams.siteId;
@@ -157,7 +148,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const [deletingRecord, setDeletingRecord] = React.useState<InstallationChecklist | null>(null);
   const [approvingRecord, setApprovingRecord] = React.useState<{ record: InstallationChecklist, type: 'Approved' | 'Rejected' } | null>(null);
   
-  const [isMatrixOpen, setIsMatrixOpen] = React.useState(false);
   const [newComment, setNewComment] = React.useState("");
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isExporting, setIsExporting] = React.useState(false);
@@ -523,103 +513,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     }
   };
 
-  const handleExportMatrixPDF = async () => {
-    if (filteredInst.length === 0) return;
-    setIsExporting(true);
-    setGenerationProgress(0);
-
-    try {
-      const { default: jsPDF } = await import('jspdf');
-      const doc = new jsPDF('l', 'mm', 'a4');
-      const margin = 10;
-      let currY = 25;
-      
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.text(`SITE QUALITY MATRIX: ${site?.name || 'MMS'}`, margin, 15);
-      doc.setFontSize(10);
-      doc.text(`Project Company: ${site?.projectCompany || 'Aditya Green Energy'}`, margin, 20);
-
-      const tableCols = ['Table Ref', ...Object.values(CHECK_LABELS)];
-      const colWidths = [30, 40, 40, 40, 40, 40, 40];
-      
-      const drawHeader = () => {
-        doc.setFillColor(45, 115, 255); // Primary blue
-        doc.rect(margin, currY, 277, 12, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'bold');
-        let x = margin;
-        tableCols.forEach((col, i) => {
-          const lines = doc.splitTextToSize(col.toUpperCase(), colWidths[i] - 4);
-          doc.text(lines, x + 2, currY + 5);
-          x += colWidths[i];
-        });
-        currY += 12;
-        doc.setTextColor(0, 0, 0);
-      };
-
-      drawHeader();
-
-      filteredInst.forEach((record, index) => {
-        if (currY > 180) {
-          doc.addPage();
-          currY = 25;
-          drawHeader();
-        }
-
-        setGenerationProgress(Math.round(((index + 1) / filteredInst.length) * 100));
-        
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        let x = margin;
-        
-        doc.rect(margin, currY, 277, 8);
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text(record.tableNumber, x + 2, currY + 5.5);
-        doc.setFont('helvetica', 'normal');
-        x += colWidths[0];
-
-        Object.keys(CHECK_LABELS).forEach((key, i) => {
-          const check = record.checks.find(c => c.key === key || c.label === (CHECK_LABELS as any)[key]);
-          const status = check?.status || '—';
-          if (status === 'OK') doc.setTextColor(0, 128, 0);
-          else if (status === 'NOT OK') doc.setTextColor(255, 0, 0);
-          else if (status === 'Pending') doc.setTextColor(218, 165, 32);
-          
-          doc.text(status, x + 2, currY + 5.5);
-          doc.setTextColor(0, 0, 0);
-          x += colWidths[i + 1];
-        });
-
-        currY += 8;
-      });
-
-      // Legends at the end
-      if (currY > 180) { doc.addPage(); currY = 25; }
-      currY += 10;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.text('LEGENDS:', margin, currY);
-      currY += 6;
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(0, 128, 0); doc.text('OK: Verification points found in compliance.', margin, currY);
-      currY += 5;
-      doc.setTextColor(255, 0, 0); doc.text('NOT OK: Issues detected requiring immediate remediation.', margin, currY);
-      currY += 5;
-      doc.setTextColor(218, 165, 32); doc.text('Pending: Verification incomplete or awaiting further audit.', margin, currY);
-
-      doc.save(`AdityaPro_Matrix_${site?.name.replace(/\s+/g, '_')}.pdf`);
-      toast({ title: 'Matrix Exported' });
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Export Failed', description: error.message });
-    } finally {
-      setIsExporting(false);
-      setGenerationProgress(0);
-    }
-  };
-
   const isVideo = (file: Attachment) => {
     const type = file.contentType?.toLowerCase() || '';
     const name = file.name?.toLowerCase() || '';
@@ -741,7 +634,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           </Button>
 
           {isAdmin && (
-            <Button onClick={() => setIsMatrixOpen(true)} disabled={filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5">
+            <Button onClick={() => router.push(`/checklists/data/${siteId}/mms/matrix`)} disabled={filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5">
               <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> 
               View All Records
             </Button>
@@ -939,75 +832,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           </CardContent>
         </Card>
       </div>
-
-      <Dialog open={isMatrixOpen} onOpenChange={setIsMatrixOpen}>
-        <DialogContent className="max-w-7xl w-[98vw] h-[90vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-2 rounded-sm"><LayoutGrid className="h-5 w-5 text-primary" /></div>
-              <div>
-                <DialogTitle className="text-xl font-black uppercase tracking-tight">{site.name} Checklist Records</DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Master Quality Data Feed</DialogDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pr-8">
-              <Button onClick={handleExportMatrixPDF} variant="outline" size="sm" className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary">
-                <FileDown className="h-3.5 w-3.5 mr-1.5" /> PDF Summary
-              </Button>
-              <DialogClose asChild><Button variant="ghost" size="icon" className="rounded-full"><X className="h-4 w-4" /></Button></DialogClose>
-            </div>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden relative">
-            <div className="h-full overflow-auto custom-scrollbar">
-              <div className="min-w-full">
-                <Table className="border-collapse table-fixed w-full">
-                  <TableHeader className="sticky top-0 z-[60] shadow-md bg-primary">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[150px] font-black uppercase text-xs md:text-sm tracking-widest border-r bg-primary text-white sticky left-0 top-0 z-[70] px-6 py-4">Table Ref</TableHead>
-                      {Object.entries(CHECK_LABELS).map(([key, label]) => (
-                        <TableHead key={key} className="text-center font-black uppercase text-[10px] md:text-xs tracking-tight leading-tight w-[160px] px-3 py-4 bg-primary text-white border-r last:border-0 sticky top-0 z-[60]">{label}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredInst.length > 0 ? filteredInst.map((record) => (
-                      <TableRow key={record.id} className="hover:bg-primary/[0.02] transition-colors border-b last:border-0">
-                        <TableCell className="px-6 py-4 font-black text-sm border-r bg-background sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">{record.tableNumber}</TableCell>
-                        {Object.keys(CHECK_LABELS).map((key) => {
-                          const check = record.checks.find(c => c.key === key || c.label === (CHECK_LABELS as any)[key]);
-                          const status = check?.status;
-                          return (
-                            <TableCell key={key} className="text-center py-4 border-r last:border-0 w-[160px]">
-                              <div className="flex justify-center">
-                                {status === 'OK' ? (
-                                  <Check className="h-5 w-5 text-green-600 drop-shadow-sm" />
-                                ) : status === 'NOT OK' ? (
-                                  <X className="h-5 w-5 text-red-600 drop-shadow-sm" />
-                                ) : status === 'Pending' ? (
-                                  <AlertTriangle className="h-5 w-5 text-amber-500 drop-shadow-sm" />
-                                ) : (
-                                  <span className="text-muted-foreground/30 font-black">—</span>
-                                )}
-                              </div>
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    )) : (
-                      <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground italic">No metrics available.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </div>
-          <div className="p-4 border-t bg-muted/5 flex items-center justify-center gap-8 shrink-0">
-             <div className="flex items-center gap-2"><Check className="h-4 w-4 text-green-600" /><span className="text-[10px] font-black uppercase text-foreground/70 tracking-widest">Verified (OK)</span></div>
-             <div className="flex items-center gap-2"><X className="h-4 w-4 text-red-600" /><span className="text-[10px] font-black uppercase text-foreground/70 tracking-widest">Issue Detected (NOT OK)</span></div>
-             <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" /><span className="text-[10px] font-black uppercase text-foreground/70 tracking-widest">Awaiting (Pending)</span></div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!viewingInstallation} onOpenChange={(o) => !o && setViewingInstallation(null)}>
         <DialogContent className="max-w-4xl w-[98vw] h-[90vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
@@ -1238,4 +1062,3 @@ function formatTimestamp(ts: any) {
   const date = ts.toDate ? ts.toDate() : new Date(ts);
   return format(date, 'dd/MM/yyyy HH:mm');
 }
-
