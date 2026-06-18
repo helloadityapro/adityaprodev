@@ -872,11 +872,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             <ScrollArea className="h-full">
               <div className="min-w-full">
                 <Table className="border-collapse table-fixed w-full">
-                  <TableHeader className="sticky top-0 z-50 shadow-md">
+                  <TableHeader className="sticky top-0 z-[60] shadow-md bg-primary">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[150px] font-black uppercase text-xs md:text-sm tracking-widest border-r bg-primary text-white sticky left-0 z-50 px-6 py-4">Table Ref</TableHead>
+                      <TableHead className="w-[150px] font-black uppercase text-xs md:text-sm tracking-widest border-r bg-primary text-white sticky left-0 top-0 z-[70] px-6 py-4">Table Ref</TableHead>
                       {Object.entries(CHECK_LABELS).map(([key, label]) => (
-                        <TableHead key={key} className="text-center font-black uppercase text-[10px] md:text-xs tracking-tight leading-tight w-[160px] px-3 py-4 bg-primary text-white border-r last:border-0 sticky top-0">{label}</TableHead>
+                        <TableHead key={key} className="text-center font-black uppercase text-[10px] md:text-xs tracking-tight leading-tight w-[160px] px-3 py-4 bg-primary text-white border-r last:border-0 sticky top-0 z-[60]">{label}</TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
