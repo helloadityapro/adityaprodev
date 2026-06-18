@@ -505,23 +505,24 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       
       const drawHeader = () => {
         doc.setFillColor(45, 115, 255); // Primary blue
-        doc.rect(margin, currY, 277, 8, 'F');
+        doc.rect(margin, currY, 277, 12, 'F');
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(8);
+        doc.setFontSize(7);
         doc.setFont('helvetica', 'bold');
         let x = margin;
         tableCols.forEach((col, i) => {
-          doc.text(col.toUpperCase(), x + 2, currY + 5.5);
+          const lines = doc.splitTextToSize(col.toUpperCase(), colWidths[i] - 4);
+          doc.text(lines, x + 2, currY + 5);
           x += colWidths[i];
         });
-        currY += 8;
+        currY += 12;
         doc.setTextColor(0, 0, 0);
       };
 
       drawHeader();
 
       filteredInst.forEach((record, index) => {
-        if (currY > 185) {
+        if (currY > 180) {
           doc.addPage();
           currY = 25;
           drawHeader();
@@ -533,16 +534,13 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         doc.setFontSize(8);
         let x = margin;
         
-        // Row border
         doc.rect(margin, currY, 277, 8);
         
-        // Table Ref
         doc.setFont('helvetica', 'bold');
         doc.text(record.tableNumber, x + 2, currY + 5.5);
         doc.setFont('helvetica', 'normal');
         x += colWidths[0];
 
-        // Checks
         Object.keys(CHECK_LABELS).forEach((key, i) => {
           const check = record.checks.find(c => c.key === key || c.label === (CHECK_LABELS as any)[key]);
           const status = check?.status || '—';
@@ -557,6 +555,20 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
 
         currY += 8;
       });
+
+      // Legends at the end
+      if (currY > 180) { doc.addPage(); currY = 25; }
+      currY += 10;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.text('LEGENDS:', margin, currY);
+      currY += 6;
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 128, 0); doc.text('OK: Verification points found in compliance.', margin, currY);
+      currY += 5;
+      doc.setTextColor(255, 0, 0); doc.text('NOT OK: Issues detected requiring immediate remediation.', margin, currY);
+      currY += 5;
+      doc.setTextColor(218, 165, 32); doc.text('Pending: Verification incomplete or awaiting further audit.', margin, currY);
 
       doc.save(`AdityaPro_Matrix_${site?.name.replace(/\s+/g, '_')}.pdf`);
       toast({ title: 'Matrix Exported' });
@@ -845,8 +857,8 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><LayoutGrid className="h-5 w-5 text-primary" /></div>
               <div>
-                <DialogTitle className="text-xl font-black uppercase tracking-tight">Site Quality Matrix</DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{site.name} • Master Quality Grid</DialogDescription>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">{site.name} Checklist Records</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Master Quality Data Feed</DialogDescription>
               </div>
             </div>
             <div className="flex items-center gap-2 pr-8">
@@ -860,11 +872,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             <ScrollArea className="h-full">
               <div className="min-w-full">
                 <Table className="border-collapse table-fixed w-full">
-                  <TableHeader className="sticky top-0 z-30 shadow-md">
+                  <TableHeader className="sticky top-0 z-50 shadow-md">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[150px] font-black uppercase text-xs md:text-sm tracking-widest border-r bg-primary text-white sticky left-0 z-40 px-6 py-4">Table Ref</TableHead>
+                      <TableHead className="w-[150px] font-black uppercase text-xs md:text-sm tracking-widest border-r bg-primary text-white sticky left-0 z-50 px-6 py-4">Table Ref</TableHead>
                       {Object.entries(CHECK_LABELS).map(([key, label]) => (
-                        <TableHead key={key} className="text-center font-black uppercase text-[10px] md:text-xs tracking-tight leading-tight w-[160px] px-3 py-4 bg-primary text-white border-r last:border-0">{label}</TableHead>
+                        <TableHead key={key} className="text-center font-black uppercase text-[10px] md:text-xs tracking-tight leading-tight w-[160px] px-3 py-4 bg-primary text-white border-r last:border-0 sticky top-0">{label}</TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
