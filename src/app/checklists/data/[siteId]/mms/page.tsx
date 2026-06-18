@@ -171,6 +171,8 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
+  const canApprove = isAdmin || isManager;
 
   const siteRef = useMemoFirebase(() => doc(firestore, 'sites', siteId), [firestore, siteId]);
   const { data: site, isLoading: siteLoading } = useDoc<Site>(siteRef);
@@ -323,7 +325,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   };
 
   const handleUpdateCheckStatus = (checkIndex: number, newStatus: 'OK' | 'NOT OK' | 'Pending') => {
-    if (!viewingInstallation || !isAdmin) return;
+    if (!viewingInstallation || !canApprove) return;
 
     const updatedChecks = [...viewingInstallation.checks];
     updatedChecks[checkIndex] = { ...updatedChecks[checkIndex], status: newStatus };
@@ -519,7 +521,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           currY += reviewH;
         }
 
-        currY += 5;
         const extCommentsRaw = record.comments?.map(c => `[${format(new Date(c.createdAt), 'dd/MM HH:mm')}] ${c.userName}: ${c.text}`).join('\n') || '—';
         const extLines = doc.splitTextToSize(extCommentsRaw, colWidthValue - 4);
         const extH = Math.max(rowHeight * 2, extLines.length * 4 + 6);
@@ -781,7 +782,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                 </div>
                 
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                  {isAdmin && (!record.status || record.status === 'Pending') && (
+                  {canApprove && (!record.status || record.status === 'Pending') && (
                     <div className="flex gap-1 mr-2">
                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setApprovingRecord({ record, type: 'Approved' })}><ThumbsUp className="h-4 w-4" /></Button>
                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setApprovingRecord({ record, type: 'Rejected' })}><ThumbsDown className="h-4 w-4" /></Button>
@@ -809,55 +810,67 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
 
         <Card className="hidden md:block rounded-sm border-primary/10 shadow-md overflow-hidden">
           <CardContent className="p-0">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead className="px-6 cursor-pointer" onClick={() => handleAuditSort('date')}><div className="flex items-center">Date & Time <AuditSortIcon column="date" /></div></TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleAuditSort('table')}><div className="flex items-center">Table Ref <AuditSortIcon column="table" /></div></TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleAuditSort('user')}><div className="flex items-center">Auditor <AuditSortIcon column="user" /></div></TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleAuditSort('status')}><div className="flex items-center">Status <AuditSortIcon column="status" /></div></TableHead>
-                  <TableHead className="text-center cursor-pointer" onClick={() => handleAuditSort('comments')}><div className="flex items-center justify-center">Comments <AuditSortIcon column="comments" /></div></TableHead>
-                  <TableHead className="text-right px-6">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInst.map((record) => (
-                  <TableRow key={record.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setViewingInstallation(record)}>
-                    <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
-                    <TableCell><Badge variant="secondary" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10">{record.tableNumber}</Badge></TableCell>
-                    <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3 w-3 text-primary opacity-50" />{record.userName}</div></TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn(
-                        "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
-                        record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                        record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                        "bg-yellow-50 text-yellow-700 border-yellow-200"
-                      )}>{record.status || 'Pending'}</Badge>
-                    </TableCell>
-                    <TableCell className="text-center"><button onClick={(e) => { e.stopPropagation(); setCommentingRecord(record); }} className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary inline-flex items-center px-3 rounded-sm transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {record.comments?.length || 0}</button></TableCell>
-                    <TableCell className="text-right px-6">
-                      <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                        {isAdmin && (!record.status || record.status === 'Pending') && (
-                          <div className="flex gap-1 mr-2">
-                             <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setApprovingRecord({ record, type: 'Approved' })} title="Approve"><CircleCheck className="h-4 w-4" /></Button>
-                             <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setApprovingRecord({ record, type: 'Rejected' })} title="Reject"><CircleX className="h-4 w-4" /></Button>
-                          </div>
-                        )}
-                        {record.status === 'Rejected' && record.userId === user?.uid && (
-                          <Button variant="outline" size="sm" className="h-8 rounded-sm font-black text-[9px] uppercase tracking-widest border-amber-500 text-amber-700 hover:bg-amber-50 mr-2" asChild>
-                            <Link href={`/checklists/installation?correct=${record.id}`}><RotateCw className="h-3 w-3 mr-1" /> Resubmit</Link>
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => exportToPDF([record])}><FileDown className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setCommentingRecord(record)}><MessageCircle className="h-4 w-4" /></Button>
-                        {(isAdmin || record.userId === user?.uid) && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>}
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('date')}>
+                      <div className="flex items-center">Date & Time <AuditSortIcon column="date" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('table')}>
+                      <div className="flex items-center">Table Ref <AuditSortIcon column="table" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('user')}>
+                      <div className="flex items-center">Auditor <AuditSortIcon column="user" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('status')}>
+                      <div className="flex items-center">Status <AuditSortIcon column="status" /></div>
+                    </TableHead>
+                    <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('comments')}>
+                      <div className="flex items-center justify-center">Comments <AuditSortIcon column="comments" /></div>
+                    </TableHead>
+                    <TableHead className="text-right px-6">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredInst.map((record) => (
+                    <TableRow key={record.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setViewingInstallation(record)}>
+                      <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
+                      <TableCell><Badge variant="secondary" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10">{record.tableNumber}</Badge></TableCell>
+                      <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3 w-3 text-primary opacity-50" />{record.userName}</div></TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn(
+                          "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
+                          record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                          record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                          "bg-yellow-50 text-yellow-700 border-yellow-200"
+                        )}>{record.status || 'Pending'}</Badge>
+                      </TableCell>
+                      <TableCell className="text-center"><button onClick={(e) => { e.stopPropagation(); setCommentingRecord(record); }} className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary inline-flex items-center px-3 rounded-sm transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {record.comments?.length || 0}</button></TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                          {canApprove && (!record.status || record.status === 'Pending') && (
+                            <div className="flex gap-1 mr-2">
+                               <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setApprovingRecord({ record, type: 'Approved' })} title="Approve"><CircleCheck className="h-4 w-4" /></Button>
+                               <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setApprovingRecord({ record, type: 'Rejected' })} title="Reject"><CircleX className="h-4 w-4" /></Button>
+                            </div>
+                          )}
+                          {record.status === 'Rejected' && record.userId === user?.uid && (
+                            <Button variant="outline" size="sm" className="h-8 rounded-sm font-black text-[9px] uppercase tracking-widest border-amber-500 text-amber-700 hover:bg-amber-50 mr-2" asChild>
+                              <Link href={`/checklists/installation?correct=${record.id}`}><RotateCw className="h-3 w-3 mr-1" /> Resubmit</Link>
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => exportToPDF([record])}><FileDown className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setCommentingRecord(record)}><MessageCircle className="h-4 w-4" /></Button>
+                          {(isAdmin || record.userId === user?.uid) && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -906,7 +919,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] md:text-[11px] font-black uppercase text-foreground">{check.label}</span>
                           <div className="flex items-center gap-1">
-                            {isAdmin ? (
+                            {canApprove ? (
                               <div className="flex items-center gap-1 border rounded-sm p-0.5 bg-background shadow-sm">
                                 <Button 
                                   variant="ghost" size="icon" 
@@ -1027,7 +1040,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             </div>
           </ScrollArea>
           <DialogFooter className="p-4 bg-muted/5 border-t shrink-0">
-             {isAdmin && (!viewingInstallation?.status || viewingInstallation.status === 'Pending') && (
+             {canApprove && (!viewingInstallation?.status || viewingInstallation.status === 'Pending') && (
                <div className="flex-1 flex gap-2">
                  <Button className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white font-black uppercase text-[10px] tracking-widest" onClick={() => setApprovingRecord({ record: viewingInstallation!, type: 'Approved' })}>Approve Audit</Button>
                  <Button variant="destructive" className="flex-1 h-11 font-black uppercase text-[10px] tracking-widest" onClick={() => setApprovingRecord({ record: viewingInstallation!, type: 'Rejected' })}>Reject Audit</Button>
