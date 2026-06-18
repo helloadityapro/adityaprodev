@@ -322,6 +322,21 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     }
   };
 
+  const handleUpdateCheckStatus = (checkIndex: number, newStatus: 'OK' | 'NOT OK' | 'Pending') => {
+    if (!viewingInstallation || !isAdmin) return;
+
+    const updatedChecks = [...viewingInstallation.checks];
+    updatedChecks[checkIndex] = { ...updatedChecks[checkIndex], status: newStatus };
+
+    updateDocumentNonBlocking(doc(firestore, 'installation_checklists', viewingInstallation.id), {
+      checks: updatedChecks,
+      updatedAt: serverTimestamp()
+    });
+
+    setViewingInstallation({ ...viewingInstallation, checks: updatedChecks });
+    toast({ title: 'Point Updated', description: `Status set to ${newStatus} for ${updatedChecks[checkIndex].label}.` });
+  };
+
   const exportToPDF = async (items: InstallationChecklist[]) => {
     if (items.length === 0) return;
     setIsExporting(true);
@@ -628,9 +643,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       <div className="flex flex-row flex-wrap items-center justify-between gap-4">
         <div className="flex flex-row flex-wrap items-center gap-2">
           <Button onClick={() => exportToPDF(filteredInst)} disabled={isExporting || filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5">
-            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} 
-            <span className="hidden sm:inline">Export All (PDF)</span>
-            <span className="sm:hidden">Export All</span>
+            {isExporting ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Rendering...</> : <><FileDown className="h-3.5 w-3.5 mr-1.5" /> PDF Export All</>}
           </Button>
 
           {isAdmin && (
@@ -752,7 +765,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                 </div>
                 
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                  {isAdmin && !record.status && (
+                  {isAdmin && (!record.status || record.status === 'Pending') && (
                     <div className="flex gap-1 mr-2">
                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setApprovingRecord({ record, type: 'Approved' })}><ThumbsUp className="h-4 w-4" /></Button>
                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setApprovingRecord({ record, type: 'Rejected' })}><ThumbsDown className="h-4 w-4" /></Button>
@@ -877,11 +890,39 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] md:text-[11px] font-black uppercase text-foreground">{check.label}</span>
                           <div className="flex items-center gap-1">
-                            {check.status === 'OK' ? (
-                              <Badge className="bg-green-50 text-green-700 border-green-200 uppercase font-black text-[7px] h-4">OK</Badge>
-                            ) : check.status === 'NOT OK' ? (
-                              <Badge className="bg-red-50 text-red-700 border-red-200 uppercase font-black text-[7px] h-4">NOT OK</Badge>
-                            ) : null}
+                            {isAdmin ? (
+                              <div className="flex items-center gap-1 border rounded-sm p-0.5 bg-background shadow-sm">
+                                <Button 
+                                  variant="ghost" size="icon" 
+                                  className={cn("h-7 w-7 rounded-sm", check.status === 'OK' ? "bg-green-100 text-green-700" : "opacity-40 hover:bg-green-50")}
+                                  onClick={() => handleUpdateCheckStatus(idx, 'OK')}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" size="icon" 
+                                  className={cn("h-7 w-7 rounded-sm", check.status === 'NOT OK' ? "bg-red-100 text-red-700" : "opacity-40 hover:bg-red-50")}
+                                  onClick={() => handleUpdateCheckStatus(idx, 'NOT OK')}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" size="icon" 
+                                  className={cn("h-7 w-7 rounded-sm", check.status === 'Pending' ? "bg-amber-100 text-amber-700" : "opacity-40 hover:bg-amber-50")}
+                                  onClick={() => handleUpdateCheckStatus(idx, 'Pending')}
+                                >
+                                  <AlertTriangle className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <>
+                                {check.status === 'OK' ? (
+                                  <Badge className="bg-green-50 text-green-700 border-green-200 uppercase font-black text-[7px] h-4">OK</Badge>
+                                ) : check.status === 'NOT OK' ? (
+                                  <Badge className="bg-red-50 text-red-700 border-red-200 uppercase font-black text-[7px] h-4">NOT OK</Badge>
+                                ) : null}
+                              </>
+                            )}
                           </div>
                         </div>
                         <p className="text-xs italic text-muted-foreground leading-relaxed">"{check.remarks || 'No specific observations recorded.'}"</p>
