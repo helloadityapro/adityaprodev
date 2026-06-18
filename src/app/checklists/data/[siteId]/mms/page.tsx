@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -52,7 +53,12 @@ import {
   Download,
   LayoutGrid,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  RotateCw,
+  ThumbsUp,
+  ThumbsDown,
+  CircleCheck,
+  CircleX
 } from 'lucide-react';
 import { format, subDays, subMonths } from 'date-fns';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -69,7 +75,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 
 type Site = { 
@@ -112,9 +118,14 @@ type InstallationChecklist = {
   customerRepName?: string;
   customerRepRemarks?: string;
   comments?: Comment[];
+  status?: 'Pending' | 'Approved' | 'Rejected';
+  adminRemarks?: string;
+  processedBy?: string;
+  processedByName?: string;
+  processedAt?: any;
 };
 
-type AuditSortKey = 'date' | 'table' | 'user' | 'comments';
+type AuditSortKey = 'date' | 'table' | 'user' | 'comments' | 'status';
 
 const CHECK_LABELS = {
   moduleNutBolt: "Module Nut-bolt Tightness",
@@ -144,6 +155,8 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const [viewingInstallation, setViewingInstallation] = React.useState<InstallationChecklist | null>(null);
   const [commentingRecord, setCommentingRecord] = React.useState<InstallationChecklist | null>(null);
   const [deletingRecord, setDeletingRecord] = React.useState<InstallationChecklist | null>(null);
+  const [approvingRecord, setApprovingRecord] = React.useState<{ record: InstallationChecklist, type: 'Approved' | 'Rejected' } | null>(null);
+  
   const [isMatrixOpen, setIsMatrixOpen] = React.useState(false);
   const [newComment, setNewComment] = React.useState("");
   const [isProcessing, setIsProcessing] = React.useState(false);
@@ -221,6 +234,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       if (key === 'date') { valA = a.createdAt?.toDate?.()?.getTime() || 0; valB = b.createdAt?.toDate?.()?.getTime() || 0; }
       else if (key === 'user') { valA = a.userName.toLowerCase(); valB = b.userName.toLowerCase(); }
       else if (key === 'comments') { valA = a.comments?.length || 0; valB = b.comments?.length || 0; }
+      else if (key === 'status') { valA = a.status || 'Pending'; valB = b.status || 'Pending'; }
 
       if (valA < valB) return direction === 'asc' ? -1 : 1;
       if (valA > valB) return direction === 'asc' ? 1 : -1;
@@ -287,6 +301,32 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       setDeletingDrawing(null);
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Delete Failed', description: error.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleProcessAudit = async (remarks: string) => {
+    if (!approvingRecord || !user || !userProfile) return;
+    setIsProcessing(true);
+    try {
+      const ref = doc(firestore, 'installation_checklists', approvingRecord.record.id);
+      await updateDocumentNonBlocking(ref, {
+        status: approvingRecord.type,
+        adminRemarks: remarks || "",
+        processedBy: user.uid,
+        processedByName: userProfile.username || user.email,
+        processedAt: serverTimestamp()
+      });
+
+      toast({ 
+        title: `Audit ${approvingRecord.type}`, 
+        description: `Checklist for Table ${approvingRecord.record.tableNumber} updated.` 
+      });
+      setApprovingRecord(null);
+      setViewingInstallation(null);
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Action Failed", description: e.message });
     } finally {
       setIsProcessing(false);
     }
@@ -678,8 +718,8 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   return (
     <div className="space-y-6 md:space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <Button variant="ghost" size="sm" onClick={() => router.push(`/checklists/data/${siteId}`)} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Hub
+        <Button variant="ghost" size="sm" onClick={() => router.push(`/checklists/data`)} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Registry
         </Button>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1 min-w-0">
@@ -700,10 +740,12 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             <span className="sm:hidden">Export All</span>
           </Button>
 
-          <Button onClick={() => setIsMatrixOpen(true)} disabled={filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5">
-            <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> 
-            View All Records
-          </Button>
+          {isAdmin && (
+            <Button onClick={() => setIsMatrixOpen(true)} disabled={filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5">
+              <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> 
+              View All Records
+            </Button>
+          )}
 
           {site.drawingUrl ? (
             <div className="flex items-center gap-1.5">
@@ -799,22 +841,42 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         <div className="md:hidden space-y-3">
           {filteredInst.map((record) => (
             <Card key={record.id} className="rounded-xl border-primary/5 shadow-sm overflow-hidden bg-card cursor-pointer" onClick={() => setViewingInstallation(record)}>
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4 min-w-0">
-                  <div className="h-10 min-w-[3.5rem] px-3 rounded-lg bg-primary/5 text-primary border-none flex items-center justify-center font-black text-xs shrink-0 whitespace-nowrap">{record.tableNumber}</div>
-                  <div className="flex flex-col min-w-0 gap-1">
-                    <div className="flex items-center gap-2 text-foreground font-bold"><User className="h-3 w-3 text-primary/60" /><span className="text-xs truncate">{record.userName}</span></div>
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium"><Calendar className="h-3 w-3" />{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</div>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="h-10 min-w-[3.5rem] px-3 rounded-lg bg-primary/5 text-primary border-none flex items-center justify-center font-black text-xs shrink-0 whitespace-nowrap">{record.tableNumber}</div>
+                    <div className="flex flex-col min-w-0 gap-1">
+                      <div className="flex items-center gap-2 text-foreground font-bold"><User className="h-3 w-3 text-primary/60" /><span className="text-xs truncate">{record.userName}</span></div>
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium"><Calendar className="h-3 w-3" />{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</div>
+                    </div>
                   </div>
+                  <Badge variant="outline" className={cn(
+                    "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                    record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                    record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                    "bg-yellow-50 text-yellow-700 border-yellow-200"
+                  )}>{record.status || 'Pending'}</Badge>
                 </div>
-                <div className="flex items-center gap-1 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
-                  <Button variant="ghost" size="icon" className="h-10 w-10 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-5 w-5" /></Button>
+                
+                <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                  {isAdmin && !record.status && (
+                    <div className="flex gap-1 mr-2">
+                       <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setApprovingRecord({ record, type: 'Approved' })}><ThumbsUp className="h-4 w-4" /></Button>
+                       <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setApprovingRecord({ record, type: 'Rejected' })}><ThumbsDown className="h-4 w-4" /></Button>
+                    </div>
+                  )}
+                  {record.status === 'Rejected' && record.userId === user?.uid && (
+                    <Button variant="outline" size="sm" className="h-8 rounded-sm font-black text-[9px] uppercase tracking-widest border-amber-500 text-amber-700 hover:bg-amber-50 mr-2" asChild>
+                      <Link href={`/checklists/installation?correct=${record.id}`}><RotateCw className="h-3 w-3 mr-1" /> Resubmit</Link>
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-5 w-5" /></Button>
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
+                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-xl">
-                      <DropdownMenuItem onClick={() => exportToPDF([record])} className="gap-2 cursor-pointer py-2.5"><FileDown className="h-4 w-4" /> Export PDF</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setCommentingRecord(record)} className="gap-2 cursor-pointer py-2.5"><MessageCircle className="h-4 w-4" /> Add Comment</DropdownMenuItem>
-                      {(isAdmin || record.userId === user?.uid) && <DropdownMenuItem onClick={() => setDeletingRecord(record)} className="gap-2 cursor-pointer py-2.5 text-destructive"><Trash2 className="h-4 w-4" /> Delete</DropdownMenuItem>}
+                      <DropdownMenuItem onClick={() => exportToPDF([record])} className="gap-2 cursor-pointer py-2.5 text-xs"><FileDown className="h-4 w-4" /> Export PDF</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setCommentingRecord(record)} className="gap-2 cursor-pointer py-2.5 text-xs"><MessageCircle className="h-4 w-4" /> Add Comment</DropdownMenuItem>
+                      {(isAdmin || record.userId === user?.uid) && <DropdownMenuItem onClick={() => setDeletingRecord(record)} className="gap-2 cursor-pointer py-2.5 text-xs text-destructive"><Trash2 className="h-4 w-4" /> Delete</DropdownMenuItem>}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -831,6 +893,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                   <TableHead className="px-6 cursor-pointer" onClick={() => handleAuditSort('date')}><div className="flex items-center">Date & Time <AuditSortIcon column="date" /></div></TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleAuditSort('table')}><div className="flex items-center">Table Ref <AuditSortIcon column="table" /></div></TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleAuditSort('user')}><div className="flex items-center">Auditor <AuditSortIcon column="user" /></div></TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleAuditSort('status')}><div className="flex items-center">Status <AuditSortIcon column="status" /></div></TableHead>
                   <TableHead className="text-center cursor-pointer" onClick={() => handleAuditSort('comments')}><div className="flex items-center justify-center">Comments <AuditSortIcon column="comments" /></div></TableHead>
                   <TableHead className="text-right px-6">Action</TableHead>
                 </TableRow>
@@ -841,8 +904,34 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                     <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
                     <TableCell><Badge variant="secondary" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10">{record.tableNumber}</Badge></TableCell>
                     <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3 w-3 text-primary opacity-50" />{record.userName}</div></TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={cn(
+                        "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
+                        record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                        record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                        "bg-yellow-50 text-yellow-700 border-yellow-200"
+                      )}>{record.status || 'Pending'}</Badge>
+                    </TableCell>
                     <TableCell className="text-center"><button onClick={(e) => { e.stopPropagation(); setCommentingRecord(record); }} className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary inline-flex items-center px-3 rounded-sm transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {record.comments?.length || 0}</button></TableCell>
-                    <TableCell className="text-right px-6"><div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => exportToPDF([record])}><FileDown className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setCommentingRecord(record)}><MessageCircle className="h-4 w-4" /></Button>{(isAdmin || record.userId === user?.uid) && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>}</div></TableCell>
+                    <TableCell className="text-right px-6">
+                      <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        {isAdmin && (!record.status || record.status === 'Pending') && (
+                          <div className="flex gap-1 mr-2">
+                             <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setApprovingRecord({ record, type: 'Approved' })} title="Approve"><CircleCheck className="h-4 w-4" /></Button>
+                             <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setApprovingRecord({ record, type: 'Rejected' })} title="Reject"><CircleX className="h-4 w-4" /></Button>
+                          </div>
+                        )}
+                        {record.status === 'Rejected' && record.userId === user?.uid && (
+                          <Button variant="outline" size="sm" className="h-8 rounded-sm font-black text-[9px] uppercase tracking-widest border-amber-500 text-amber-700 hover:bg-amber-50 mr-2" asChild>
+                            <Link href={`/checklists/installation?correct=${record.id}`}><RotateCw className="h-3 w-3 mr-1" /> Resubmit</Link>
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => exportToPDF([record])}><FileDown className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setCommentingRecord(record)}><MessageCircle className="h-4 w-4" /></Button>
+                        {(isAdmin || record.userId === user?.uid) && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -931,6 +1020,12 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
               </div>
             </div>
             <div className="flex items-center gap-2 pr-8">
+               <Badge variant="outline" className={cn(
+                  "rounded-sm text-[9px] font-black uppercase px-2 h-6 mr-2",
+                  viewingInstallation?.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                  viewingInstallation?.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                  "bg-yellow-50 text-yellow-700 border-yellow-200"
+                )}>{viewingInstallation?.status || 'Pending'}</Badge>
                <Button onClick={() => viewingInstallation && exportToPDF([viewingInstallation])} variant="outline" size="sm" className="h-8 md:h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary/20 text-primary">
                  <FileDown className="h-3.5 w-3.5 mr-0 md:mr-1.5" /> <span className="hidden md:inline">PDF Report</span>
                </Button>
@@ -940,7 +1035,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             <div className="p-4 md:p-8 space-y-8 md:space-y-10 text-left">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                 <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Personnel</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.userName}</p></div>
-                <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Status</Label><div><Badge className="bg-green-600 text-white font-black uppercase text-[7px] md:text-[8px] border-none px-2 h-4 md:h-5">Verified</Badge></div></div>
                 <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Table Config</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.tableSize || '—'}</p></div>
                 <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Columns</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.columnCount || '—'}</p></div>
                 <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Modules</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.moduleCount || '—'}</p></div>
@@ -1006,6 +1100,18 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                 </div>
               ) : null}
 
+              {viewingInstallation?.adminRemarks && (
+                <div className="space-y-4 pt-6 border-t border-dashed">
+                  <Label className="text-[9px] md:text-[10px] font-black uppercase text-red-700 tracking-widest flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4" /> Administrative Feedback
+                  </Label>
+                  <div className="p-4 bg-red-50 border border-red-100 rounded-sm">
+                    <p className="text-sm italic font-medium text-red-900">"{viewingInstallation.adminRemarks}"</p>
+                    <p className="text-[8px] font-black text-red-700 uppercase mt-2">Processed by {viewingInstallation.processedByName} on {formatTimestamp(viewingInstallation.processedAt)}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4 pt-6 border-t border-dashed">
                 <Label className="text-[9px] md:text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
                   <ShieldCheck className="h-4 w-4" /> Compliance Undertaking
@@ -1022,7 +1128,43 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
               </div>
             </div>
           </ScrollArea>
-          <DialogFooter className="p-4 bg-muted/5 border-t shrink-0"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 md:h-11 px-8 w-full sm:w-auto">Close Audit Log</Button></DialogClose></DialogFooter>
+          <DialogFooter className="p-4 bg-muted/5 border-t shrink-0">
+             {isAdmin && (!viewingInstallation?.status || viewingInstallation.status === 'Pending') && (
+               <div className="flex-1 flex gap-2">
+                 <Button className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white font-black uppercase text-[10px] tracking-widest" onClick={() => setApprovingRecord({ record: viewingInstallation!, type: 'Approved' })}>Approve Audit</Button>
+                 <Button variant="destructive" className="flex-1 h-11 font-black uppercase text-[10px] tracking-widest" onClick={() => setApprovingRecord({ record: viewingInstallation!, type: 'Rejected' })}>Reject Audit</Button>
+               </div>
+             )}
+             {viewingInstallation?.status === 'Rejected' && viewingInstallation.userId === user?.uid && (
+               <Button className="flex-1 h-11 bg-amber-600 hover:bg-amber-700 font-black uppercase text-[10px] tracking-widest" asChild>
+                 <Link href={`/checklists/installation?correct=${viewingInstallation.id}`}><RotateCw className="h-4 w-4 mr-2" /> Start Correction Flow</Link>
+               </Button>
+             )}
+             <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 md:h-11 px-8 w-full sm:w-auto">Close Audit Log</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!approvingRecord} onOpenChange={() => setApprovingRecord(null)}>
+        <DialogContent className="max-w-md w-[95vw] rounded-sm p-6">
+          <DialogHeader>
+            <DialogTitle className="font-black uppercase tracking-tight">Process {approvingRecord?.type} Decision</DialogTitle>
+            <DialogDescription className="text-xs font-medium">Finalize the quality audit for Table {approvingRecord?.record.tableNumber}.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-2">
+            <Label className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">Decision Remarks (Optional)</Label>
+            <Textarea id="action-remarks" placeholder="Enter findings or feedback..." className="min-h-[120px] rounded-sm" />
+          </div>
+          <DialogFooter className="flex flex-col sm:flex-row gap-3">
+            <DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-11 rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
+            <Button 
+              className={cn("w-full sm:flex-1 h-11 rounded-sm font-black uppercase text-[10px] shadow-lg", approvingRecord?.type === 'Approved' ? 'bg-green-600' : 'bg-red-600')} 
+              onClick={() => handleProcessAudit((document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || "")}
+              disabled={isProcessing}
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : `Confirm ${approvingRecord?.type}`}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1089,4 +1231,10 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       </Dialog>
     </div>
   );
+}
+
+function formatTimestamp(ts: any) {
+  if (!ts) return '—';
+  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  return format(date, 'dd/MM/yyyy HH:mm');
 }

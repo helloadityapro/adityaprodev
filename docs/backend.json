@@ -402,17 +402,22 @@
             "properties": {
               "label": { "type": "string" },
               "remarks": { "type": "string" },
-              "photoUrl": { "type": "string" }
+              "photoUrl": { "type": "string" },
+              "status": { "type": "string", "enum": ["OK", "NOT OK", "Pending"] }
             }
           }
         },
         "otherRemarks": { "type": "string" },
-        "otherPhotoUrl": { "type": "string" },
         "customerRepPresent": { "type": "boolean" },
         "customerRepName": { "type": "string" },
         "customerRepRemarks": { "type": "string" },
         "userId": { "type": "string" },
         "userName": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"], "default": "Pending" },
+        "adminRemarks": { "type": "string" },
+        "processedBy": { "type": "string" },
+        "processedByName": { "type": "string" },
+        "processedAt": { "type": "string", "format": "date-time" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteId", "tableNumber", "userId"]
