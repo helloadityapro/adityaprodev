@@ -31,7 +31,8 @@ import {
   Plus,
   CheckCircle2,
   ArrowRight,
-  FileImage
+  FileImage,
+  AlertCircle
 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -46,6 +47,7 @@ import { sendNotification } from "@/lib/notifications";
 import { motion } from "framer-motion";
 
 const checkItemSchema = z.object({
+  status: z.enum(["OK", "NOT OK", "Pending"], { required_error: "Selection required" }),
   remarks: z.string().min(1, "Findings/Remarks are required for this check"),
   localFiles: z.array(z.any()).default([]),
 });
@@ -136,12 +138,12 @@ export default function TableLevelMMSChecklistPage() {
       columnCount: 0,
       moduleCount: 0,
       checks: {
-        moduleNutBolt: { remarks: "", localFiles: [] },
-        mmsNutBolt: { remarks: "", localFiles: [] },
-        crackedModules: { remarks: "", localFiles: [] },
-        cableDressing: { remarks: "", localFiles: [] },
-        cappingCondition: { remarks: "", localFiles: [] },
-        earthingCondition: { remarks: "", localFiles: [] },
+        moduleNutBolt: { status: undefined as any, remarks: "", localFiles: [] },
+        mmsNutBolt: { status: undefined as any, remarks: "", localFiles: [] },
+        crackedModules: { status: undefined as any, remarks: "", localFiles: [] },
+        cableDressing: { status: undefined as any, remarks: "", localFiles: [] },
+        cappingCondition: { status: undefined as any, remarks: "", localFiles: [] },
+        earthingCondition: { status: undefined as any, remarks: "", localFiles: [] },
       },
       otherRemarks: "",
       otherLocalFiles: [],
@@ -156,7 +158,6 @@ export default function TableLevelMMSChecklistPage() {
 
   const uploadFile = async (file: File, path: string): Promise<{url: string, contentType: string, name: string}> => {
     let blob: Blob = file;
-    // Only compress standard web images, leave HEIC/Originals alone as per requirements
     const isCompressible = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp';
     
     if (isCompressible) {
@@ -232,7 +233,6 @@ export default function TableLevelMMSChecklistPage() {
 
       const timestamp = Date.now();
 
-      // Sequential Processing of Categories and Files to prevent storage/retry-limit-exceeded errors on site internet
       const finalChecks = [];
       for (const [key, check] of Object.entries(values.checks)) {
         const attachments = [];
@@ -247,6 +247,7 @@ export default function TableLevelMMSChecklistPage() {
         finalChecks.push({
           key,
           label: (CHECK_LABELS as any)[key],
+          status: check.status,
           remarks: check.remarks || "",
           attachments
         });
@@ -482,74 +483,133 @@ export default function TableLevelMMSChecklistPage() {
             <CardContent className="p-0 divide-y">
               {Object.keys(CHECK_LABELS).map((key) => (
                 <div key={key} className="p-4 sm:p-6 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">
-                      {(CHECK_LABELS as any)[key]} *
-                    </Label>
-                    
-                    <FormField control={form.control} name={`checks.${key}.localFiles` as any} render={({ field: { value, onChange } }) => (
-                      <FormItem className="space-y-0 w-full sm:w-auto">
-                        <FormControl>
-                          <div className="flex flex-col gap-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              {(value || []).map((file: File, fIdx: number) => {
-                                const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
-                                return (
-                                  <Badge key={fIdx} variant="secondary" className="h-8 gap-1.5 pl-2 pr-1 rounded-sm bg-primary/5 text-primary border-primary/20">
-                                    {file.type.startsWith('video/') ? <Film className="h-3 w-3" /> : isHeic ? <FileImage className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
-                                    <span className="text-[9px] font-black truncate max-w-[80px]">{file.name}</span>
-                                    <Button 
-                                      type="button"
-                                      variant="ghost" size="icon" 
-                                      className="h-5 w-5 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
-                                      onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">
+                        {(CHECK_LABELS as any)[key]} *
+                      </Label>
+                      
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        <FormField
+                          control={form.control}
+                          name={`checks.${key}.status` as any}
+                          render={({ field }) => (
+                            <FormItem className="space-y-0">
+                              <FormControl>
+                                <RadioGroup
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                  className="flex items-center gap-4"
+                                >
+                                  <div className="flex items-center space-x-1.5">
+                                    <RadioGroupItem value="OK" id={`${key}-ok`} className="sr-only" />
+                                    <Label
+                                      htmlFor={`${key}-ok`}
+                                      className={cn(
+                                        "flex items-center gap-1 px-3 py-1.5 rounded-sm border-2 cursor-pointer transition-all",
+                                        field.value === "OK" 
+                                          ? "bg-green-50 border-green-500 text-green-700 shadow-sm" 
+                                          : "bg-background border-transparent text-muted-foreground hover:bg-muted/50"
+                                      )}
                                     >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                  </Badge>
-                                );
-                              })}
-                              
-                              <label className="cursor-pointer">
-                                <div className="flex items-center justify-center gap-2 px-3 h-8 rounded-sm border border-dashed border-primary/30 bg-background text-primary hover:bg-primary/5 transition-colors text-[9px] font-black uppercase tracking-widest">
-                                  <Camera className="h-3 w-3" /> Add Media
-                                </div>
-                                <input 
-                                  type="file" 
-                                  multiple 
-                                  accept="image/*,video/*,.heic,.heif" 
-                                  className="hidden" 
-                                  onChange={(e) => {
-                                    const newFiles = Array.from(e.target.files || []);
-                                    onChange([...(value || []), ...newFiles]);
-                                  }} 
-                                />
-                              </label>
-                            </div>
-                            <div className="space-y-1">
-                              {(value || []).map((file: File) => uploadProgress[file.name] !== undefined && (
-                                <div key={file.name} className="space-y-1">
-                                  <div className="flex justify-between text-[8px] font-black uppercase text-primary">
-                                    <span className="truncate max-w-[100px]">{file.name}</span>
-                                    <span>{Math.round(uploadProgress[file.name])}%</span>
+                                      <Check className={cn("h-4 w-4", field.value === "OK" ? "text-green-600" : "opacity-40")} />
+                                      <span className="text-[10px] font-black uppercase">OK</span>
+                                    </Label>
                                   </div>
-                                  <Progress value={uploadProgress[file.name]} className="h-0.5 rounded-none" />
+
+                                  <div className="flex items-center space-x-1.5">
+                                    <RadioGroupItem value="NOT OK" id={`${key}-notok`} className="sr-only" />
+                                    <Label
+                                      htmlFor={`${key}-notok`}
+                                      className={cn(
+                                        "flex items-center gap-1 px-3 py-1.5 rounded-sm border-2 cursor-pointer transition-all",
+                                        field.value === "NOT OK" 
+                                          ? "bg-red-50 border-red-500 text-red-700 shadow-sm" 
+                                          : "bg-background border-transparent text-muted-foreground hover:bg-muted/50"
+                                      )}
+                                    >
+                                      <X className={cn("h-4 w-4", field.value === "NOT OK" ? "text-red-600" : "opacity-40")} />
+                                      <span className="text-[10px] font-black uppercase">NOT OK</span>
+                                    </Label>
+                                  </div>
+
+                                  <div className="flex items-center space-x-1.5">
+                                    <RadioGroupItem value="Pending" id={`${key}-pending`} className="sr-only" />
+                                    <Label
+                                      htmlFor={`${key}-pending`}
+                                      className={cn(
+                                        "flex items-center gap-1 px-3 py-1.5 rounded-sm border-2 cursor-pointer transition-all",
+                                        field.value === "Pending" 
+                                          ? "bg-amber-50 border-amber-500 text-amber-700 shadow-sm" 
+                                          : "bg-background border-transparent text-muted-foreground hover:bg-muted/50"
+                                      )}
+                                    >
+                                      <AlertCircle className={cn("h-4 w-4", field.value === "Pending" ? "text-amber-600" : "opacity-40")} />
+                                      <span className="text-[10px] font-black uppercase">Pending</span>
+                                    </Label>
+                                  </div>
+                                </RadioGroup>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField control={form.control} name={`checks.${key}.localFiles` as any} render={({ field: { value, onChange } }) => (
+                          <FormItem className="space-y-0">
+                            <FormControl>
+                              <div className="flex flex-col gap-3">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {(value || []).map((file: File, fIdx: number) => {
+                                    const isHeic = file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+                                    return (
+                                      <Badge key={fIdx} variant="secondary" className="h-8 gap-1.5 pl-2 pr-1 rounded-sm bg-primary/5 text-primary border-primary/20">
+                                        {file.type.startsWith('video/') ? <Film className="h-3 w-3" /> : isHeic ? <FileImage className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                                        <span className="text-[9px] font-black truncate max-w-[80px]">{file.name}</span>
+                                        <Button 
+                                          type="button"
+                                          variant="ghost" size="icon" 
+                                          className="h-5 w-5 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive" 
+                                          onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </Button>
+                                      </Badge>
+                                    );
+                                  })}
+                                  
+                                  <label className="cursor-pointer">
+                                    <div className="flex items-center justify-center gap-2 px-3 h-8 rounded-sm border border-dashed border-primary/30 bg-background text-primary hover:bg-primary/5 transition-colors text-[9px] font-black uppercase tracking-widest">
+                                      <Camera className="h-3 w-3" /> Add Media
+                                    </div>
+                                    <input 
+                                      type="file" 
+                                      multiple 
+                                      accept="image/*,video/*,.heic,.heif" 
+                                      className="hidden" 
+                                      onChange={(e) => {
+                                        const newFiles = Array.from(e.target.files || []);
+                                        onChange([...(value || []), ...newFiles]);
+                                      }} 
+                                    />
+                                  </label>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        </FormControl>
-                      </FormItem>
+                              </div>
+                            </FormControl>
+                          </FormItem>
+                        )} />
+                      </div>
+                    </div>
+
+                    <FormField control={form.control} name={`checks.${key}.remarks` as any} render={({ field }) => (
+                      <FormControl>
+                        <div className="space-y-1">
+                          <Textarea placeholder="Enter mandatory findings..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm" />
+                          <FormMessage />
+                        </div>
+                      </FormControl>
                     )} />
                   </div>
-                  <FormField control={form.control} name={`checks.${key}.remarks` as any} render={({ field }) => (
-                    <FormControl>
-                      <div className="space-y-1">
-                        <Textarea placeholder="Enter mandatory findings..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm" />
-                        <FormMessage />
-                      </div>
-                    </FormControl>
-                  )} />
                 </div>
               ))}
             </CardContent>
@@ -598,11 +658,6 @@ export default function TableLevelMMSChecklistPage() {
                                    <Trash2 className="h-3.5 w-3.5" />
                                  </Button>
                               </div>
-                              {uploadProgress[file.name] !== undefined && (
-                                <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary/20">
-                                  <Progress value={uploadProgress[file.name]} className="h-full rounded-none" />
-                                </div>
-                              )}
                             </div>
                           );
                         })}
