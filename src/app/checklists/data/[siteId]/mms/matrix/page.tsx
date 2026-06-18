@@ -93,7 +93,7 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
       
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
-      doc.text(`SITE QUALITY MATRIX: ${site?.name || 'MMS'}`, margin, 15);
+      doc.text(`SITE CHECKLIST MATRIX: ${site?.name || 'MMS'}`, margin, 15);
       doc.setFontSize(10);
       doc.text(`Project Company: ${site?.projectCompany || 'Aditya Green Energy'}`, margin, 20);
 
@@ -165,7 +165,7 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
       currY += 5;
       doc.setTextColor(255, 0, 0); doc.text('NOT OK: Issues detected requiring immediate remediation.', margin, currY);
       currY += 5;
-      doc.setTextColor(218, 165, 32); doc.text('Pending: Verification incomplete or awaiting further audit.', margin, currY);
+      doc.setTextColor(218, 165, 32); doc.text('Pending: Verification incomplete or Work is still pending.', margin, currY);
 
       doc.save(`AdityaPro_Matrix_${site?.name.replace(/\s+/g, '_')}.pdf`);
       toast({ title: 'Matrix Exported' });

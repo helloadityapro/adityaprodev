@@ -503,6 +503,22 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         doc.text(clientLines, margin + colWidthLabel + 2, currY + 5.5);
         currY += clientH;
 
+        if (record.status && record.status !== 'Pending') {
+          currY += 5;
+          const reviewRemarks = record.adminRemarks || 'No additional remarks.';
+          const reviewContent = `Status: ${record.status}\nReviewer: ${record.processedByName || 'Admin'}\nDate: ${record.processedAt ? format(record.processedAt.toDate(), 'dd/MM/yyyy HH:mm') : '—'}\nRemarks: ${reviewRemarks}`;
+          const reviewLines = doc.splitTextToSize(reviewContent, colWidthValue - 4);
+          const reviewH = Math.max(rowHeight * 2, reviewLines.length * 4 + 6);
+          if (currY + reviewH > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
+          doc.setFont('helvetica', 'bold');
+          doc.rect(margin, currY, colWidthLabel, reviewH);
+          doc.text('AUTHORITY REVIEW COMMENTS', margin + 2, currY + 5.5);
+          doc.setFont('helvetica', 'normal');
+          doc.rect(margin + colWidthLabel, currY, colWidthValue, reviewH);
+          doc.text(reviewLines, margin + colWidthLabel + 2, currY + 5.5);
+          currY += reviewH;
+        }
+
         currY += 5;
         const extCommentsRaw = record.comments?.map(c => `[${format(new Date(c.createdAt), 'dd/MM HH:mm')}] ${c.userName}: ${c.text}`).join('\n') || '—';
         const extLines = doc.splitTextToSize(extCommentsRaw, colWidthValue - 4);
@@ -965,14 +981,31 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                 </div>
               ) : null}
 
-              {viewingInstallation?.adminRemarks && (
+              {viewingInstallation?.status && viewingInstallation.status !== 'Pending' && (
                 <div className="space-y-4 pt-6 border-t border-dashed">
-                  <Label className="text-[9px] md:text-[10px] font-black uppercase text-red-700 tracking-widest flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4" /> Administrative Feedback
+                  <Label className={cn(
+                    "text-[9px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-2",
+                    viewingInstallation.status === 'Approved' ? "text-green-700" : "text-red-700"
+                  )}>
+                    <ShieldCheck className="h-4 w-4" /> Authority Review Feedback
                   </Label>
-                  <div className="p-4 bg-red-50 border border-red-100 rounded-sm">
-                    <p className="text-sm italic font-medium text-red-900">"{viewingInstallation.adminRemarks}"</p>
-                    <p className="text-[8px] font-black text-red-700 uppercase mt-2">Processed by {viewingInstallation.processedByName} on {formatTimestamp(viewingInstallation.processedAt)}</p>
+                  <div className={cn(
+                    "p-4 border rounded-sm",
+                    viewingInstallation.status === 'Approved' ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
+                  )}>
+                    <div className="flex items-center justify-between mb-2">
+                       <Badge variant="outline" className={cn(
+                         "h-5 text-[8px] font-black uppercase rounded-sm px-1.5",
+                         viewingInstallation.status === 'Approved' ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                       )}>{viewingInstallation.status}</Badge>
+                       <span className="text-[10px] font-bold text-muted-foreground uppercase">{formatTimestamp(viewingInstallation.processedAt)}</span>
+                    </div>
+                    <p className={cn("text-sm italic font-medium", viewingInstallation.status === 'Approved' ? "text-green-900" : "text-red-900")}>
+                      "{viewingInstallation.adminRemarks || 'Processed without additional remarks.'}"
+                    </p>
+                    <p className={cn("text-[8px] font-black uppercase mt-3", viewingInstallation.status === 'Approved' ? "text-green-700" : "text-red-700")}>
+                      Decision by: {viewingInstallation.processedByName || 'Authorized Administrator'}
+                    </p>
                   </div>
                 </div>
               )}
