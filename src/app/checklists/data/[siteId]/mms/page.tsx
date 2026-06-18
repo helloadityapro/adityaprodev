@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -75,8 +74,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
+import Link from 'next/link';
 
 type Site = { 
   id: string; 
@@ -1212,7 +1212,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                   <div className="bg-white/5 p-12 rounded-sm flex flex-col items-center gap-6 text-center pointer-events-auto">
                     <FileImage className="h-16 w-16 text-primary opacity-20" />
                     <div className="space-y-2">
-                      <p className="text-white font-black text-sm uppercase tracking-widest">HEIC Media Unsupported</p>
+                      <p className="text-white font-black text-sm uppercase tracking-widest" style={{ letterSpacing: "0.4em" }}>HEIC Media Unsupported</p>
                       <p className="text-white/40 text-xs max-w-[200px]">This file format cannot be previewed directly in your browser.</p>
                     </div>
                     <Button asChild className="rounded-sm font-bold uppercase text-[10px] tracking-widest">
@@ -1238,3 +1238,4 @@ function formatTimestamp(ts: any) {
   const date = ts.toDate ? ts.toDate() : new Date(ts);
   return format(date, 'dd/MM/yyyy HH:mm');
 }
+
