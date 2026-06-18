@@ -869,7 +869,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             </div>
           </DialogHeader>
           <div className="flex-1 overflow-hidden relative">
-            <ScrollArea className="h-full">
+            <div className="h-full overflow-auto custom-scrollbar">
               <div className="min-w-full">
                 <Table className="border-collapse table-fixed w-full">
                   <TableHeader className="sticky top-0 z-[60] shadow-md bg-primary">
@@ -910,8 +910,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                   </TableBody>
                 </Table>
               </div>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
+            </div>
           </div>
           <div className="p-4 border-t bg-muted/5 flex items-center justify-center gap-8 shrink-0">
              <div className="flex items-center gap-2"><Check className="h-4 w-4 text-green-600" /><span className="text-[10px] font-black uppercase text-foreground/70 tracking-widest">Verified (OK)</span></div>
