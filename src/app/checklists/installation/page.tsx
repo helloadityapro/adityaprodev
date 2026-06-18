@@ -32,7 +32,8 @@ import {
   CheckCircle2,
   ArrowRight,
   FileImage,
-  AlertCircle
+  AlertCircle,
+  Zap
 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -48,7 +49,7 @@ import { motion } from "framer-motion";
 
 const checkItemSchema = z.object({
   status: z.enum(["OK", "NOT OK", "Pending"], { required_error: "Selection required" }),
-  remarks: z.string().optional().default(""), // Remarks no longer mandatory
+  remarks: z.string().optional().default(""),
   localFiles: z.array(z.any()).default([]),
 });
 
@@ -56,7 +57,7 @@ const installationSchema = z.object({
   siteId: z.string().min(1, "Site is required"),
   siteName: z.string(),
   projectCompany: z.string().optional(),
-  tableNumber: z.string().min(1, "Table Number is required").regex(/^\d+$/, "Strictly digits only"), // Strictly digits
+  tableNumber: z.string().min(1, "Table Number is required").regex(/^\d+$/, "Strictly digits only"),
   tableSize: z.string()
     .min(1, "Size of Table is required")
     .refine(val => !val.includes(" "), "Spaces are not allowed in Size of Table"),
@@ -101,7 +102,7 @@ type Site = { id: string; name: string; projectCompany?: string };
 const CHECK_LABELS = {
   moduleNutBolt: "Module Nut-bolt Tightness",
   mmsNutBolt: "MMS Nut-Bolt Tightness",
-  crackedModules: "Cracked Modules",
+  crackedModules: "Module Condition/Cracks",
   cableDressing: "Cable Dressing",
   cappingCondition: "Capping Condition",
   earthingCondition: "Earthing Condition",
@@ -160,11 +161,10 @@ export default function TableLevelMMSChecklistPage() {
     let blob: Blob = file;
     const isCompressible = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp';
     
-    // Robust compression for high size images on weak networks
     if (isCompressible) {
       try {
         blob = await imageCompression(file, { 
-          maxSizeMB: 0.8, // Reduced slightly for better transfer reliability
+          maxSizeMB: 0.8,
           maxWidthOrHeight: 1920,
           alwaysKeepResolution: true,
           initialQuality: 0.8,
@@ -234,7 +234,6 @@ export default function TableLevelMMSChecklistPage() {
 
       const timestamp = Date.now();
 
-      // Sequential uploads for maximum robustness on weak networks
       const finalChecks = [];
       for (const [key, check] of Object.entries(values.checks)) {
         const attachments = [];
@@ -441,7 +440,7 @@ export default function TableLevelMMSChecklistPage() {
                         placeholder="101" 
                         {...field} 
                         className="h-11 rounded-sm pl-10" 
-                        onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))} // Strictly digits
+                        onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
                       />
                     </div>
                   </FormControl>

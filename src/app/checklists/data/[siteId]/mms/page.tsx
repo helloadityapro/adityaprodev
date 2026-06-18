@@ -49,7 +49,10 @@ import {
   ChevronRight,
   ListFilter,
   FileImage,
-  Download
+  Download,
+  LayoutGrid,
+  Check,
+  AlertTriangle
 } from 'lucide-react';
 import { format, subDays, subMonths } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -102,7 +105,7 @@ type InstallationChecklist = {
   userId: string;
   userName: string;
   createdAt: any;
-  checks: { label: string; remarks: string; attachments?: Attachment[] }[];
+  checks: { key?: string; label: string; remarks: string; status: 'OK' | 'NOT OK' | 'Pending'; attachments?: Attachment[] }[];
   otherRemarks: string;
   otherAttachments?: Attachment[];
   customerRepPresent: boolean;
@@ -112,6 +115,15 @@ type InstallationChecklist = {
 };
 
 type AuditSortKey = 'date' | 'table' | 'user' | 'comments';
+
+const CHECK_LABELS = {
+  moduleNutBolt: "Module Nut-bolt Tightness",
+  mmsNutBolt: "MMS Nut-Bolt Tightness",
+  crackedModules: "Module Condition/Cracks",
+  cableDressing: "Cable Dressing",
+  cappingCondition: "Capping Condition",
+  earthingCondition: "Earthing Condition",
+};
 
 export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteId: string }> }) {
   const resolvedParams = React.use(params);
@@ -132,6 +144,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const [viewingInstallation, setViewingInstallation] = React.useState<InstallationChecklist | null>(null);
   const [commentingRecord, setCommentingRecord] = React.useState<InstallationChecklist | null>(null);
   const [deletingRecord, setDeletingRecord] = React.useState<InstallationChecklist | null>(null);
+  const [isMatrixOpen, setIsMatrixOpen] = React.useState(false);
   const [newComment, setNewComment] = React.useState("");
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isExporting, setIsExporting] = React.useState(false);
@@ -582,12 +595,17 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         </div>
       </div>
 
-      <div className="flex flex-row items-center justify-between gap-4">
-        <div className="flex flex-row items-center gap-2">
+      <div className="flex flex-row flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-row flex-wrap items-center gap-2">
           <Button onClick={() => exportToPDF(filteredInst)} disabled={isExporting || filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5">
             {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} 
             <span className="hidden sm:inline">Export All (PDF)</span>
             <span className="sm:hidden">Export All</span>
+          </Button>
+
+          <Button onClick={() => setIsMatrixOpen(true)} disabled={filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5">
+            <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> 
+            Site Health Matrix
           </Button>
 
           {site.drawingUrl ? (
@@ -736,6 +754,66 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         </Card>
       </div>
 
+      <Dialog open={isMatrixOpen} onOpenChange={setIsMatrixOpen}>
+        <DialogContent className="max-w-5xl w-[98vw] h-[90vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><LayoutGrid className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Site Quality Matrix</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{site.name} • Cross-Table Status Feed</DialogDescription>
+              </div>
+            </div>
+            <DialogClose asChild><Button variant="ghost" size="icon" className="rounded-full"><X className="h-4 w-4" /></Button></DialogClose>
+          </DialogHeader>
+          <ScrollArea className="flex-1">
+            <div className="p-0">
+              <Table className="border-collapse">
+                <TableHeader className="bg-muted/50 sticky top-0 z-20 shadow-sm">
+                  <TableRow>
+                    <TableHead className="px-6 font-black uppercase text-[9px] tracking-widest border-r bg-muted/50 sticky left-0 z-30">Table Ref</TableHead>
+                    {Object.entries(CHECK_LABELS).map(([key, label]) => (
+                      <TableHead key={key} className="text-center font-black uppercase text-[8px] tracking-tighter leading-tight min-w-[80px] px-2">{label}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredInst.length > 0 ? filteredInst.map((record) => (
+                    <TableRow key={record.id} className="hover:bg-primary/[0.02] transition-colors border-b last:border-0">
+                      <TableCell className="px-6 py-3 font-black text-xs border-r bg-background sticky left-0 z-10">{record.tableNumber}</TableCell>
+                      {Object.keys(CHECK_LABELS).map((key) => {
+                        const check = record.checks.find(c => c.key === key || c.label === (CHECK_LABELS as any)[key]);
+                        const status = check?.status;
+                        return (
+                          <TableCell key={key} className="text-center py-3 border-r last:border-0">
+                            {status === 'OK' ? (
+                              <Check className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : status === 'NOT OK' ? (
+                              <X className="h-4 w-4 text-red-600 mx-auto" />
+                            ) : status === 'Pending' ? (
+                              <AlertTriangle className="h-4 w-4 text-amber-500 mx-auto" />
+                            ) : (
+                              <span className="text-muted-foreground/30 font-black">—</span>
+                            )}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  )) : (
+                    <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground italic">No metrics available.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </ScrollArea>
+          <div className="p-4 border-t bg-muted/5 flex items-center justify-center gap-6 shrink-0">
+             <div className="flex items-center gap-1.5"><Check className="h-3 w-3 text-green-600" /><span className="text-[9px] font-black uppercase">Verified (OK)</span></div>
+             <div className="flex items-center gap-1.5"><X className="h-3 w-3 text-red-600" /><span className="text-[9px] font-black uppercase">Issue Detected (NOT OK)</span></div>
+             <div className="flex items-center gap-1.5"><AlertTriangle className="h-3 w-3 text-amber-500" /><span className="text-[9px] font-black uppercase">Awaiting (Pending)</span></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!viewingInstallation} onOpenChange={(o) => !o && setViewingInstallation(null)}>
         <DialogContent className="max-w-4xl w-[98vw] h-[90vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
           <DialogHeader className="p-4 md:p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
@@ -772,8 +850,17 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                   {viewingInstallation?.checks.map((check, idx) => (
                     <div key={idx} className="flex flex-col gap-4 p-3 md:p-5 border rounded-sm bg-muted/5 group transition-colors hover:border-primary/20">
                       <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between">
                           <span className="text-[10px] md:text-[11px] font-black uppercase text-foreground">{check.label}</span>
+                          <div className="flex items-center gap-1">
+                            {check.status === 'OK' ? (
+                              <Badge className="bg-green-50 text-green-700 border-green-200 uppercase font-black text-[7px] h-4">OK</Badge>
+                            ) : check.status === 'NOT OK' ? (
+                              <Badge className="bg-red-50 text-red-700 border-red-200 uppercase font-black text-[7px] h-4">NOT OK</Badge>
+                            ) : (
+                              <Badge className="bg-amber-50 text-amber-700 border-amber-200 uppercase font-black text-[7px] h-4">Pending</Badge>
+                            )}
+                          </div>
                         </div>
                         <p className="text-xs italic text-muted-foreground leading-relaxed">"{check.remarks || 'No specific observations recorded.'}"</p>
                       </div>
