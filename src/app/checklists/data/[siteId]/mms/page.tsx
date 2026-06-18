@@ -773,12 +773,17 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                       <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium"><Calendar className="h-3 w-3" />{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</div>
                     </div>
                   </div>
-                  <Badge variant="outline" className={cn(
-                    "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                    record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                    record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                    "bg-yellow-50 text-yellow-700 border-yellow-200"
-                  )}>{record.status || 'Pending'}</Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant="outline" className={cn(
+                      "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                      record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                      record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                      "bg-yellow-50 text-yellow-700 border-yellow-200"
+                    )}>{record.status || 'Pending'}</Badge>
+                    {record.processedByName && (record.status === 'Approved' || record.status === 'Rejected') && (
+                      <span className="text-[7px] font-bold text-muted-foreground uppercase">By: {record.processedByName}</span>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
@@ -839,12 +844,17 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                       <TableCell><Badge variant="secondary" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10">{record.tableNumber}</Badge></TableCell>
                       <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3 w-3 text-primary opacity-50" />{record.userName}</div></TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={cn(
-                          "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
-                          record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                          record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                          "bg-yellow-50 text-yellow-700 border-yellow-200"
-                        )}>{record.status || 'Pending'}</Badge>
+                        <div className="flex flex-col gap-1">
+                          <Badge variant="outline" className={cn(
+                            "rounded-sm text-[9px] font-black uppercase px-1.5 h-5 w-fit",
+                            record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                            record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                            "bg-yellow-50 text-yellow-700 border-yellow-200"
+                          )}>{record.status || 'Pending'}</Badge>
+                          {record.processedByName && (record.status === 'Approved' || record.status === 'Rejected') && (
+                            <span className="text-[8px] font-bold text-muted-foreground uppercase leading-tight">By: {record.processedByName}</span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-center"><button onClick={(e) => { e.stopPropagation(); setCommentingRecord(record); }} className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary inline-flex items-center px-3 rounded-sm transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {record.comments?.length || 0}</button></TableCell>
                       <TableCell className="text-right px-6">
@@ -1080,7 +1090,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       </Dialog>
 
       <Dialog open={!!commentingRecord} onOpenChange={(o) => !o && setCommentingRecord(null)}>
-        <DialogContent className="max-w-md w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[70vh]">
+        <DialogContent className="max-md w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[70vh]">
           <DialogHeader className="p-4 md:p-6 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-3"><div className="bg-primary/10 p-2 rounded-sm"><MessageCircle className="h-5 w-5 text-primary" /></div><div className="min-w-0"><DialogTitle className="text-base md:text-xl font-black uppercase tracking-tight truncate">Audit Discussion</DialogTitle></div></div>
           </DialogHeader>
