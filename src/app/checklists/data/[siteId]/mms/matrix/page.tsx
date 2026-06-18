@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useToast } from '@/hooks/use-toast';
+import { Progress } from "@/components/ui/progress";
 
 type Site = { 
   id: string; 
