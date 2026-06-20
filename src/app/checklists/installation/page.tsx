@@ -290,7 +290,7 @@ export default function TableLevelMMSChecklistPage() {
           userId: adminDoc.id,
           title: "New MMS Audit Logged",
           description: `${userProfile.username} submitted an audit for Table ${finalTableNumber} at ${values.siteName}.`,
-          link: `/checklists/data`,
+          link: `/checklists/data/${values.siteId}/mms`,
           push: true
         });
       });
