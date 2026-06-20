@@ -998,6 +998,10 @@ export default function ManageAllTripsPage() {
 
       <Dialog open={!!viewUrl} onOpenChange={(o) => { if(!o) { setZoom(1); setViewUrl(null); setViewUrls([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Audit Media Viewer</DialogTitle>
+            <DialogDescription>Verification media for vehicle trip audit.</DialogDescription>
+          </DialogHeader>
           <div className="absolute top-4 left-4 flex gap-2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }}><ZoomIn className="h-4 w-4" /></Button><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }}><ZoomOut className="h-4 w-4" /></Button><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }}><RotateCcw className="h-5 w-5" /></Button></div>
           <div className="relative w-full h-full overflow-auto p-4 flex"><div ref={viewerRef} className={cn("m-auto transition-transform duration-200", zoom > 1 ? "cursor-move" : "cursor-default")} style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}>{viewUrl && <img src={viewUrl} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Evidence" />}</div></div>
         </DialogContent>
