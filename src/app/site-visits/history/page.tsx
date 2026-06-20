@@ -108,6 +108,19 @@ export default function SiteVisitsHistoryPage() {
   const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'startTime', direction: 'desc' });
 
+  // Persistence logic for active tab
+  React.useEffect(() => {
+    const savedTab = localStorage.getItem('siteVisitsActiveTab');
+    if (savedTab && (savedTab === 'site' || savedTab === 'other')) {
+      setLocationTab(savedTab);
+    }
+  }, []);
+
+  const handleTabChange = (val: string) => {
+    setLocationTab(val);
+    localStorage.setItem('siteVisitsActiveTab', val);
+  };
+
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
@@ -120,15 +133,15 @@ export default function SiteVisitsHistoryPage() {
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
   const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
 
-  const isSuper = isSuperAdmin(user?.email);
-  const isAdmin = isSuper || userProfile?.role === 'Admin';
-  const isManager = userProfile?.role === 'Site Manager';
-
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
     return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
   }, [firestore, user, isManager]);
   const { data: teamMembers } = useCollection<any>(teamQuery);
+
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
@@ -399,7 +412,7 @@ export default function SiteVisitsHistoryPage() {
       </div>
 
       <div className="space-y-4">
-        <Tabs value={locationTab} onValueChange={setLocationTab} className="w-full">
+        <Tabs value={locationTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="bg-muted/50 border border-primary/10 p-1 h-11 max-w-sm mb-6">
             <TabsTrigger value="site" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
               <Building2 className="h-3.5 w-3.5 mr-2" /> Site Visits
@@ -421,4 +434,3 @@ export default function SiteVisitsHistoryPage() {
     </div>
   );
 }
-
