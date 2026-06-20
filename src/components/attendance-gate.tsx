@@ -2,18 +2,19 @@
 
 import * as React from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { collection, query, where, doc, limit, Timestamp, arrayUnion, getDoc, updateDoc } from 'firebase/firestore';
-import { format, isAfter, setHours, setMinutes, parseISO, endOfDay, isBefore, startOfDay } from 'date-fns';
+import { collection, query, where, doc, limit, Timestamp, getDoc, updateDoc } from 'firebase/firestore';
+import { format, parseISO, endOfDay } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useRouter, usePathname } from 'next/navigation';
 import { Clock, LogIn } from 'lucide-react';
 
 /**
- * Global component to manage attendance compliance and background tracking.
+ * Global component to manage attendance compliance.
+ * Handles reminders for check-in/check-out and automatic session cleanup.
  */
 export function AttendanceGate() {
-  const { user } = useUser();
+  const { user } = userUser();
   const firestore = useFirestore();
   const router = useRouter();
   const pathname = usePathname();
@@ -107,7 +108,6 @@ export function AttendanceGate() {
 
   const todayFinishedQuery = useMemoFirebase(() => {
     if (!user) return null;
-    // Note: This still uses currentDate state for the broad filter, which is fine for reminders
     return query(
       collection(firestore, 'attendance'),
       where('userId', '==', user.uid),
@@ -119,57 +119,6 @@ export function AttendanceGate() {
 
   const { data: todayFinished, isLoading: isFinishedLoading } = useCollection(todayFinishedQuery);
 
-  /**
-   * BACKGROUND TRACKING LOGIC
-   * Captures location every 10 minutes during an active session.
-   */
-  React.useEffect(() => {
-    if (!user || !activeSessions || activeSessions.length === 0) return;
-    const session = activeSessions[0];
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    if (session.date !== todayStr) return;
-
-    const trackLocation = () => {
-      if (!navigator.geolocation) return;
-
-      navigator.geolocation.getCurrentPosition(async (position) => {
-        const { latitude: lat, longitude: lng } = position.coords;
-        const sessionRef = doc(firestore, 'attendance', session.id);
-
-        // Fetch fresh data to check if we've moved significantly
-        const snap = await getDoc(sessionRef);
-        if (!snap.exists()) return;
-        
-        const data = snap.data();
-        const lastPoints = data?.trackingPoints || [];
-        const lastPoint = lastPoints[lastPoints.length - 1];
-
-        const hasMoved = !lastPoint || 
-          Math.abs(lastPoint.lat - lat) > 0.0001 || 
-          Math.abs(lastPoint.lng - lng) > 0.0001;
-
-        if (hasMoved) {
-          updateDocumentNonBlocking(sessionRef, {
-            trackingPoints: arrayUnion({
-              lat,
-              lng,
-              timestamp: new Date().toISOString()
-            }),
-            lastUpdated: serverTimestamp()
-          });
-        }
-      }, (err) => console.warn("Background tracking error:", err), {
-        enableHighAccuracy: true,
-        timeout: 15000
-      });
-    };
-
-    // Initial track and then every 10 mins
-    trackLocation();
-    const interval = setInterval(trackLocation, 10 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [user, activeSessions, firestore]);
-
   React.useEffect(() => {
     if (isActiveLoading || isFinishedLoading || !user || isWaitingForCelebration) return;
     if (pathname.startsWith('/attendance')) return;
@@ -179,8 +128,6 @@ export function AttendanceGate() {
     const activeSession = activeSessions?.[0];
     const hasCompletedToday = todayFinished && todayFinished.length > 0;
 
-    // CRITICAL FIX: Only auto-close if the session date is strictly BEFORE today.
-    // Using !== previously caused immediate checkouts on rollovers because of state lag.
     if (activeSession && activeSession.date < todayStr) {
       const ref = doc(firestore, 'attendance', activeSession.id);
       const sessionDate = parseISO(activeSession.date);
@@ -299,6 +246,11 @@ export function AttendanceGate() {
       </Dialog>
     </>
   );
+}
+
+function userUser() {
+    const { user, isUserLoading, userError } = useUser();
+    return { user, isUserLoading, userError };
 }
 
 function serverTimestamp() {
