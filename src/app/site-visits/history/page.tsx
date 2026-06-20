@@ -124,6 +124,11 @@ export default function SiteVisitsHistoryPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
+  // Authority Flags
+  const isSuper = isSuperAdmin(user?.email);
+  const isAdmin = isSuper || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
+
   const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
@@ -138,10 +143,6 @@ export default function SiteVisitsHistoryPage() {
     return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
   }, [firestore, user, isManager]);
   const { data: teamMembers } = useCollection<any>(teamQuery);
-
-  const isSuper = isSuperAdmin(user?.email);
-  const isAdmin = isSuper || userProfile?.role === 'Admin';
-  const isManager = userProfile?.role === 'Site Manager';
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
