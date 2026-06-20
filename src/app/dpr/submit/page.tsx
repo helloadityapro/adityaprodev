@@ -14,15 +14,17 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Check, ChevronsUpDown, Loader2, FilePlus, Calendar, Plus, Trash2, MessageCircle, CheckCircle2 } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, FilePlus, Calendar, Plus, Trash2, MessageCircle, CheckCircle2, Building2, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const dprSchema = z.object({
-  siteName: z.string().min(1, "Site is required"),
+  dprType: z.enum(['site', 'other'], { required_error: "Please select a category." }),
+  siteName: z.string().min(1, "Location/Site name is required"),
   reportDate: z.string().min(1, "Date is required"),
   updates: z.array(z.object({
     value: z.string().min(1, "Paragraph cannot be empty")
@@ -116,6 +118,7 @@ export default function SubmitDPRPage() {
   const form = useForm<z.infer<typeof dprSchema>>({
     resolver: zodResolver(dprSchema),
     defaultValues: { 
+      dprType: 'site',
       siteName: "", 
       reportDate: format(new Date(), 'yyyy-MM-dd'), 
       updates: [{ value: "" }] 
@@ -127,18 +130,27 @@ export default function SubmitDPRPage() {
     name: "updates"
   });
 
+  const watchDprType = form.watch('dprType');
+
   const onSubmit = async (values: z.infer<typeof dprSchema>) => {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
     try {
       const combinedDescription = values.updates.map(u => u.value.trim()).join('\n\n');
-      const siteId = accessibleSites.find(s => s.name === values.siteName)?.id;
+      const siteId = values.dprType === 'site' ? accessibleSites.find(s => s.name === values.siteName)?.id : 'other';
 
-      const overridesQuery = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', siteId || '')));
-      const overridesSnap = await getDocs(overridesQuery);
-      const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
+      let effectiveSiteManagerId = userProfile.siteManagerId || null;
+      
+      if (values.dprType === 'site' && siteId !== 'other') {
+        const overridesQuery = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', siteId || '')));
+        const overridesSnap = await getDocs(overridesQuery);
+        if (!overridesSnap.empty) {
+          effectiveSiteManagerId = overridesSnap.docs[0].data().managerId;
+        }
+      }
       
       await addDocumentNonBlocking(collection(firestore, 'dprs'), {
+        dprType: values.dprType,
         siteId: siteId || null,
         siteName: values.siteName,
         reportDate: values.reportDate,
@@ -191,7 +203,7 @@ export default function SubmitDPRPage() {
       });
       setIsSubmitted(true);
       toast({ title: "Success", description: "DPR submitted. Points awarded successfully." });
-      form.reset({ siteName: "", reportDate: format(new Date(), 'yyyy-MM-dd'), updates: [{ value: "" }] });
+      form.reset({ dprType: 'site', siteName: "", reportDate: format(new Date(), 'yyyy-MM-dd'), updates: [{ value: "" }] });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
@@ -265,70 +277,115 @@ export default function SubmitDPRPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField control={form.control} name="siteName" render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Site Name</FormLabel>
-                  <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button 
-                          variant="outline" 
-                          role="combobox" 
-                          className={cn("w-full justify-between font-normal rounded-sm", !field.value && "text-muted-foreground")}
-                        >
-                          {field.value || "Select a site..."}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                      <div className="flex items-center border-b px-3">
-                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                        <Input 
-                          placeholder="Search sites..." 
-                          className="h-9 w-full border-none focus-visible:ring-0 px-0" 
-                          value={siteSearchQuery} 
-                          onChange={(e) => setSiteSearchQuery(e.target.value)} 
-                          onKeyDown={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      <ScrollArea className="h-[200px]">
-                        {filteredSites.length > 0 ? filteredSites.map((site) => (
-                          <Button 
-                              key={site.id} 
-                              type="button" 
-                              variant="ghost" 
-                              className="w-full justify-start font-normal text-left" 
-                              onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}
-                          >
-                            <Check className={cn("mr-2 h-4 w-4 shrink-0", site.name === field.value ? "opacity-100" : "opacity-0")} />
-                            <span className="truncate">{site.name}</span>
-                          </Button>
-                        )) : (
-                          <div className="p-4 text-center text-sm text-muted-foreground">No sites found.</div>
-                        )}
-                      </ScrollArea>
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              
+              <FormField
+                control={form.control}
+                name="dprType"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">DPR Category</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(val) => {
+                          field.onChange(val);
+                          form.setValue('siteName', '');
+                        }}
+                        defaultValue={field.value}
+                        className="flex gap-6 h-11 items-center"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="site" id="dpr-site" />
+                          <Label htmlFor="dpr-site" className="font-bold cursor-pointer flex items-center gap-1.5 text-xs uppercase">
+                            <Building2 className="h-3.5 w-3.5 text-primary" /> Site-related
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="other" id="dpr-other" />
+                          <Label htmlFor="dpr-other" className="font-bold cursor-pointer flex items-center gap-1.5 text-xs uppercase">
+                            <Globe className="h-3.5 w-3.5 text-slate-500" /> Other
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-              <FormField control={form.control} name="reportDate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Select Date</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input type="date" {...field} className="rounded-sm pr-10" />
-                      <Calendar className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField control={form.control} name="siteName" render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {watchDprType === 'site' ? 'Select Project Site' : 'Work Location / Title'}
+                    </FormLabel>
+                    {watchDprType === 'site' ? (
+                      <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button 
+                              variant="outline" 
+                              role="combobox" 
+                              className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}
+                            >
+                              {field.value || "Select a site..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <div className="flex items-center border-b px-3">
+                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                            <Input 
+                              placeholder="Search sites..." 
+                              className="h-9 w-full border-none focus-visible:ring-0 px-0" 
+                              value={siteSearchQuery} 
+                              onChange={(e) => setSiteSearchQuery(e.target.value)} 
+                              onKeyDown={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          <ScrollArea className="h-[200px]">
+                            {filteredSites.length > 0 ? filteredSites.map((site) => (
+                              <Button 
+                                  key={site.id} 
+                                  type="button" 
+                                  variant="ghost" 
+                                  className="w-full justify-start font-normal text-left" 
+                                  onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4 shrink-0", site.name === field.value ? "opacity-100" : "opacity-0")} />
+                                <span className="truncate">{site.name}</span>
+                              </Button>
+                            )) : (
+                              <div className="p-4 text-center text-sm text-muted-foreground">No sites found.</div>
+                            )}
+                          </ScrollArea>
+                        </PopoverContent>
+                      </Popover>
+                    ) : (
+                      <FormControl>
+                        <Input placeholder="e.g. Office work, Vendor meeting..." {...field} className="h-11 rounded-sm" />
+                      </FormControl>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="reportDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Date</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input type="date" {...field} className="rounded-sm pr-10 h-11" />
+                        <Calendar className="absolute right-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
 
               <div className="space-y-4">
-                <FormLabel>Daily Updates (Paragraph Wise)</FormLabel>
+                <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Daily Updates (Paragraph Wise)</FormLabel>
                 {fields.map((field, index) => (
                   <FormField
                     key={field.id}
@@ -373,7 +430,7 @@ export default function SubmitDPRPage() {
               </div>
 
               <div className="flex justify-end gap-4 pt-4 border-t">
-                <Button type="submit" className="min-w-[150px] h-11 rounded-sm text-lg font-semibold" disabled={isSubmitting}>
+                <Button type="submit" className="min-w-[150px] h-12 rounded-sm text-lg font-semibold" disabled={isSubmitting}>
                   {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : "Submit DPR"}
                 </Button>
               </div>

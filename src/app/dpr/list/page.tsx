@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -8,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, subDays, subMonths, subYears } from "date-fns";
-import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, MessageCircle, User } from "lucide-react";
+import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, MessageCircle, User, Building2, Globe } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -35,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type DPR = {
   id: string;
@@ -48,6 +48,7 @@ type DPR = {
   createdAt: any;
   editedBy?: string;
   editedAt?: any;
+  dprType?: 'site' | 'other';
 };
 
 type AccessConfig = {
@@ -61,11 +62,25 @@ export default function DPRListPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState("");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [activeTab, setActiveTab] = React.useState<string>("site");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [editingDpr, setEditingDpr] = React.useState<DPR | null>(null);
   const [deletingDpr, setDeletingDpr] = React.useState<DPR | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
+
+  // Persistence logic for active tab
+  React.useEffect(() => {
+    const savedTab = localStorage.getItem('dprActiveTab');
+    if (savedTab && (savedTab === 'site' || savedTab === 'other')) {
+      setActiveTab(savedTab);
+    }
+  }, []);
+
+  const handleTabChange = (val: string) => {
+    setActiveTab(val);
+    localStorage.setItem('dprActiveTab', val);
+  };
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
@@ -132,10 +147,17 @@ export default function DPRListPage() {
 
     if (isOwnDataOnly && !isSuper) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
-      result = result.filter(dpr => assignedIds.has(dpr.siteId));
+      result = result.filter(dpr => {
+        if (dpr.dprType === 'other') return true;
+        return assignedIds.has(dpr.siteId);
+      });
     }
 
     result = result.filter(dpr => {
+      // Logic: Default to 'site' if dprType is missing (historical data)
+      const matchesTab = (dpr.dprType || 'site') === activeTab;
+      if (!matchesTab) return false;
+
       const matchesSearch = dpr.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (dpr.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         dpr.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -150,7 +172,7 @@ export default function DPRListPage() {
         const dateB = new Date(b.reportDate || (b.createdAt?.toDate?.() || 0)).getTime();
         return dateB - dateA;
     });
-  }, [dprs, searchTerm, queryDateRange, userProfile, roleConfigs, isSuper]);
+  }, [dprs, searchTerm, queryDateRange, userProfile, roleConfigs, isSuper, activeTab]);
 
   const handleDelete = async () => {
     if (!deletingDpr || !firestore) return;
@@ -207,14 +229,152 @@ export default function DPRListPage() {
     setDateFilter("7days");
   };
 
+  function renderTable() {
+    return (
+      <>
+        {/* Mobile Card Layout */}
+        <div className="md:hidden divide-y">
+          {sortedAndFilteredDprs.length > 0 ? sortedAndFilteredDprs.map((dpr) => (
+            <div key={dpr.id} className="p-4 space-y-3 bg-card hover:bg-muted/5 transition-colors">
+              <div className="flex justify-between items-start">
+                <div className="flex flex-col gap-1 min-w-0">
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
+                    {dpr.reportDate ? format(new Date(dpr.reportDate), 'dd MMM yyyy') : '—'}
+                  </span>
+                  <h3 className="font-bold text-sm leading-tight text-foreground truncate">{dpr.siteName}</h3>
+                </div>
+                <Badge variant="outline" className="text-[8px] font-black uppercase rounded-sm border-primary/20 text-primary">
+                  DPR
+                </Badge>
+              </div>
+
+              <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
+                <User className="h-3 w-3 text-primary" />
+                <span>{dpr.userName}</span>
+              </div>
+
+              <div className="space-y-2">
+                {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx) => (
+                  <p key={pIdx} className="text-xs italic text-muted-foreground leading-relaxed line-clamp-3">
+                    "{para.trim()}"
+                  </p>
+                ))}
+              </div>
+
+              {dpr.editedBy && (
+                <div className="flex items-center gap-1.5 text-[9px] text-primary/70 font-medium bg-primary/5 p-1.5 rounded-sm">
+                  <Clock className="h-2.5 w-2.5" />
+                  <span>Edited by {dpr.editedBy} on {dpr.editedAt ? format(dpr.editedAt.toDate(), 'dd MMM HH:mm') : '—'}</span>
+                </div>
+              )}
+
+              <div className="pt-2 border-t flex justify-end items-center gap-2">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(dpr)} title="Push to WhatsApp">
+                  <MessageCircle className="h-4 w-4" />
+                </Button>
+                {dpr.userId === user?.uid && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingDpr(dpr)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                {(dpr.userId === user?.uid || dpr.siteManagerId === user?.uid || isAdmin) && (
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingDpr(dpr)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          )) : (
+            <div className="p-12 text-center text-muted-foreground italic text-sm">No records found.</div>
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead className="w-32">Date</TableHead>
+                <TableHead>Location / Site</TableHead>
+                <TableHead>User</TableHead>
+                <TableHead className="min-w-[300px]">Update & Activity</TableHead>
+                <TableHead className="text-right px-6 no-print">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedAndFilteredDprs.length > 0 ? sortedAndFilteredDprs.map((dpr) => (
+                <TableRow key={dpr.id} className="hover:bg-muted/5">
+                  <TableCell className="font-medium whitespace-nowrap">
+                      {dpr.reportDate ? format(new Date(dpr.reportDate), 'dd MMM yyyy') : '—'}
+                  </TableCell>
+                  <TableCell className="font-semibold">{dpr.siteName}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    <div className="font-medium text-foreground">{dpr.userName || '—'}</div>
+                  </TableCell>
+                  <TableCell className="max-w-md py-4">
+                      <div className="space-y-3 mb-3">
+                          {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx, arr) => (
+                              <React.Fragment key={pIdx}>
+                                  <p className="text-sm italic text-muted-foreground leading-relaxed">
+                                      "{para.trim()}"
+                                  </p>
+                                  {pIdx < arr.length - 1 && (
+                                      <div className="h-px bg-primary/10 my-2" />
+                                  )}
+                              </React.Fragment>
+                          ))}
+                      </div>
+                      {dpr.editedBy && (
+                          <div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-medium border-t border-primary/5 pt-2">
+                              <span className="bg-primary/10 px-1 rounded">Edited</span>
+                              <span>by {dpr.editedBy}</span>
+                              {dpr.editedAt && (
+                                  <span className="text-muted-foreground/60 flex items-center gap-1">
+                                      <Clock className="h-2.5 w-2.5" />
+                                      {format(dpr.editedAt.toDate(), 'dd MMM HH:mm')}
+                                  </span>
+                              )}
+                          </div>
+                      )}
+                  </TableCell>
+                  <TableCell className="text-right px-6 no-print">
+                      <div className="flex justify-end items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(dpr)} title="Push to WhatsApp">
+                              <MessageCircle className="h-4 w-4" />
+                          </Button>
+                          {dpr.userId === user?.uid && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setEditingDpr(dpr)}>
+                                  <Pencil className="h-4 w-4" />
+                              </Button>
+                          )}
+                          {(dpr.userId === user?.uid || dpr.siteManagerId === user?.uid || isAdmin) && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingDpr(dpr)}>
+                                  <Trash2 className="h-4 w-4" />
+                              </Button>
+                          )}
+                      </div>
+                  </TableCell>
+                </TableRow>
+              )) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">No records found.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2">
-            <FileText className="h-8 w-8 text-primary" /> DPR Data
+            <FileText className="h-8 w-8 text-primary" /> DPR Data Registry
           </h1>
-          <p className="text-muted-foreground">Track and review submitted progress reports.</p>
+          <p className="text-muted-foreground">Historical log of all progress updates across authorized locations.</p>
         </div>
       </div>
 
@@ -244,7 +404,6 @@ export default function DPRListPage() {
               <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
               <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
               <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
-              <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
               <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
               <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
             </SelectContent>
@@ -270,163 +429,47 @@ export default function DPRListPage() {
         </div>
       </div>
 
-      <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden" id="printable-report-area">
-        <CardHeader className="border-b bg-muted/5">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Daily Progress Updates</CardTitle>
-              <CardDescription>
-                Viewing records from {queryDateRange.start} to {queryDateRange.end}
-              </CardDescription>
-            </div>
-            <div className="hidden print:block text-right">
-              <p className="text-xs font-bold uppercase text-muted-foreground">Generated On</p>
-              <p className="text-sm font-mono">{format(new Date(), 'dd MMM yyyy HH:mm')}</p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {dprsLoading ? (
-            <div className="p-6 space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : sortedAndFilteredDprs && sortedAndFilteredDprs.length > 0 ? (
-            <>
-              {/* Mobile Card Layout */}
-              <div className="md:hidden divide-y">
-                {sortedAndFilteredDprs.map((dpr) => (
-                  <div key={dpr.id} className="p-4 space-y-3 bg-card hover:bg-muted/5 transition-colors">
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col gap-1 min-w-0">
-                        <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
-                          {dpr.reportDate ? format(new Date(dpr.reportDate), 'dd MMM yyyy') : '—'}
-                        </span>
-                        <h3 className="font-bold text-sm leading-tight text-foreground truncate">{dpr.siteName}</h3>
-                      </div>
-                      <Badge variant="outline" className="text-[8px] font-black uppercase rounded-sm border-primary/20 text-primary">
-                        DPR
-                      </Badge>
-                    </div>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-11 max-w-sm mb-6">
+          <TabsTrigger value="site" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
+            <Building2 className="h-3.5 w-3.5 mr-2" /> Site DPR
+          </TabsTrigger>
+          <TabsTrigger value="other" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
+            <Globe className="h-3.5 w-3.5 mr-2" /> Other DPR
+          </TabsTrigger>
+        </TabsList>
 
-                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
-                      <User className="h-3 w-3 text-primary" />
-                      <span>{dpr.userName}</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx) => (
-                        <p key={pIdx} className="text-xs italic text-muted-foreground leading-relaxed line-clamp-3">
-                          "{para.trim()}"
-                        </p>
-                      ))}
-                    </div>
-
-                    {dpr.editedBy && (
-                      <div className="flex items-center gap-1.5 text-[9px] text-primary/70 font-medium bg-primary/5 p-1.5 rounded-sm">
-                        <Clock className="h-2.5 w-2.5" />
-                        <span>Edited by {dpr.editedBy} on {dpr.editedAt ? format(dpr.editedAt.toDate(), 'dd MMM HH:mm') : '—'}</span>
-                      </div>
-                    )}
-
-                    <div className="pt-2 border-t flex justify-end items-center gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(dpr)} title="Push to WhatsApp">
-                        <MessageCircle className="h-4 w-4" />
-                      </Button>
-                      {dpr.userId === user?.uid && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingDpr(dpr)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {(dpr.userId === user?.uid || dpr.siteManagerId === user?.uid || isAdmin) && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingDpr(dpr)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+        <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden" id="printable-report-area">
+          <CardHeader className="border-b bg-muted/5">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>{activeTab === 'site' ? 'Project Site Reports' : 'Other Work Reports'}</CardTitle>
+                <CardDescription>
+                  Viewing records from {queryDateRange.start} to {queryDateRange.end}
+                </CardDescription>
               </div>
-
-              {/* Desktop Table View */}
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/30">
-                      <TableHead className="w-32">Date</TableHead>
-                      <TableHead>Site</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead className="min-w-[300px]">Update & Activity</TableHead>
-                      <TableHead className="text-right px-6 no-print">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedAndFilteredDprs.map((dpr) => (
-                      <TableRow key={dpr.id} className="hover:bg-muted/5">
-                        <TableCell className="font-medium whitespace-nowrap">
-                            {dpr.reportDate ? format(new Date(dpr.reportDate), 'dd MMM yyyy') : '—'}
-                        </TableCell>
-                        <TableCell className="font-semibold">{dpr.siteName}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          <div className="font-medium text-foreground">{dpr.userName || '—'}</div>
-                        </TableCell>
-                        <TableCell className="max-w-md py-4">
-                            <div className="space-y-3 mb-3">
-                                {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx, arr) => (
-                                    <React.Fragment key={pIdx}>
-                                        <p className="text-sm italic text-muted-foreground leading-relaxed">
-                                            "{para.trim()}"
-                                        </p>
-                                        {pIdx < arr.length - 1 && (
-                                            <div className="h-px bg-primary/10 my-2" />
-                                        )}
-                                    </React.Fragment>
-                                ))}
-                            </div>
-                            {dpr.editedBy && (
-                                <div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-medium border-t border-primary/5 pt-2">
-                                    <span className="bg-primary/10 px-1 rounded">Edited</span>
-                                    <span>by {dpr.editedBy}</span>
-                                    {dpr.editedAt && (
-                                        <span className="text-muted-foreground/60 flex items-center gap-1">
-                                            <Clock className="h-2.5 w-2.5" />
-                                            {format(dpr.editedAt.toDate(), 'dd MMM HH:mm')}
-                                        </span>
-                                    )}
-                                </div>
-                            )}
-                        </TableCell>
-                        <TableCell className="text-right px-6 no-print">
-                            <div className="flex justify-end items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(dpr)} title="Push to WhatsApp">
-                                    <MessageCircle className="h-4 w-4" />
-                                </Button>
-                                {dpr.userId === user?.uid && (
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setEditingDpr(dpr)}>
-                                        <Pencil className="h-4 w-4" />
-                                    </Button>
-                                )}
-                                {(dpr.userId === user?.uid || dpr.siteManagerId === user?.uid || isAdmin) && (
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingDpr(dpr)}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                )}
-                            </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-24 text-muted-foreground italic bg-muted/5">
-              No reports found for the selected time range.
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="p-0">
+            {dprsLoading ? (
+              <div className="p-6 space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : (
+              <TabsContent value="site" className="m-0 animate-in fade-in-50 duration-300">
+                {renderTable()}
+              </TabsContent>
+            )}
+            {!dprsLoading && (
+              <TabsContent value="other" className="m-0 animate-in fade-in-50 duration-300">
+                {renderTable()}
+              </TabsContent>
+            )}
+          </CardContent>
+        </Card>
+      </Tabs>
 
       {/* Edit Dialog */}
       <Dialog open={!!editingDpr} onOpenChange={(o) => !o && setEditingDpr(null)}>
