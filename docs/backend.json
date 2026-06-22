@@ -49,6 +49,7 @@
         "id": { "type": "string" },
         "name": { "type": "string" },
         "projectCompany": { "type": "string" },
+        "projectType": { "type": "string", "enum": ["groundmount", "rooftop"], "default": "groundmount" },
         "acCapacity": { "type": "number" },
         "dcCapacity": { "type": "number" },
         "latitude": { "type": "number" },
@@ -58,7 +59,7 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "projectCompany"]
+      "required": ["name", "projectCompany", "projectType"]
     },
     "SiteGroup": {
       "title": "Site Group",

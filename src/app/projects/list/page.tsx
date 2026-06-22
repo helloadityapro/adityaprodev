@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -21,7 +22,8 @@ import {
   ChevronDown,
   Zap,
   ShieldCheck,
-  Check
+  Check,
+  LayoutGrid
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -34,6 +36,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { slugifyRole } from '@/lib/access-control';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type Site = {
   id: string;
@@ -41,6 +44,7 @@ type Site = {
   projectCompany: string;
   acCapacity: any;
   dcCapacity: any;
+  projectType?: 'groundmount' | 'rooftop';
 };
 
 type AccessConfig = {
@@ -74,6 +78,8 @@ export default function ProjectsListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+
+  const [activeTab, setActiveTab] = React.useState<string>("groundmount");
   const [searchTerm, setSearchTerm] = React.useState("");
   const [showStarredOnly, setShowStarredOnly] = React.useState(false);
   const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
@@ -104,6 +110,19 @@ export default function ProjectsListPage() {
   const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
   const starredIds = React.useMemo(() => new Set(userProfile?.starredProjectIds || []), [userProfile]);
+
+  // Persist active tab
+  React.useEffect(() => {
+    const saved = localStorage.getItem('projectListActiveTab');
+    if (saved && (saved === 'groundmount' || saved === 'rooftop')) {
+      setActiveTab(saved);
+    }
+  }, []);
+
+  const handleTabChange = (val: string) => {
+    setActiveTab(val);
+    localStorage.setItem('projectListActiveTab', val);
+  };
 
   const toggleStar = (e: React.MouseEvent, siteId: string) => {
     e.stopPropagation();
@@ -152,6 +171,12 @@ export default function ProjectsListPage() {
 
   const filteredSites = React.useMemo(() => {
     let result = accessibleSites.filter(s => {
+      // Move all existing projects under groundmount if projectType is missing
+      const type = s.projectType || 'groundmount';
+      return type === activeTab;
+    });
+
+    result = result.filter(s => {
       const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            s.projectCompany.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStarred = !showStarredOnly || starredIds.has(s.id);
@@ -167,7 +192,7 @@ export default function ProjectsListPage() {
     }
 
     return result.sort((a, b) => a.name.localeCompare(b.name));
-  }, [accessibleSites, searchTerm, showStarredOnly, starredIds, selectedGroupIds, groups]);
+  }, [accessibleSites, searchTerm, showStarredOnly, starredIds, selectedGroupIds, groups, activeTab]);
 
   const summaryStats = React.useMemo(() => {
     return {
@@ -205,139 +230,166 @@ export default function ProjectsListPage() {
         <p className="text-muted-foreground text-sm font-medium">Monitoring site assets, Bill of Materials, and inventory compliance.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in slide-in-from-top-2 duration-300">
-        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
-          <div className="space-y-0.5">
-            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">{countLabel}</p>
-            <p className="text-2xl font-black text-primary leading-none">{summaryStats.count}</p>
-            <p className="text-[8px] font-bold text-primary/60 uppercase">Active Locations</p>
-          </div>
-          <Building2 className="h-8 w-8 text-primary/10" />
-        </div>
-        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
-          <div className="space-y-0.5">
-            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">Agg. AC Capacity</p>
-            <p className="text-2xl font-black text-primary leading-none">{formatCapacity(summaryStats.ac)}</p>
-            <p className="text-[8px] font-bold text-primary/60 uppercase">Megawatts (MW)</p>
-          </div>
-          <Zap className="h-8 w-8 text-primary/10" />
-        </div>
-        <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
-          <div className="space-y-0.5">
-            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">Agg. DC Capacity</p>
-            <p className="text-2xl font-black text-primary leading-none">{formatCapacity(summaryStats.dc)}</p>
-            <p className="text-[8px] font-bold text-primary/60 uppercase">Megawatts Peak (MWp)</p>
-          </div>
-          <ShieldCheck className="h-8 w-8 text-primary/10" />
-        </div>
-      </div>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="bg-muted/50 border border-primary/10 p-1 h-11 max-w-md mb-8">
+          <TabsTrigger value="groundmount" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
+            <LayoutGrid className="h-3.5 w-3.5 mr-2" /> Groundmount
+          </TabsTrigger>
+          <TabsTrigger value="rooftop" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
+            <Building2 className="h-3.5 w-3.5 mr-2" /> Rooftop
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="flex flex-col gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center gap-4 w-full">
-          <div className="relative flex-1 md:w-96">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search project or company..." 
-              className="pl-10 h-11 rounded-sm border-primary/20 bg-background"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+        <TabsContent value="groundmount" className="space-y-8 m-0 animate-in fade-in-50 duration-300">
+          {renderSummaryAndTable()}
+        </TabsContent>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-11 rounded-sm font-bold border-primary/20 text-primary bg-background shadow-sm px-4 gap-1.5 min-w-[160px]">
-                  <Tags className="h-4 w-4" />
-                  {selectedGroupIds.length === 0 ? "All Groups" : `${selectedGroupIds.length} Groups`}
-                  <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-64 p-0 rounded-sm border-primary/10 shadow-2xl overflow-hidden">
-                <div className="bg-primary/5 p-3 border-b">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Organizational Groups</h3>
-                </div>
-                <ScrollArea className="h-[250px]">
-                  <div className="p-2 space-y-1">
-                    {groups?.sort((a, b) => a.name.localeCompare(b.name)).map(group => (
-                      <div 
-                        key={group.id} 
-                        className={cn(
-                          "flex items-center space-x-2 p-2 rounded-sm hover:bg-muted/50 transition-colors cursor-pointer",
-                          selectedGroupIds.includes(group.id) && "bg-primary/10"
-                        )}
-                        onClick={() => setSelectedGroupIds(prev => prev.includes(group.id) ? prev.filter(id => id !== group.id) : [...prev, group.id])}
-                      >
-                        <Checkbox checked={selectedGroupIds.includes(group.id)} />
-                        <span className="text-xs font-bold uppercase truncate">{group.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </PopoverContent>
-            </Popover>
-
-            <Button 
-              variant={showStarredOnly ? "default" : "outline"} 
-              size="sm" 
-              onClick={() => setShowStarredOnly(!showStarredOnly)}
-              className={cn("h-11 rounded-sm font-bold px-6", showStarredOnly ? "" : "text-primary border-primary/20 hover:bg-primary/5")}
-            >
-              <Star className={cn("h-4 w-4 mr-2", showStarredOnly && "fill-current")} />
-              {showStarredOnly ? "Starred Projects" : "View Starred"}
-            </Button>
-            
-            <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setShowStarredOnly(false); setSelectedGroupIds([]); }} className="h-11 w-11 text-muted-foreground rounded-sm">
-              <FilterX className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="hidden md:block">
-        <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
-                  <TableRow>
-                    <TableHead className="w-12 text-center"></TableHead>
-                    <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest">Project Description</TableHead>
-                    <TableHead className="font-black uppercase text-[10px] tracking-widest">Company</TableHead>
-                    <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">AC Capacity</TableHead>
-                    <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">DC Capacity</TableHead>
-                    <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Management</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSites.length > 0 ? filteredSites.map((site) => {
-                    const isStarred = starredIds.has(site.id);
-                    return (
-                      <TableRow key={site.id} className="hover:bg-muted/5 transition-colors group">
-                        <TableCell className="text-center pl-4">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => toggleStar(e, site.id)}>
-                            <Star className={cn("h-4 w-4 transition-all", isStarred ? "fill-primary text-primary scale-110" : "text-muted-foreground/30")} />
-                          </Button>
-                        </TableCell>
-                        <TableCell className="px-6 py-4">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0"><Building2 className="h-4 w-4" /></div>
-                            <span className="font-bold text-sm text-foreground break-words leading-tight">{site.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs font-medium text-muted-foreground break-words max-w-[200px]">{site.projectCompany}</TableCell>
-                        <TableCell className="text-center font-mono text-xs font-bold text-primary">{formatCapacity(site.acCapacity)} MW</TableCell>
-                        <TableCell className="text-center font-mono text-xs font-bold text-amber-600">{formatCapacity(site.dcCapacity)} MWp</TableCell>
-                        <TableCell className="text-right px-6"><Button asChild size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-primary"><Link href={`/projects/${site.id}`}>Manage Site <ArrowRight className="ml-1.5 h-3 w-3" /></Link></Button></TableCell>
-                      </TableRow>
-                    );
-                  }) : <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No matching projects discovered</TableCell></TableRow>}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="rooftop" className="space-y-8 m-0 animate-in fade-in-50 duration-300">
+          {renderSummaryAndTable()}
+        </TabsContent>
+      </Tabs>
     </div>
   );
+
+  function renderSummaryAndTable() {
+    return (
+      <>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in slide-in-from-top-2 duration-300">
+          <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
+            <div className="space-y-0.5">
+              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">{countLabel}</p>
+              <p className="text-2xl font-black text-primary leading-none">{summaryStats.count}</p>
+              <p className="text-[8px] font-bold text-primary/60 uppercase">Active Locations</p>
+            </div>
+            <Building2 className="h-8 w-8 text-primary/10" />
+          </div>
+          <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
+            <div className="space-y-0.5">
+              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">Agg. AC Capacity</p>
+              <p className="text-2xl font-black text-primary leading-none">{formatCapacity(summaryStats.ac)}</p>
+              <p className="text-[8px] font-bold text-primary/60 uppercase">Megawatts (MW)</p>
+            </div>
+            <Zap className="h-8 w-8 text-primary/10" />
+          </div>
+          <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
+            <div className="space-y-0.5">
+              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">Agg. DC Capacity</p>
+              <p className="text-2xl font-black text-primary leading-none">{formatCapacity(summaryStats.dc)}</p>
+              <p className="text-[8px] font-bold text-primary/60 uppercase">Megawatts Peak (MWp)</p>
+            </div>
+            <ShieldCheck className="h-8 w-8 text-primary/10" />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center gap-4 w-full">
+            <div className="relative flex-1 md:w-96">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search project or company..." 
+                className="pl-10 h-11 rounded-sm border-primary/20 bg-background"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-11 rounded-sm font-bold border-primary/20 text-primary bg-background shadow-sm px-4 gap-1.5 min-w-[160px]">
+                    <Tags className="h-4 w-4" />
+                    {selectedGroupIds.length === 0 ? "All Groups" : `${selectedGroupIds.length} Groups`}
+                    <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 p-0 rounded-sm border-primary/10 shadow-2xl overflow-hidden">
+                  <div className="bg-primary/5 p-3 border-b">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Organizational Groups</h3>
+                  </div>
+                  <ScrollArea className="h-[250px]">
+                    <div className="p-2 space-y-1">
+                      {groups?.map(group => (
+                        <div 
+                          key={group.id} 
+                          className={cn(
+                            "flex items-center space-x-2 p-2 rounded-sm hover:bg-muted/50 transition-colors cursor-pointer",
+                            selectedGroupIds.includes(group.id) && "bg-primary/10"
+                          )}
+                          onClick={() => setSelectedGroupIds(prev => prev.includes(group.id) ? prev.filter(id => id !== group.id) : [...prev, group.id])}
+                        >
+                          <Checkbox checked={selectedGroupIds.includes(group.id)} />
+                          <span className="text-xs font-bold uppercase truncate">{group.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+
+              <Button 
+                variant={showStarredOnly ? "default" : "outline"} 
+                size="sm" 
+                onClick={() => setShowStarredOnly(!showStarredOnly)}
+                className={cn("h-11 rounded-sm font-bold px-6", showStarredOnly ? "" : "text-primary border-primary/20 hover:bg-primary/5")}
+              >
+                <Star className={cn("h-4 w-4 mr-2", showStarredOnly && "fill-current")} />
+                {showStarredOnly ? "Starred Projects" : "View Starred"}
+              </Button>
+              
+              <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setShowStarredOnly(false); setSelectedGroupIds([]); }} className="h-11 w-11 text-muted-foreground rounded-sm">
+                <FilterX className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="hidden md:block">
+          <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
+                    <TableRow>
+                      <TableHead className="w-12 text-center"></TableHead>
+                      <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest">Project Description</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest">Company</TableHead>
+                      <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">AC Capacity</TableHead>
+                      <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">DC Capacity</TableHead>
+                      <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Management</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSites.length > 0 ? filteredSites.map((site) => {
+                      const isStarred = starredIds.has(site.id);
+                      return (
+                        <TableRow key={site.id} className="hover:bg-muted/5 transition-colors group">
+                          <TableCell className="text-center pl-4">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => toggleStar(e, site.id)}>
+                              <Star className={cn("h-4 w-4 transition-all", isStarred ? "fill-primary text-primary scale-110" : "text-muted-foreground/30")} />
+                            </Button>
+                          </TableCell>
+                          <TableCell className="px-6 py-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0">
+                                {activeTab === 'rooftop' ? <Building2 className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
+                              </div>
+                              <span className="font-bold text-sm text-foreground break-words leading-tight">{site.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs font-medium text-muted-foreground break-words max-w-[200px]">{site.projectCompany}</TableCell>
+                          <TableCell className="text-center font-mono text-xs font-bold text-primary">{formatCapacity(site.acCapacity)} MW</TableCell>
+                          <TableCell className="text-center font-mono text-xs font-bold text-amber-600">{formatCapacity(site.dcCapacity)} MWp</TableCell>
+                          <TableCell className="text-right px-6"><Button asChild size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-primary"><Link href={`/projects/${site.id}`}>Manage Site <ArrowRight className="ml-1.5 h-3 w-3" /></Link></Button></TableCell>
+                        </TableRow>
+                      );
+                    }) : <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No matching projects discovered</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </>
+    );
+  }
 }
