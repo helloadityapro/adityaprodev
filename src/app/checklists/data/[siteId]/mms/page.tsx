@@ -418,75 +418,77 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         drawRow('NUMBER OF MODULES', String(record.moduleCount || '—'));
 
         currY += 5;
-        const col1 = 50; const colStatus = 25; const col2 = 70; const col3 = 35;
+        const col1 = 50; const colStatusRemarks = 95; const col3 = 35;
         doc.setFont('helvetica', 'bold');
         doc.rect(margin, currY, col1, rowHeight);
         doc.text('CHECKS/ AUTHORITIES', margin + 2, currY + 5.5);
-        doc.rect(margin + col1, currY, colStatus, rowHeight);
-        doc.text('STATUS', margin + col1 + 2, currY + 5.5);
-        doc.rect(margin + col1 + colStatus, currY, col2, rowHeight);
-        doc.text('REMARKS', margin + col1 + colStatus + 2, currY + 5.5);
-        doc.rect(margin + col1 + colStatus + col2, currY, col3, rowHeight);
-        doc.text('ATTACHMENTS', margin + col1 + colStatus + col2 + 2, currY + 5.5);
+        doc.rect(margin + col1, currY, colStatusRemarks, rowHeight);
+        doc.text('STATUS & REMARKS', margin + col1 + 2, currY + 5.5);
+        doc.rect(margin + col1 + colStatusRemarks, currY, col3, rowHeight);
+        doc.text('ATTACHMENTS', margin + col1 + colStatusRemarks + 2, currY + 5.5);
         currY += rowHeight;
 
         doc.setFont('helvetica', 'normal');
         for (const check of record.checks) {
-          const remarkLines = doc.splitTextToSize(check.remarks || '—', col2 - 4);
+          const statusText = check.status || '—';
+          const remarksText = check.remarks || '—';
+          const combinedText = `${statusText}\n${remarksText}`;
+          const combinedLines = doc.splitTextToSize(combinedText, colStatusRemarks - 4);
+          
           const attachments = check.attachments || [];
           const iHeight = attachments.length > 0 ? (attachments.length * 5) + 4 : rowHeight;
-          const h = Math.max(rowHeight, remarkLines.length * 4 + 4, iHeight);
+          const h = Math.max(rowHeight, combinedLines.length * 4 + 4, iHeight);
+          
           if (currY + h > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
+          
           doc.rect(margin, currY, col1, h);
           doc.text(check.label.toUpperCase(), margin + 2, currY + 5.5);
 
-          // Status Column
-          doc.rect(margin + col1, currY, colStatus, h);
-          doc.text(check.status || '—', margin + col1 + 2, currY + 5.5);
+          // Combined Status & Remarks Column
+          doc.rect(margin + col1, currY, colStatusRemarks, h);
+          doc.text(combinedLines, margin + col1 + 2, currY + 5.5);
 
-          doc.rect(margin + col1 + colStatus, currY, col2, h);
-          doc.text(remarkLines, margin + col1 + colStatus + 2, currY + 5.5);
-          doc.rect(margin + col1 + colStatus + col2, currY, col3, h);
+          doc.rect(margin + col1 + colStatusRemarks, currY, col3, h);
           if (attachments.length > 0) {
             attachments.forEach((att, attIdx) => {
               const linkY = currY + 5.5 + (attIdx * 5);
               doc.setTextColor(0, 0, 255);
-              doc.text('View File', margin + col1 + colStatus + col2 + 2, linkY);
+              doc.text('View File', margin + col1 + colStatusRemarks + 2, linkY);
               const textWidth = doc.getTextWidth('View File');
-              doc.line(margin + col1 + colStatus + col2 + 2, linkY + 0.5, margin + col1 + colStatus + col2 + 2 + textWidth, linkY + 0.5);
-              doc.link(margin + col1 + colStatus + col2 + 2, linkY - 4, textWidth, 6, { url: att.url });
+              doc.line(margin + col1 + colStatusRemarks + 2, linkY + 0.5, margin + col1 + colStatusRemarks + 2 + textWidth, linkY + 0.5);
+              doc.link(margin + col1 + colStatusRemarks + 2, linkY - 4, textWidth, 6, { url: att.url });
             });
             doc.setTextColor(0, 0, 0);
-          } else { doc.text('NO', margin + col1 + colStatus + col2 + 2, currY + 5.5); }
+          } else { doc.text('NO', margin + col1 + colStatusRemarks + 2, currY + 5.5); }
           currY += h;
         }
 
-        const otherRemLines = doc.splitTextToSize(record.otherRemarks || '—', col2 - 4);
+        const otherRemLines = doc.splitTextToSize(record.otherRemarks || '—', colStatusRemarks - 4);
         const otherAttachments = record.otherAttachments || [];
         const otherAttH = otherAttachments.length > 0 ? (otherAttachments.length * 5) + 4 : rowHeight;
         const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4, otherAttH);
+        
         if (currY + otherH > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
+        
         doc.rect(margin, currY, col1, otherH);
         doc.text('OTHER REMARK (IF ANY)', margin + 2, currY + 5.5);
         
-        // Match columns
-        doc.rect(margin + col1, currY, colStatus, otherH);
-        doc.text('—', margin + col1 + 2, currY + 5.5);
+        // Combined Status & Remarks Column for "Other"
+        doc.rect(margin + col1, currY, colStatusRemarks, otherH);
+        doc.text(otherRemLines, margin + col1 + 2, currY + 5.5);
 
-        doc.rect(margin + col1 + colStatus, currY, col2, otherH);
-        doc.text(otherRemLines, margin + col1 + colStatus + 2, currY + 5.5);
-        doc.rect(margin + col1 + colStatus + col2, currY, col3, otherH);
+        doc.rect(margin + col1 + colStatusRemarks, currY, col3, otherH);
         if (otherAttachments.length > 0) {
           otherAttachments.forEach((att, attIdx) => {
             const linkY = currY + 5.5 + (attIdx * 5);
             doc.setTextColor(0, 0, 255);
-            doc.text('View File', margin + col1 + colStatus + col2 + 2, linkY);
+            doc.text('View File', margin + col1 + colStatusRemarks + 2, linkY);
             const textWidth = doc.getTextWidth('View File');
-            doc.line(margin + col1 + colStatus + col2 + 2, linkY + 0.5, margin + col1 + colStatus + col2 + 2 + textWidth, linkY + 0.5);
-            doc.link(margin + col1 + colStatus + col2 + 2, linkY - 4, textWidth, 6, { url: att.url });
+            doc.line(margin + col1 + colStatusRemarks + 2, linkY + 0.5, margin + col1 + colStatusRemarks + 2 + textWidth, linkY + 0.5);
+            doc.link(margin + col1 + colStatusRemarks + 2, linkY - 4, textWidth, 6, { url: att.url });
           });
           doc.setTextColor(0, 0, 0);
-        } else { doc.text('NO', margin + col1 + colStatus + col2 + 2, currY + 5.5); }
+        } else { doc.text('NO', margin + col1 + colStatusRemarks + 2, currY + 5.5); }
         currY += otherH;
 
         currY += 5;
@@ -959,7 +961,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                                 </Button>
                                 <Button 
                                   variant="ghost" size="icon" 
-                                  className={cn("h-7 w-7 rounded-sm", check.status === 'Pending' ? "bg-amber-100 text-amber-700" : "opacity-40 hover:bg-amber-50")}
+                                  className={cn("h-7 w-7 rounded-sm", check.status === 'Pending' ? "bg-amber-100 text-amber-700" : "opacity-40 hover:bg-green-50")}
                                   onClick={() => handleUpdateCheckStatus(idx, 'Pending')}
                                 >
                                   <AlertTriangle className="h-4 w-4" />
