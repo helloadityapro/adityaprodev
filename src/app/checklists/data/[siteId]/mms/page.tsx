@@ -418,14 +418,16 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         drawRow('NUMBER OF MODULES', String(record.moduleCount || '—'));
 
         currY += 5;
-        const col1 = 65; const col2 = 80; const col3 = 35;
+        const col1 = 50; const colStatus = 25; const col2 = 70; const col3 = 35;
         doc.setFont('helvetica', 'bold');
         doc.rect(margin, currY, col1, rowHeight);
         doc.text('CHECKS/ AUTHORITIES', margin + 2, currY + 5.5);
-        doc.rect(margin + col1, currY, col2, rowHeight);
-        doc.text('REMARKS', margin + col1 + 2, currY + 5.5);
-        doc.rect(margin + col1 + col2, currY, col3, rowHeight);
-        doc.text('ATTACHMENTS', margin + col1 + col2 + 2, currY + 5.5);
+        doc.rect(margin + col1, currY, colStatus, rowHeight);
+        doc.text('STATUS', margin + col1 + 2, currY + 5.5);
+        doc.rect(margin + col1 + colStatus, currY, col2, rowHeight);
+        doc.text('REMARKS', margin + col1 + colStatus + 2, currY + 5.5);
+        doc.rect(margin + col1 + colStatus + col2, currY, col3, rowHeight);
+        doc.text('ATTACHMENTS', margin + col1 + colStatus + col2 + 2, currY + 5.5);
         currY += rowHeight;
 
         doc.setFont('helvetica', 'normal');
@@ -437,20 +439,25 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           if (currY + h > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
           doc.rect(margin, currY, col1, h);
           doc.text(check.label.toUpperCase(), margin + 2, currY + 5.5);
-          doc.rect(margin + col1, currY, col2, h);
-          doc.text(remarkLines, margin + col1 + 2, currY + 5.5);
-          doc.rect(margin + col1 + col2, currY, col3, h);
+
+          // Status Column
+          doc.rect(margin + col1, currY, colStatus, h);
+          doc.text(check.status || '—', margin + col1 + 2, currY + 5.5);
+
+          doc.rect(margin + col1 + colStatus, currY, col2, h);
+          doc.text(remarkLines, margin + col1 + colStatus + 2, currY + 5.5);
+          doc.rect(margin + col1 + colStatus + col2, currY, col3, h);
           if (attachments.length > 0) {
             attachments.forEach((att, attIdx) => {
               const linkY = currY + 5.5 + (attIdx * 5);
               doc.setTextColor(0, 0, 255);
-              doc.text('View File', margin + col1 + col2 + 2, linkY);
+              doc.text('View File', margin + col1 + colStatus + col2 + 2, linkY);
               const textWidth = doc.getTextWidth('View File');
-              doc.line(margin + col1 + col2 + 2, linkY + 0.5, margin + col1 + col2 + 2 + textWidth, linkY + 0.5);
-              doc.link(margin + col1 + col2 + 2, linkY - 4, textWidth, 6, { url: att.url });
+              doc.line(margin + col1 + colStatus + col2 + 2, linkY + 0.5, margin + col1 + colStatus + col2 + 2 + textWidth, linkY + 0.5);
+              doc.link(margin + col1 + colStatus + col2 + 2, linkY - 4, textWidth, 6, { url: att.url });
             });
             doc.setTextColor(0, 0, 0);
-          } else { doc.text('NO', margin + col1 + col2 + 2, currY + 5.5); }
+          } else { doc.text('NO', margin + col1 + colStatus + col2 + 2, currY + 5.5); }
           currY += h;
         }
 
@@ -461,20 +468,25 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         if (currY + otherH > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
         doc.rect(margin, currY, col1, otherH);
         doc.text('OTHER REMARK (IF ANY)', margin + 2, currY + 5.5);
-        doc.rect(margin + col1, currY, col2, otherH);
-        doc.text(otherRemLines, margin + col1 + 2, currY + 5.5);
-        doc.rect(margin + col1 + col2, currY, col3, otherH);
+        
+        // Match columns
+        doc.rect(margin + col1, currY, colStatus, otherH);
+        doc.text('—', margin + col1 + 2, currY + 5.5);
+
+        doc.rect(margin + col1 + colStatus, currY, col2, otherH);
+        doc.text(otherRemLines, margin + col1 + colStatus + 2, currY + 5.5);
+        doc.rect(margin + col1 + colStatus + col2, currY, col3, otherH);
         if (otherAttachments.length > 0) {
           otherAttachments.forEach((att, attIdx) => {
             const linkY = currY + 5.5 + (attIdx * 5);
             doc.setTextColor(0, 0, 255);
-            doc.text('View File', margin + col1 + col2 + 2, linkY);
+            doc.text('View File', margin + col1 + colStatus + col2 + 2, linkY);
             const textWidth = doc.getTextWidth('View File');
-            doc.line(margin + col1 + col2 + 2, linkY + 0.5, margin + col1 + col2 + 2 + textWidth, linkY + 0.5);
-            doc.link(margin + col1 + col2 + 2, linkY - 4, textWidth, 6, { url: att.url });
+            doc.line(margin + col1 + colStatus + col2 + 2, linkY + 0.5, margin + col1 + colStatus + col2 + 2 + textWidth, linkY + 0.5);
+            doc.link(margin + col1 + colStatus + col2 + 2, linkY - 4, textWidth, 6, { url: att.url });
           });
           doc.setTextColor(0, 0, 0);
-        } else { doc.text('NO', margin + col1 + col2 + 2, currY + 5.5); }
+        } else { doc.text('NO', margin + col1 + colStatus + col2 + 2, currY + 5.5); }
         currY += otherH;
 
         currY += 5;
@@ -959,12 +971,24 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                                   <Badge className="bg-green-50 text-green-700 border-green-200 uppercase font-black text-[7px] h-4">OK</Badge>
                                 ) : check.status === 'NOT OK' ? (
                                   <Badge className="bg-red-50 text-red-700 border-red-200 uppercase font-black text-[7px] h-4">NOT OK</Badge>
-                                ) : null}
+                                ) : (
+                                  <Badge className="bg-amber-50 text-amber-700 border-amber-200 uppercase font-black text-[7px] h-4">Pending</Badge>
+                                )}
                               </>
                             )}
                           </div>
                         </div>
-                        <p className="text-xs italic text-muted-foreground leading-relaxed">"{check.remarks || 'No specific observations recorded.'}"</p>
+                        <div className="space-y-1">
+                          <p className={cn(
+                            "text-[10px] font-black uppercase tracking-tight",
+                            check.status === 'OK' ? "text-green-600" : check.status === 'NOT OK' ? "text-red-600" : "text-amber-600"
+                          )}>
+                            Status: {check.status}
+                          </p>
+                          {check.remarks && (
+                            <p className="text-xs italic text-muted-foreground leading-relaxed">"{check.remarks}"</p>
+                          )}
+                        </div>
                       </div>
                       {check.attachments && check.attachments.length > 0 && (
                         <div className="flex flex-wrap gap-2 md:gap-3">
