@@ -37,6 +37,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from "@/components/ui/progress";
+import { Separator } from '@/components/ui/separator';
 import {
   Tooltip,
   TooltipContent,
