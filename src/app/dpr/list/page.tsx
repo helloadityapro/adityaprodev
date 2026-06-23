@@ -432,10 +432,10 @@ export default function DPRListPage() {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-11 max-w-sm mb-6">
           <TabsTrigger value="site" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
-            <Building2 className="h-3.5 w-3.5 mr-2" /> Site DPR
+            <Building2 className="h-3.5 w-3.5 mr-2" /> Groundmount
           </TabsTrigger>
           <TabsTrigger value="other" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
-            <Globe className="h-3.5 w-3.5 mr-2" /> Other DPR
+            <Globe className="h-3.5 w-3.5 mr-2" /> Others
           </TabsTrigger>
         </TabsList>
 

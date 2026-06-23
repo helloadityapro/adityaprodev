@@ -297,13 +297,13 @@ export default function SubmitDPRPage() {
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="site" id="dpr-site" />
                           <Label htmlFor="dpr-site" className="font-bold cursor-pointer flex items-center gap-1.5 text-xs uppercase">
-                            <Building2 className="h-3.5 w-3.5 text-primary" /> Site-related
+                            <Building2 className="h-3.5 w-3.5 text-primary" /> Groundmount Projects
                           </Label>
                         </div>
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="other" id="dpr-other" />
                           <Label htmlFor="dpr-other" className="font-bold cursor-pointer flex items-center gap-1.5 text-xs uppercase">
-                            <Globe className="h-3.5 w-3.5 text-slate-500" /> Other
+                            <Globe className="h-3.5 w-3.5 text-slate-500" /> Others
                           </Label>
                         </div>
                       </RadioGroup>
