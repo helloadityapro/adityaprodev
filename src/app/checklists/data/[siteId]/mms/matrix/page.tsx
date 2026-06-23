@@ -28,7 +28,8 @@ import {
   PlayCircle,
   FileImage,
   Download,
-  MessageCircle
+  MessageCircle,
+  Info
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -274,7 +275,7 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
   }, [isProfileLoading, isAdmin, router]);
 
   if (isProfileLoading || siteLoading || instLoading) {
-    return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
+    return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[600px] w-full" /></div>;
   }
 
   if (!isAdmin) return null;
@@ -312,32 +313,32 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
         </div>
       )}
 
-      <Card className="rounded-sm border-primary/10 shadow-xl overflow-hidden min-h-[600px] flex flex-col">
+      <Card className="rounded-sm border-primary/10 shadow-xl overflow-hidden min-h-[600px] flex flex-col relative">
         <div className="flex-1 overflow-hidden relative">
-          <ScrollArea className="h-[calc(100vh-250px)] w-full">
+          <ScrollArea className="h-[calc(100vh-250px)] w-full relative z-0">
             <div className="min-w-full">
               <TooltipProvider delayDuration={0}>
-                <Table className="border-collapse table-fixed w-full">
-                  <TableHeader className="sticky top-0 z-[60] shadow-md bg-primary">
+                <Table className="border-separate border-spacing-0 table-fixed w-full">
+                  <TableHeader className="sticky top-0 z-20 shadow-sm">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[150px] font-black uppercase text-xs md:text-sm tracking-widest border-r bg-primary text-white sticky left-0 top-0 z-[70] px-6 py-4">Table Ref</TableHead>
+                      <TableHead className="w-[150px] font-black uppercase text-xs md:text-sm tracking-widest bg-primary text-white sticky left-0 top-0 z-30 px-6 py-4 border-r border-white/10">Table Ref</TableHead>
                       {Object.entries(CHECK_LABELS).map(([key, label]) => (
-                        <TableHead key={key} className="text-center font-black uppercase text-[10px] md:text-xs tracking-tight leading-tight w-[160px] px-3 py-4 bg-primary text-white border-r last:border-0 sticky top-0 z-[60]">{label}</TableHead>
+                        <TableHead key={key} className="text-center font-black uppercase text-[10px] md:text-xs tracking-tight leading-tight w-[160px] px-3 py-4 bg-primary text-white border-r border-white/10 last:border-0 sticky top-0 z-20">{label}</TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredInst.length > 0 ? filteredInst.map((record) => (
-                      <TableRow key={record.id} className="hover:bg-primary/[0.02] transition-colors border-b last:border-0">
-                        <TableCell className="px-6 py-4 font-black text-sm border-r bg-background sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">{record.tableNumber}</TableCell>
+                      <TableRow key={record.id} className="hover:bg-primary/[0.02] transition-colors group">
+                        <TableCell className="px-6 py-4 font-black text-sm border-r border-b bg-background sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">{record.tableNumber}</TableCell>
                         {Object.keys(CHECK_LABELS).map((key) => {
                           const check = record.checks.find(c => c.key === key || c.label === (CHECK_LABELS as any)[key]);
                           const status = check?.status;
                           return (
-                            <TableCell key={key} className="text-center py-4 border-r last:border-0 w-[160px] p-0">
+                            <TableCell key={key} className="text-center py-0 border-r border-b last:border-0 w-[160px] p-0">
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <div className="w-full h-full flex justify-center items-center py-4 cursor-help">
+                                  <div className="w-full h-full flex justify-center items-center py-5 cursor-default hover:bg-muted/10 transition-colors">
                                     {status === 'OK' ? (
                                       <Check className="h-5 w-5 text-green-600 drop-shadow-sm" />
                                     ) : status === 'NOT OK' ? (
@@ -349,45 +350,40 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
                                     )}
                                   </div>
                                 </TooltipTrigger>
-                                <TooltipContent side="top" className="p-0 border-none shadow-2xl bg-background rounded-sm overflow-hidden min-w-[200px]">
-                                  <div className="bg-primary/5 p-3 border-b">
-                                    <p className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-1">Status Report</p>
-                                    <div className="flex items-center justify-between gap-4">
-                                      <span className={cn(
-                                        "text-[10px] font-black uppercase",
-                                        status === 'OK' ? "text-green-600" : status === 'NOT OK' ? "text-red-600" : "text-amber-600"
-                                      )}>{status || 'Unknown'}</span>
-                                      <Badge variant="outline" className="h-4 px-1.5 text-[7px] font-black uppercase border-primary/20 text-primary">{record.tableNumber}</Badge>
-                                    </div>
+                                <TooltipContent side="top" className="p-0 border-none shadow-2xl bg-white rounded-sm overflow-hidden min-w-[180px] max-w-[240px]">
+                                  <div className="bg-muted/30 p-2.5 border-b flex items-center justify-between">
+                                    <span className={cn(
+                                      "text-[9px] font-black uppercase tracking-widest",
+                                      status === 'OK' ? "text-green-600" : status === 'NOT OK' ? "text-red-600" : "text-amber-600"
+                                    )}>Status: {status || 'N/A'}</span>
+                                    <span className="text-[8px] font-bold text-muted-foreground uppercase">{record.tableNumber}</span>
                                   </div>
-                                  <div className="p-3 space-y-3">
+                                  <div className="p-2.5 space-y-3">
                                     {check?.remarks ? (
-                                      <p className="text-[10px] italic text-muted-foreground leading-relaxed">"{check.remarks}"</p>
+                                      <p className="text-[10px] italic text-muted-foreground leading-snug line-clamp-3">"{check.remarks}"</p>
                                     ) : (
-                                      <p className="text-[9px] text-muted-foreground/40 italic">No field observations recorded.</p>
+                                      <p className="text-[9px] text-muted-foreground/40 italic">No notes.</p>
                                     )}
                                     
                                     {check?.attachments && check.attachments.length > 0 && (
-                                      <div className="space-y-2 pt-2 border-t border-border/50">
+                                      <div className="flex flex-col gap-2 pt-2 border-t border-border/50">
                                         <div className="flex items-center gap-2">
-                                           <div className="relative h-10 w-16 bg-muted rounded-sm overflow-hidden border">
+                                           <div className="relative h-8 w-12 bg-muted rounded-sm overflow-hidden border">
                                               {isVideo(check.attachments[0]) ? (
                                                 <div className="w-full h-full flex items-center justify-center bg-slate-900"><Film className="h-3 w-3 text-white/40" /></div>
                                               ) : (
                                                 <img src={check.attachments[0].url} className="w-full h-full object-cover" alt="Audit" />
                                               )}
                                            </div>
-                                           {check.attachments.length > 1 && (
-                                             <span className="text-[8px] font-black text-muted-foreground">+{check.attachments.length - 1} more</span>
-                                           )}
+                                           <span className="text-[8px] font-bold text-muted-foreground uppercase">{check.attachments.length} File{check.attachments.length > 1 ? 's' : ''}</span>
                                         </div>
                                         <Button 
                                           variant="default" 
                                           size="sm" 
-                                          className="w-full h-7 rounded-sm text-[8px] font-black uppercase tracking-widest"
+                                          className="w-full h-7 rounded-sm text-[8px] font-black uppercase tracking-widest h-8"
                                           onClick={() => openViewer(check.attachments![0], check.attachments!, check.remarks)}
                                         >
-                                          <Maximize2 className="h-2.5 w-2.5 mr-1" /> View Evidence
+                                          <Maximize2 className="h-3 w-3 mr-1.5" /> View Evidence
                                         </Button>
                                       </div>
                                     )}
@@ -409,18 +405,18 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
             <ScrollBar orientation="vertical" />
           </ScrollArea>
         </div>
-        <div className="p-4 border-t bg-muted/5 flex items-center justify-center gap-8 shrink-0">
-           <div className="flex items-center gap-2"><Check className="h-4 w-4 text-green-600" /><span className="text-[10px] font-black uppercase text-foreground/70 tracking-widest">Verified (OK)</span></div>
-           <div className="flex items-center gap-2"><X className="h-4 w-4 text-red-600" /><span className="text-[10px] font-black uppercase text-foreground/70 tracking-widest">Issue Detected (NOT OK)</span></div>
-           <div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" /><span className="text-[10px] font-black uppercase text-foreground/70 tracking-widest">Awaiting (Pending)</span></div>
+        <div className="p-3 border-t bg-muted/5 flex items-center justify-center gap-6 shrink-0 relative z-10">
+           <div className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-green-600" /><span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">OK</span></div>
+           <div className="flex items-center gap-1.5"><X className="h-3.5 w-3.5 text-red-600" /><span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">NOT OK</span></div>
+           <div className="flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-amber-500" /><span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">PENDING</span></div>
         </div>
       </Card>
 
       {/* Media Viewer Dialog */}
       <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { resetViewer(); setViewFile(null); setViewFiles([]); setViewRemarks(""); } }}>
-        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl z-[100]">
           <DialogHeader className="sr-only"><DialogTitle>Audit Media Evidence</DialogTitle></DialogHeader>
-          <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent no-print">
+          <div className="absolute top-0 left-0 right-0 z-[110] flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent no-print">
             <div className="flex items-center gap-3">
               <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
               <div className="flex flex-col">
@@ -429,9 +425,9 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-5 w-5" /></Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-5 w-5" /></Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button>
               <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
               <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-red-500"><X className="h-6 w-6" /></Button></DialogClose>
             </div>
@@ -439,16 +435,16 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
 
           {viewFiles.length > 1 && (
             <>
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-8 w-8" /></Button>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-[110]">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-8 w-8" /></Button>
               </div>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-8 w-8" /></Button>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-[110]">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-8 w-8" /></Button>
               </div>
             </>
           )}
 
-          <div ref={containerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDoubleClick={handleDoubleClick}>
+          <div ref={containerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none z-[105]", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDoubleClick={handleDoubleClick}>
             <div ref={mediaRef} className={cn("transition-transform duration-200 ease-out flex items-center justify-center pointer-events-none w-fit h-fit", isDragging && "transition-none")} style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
               {viewFile && (
                 isVideo(viewFile) ? (
@@ -466,7 +462,7 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
             </div>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/80 to-transparent flex flex-col items-center gap-4">
+          <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/80 to-transparent flex flex-col items-center gap-4 z-[110]">
             {viewRemarks && (
               <div className="max-w-2xl w-full bg-white/10 backdrop-blur-md p-4 rounded-sm border border-white/10 shadow-2xl animate-in slide-in-from-bottom-4 duration-500">
                 <div className="flex items-center gap-2 mb-2 text-primary">
