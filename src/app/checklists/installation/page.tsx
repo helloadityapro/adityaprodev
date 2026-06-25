@@ -610,7 +610,7 @@ export default function TableLevelMMSChecklistPage() {
                     <FormField control={form.control} name={`checks.${key}.remarks` as any} render={({ field }) => (
                       <FormControl>
                         <div className="space-y-1">
-                          <Textarea placeholder="Enter findings (Optional)..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm" />
+                          <Textarea placeholder="Enter findings..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm" />
                           <FormMessage />
                         </div>
                       </FormControl>
