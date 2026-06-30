@@ -5,23 +5,20 @@ import {
   Search, 
   FileText, 
   CheckSquare, 
-  Package, 
   ArrowLeftRight, 
   User, 
   MapPin, 
   Loader2, 
   Command as CommandIcon,
-  X,
   FileCheck,
   Table as TableIcon,
-  TrendingUp,
   Tags,
   Check,
   ChevronDown
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, where, getDocs, limit, doc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
@@ -37,6 +34,7 @@ import { ViewUserDialog } from './view-user-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
+import { slugifyRole } from '@/lib/access-control';
 
 type SearchResult = {
   id: string;
@@ -76,9 +74,9 @@ export function GlobalSearch() {
   const [isSearching, setIsSearching] = React.useState(false);
   const [selectedUserForView, setSelectedUserForView] = React.useState<any>(null);
   
-  // Group Filtering in Search
   const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
 
+  // DEFERRED DATA FETCHING: Only fetch these when search is actually relevant
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
 
@@ -94,16 +92,15 @@ export function GlobalSearch() {
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
   const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
 
-  const teamQuery = useMemoFirebase(() => {
-    if (!userProfile || userProfile.role !== 'Site Manager' || !user) return null;
-    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
-  }, [firestore, user, userProfile?.role]);
-  const { data: teamMembers } = useCollection<any>(teamQuery);
-
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
-  // Keyboard shortcut listener
+  const teamQuery = useMemoFirebase(() => {
+    if (!isManager || !user) return null;
+    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
+  }, [firestore, user, isManager]);
+  const { data: teamMembers } = useCollection<any>(teamQuery);
+
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
@@ -115,7 +112,6 @@ export function GlobalSearch() {
     return () => document.addEventListener('keydown', down);
   }, []);
 
-  // Debounced search trigger
   React.useEffect(() => {
     if (!isOpen) {
       setSearchQuery('');
@@ -137,7 +133,6 @@ export function GlobalSearch() {
   const performSearch = async (term: string) => {
     setIsSearching(true);
     
-    // Calculate effective site filters based on selected groups
     let allowedSiteIdsFromGroups: Set<string> | null = null;
     if (selectedGroupIds.length > 0 && groups) {
       allowedSiteIdsFromGroups = new Set();
@@ -146,7 +141,6 @@ export function GlobalSearch() {
       });
     }
 
-    // 1. Calculate accessible sites set for the search
     const accessibleIds = new Set<string>();
     if (allSites && userProfile) {
       if (isAdmin) {
@@ -154,13 +148,11 @@ export function GlobalSearch() {
       } else {
         const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
           ? userProfile.ownDataOnly 
-          : roleConfigs?.find(c => c.id === userProfile.role?.toLowerCase()?.replace(/\s+/g, '-'))?.ownDataOnly ?? false;
+          : roleConfigs?.find(c => c.id === slugifyRole(userProfile.role || ""))?.ownDataOnly ?? false;
 
         if (isOwnDataOnly) {
           if (isManager) {
-            // 1. Explicit Overrides
             allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => accessibleIds.add(o.siteId));
-            // 2. Direct Team Defaults (not overridden elsewhere)
             teamMembers?.forEach(member => {
               (member.assignedProjectIds || []).forEach(sid => {
                 const otherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
@@ -176,7 +168,6 @@ export function GlobalSearch() {
       }
     }
 
-    // 2. Sites search (Local)
     const siteResults: SearchResult[] = [];
     if (allSites) {
       allSites.forEach(s => {
@@ -213,10 +204,7 @@ export function GlobalSearch() {
           const data = d.data();
           const siteId = data.siteId;
 
-          // Access Control Check
           if (!isAdmin && siteId && !accessibleIds.has(siteId)) return;
-
-          // Group Filter Check
           if (allowedSiteIdsFromGroups && siteId && !allowedSiteIdsFromGroups.has(siteId)) return;
 
           const isMatch = !term || fields.some(field => {
@@ -319,7 +307,7 @@ export function GlobalSearch() {
             <span className="xs:hidden">Search...</span>
           </span>
           <kbd className="pointer-none hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
-            <span className="text-xs">⌘</span>K
+            <span className="text-xs">K</span>
           </kbd>
         </div>
       </div>

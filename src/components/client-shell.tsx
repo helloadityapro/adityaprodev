@@ -3,7 +3,7 @@
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser, useDoc, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection, useFirestore, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, or, and, getDocs } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, getDocs } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import { MainNav } from "@/components/main-nav";
 import {
@@ -49,30 +49,23 @@ type AccessConfig = {
   allowedPageKeys: PageKey[];
 };
 
+/**
+ * A ultra-lightweight loader that uses static quotes to avoid network blocking
+ * during the first 5 seconds of application startup.
+ */
 function FullPageLoader() {
   const [quote, setQuote] = React.useState("");
-  const firestore = useFirestore();
 
   React.useEffect(() => {
-    const fetchQuote = async () => {
-      const defaultQuotes = [
-        "Individual commitment to a group effort—that is what makes a team work.",
-        "Unity is strength... when there is teamwork and collaboration, wonderful things can be achieved.",
-        "Coming together is a beginning. Keeping together is progress. Working together is success.",
-        "Alone we can do so little; together we can do so much."
-      ];
-
-      try {
-        const snap = await getDocs(collection(firestore, 'quotes'));
-        const dbQuotes = snap.docs.map(d => d.data().text);
-        const combined = dbQuotes.length > 0 ? dbQuotes : defaultQuotes;
-        setQuote(combined[Math.floor(Math.random() * combined.length)]);
-      } catch (e) {
-        setQuote(defaultQuotes[Math.floor(Math.random() * defaultQuotes.length)]);
-      }
-    };
-    fetchQuote();
-  }, [firestore]);
+    const defaultQuotes = [
+      "Individual commitment to a group effort—that is what makes a team work.",
+      "Unity is strength... when there is teamwork and collaboration, wonderful things can be achieved.",
+      "Coming together is a beginning. Keeping together is progress. Working together is success.",
+      "Alone we can do so little; together we can do so much."
+    ];
+    // Select a static quote immediately without waiting for Firestore
+    setQuote(defaultQuotes[Math.floor(Math.random() * defaultQuotes.length)]);
+  }, []);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background animate-in fade-in duration-300 px-6">
@@ -120,7 +113,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (Capacitor.isNativePlatform()) {
-      const backListener = App.addListener('backButton', (data) => {
+      const backListener = App.addListener('backButton', () => {
         if (pathname === '/' || pathname === '/rewards' || pathname === '/login') {
           App.exitApp();
         } else {
@@ -264,10 +257,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (userRole === 'Site Manager') {
       return query(
         colRef, 
-        and(
-          where('status', '==', 'Pending'),
-          where('siteManagerId', '==', user.uid)
-        )
+        where('status', '==', 'Pending'),
+        where('siteManagerId', '==', user.uid)
       );
     }
     
@@ -293,23 +284,16 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     });
   }, [unsortedNotifications]);
 
-  // Handle Toast Triggering logic
   React.useEffect(() => {
       if (notifications && user) {
           const now = Date.now();
-          const freshnessThreshold = 60000; // 60 seconds
+          const freshnessThreshold = 60000; 
 
           notifications.forEach(notif => {
               if (processedNotifsRef.current.has(notif.id)) return;
-
-              // Mark as processed immediately to prevent double toasts during rapid state updates
               processedNotifsRef.current.add(notif.id);
 
               const createdAt = notif.createdAt?.toDate?.().getTime() || now;
-              
-              // Only toast if:
-              // 1. Notification is unread
-              // 2. Notification is "Fresh" (created within 60s) OR created AFTER this component mounted
               const isFresh = (now - createdAt) < freshnessThreshold || createdAt > shellMountTime.current;
 
               if (!notif.read && isFresh) {
@@ -337,12 +321,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               }
           });
           
-          // Persistence for displayed items across session navigation
           sessionStorage.setItem(DISPLAYED_NOTIFS_KEY, JSON.stringify(Array.from(processedNotifsRef.current)));
       }
   }, [notifications, user, toast, firestore, router]);
 
-  // Load seen notifications from session storage on mount
   React.useEffect(() => {
     try {
       const raw = sessionStorage.getItem(DISPLAYED_NOTIFS_KEY);
