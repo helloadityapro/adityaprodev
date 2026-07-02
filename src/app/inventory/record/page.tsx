@@ -5,7 +5,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useRouter } from "next/navigation";
+import { sendNotification } from "@/lib/notifications";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item selection is required"),
@@ -105,7 +106,7 @@ export default function RecordMovementPage() {
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
@@ -121,13 +122,35 @@ export default function RecordMovementPage() {
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
 
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
-  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+  const { data: allOverrides, isLoading: overridesLoading } = useCollection<MappingOverride>(overridesQuery);
 
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
     return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
   }, [firestore, user, isManager]);
   const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
+
+  const accessibleSites = React.useMemo(() => {
+    if (!allSites || !userProfile) return [];
+    if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
+    
+    // Sovereignty Logic
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    if (isManager) {
+      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      if (teamMembers) {
+        teamMembers.forEach(member => {
+          (member.assignedProjectIds || []).forEach(id => {
+            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
+            if (!hasOtherOverride) siteIds.add(id);
+          });
+        });
+      }
+    }
+    
+    const filtered = allSites.filter(s => siteIds.has(s.id));
+    return Array.from(new Map(filtered.map(s => [s.name, s])).values());
+  }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
@@ -141,7 +164,7 @@ export default function RecordMovementPage() {
   const [approvedBomItems, setApprovedBomItems] = React.useState<BoMItem[]>([]);
   const [approvedPOs, setApprovedPOs] = React.useState<PurchaseOrder[]>([]);
   const [sourceSiteInventory, setSourceSiteInventory] = React.useState<InventoryItem[]>([]);
-  
+
   const form = useForm<z.infer<typeof movementSchema>>({
     resolver: zodResolver(movementSchema),
     defaultValues: { 
@@ -269,12 +292,10 @@ export default function RecordMovementPage() {
       const isTransfer = values.sourceOrDestinationType === 'Site';
       const status = isTransfer ? 'Pending' : 'Recorded';
 
-      // 1. Resolve Effective Recording Manager (respecting overrides)
       const recordingOverridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', selectedSiteId)));
       const recordingOverridesSnap = await getDocs(recordingOverridesQ);
       const effectiveSiteManagerId = !recordingOverridesSnap.empty ? recordingOverridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
 
-      // 2. Resolve Effective Receiving Manager for Transfers (respecting overrides)
       let receivingManagerId = null;
       if (isTransfer) {
         const destSiteName = values.movementType === 'Outward' ? values.sourceOrDestination : values.siteName;
@@ -348,55 +369,97 @@ export default function RecordMovementPage() {
     }
   };
 
-  const accessibleSites = React.useMemo(() => {
-    if (!allSites || !userProfile) return [];
-    if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
-    
-    // Sovereignty Logic
-    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
-    if (isManager) {
-      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
-      if (teamMembers) {
-        teamMembers.forEach(member => {
-          (member.assignedProjectIds || []).forEach(id => {
-            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
-            if (!hasOtherOverride) siteIds.add(id);
-          });
-        });
-      }
-    }
-    
-    const filtered = allSites.filter(s => siteIds.has(s.id));
-    return Array.from(new Map(filtered.map(s => [s.name, s])).values());
-  }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
+  const triggerWhatsApp = () => {
+    if (!submittedData) return;
+    const itemsText = submittedData.items.map((it: any) => `- ${it.itemName}: ${it.quantity} ${it.unit}`).join('\n');
+    const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${submittedData.siteName}\n*Date:* ${format(new Date(submittedData.movementDate), 'dd MMM yyyy')}\n*Flow:* ${submittedData.movementType}\n*Src/Dest:* ${submittedData.sourceOrDestination}\n\n*Items:*\n${itemsText}\n\n*Recorded By:* ${userProfile?.username || user?.email}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
+  if (isSubmitted && submittedData) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh] px-4 animate-in fade-in zoom-in-95 duration-500">
+        <Card className="max-w-md w-full rounded-sm shadow-2xl border-emerald-500/20">
+          <CardHeader className="text-center pt-8">
+            <div className="flex justify-center mb-6">
+              <div className="bg-emerald-500/10 p-6 rounded-full">
+                <CheckCircle2 className="h-16 w-16 text-emerald-600" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-black uppercase tracking-tight text-emerald-900">Log Published</CardTitle>
+            <CardDescription className="text-base font-medium text-emerald-800/70 mt-2">
+              The material movement has been successfully recorded in the site registry.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pb-8 px-8">
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm shadow-md" 
+              onClick={triggerWhatsApp}
+            >
+              <MessageCircle className="mr-2 h-5 w-5" />
+              Share on WhatsApp
+            </Button>
+            <Button 
+              variant="outline"
+              className="w-full h-11 rounded-sm font-bold border-primary/20" 
+              onClick={() => {
+                setIsSubmitted(false);
+                setSubmittedData(null);
+                form.reset();
+              }}
+            >
+              Record New Movement
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <ArrowLeftRight className="h-8 w-8" /> Record Site Movement
+    <div className="space-y-6 max-w-4xl mx-auto pb-20 px-2 sm:px-4">
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 rounded-full">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <h1 className="text-xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+          <ArrowLeftRight className="h-5 w-5" /> Record Movement
         </h1>
-        <p className="text-muted-foreground">Log materials entering or leaving project sites. Transfers require destination manager approval.</p>
       </div>
 
       <Card className="shadow-md border-primary/10 rounded-sm">
-        <CardHeader><CardTitle>Movement Entry Form</CardTitle></CardHeader>
-        <CardContent>
+        <CardContent className="pt-6 px-3 sm:px-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 sm:space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <FormField control={form.control} name="movementDate" render={({ field }) => (
-                  <FormItem><FormLabel>Movement Date</FormLabel><FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Date</FormLabel>
+                    <FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
 
                 <FormField control={form.control} name="movementType" render={({ field }) => (
-                  <FormItem><FormLabel>Movement Direction</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="Inward">Inward (Add to Stock)</SelectItem><SelectItem value="Outward">Outward (Remove from Stock)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Direction</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="Inward">Inward (Add to Stock)</SelectItem>
+                        <SelectItem value="Outward">Outward (Remove from Stock)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>)} 
+                />
 
                 <FormField control={form.control} name="siteName" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Project Site (Recording Site)</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Recording Site</FormLabel>
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
@@ -413,17 +476,17 @@ export default function RecordMovementPage() {
                 )} />
 
                 <FormField control={form.control} name="sourceOrDestinationType" render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel>{movementType === 'Inward' ? 'Source' : 'Destination'} Type</FormLabel>
+                  <FormItem className="space-y-2">
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{movementType === 'Inward' ? 'Source' : 'Dest'} Type</FormLabel>
                     <FormControl>
                       <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="Supplier" id="src-supp" />
-                          <Label htmlFor="src-supp">Supplier</Label>
+                          <Label htmlFor="src-supp" className="text-xs font-bold cursor-pointer">Supplier</Label>
                         </div>
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="Site" id="src-site" />
-                          <Label htmlFor="src-site">Project Site</Label>
+                          <Label htmlFor="src-site" className="text-xs font-bold cursor-pointer">Site</Label>
                         </div>
                       </RadioGroup>
                     </FormControl>
@@ -434,13 +497,13 @@ export default function RecordMovementPage() {
 
               <FormField control={form.control} name="sourceOrDestination" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{movementType === 'Inward' ? 'Received From' : 'Sent To'} Name</FormLabel>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{movementType === 'Inward' ? 'Received From' : 'Sent To'}</FormLabel>
                   {sourceOrDestinationType === 'Supplier' ? (
                     <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>
-                            {field.value || (movementType === 'Inward' ? "Select Supplier (With Approved POs)..." : "Select Supplier...")}
+                            <span className="truncate">{field.value || "Select Vendor..."}</span>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -448,7 +511,7 @@ export default function RecordMovementPage() {
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input placeholder="Search suppliers..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
+                          <Input placeholder="Search vendors..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredSuppliers.map(s => (
@@ -465,7 +528,7 @@ export default function RecordMovementPage() {
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>
-                            {field.value || "Select Target Site..."}
+                            <span className="truncate">{field.value || "Select Target Site..."}</span>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -494,16 +557,16 @@ export default function RecordMovementPage() {
 
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Invoice Documentation</h3>
+                  <FileText className="h-4 w-4 text-primary" />
+                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest text-foreground">Documentation</h3>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField control={form.control} name="invoiceNumber" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice / Challan Number</FormLabel>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice #</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. INV/2024/001" {...field} className="h-11 rounded-sm" />
+                        <Input placeholder="INV/001" {...field} className="h-11 rounded-sm" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -522,13 +585,13 @@ export default function RecordMovementPage() {
 
                 <div className="space-y-3">
                   <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                    <FileUp className="h-4 w-4" /> Upload Invoices / Proof
+                    <FileUp className="h-4 w-4" /> Upload Artifacts
                   </Label>
                   <Input 
                     type="file" 
                     multiple 
                     accept="image/*,application/pdf" 
-                    className="h-auto py-2 border-dashed"
+                    className="h-auto py-2 border-dashed rounded-sm text-xs"
                     onChange={e => {
                       if (e.target.files) {
                         setInvoiceFiles(prev => [...prev, ...Array.from(e.target.files!)]);
@@ -536,11 +599,11 @@ export default function RecordMovementPage() {
                     }}
                   />
                   {invoiceFiles.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-2">
+                    <div className="flex flex-wrap gap-2 pt-1">
                       {invoiceFiles.map((file, idx) => (
-                        <Badge key={idx} variant="secondary" className="gap-2 h-8 rounded-sm">
+                        <Badge key={idx} variant="secondary" className="gap-2 h-7 rounded-sm py-0">
                           <FileText className="h-3 w-3" />
-                          <span className="truncate max-w-[150px] text-[10px]">{file.name}</span>
+                          <span className="truncate max-w-[120px] text-[10px]">{file.name}</span>
                           <X 
                             className="h-3 w-3 cursor-pointer hover:text-destructive transition-colors" 
                             onClick={() => setInvoiceFiles(prev => prev.filter((_, i) => i !== idx))}
@@ -552,32 +615,77 @@ export default function RecordMovementPage() {
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <div className="flex items-center justify-between"><h3 className="text-lg font-black uppercase tracking-widest flex items-center gap-2"><ListPlus className="h-5 w-5 text-primary" /> Authorized Materials List</h3><Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="rounded-sm border-primary text-primary"><Plus className="mr-2 h-4 w-4" /> Add Line Item</Button></div>
-                <div className="space-y-4">{fields.map((field, index) => (
-                  <Card key={field.id} className="relative bg-muted/10 border-dashed rounded-sm">
-                    <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8 text-destructive" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
-                    <CardContent className="pt-6 space-y-4">
-                      <FormField control={form.control} name={`items.${index}.itemName`} render={({ field: itemField }) => (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>Authorized Item</FormLabel>
-                          <Popover open={openItemPopoverIndex === index} onOpenChange={o => setOpenItemPopoverIndex(o ? index : null)}>
-                            <PopoverTrigger asChild><FormControl><Button variant="outline" className={cn("w-full justify-between h-auto min-h-10 bg-background text-left", !itemField.value && "text-muted-foreground")}><span className="truncate whitespace-normal">{itemField.value || "Search contextual materials..."}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger>
-                            <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-1">{filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (<Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-10 text-xs py-2 px-3 text-left whitespace-normal flex items-start gap-2" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}><Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} /><span className="flex-1 break-words leading-relaxed">{lookup.name}</span></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No matching authorized items found for this context.</div>)}</div></ScrollArea></PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel>Quantity</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 bg-background font-mono" /></FormControl><FormMessage /></FormItem>)} />
-                        <FormItem><FormLabel>Unit</FormLabel><Input readOnly value={form.watch(`items.${index}.unit`) || "Numbers"} className="h-10 bg-muted/20 cursor-not-allowed font-bold" /></FormItem>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}</div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                    <ListPlus className="h-4 w-4 text-primary" /> Materials List
+                  </h3>
+                  <Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="h-8 rounded-sm border-primary text-primary text-[10px] px-3">
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Line
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {fields.map((field, index) => (
+                    <Card key={field.id} className="relative bg-muted/10 border-dashed rounded-sm overflow-hidden">
+                      <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 text-destructive" onClick={() => remove(index)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <CardContent className="pt-5 pb-4 px-3 sm:px-6 space-y-4">
+                        <FormField control={form.control} name={`items.${index}.itemName`} render={({ field: itemField }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Authorized Material</FormLabel>
+                            <Popover open={openItemPopoverIndex === index} onOpenChange={o => setOpenItemPopoverIndex(o ? index : null)}>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button variant="outline" className={cn("w-full justify-between h-auto min-h-10 bg-background text-left text-xs rounded-sm", !itemField.value && "text-muted-foreground")}>
+                                    <span className="truncate whitespace-normal leading-tight">{itemField.value || "Select material..."}</span>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start">
+                                <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none text-sm" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
+                                <ScrollArea className="h-[250px]">
+                                  <div className="p-1">
+                                    {filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (
+                                      <Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-11 text-xs py-2 px-3 text-left flex items-start gap-2 mb-0.5" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}>
+                                        <Check className={cn("mt-0.5 h-3.5 w-3.5 text-primary shrink-0", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} />
+                                        <span className="flex-1 break-words leading-tight">{lookup.name}</span>
+                                      </Button>
+                                    )) : (
+                                      <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic">No authorized items matching context.</div>
+                                    )}
+                                  </div>
+                                </ScrollArea>
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Quantity</FormLabel>
+                              <FormControl><Input type="number" step="0.01" {...field} className="h-10 bg-background font-mono font-bold text-xs" /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Unit</FormLabel>
+                            <Input readOnly value={form.watch(`items.${index}.unit`) || "Numbers"} className="h-10 bg-muted/20 cursor-not-allowed font-bold text-xs" />
+                          </FormItem>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex justify-end gap-4 pt-6 border-t"><Button type="submit" className="min-w-[200px] h-12 text-lg font-black uppercase" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Recording...</> : "Record Movements"}</Button></div>
+              <div className="flex justify-end pt-4">
+                <Button type="submit" className="w-full sm:w-auto min-w-[200px] h-12 text-sm font-black uppercase tracking-widest shadow-xl" disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Recording...</> : "Record Movements"}
+                </Button>
+              </div>
             </form>
           </Form>
         </CardContent>
