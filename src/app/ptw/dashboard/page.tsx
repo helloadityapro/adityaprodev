@@ -22,7 +22,8 @@ import {
   TrendingUp,
   AlertCircle,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  FileDown
 } from 'lucide-react';
 import { format, subDays, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -33,6 +34,7 @@ import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import * as XLSX from 'xlsx';
 
 export default function PtwDashboardPage() {
   const firestore = useFirestore();
@@ -119,6 +121,31 @@ export default function PtwDashboardPage() {
     }
   };
 
+  const handleExport = () => {
+    if (!dashboardData || dashboardData.length === 0) return;
+
+    const exportData = dashboardData.map(row => {
+      const data: any = {
+        'Project Company': row.projectCompany,
+        'Project Name': row.name,
+        'Managers': row.managers,
+        'Engineers': row.engineers,
+        'Total PtWs': row.total
+      };
+      
+      ptwTypes?.forEach(type => {
+        data[type.name] = row.typeCounts[type.name] || 0;
+      });
+      
+      return data;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "PtW Compliance Matrix");
+    XLSX.writeFile(wb, `PtW_Dashboard_${format(queryDateRange.start, 'yyyyMMdd')}.xlsx`);
+  };
+
   if (isProfileLoading || sitesLoading || typesLoading || usersLoading || permitsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
   }
@@ -152,6 +179,9 @@ export default function PtwDashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button onClick={handleExport} variant="outline" size="sm" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 mr-2">
+              <FileDown className="h-4 w-4 mr-2" /> Export Matrix
+            </Button>
             <Select value={dateFilter} onValueChange={setDateFilter}>
               <SelectTrigger className="h-10 w-[160px] rounded-sm font-black uppercase text-[10px] tracking-widest bg-secondary border-none">
                 <Calendar className="mr-2 h-3.5 w-3.5" /><SelectValue />

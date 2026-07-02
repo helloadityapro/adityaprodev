@@ -25,7 +25,8 @@ import {
   Globe,
   AreaChart,
   FileText,
-  Eye
+  Eye,
+  FileDown
 } from 'lucide-react';
 import { format, startOfDay, endOfDay, parseISO, differenceInMinutes, isValid } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,7 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
 
 type UserProfile = {
   id: string;
@@ -53,6 +55,7 @@ type SiteVisit = {
   endTime?: any;
   status: 'ongoing' | 'completed';
   locationType?: 'site' | 'other';
+  purpose?: string;
 };
 
 export default function SiteVisitsSummaryPage() {
@@ -135,6 +138,16 @@ export default function SiteVisitsSummaryPage() {
     fetchVisits();
   }, [selectedUserId, selectedDate, customStart, customEnd, useRange, firestore]);
 
+  const calculateDurationStr = (start: any, end: any) => {
+    if (!start || !end) return '—';
+    const s = start.toDate ? start.toDate() : new Date(start);
+    const e = end.toDate ? end.toDate() : new Date(end);
+    const totalMinutes = differenceInMinutes(e, s);
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return `${hours}h ${mins}m`;
+  };
+
   const summary = React.useMemo(() => {
     const totalVisits = filteredVisits.length;
     let totalMinutes = 0;
@@ -158,6 +171,33 @@ export default function SiteVisitsSummaryPage() {
     };
   }, [filteredVisits]);
 
+  const handleExport = () => {
+    if (filteredVisits.length === 0) return;
+
+    const exportData = filteredVisits.map(visit => ({
+      'Date': format(visit.startTime.toDate(), 'dd MMM yyyy'),
+      'Time': `${format(visit.startTime.toDate(), 'HH:mm')} - ${visit.endTime ? format(visit.endTime.toDate(), 'HH:mm') : 'Ongoing'}`,
+      'Location': visit.siteName,
+      'Type': visit.locationType || 'site',
+      'Purpose': visit.purpose || 'N/A',
+      'Duration': calculateDurationStr(visit.startTime, visit.endTime)
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Visit Audit Log");
+    
+    XLSX.utils.sheet_add_aoa(ws, [
+      [],
+      ["Summary Statistics"],
+      ["Total Visits", summary.totalVisits],
+      ["Total Time", summary.totalTime],
+      ["Average Time", summary.avgTime]
+    ], { origin: -1 });
+
+    XLSX.writeFile(wb, `Visit_Summary_${selectedUserObj?.username || 'User'}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  };
+
   if (isProfileLoading || isUsersLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
@@ -180,6 +220,10 @@ export default function SiteVisitsSummaryPage() {
         </div>
 
         <div className="flex flex-wrap items-end gap-3 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+          <Button onClick={handleExport} disabled={filteredVisits.length === 0} variant="outline" size="sm" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+            <FileDown className="h-4 w-4 mr-2" /> Export Report
+          </Button>
+
           <div className="space-y-1.5">
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Select Personnel</Label>
             <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
@@ -384,13 +428,3 @@ function SummaryCard({ title, value, icon: Icon, color, description }: { title: 
     </Card>
   );
 }
-
-const calculateDurationStr = (start: any, end: any) => {
-  if (!start || !end) return '—';
-  const s = start.toDate ? start.toDate() : new Date(start);
-  const e = end.toDate ? end.toDate() : new Date(end);
-  const totalMinutes = differenceInMinutes(e, s);
-  const hours = Math.floor(totalMinutes / 60);
-  const mins = totalMinutes % 60;
-  return `${hours}h ${mins}m`;
-};
