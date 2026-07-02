@@ -15,7 +15,7 @@ import { Download, Award, ShieldCheck, Loader2, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 
 interface CertificateDialogProps {
@@ -198,8 +198,6 @@ export function CertificateDialog({
                 </div>
               </div>
             </div>
-            <ScrollBar orientation="horizontal" />
-            <ScrollBar orientation="vertical" />
           </ScrollArea>
         </div>
 
