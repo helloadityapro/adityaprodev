@@ -169,11 +169,13 @@ export default function PtwActivitiesPage() {
           <h1>PtW Activities</h1>
           <p className="text-muted-foreground text-sm font-medium">Historical log of all permit-related actions and status changes.</p>
         </div>
-        <Button asChild className="rounded-sm font-black uppercase text-[10px] tracking-widest h-10 px-6 shadow-md shadow-primary/20">
-          <Link href="/ptw/dashboard">
-            <LayoutDashboard className="h-3.5 w-3.5 mr-2" /> PtW Dashboard
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest h-10 px-6 border-primary/20 text-primary">
+            <Link href="/ptw/dashboard">
+              <LayoutDashboard className="h-3.5 w-3.5 mr-2" /> PtW Dashboard
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">

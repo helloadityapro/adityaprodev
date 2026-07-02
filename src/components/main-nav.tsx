@@ -513,6 +513,16 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
+                    {canShow('ptw-dashboard') && (
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/ptw/dashboard'} onClick={handleMobileClose}>
+                          <Link href="/ptw/dashboard">
+                            <LayoutDashboard className="h-4 w-4" />
+                            <span>PtW Dashboard</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    )}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>

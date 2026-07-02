@@ -35,6 +35,7 @@ import { Separator } from '@/components/ui/separator';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import Link from 'next/link';
 
 type UserProfile = {
   id: string;
@@ -271,7 +272,7 @@ export default function SiteVisitsSummaryPage() {
         <div className="flex flex-col items-center justify-center py-32 text-center bg-card border border-dashed rounded-sm border-primary/20">
           <User className="h-16 w-16 text-muted-foreground/20 mb-4" />
           <h3 className="text-xl font-bold">Awaiting Selection</h3>
-          <p className="text-muted-foreground max-w-sm mx-auto mt-2 text-sm font-medium">
+          <p className="text-muted-foreground max-sm mx-auto mt-2 text-sm font-medium">
             Please select a personnel from the dropdown above to view their field activity analytics.
           </p>
         </div>

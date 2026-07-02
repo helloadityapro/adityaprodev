@@ -167,6 +167,18 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
   const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
+  const canShow = React.useCallback((key: PageKey): boolean => {
+    if (isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
+    if (!userProfile) return false;
+
+    // Use specific keys if defined in profile, otherwise role defaults
+    const allowedKeys = userProfile.customPermissions 
+      ? new Set(userProfile.customPermissions) 
+      : new Set(roleConfigs?.find(c => c.id === userRoleStr)?.allowedPageKeys || []);
+
+    return allowedKeys.has(key);
+  }, [user, userProfile, roleConfigs, userRoleStr]);
+
   const isBirthday = React.useMemo(() => {
     if (!userProfile?.dob) return false;
     const today = new Date();
@@ -186,15 +198,19 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (isAuthPage || isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
     if (isUserLoading || isProfileLoading || !userProfile) return true;
 
+    // Direct Checklist pages are usually open to all workers
     if (pathname.startsWith('/checklists')) return true;
 
     const pageKey = getPageKeyByPath(pathname);
-    if (!pageKey) return true;
+    if (!pageKey) return true; // Default allowed if not mapped to a specific system key
 
     const allowedKeys = userProfile.customPermissions 
       ? new Set(userProfile.customPermissions) 
       : new Set(roleConfigs?.find(c => c.id === userRoleStr)?.allowedPageKeys || []);
 
+    // Essential screens that bypass restriction logic
+    if (pageKey === 'rewards' || pageKey === 'reports') return true;
+    
     if (allowedKeys.size === 0) return false; 
     
     return allowedKeys.has(pageKey);

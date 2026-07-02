@@ -17,6 +17,7 @@ export type PageKey =
   | 'dpr' 
   | 'tasks' 
   | 'permits' 
+  | 'ptw-dashboard'
   | 'visits' 
   | 'visits-summary'
   | 'trips' 
@@ -77,6 +78,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'dpr', label: 'Daily Progress Reports (DPR)', category: 'Operations', path: '/dpr/submit' },
   { id: 'tasks', label: 'Tasks', category: 'Operations', path: '/tasks/list' },
   { id: 'permits', label: 'Permits to Work (PtW)', category: 'Operations', path: '/ptw/list' },
+  { id: 'ptw-dashboard', label: 'PtW Dashboard', category: 'Operations', path: '/ptw/dashboard' },
   { id: 'visits', label: 'Site Visits', category: 'Operations', path: '/site-visits/active' },
   { id: 'visits-summary', label: 'Visit Summary', category: 'Operations', path: '/site-visits/summary' },
   { id: 'trips', label: 'Vehicle Trips', category: 'Operations', path: '/vehicles/trips/manage' },
@@ -130,7 +132,10 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (match) return match.id;
 
   // 2. Explicit aliases for operational modules that have multiple entry points
-  if (path.startsWith('/ptw')) return 'permits';
+  if (path.startsWith('/ptw')) {
+    if (path.includes('/dashboard')) return 'ptw-dashboard';
+    return 'permits';
+  }
   if (path.startsWith('/dpr')) return 'dpr';
   if (path.startsWith('/tasks')) return 'tasks';
   if (path.startsWith('/inventory')) return 'inventory';
