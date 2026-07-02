@@ -55,7 +55,8 @@ import {
   CalendarCheck,
   Zap,
   FileBarChart,
-  CalendarDays
+  CalendarDays,
+  AreaChart
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -588,6 +589,16 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
+                    {canShow('visits-summary') && (
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/site-visits/summary'} onClick={handleMobileClose}>
+                          <Link href="/site-visits/summary">
+                            <AreaChart className="h-4 w-4" />
+                            <span>Visit Summary</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    )}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>

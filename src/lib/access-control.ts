@@ -18,6 +18,7 @@ export type PageKey =
   | 'tasks' 
   | 'permits' 
   | 'visits' 
+  | 'visits-summary'
   | 'trips' 
   | 'attendance'
   | 'attendance-map'
@@ -77,6 +78,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'tasks', label: 'Tasks', category: 'Operations', path: '/tasks/list' },
   { id: 'permits', label: 'Permits to Work (PtW)', category: 'Operations', path: '/ptw/list' },
   { id: 'visits', label: 'Site Visits', category: 'Operations', path: '/site-visits/active' },
+  { id: 'visits-summary', label: 'Visit Summary', category: 'Operations', path: '/site-visits/summary' },
   { id: 'trips', label: 'Vehicle Trips', category: 'Operations', path: '/vehicles/trips/manage' },
   { id: 'attendance', label: 'Personnel Attendance', category: 'Operations', path: '/attendance' },
   { id: 'attendance-map', label: 'Personnel Live Map', category: 'Operations', path: '/attendance/map-view' },
@@ -137,7 +139,10 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/work-orders')) return 'work-orders';
   if (path.startsWith('/payments')) return 'payments';
   if (path.startsWith('/requirements')) return 'requirements';
-  if (path.startsWith('/site-visits')) return 'visits';
+  if (path.startsWith('/site-visits')) {
+    if (path.includes('/summary')) return 'visits-summary';
+    return 'visits';
+  }
   if (path.startsWith('/attendance')) return 'attendance';
   if (path.startsWith('/checklists/installation')) return 'checklists-installation';
   if (path.startsWith('/checklists/ht-line')) return 'checklists-ht-line';
