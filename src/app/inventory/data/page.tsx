@@ -383,8 +383,8 @@ export default function MovementDataPage() {
 
       {/* View Detail Dialog */}
       <Dialog open={!!viewingMovement} onOpenChange={(o) => !o && setViewingMovement(null)}>
-        <DialogContent className="max-w-2xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
+        <DialogContent className="max-w-2xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><History className="h-5 w-5 text-primary" /></div>
               <div>
@@ -488,7 +488,7 @@ export default function MovementDataPage() {
                    </div>
                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
                      <Clock className="h-3 w-3" /> 
-                     System Timestamp: <span className="text-foreground font-mono">{m.createdAt ? format(viewingMovement.createdAt.toDate(), 'dd MMM yyyy, HH:mm:ss') : '—'}</span>
+                     System Timestamp: <span className="text-foreground font-mono">{viewingMovement.createdAt ? format(viewingMovement.createdAt.toDate(), 'dd MMM yyyy, HH:mm:ss') : '—'}</span>
                    </div>
                 </div>
               </div>
