@@ -1,45 +1,27 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, query, doc } from "firebase/firestore";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import * as React from 'react';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, query, doc } from 'firebase/firestore';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   LayoutDashboard, 
   Search, 
-  FilterX, 
   ArrowLeft, 
-  FileDown, 
   Calendar,
-  Building2,
   ChevronLeft,
   ChevronRight,
-} from "lucide-react";
-import { format, subDays, subMonths, startOfDay, endOfDay } from "date-fns";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import * as XLSX from 'xlsx';
-import { isSuperAdmin } from "@/lib/auth-constants";
-
-type PtwType = { id: string; name: string };
-type Site = { id: string; name: string; projectCompany: string };
-type UserProfile = { id: string; username: string; role: string; assignedProjectIds?: string[] };
-type Permit = { 
-  id: string; 
-  siteId: string; 
-  siteName: string; 
-  ptwType: string; 
-  status: string; 
-  requestDate: any; 
-  siteEngineerId: string; 
-  siteManagerId?: string;
-};
+} from 'lucide-react';
+import { format, subDays, subMonths, startOfDay, endOfDay } from 'date-fns';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import { isSuperAdmin } from '@/lib/auth-constants';
 
 export default function PtwDashboardPage() {
   const firestore = useFirestore();
@@ -51,21 +33,21 @@ export default function PtwDashboardPage() {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
-  const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
+  const { data: allSites, isLoading: sitesLoading } = useCollection<any>(sitesQuery);
 
   const typesQuery = useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]);
-  const { data: ptwTypes, isLoading: typesLoading } = useCollection<PtwType>(typesQuery);
+  const { data: ptwTypes, isLoading: typesLoading } = useCollection<any>(typesQuery);
 
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-  const { data: allUsers, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
+  const { data: allUsers, isLoading: usersLoading } = useCollection<any>(usersQuery);
 
   const permitsQuery = useMemoFirebase(() => collection(firestore, 'permits_to_work'), [firestore]);
-  const { data: allPermits, isLoading: permitsLoading } = useCollection<Permit>(permitsQuery);
+  const { data: allPermits, isLoading: permitsLoading } = useCollection<any>(permitsQuery);
 
   const queryDateRange = React.useMemo(() => {
     const today = new Date();
@@ -120,26 +102,6 @@ export default function PtwDashboardPage() {
     }
   };
 
-  const handleExport = () => {
-    if (dashboardData.length === 0) return;
-    const exportData = dashboardData.map(row => {
-      const base: any = {
-        'Company': row.projectCompany,
-        'Project Site': row.name,
-        'Team': `Mgr: ${row.managers} | Eng: ${row.engineers}`,
-        'Total PtWs': row.total
-      };
-      ptwTypes?.forEach(t => {
-        base[t.name] = row.typeCounts[t.name] || 0;
-      });
-      return base;
-    });
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "PtW Dashboard");
-    XLSX.writeFile(wb, `PtW_Compliance_Matrix_${format(new Date(), 'yyyyMMdd')}.xlsx`);
-  };
-
   if (isProfileLoading || sitesLoading || typesLoading || usersLoading || permitsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
   }
@@ -175,9 +137,6 @@ export default function PtwDashboardPage() {
                 <SelectItem value="allTime" className="text-[10px] font-black uppercase">All Time</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary">
-              <FileDown className="h-4 w-4 mr-2" /> Export Excel
-            </Button>
           </div>
         </div>
       </div>
@@ -255,28 +214,30 @@ export default function PtwDashboardPage() {
                 </TableBody>
               </Table>
             </div>
-
-            {/* Floating Horizontal Scroll Controls */}
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-30 px-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              <Button 
-                variant="secondary" 
-                size="icon" 
-                className="h-10 w-10 rounded-full shadow-2xl bg-background/90 backdrop-blur border border-primary/20 pointer-events-auto hover:bg-primary hover:text-white transition-all"
-                onClick={() => scroll('left')}
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <Button 
-                variant="secondary" 
-                size="icon" 
-                className="h-10 w-10 rounded-full shadow-2xl bg-background/90 backdrop-blur border border-primary/20 pointer-events-auto hover:bg-primary hover:text-white transition-all"
-                onClick={() => scroll('right')}
-              >
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-            </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Floating Horizontal Scroll Controls - VIEWPORT FIXED */}
+      <div className="fixed right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-[60] no-print animate-in fade-in slide-in-from-right-4 duration-500">
+        <Button 
+          variant="secondary" 
+          size="icon" 
+          className="h-12 w-12 rounded-full shadow-2xl bg-background/90 backdrop-blur border-2 border-primary/20 hover:bg-primary hover:text-white transition-all scale-100 hover:scale-110 active:scale-95 group"
+          onClick={() => scroll('left')}
+          title="Scroll Left"
+        >
+          <ChevronLeft className="h-6 w-6 group-hover:scale-110 transition-transform" />
+        </Button>
+        <Button 
+          variant="secondary" 
+          size="icon" 
+          className="h-12 w-12 rounded-full shadow-2xl bg-background/90 backdrop-blur border-2 border-primary/20 hover:bg-primary hover:text-white transition-all scale-100 hover:scale-110 active:scale-95 group"
+          onClick={() => scroll('right')}
+          title="Scroll Right"
+        >
+          <ChevronRight className="h-6 w-6 group-hover:scale-110 transition-transform" />
+        </Button>
       </div>
     </div>
   );
