@@ -20,7 +20,9 @@ import {
   UserCog,
   ShieldCheck,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { format, subDays, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -78,7 +80,11 @@ export default function PtwDashboardPage() {
 
     return allSites.map(site => {
       const sitePermits = allPermits.filter(p => {
-        const pDate = p.requestDate?.toDate?.() || new Date(p.requestDate);
+        let pDate: Date;
+        if (p.requestDate?.toDate) pDate = p.requestDate.toDate();
+        else if (p.requestDate) pDate = new Date(p.requestDate);
+        else return false;
+
         const matchesDate = pDate >= start && pDate <= end;
         return p.siteId === site.id && matchesDate;
       });
@@ -184,13 +190,13 @@ export default function PtwDashboardPage() {
               <Table className="border-separate border-spacing-0 text-[10px] min-w-full w-max table-fixed">
                 <TableHeader className="sticky top-0 z-40">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="sticky left-0 z-50 w-[180px] min-w-[180px] font-black uppercase tracking-widest px-4 h-10 border-r border-b bg-muted shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Project Company</TableHead>
-                    <TableHead className="sticky left-[180px] z-50 w-[200px] min-w-[200px] font-black uppercase tracking-widest px-4 h-10 border-r border-b bg-muted shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Project Name</TableHead>
-                    <TableHead className="sticky left-[380px] z-50 w-[220px] min-w-[220px] font-black uppercase tracking-widest px-4 h-10 border-r border-b text-primary bg-muted shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Assigned Personnel</TableHead>
+                    <TableHead className="sticky left-0 z-50 w-[180px] min-w-[180px] font-black uppercase tracking-widest px-4 h-10 border-r border-b bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Project Company</TableHead>
+                    <TableHead className="sticky left-[180px] z-50 w-[200px] min-w-[200px] font-black uppercase tracking-widest px-4 h-10 border-r border-b bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Project Name</TableHead>
+                    <TableHead className="sticky left-[380px] z-50 w-[220px] min-w-[220px] font-black uppercase tracking-widest px-4 h-10 border-r border-b text-primary bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Assigned Personnel</TableHead>
                     <TableHead className="sticky left-[600px] z-50 w-[100px] min-w-[100px] font-black uppercase tracking-widest px-4 h-10 border-r border-b text-center bg-primary text-primary-foreground shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Total</TableHead>
                     
                     {ptwTypes?.map(type => (
-                      <TableHead key={type.id} className="w-[140px] min-w-[140px] font-black uppercase tracking-tight text-center px-2 h-10 border-r border-b last:border-r-0 bg-muted/50 backdrop-blur">
+                      <TableHead key={`head-${type.id}`} className="w-[140px] min-w-[140px] font-black uppercase tracking-tight text-center px-2 h-10 border-r border-b last:border-r-0 bg-muted/50 backdrop-blur">
                         {type.name}
                       </TableHead>
                     ))}
@@ -198,7 +204,7 @@ export default function PtwDashboardPage() {
                 </TableHeader>
                 <TableBody>
                   {dashboardData.length > 0 ? dashboardData.map((row) => (
-                    <TableRow key={row.id} className="hover:bg-muted/10 transition-colors group">
+                    <TableRow key={`row-${row.id}`} className="hover:bg-muted/10 transition-colors group">
                       <TableCell className="sticky left-0 z-30 px-4 py-2 font-bold text-muted-foreground border-r border-b bg-background group-hover:bg-muted truncate max-w-[180px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] transition-colors">
                         {row.projectCompany}
                       </TableCell>
@@ -222,7 +228,7 @@ export default function PtwDashboardPage() {
                       </TableCell>
                       
                       {ptwTypes?.map(type => (
-                        <TableCell key={`${row.id}-${type.id}`} className="px-2 py-2 text-center border-r border-b last:border-r-0">
+                        <TableCell key={`cell-${row.id}-${type.id}`} className="px-2 py-2 text-center border-r border-b last:border-r-0">
                           <span className={cn(
                             "font-bold text-[11px]",
                             row.typeCounts[type.name] > 0 ? "text-foreground" : "text-muted-foreground/20"

@@ -70,52 +70,19 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from "@/firebase"
-import { doc, collection } from "firebase/firestore"
 import * as React from "react"
-import { isSuperAdmin } from "@/lib/auth-constants"
-import { type PageKey, slugifyRole } from "@/lib/access-control"
+import { type PageKey } from "@/lib/access-control"
 
-type AccessConfig = {
-  id: string;
-  allowedPageKeys: PageKey[];
-};
+interface MainNavProps {
+  userRole: string;
+  userDepartment: string;
+  pendingPtwCount: number;
+  canShow: (key: PageKey) => boolean;
+}
 
-export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRole: string, userDepartment: string, pendingPtwCount: number }) {
+export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: MainNavProps) {
   const pathname = usePathname()
-  const firestore = useFirestore()
-  const { user } = useUser()
   const { setOpenMobile, isMobile } = useSidebar();
-
-  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<any>(userProfileRef);
-
-  const roleConfigsQuery = useMemoFirebase(() => {
-    if (!user) return null;
-    return collection(firestore, 'system_settings', 'access', 'roles');
-  }, [firestore, user]);
-  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
-
-  const isSuper = isSuperAdmin(user?.email);
-  const isAdmin = isSuper || userRole === 'Admin';
-
-  const allowedKeys = React.useMemo(() => {
-    if (isSuper) return null; 
-    if (userProfile?.customPermissions) {
-      return new Set<string>(userProfile.customPermissions);
-    }
-    const roleId = slugifyRole(userRole);
-    const config = roleConfigs?.find(c => c.id === roleId);
-    if (config) {
-      return new Set<string>(config.allowedPageKeys);
-    }
-    return null;
-  }, [userProfile, roleConfigs, userRole, isSuper]);
-
-  const canShow = (key: PageKey) => {
-    if (!allowedKeys) return true;
-    return allowedKeys.has(key);
-  };
 
   const handleMobileClose = () => {
     if (isMobile) {
@@ -192,7 +159,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {isAdmin && (
+                    {canShow('admin-dashboard') && (
                       <SidebarMenuSubItem>
                         <SidebarMenuSubButton asChild isActive={pathname === '/projects/add'} onClick={handleMobileClose}>
                           <Link href="/projects/add">
@@ -269,7 +236,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
-                    {isAdmin && (
+                    {canShow('admin-settings') && (
                       <>
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton asChild isActive={pathname === '/inventory/manage'} onClick={handleMobileClose}>
@@ -511,7 +478,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount }: { userRol
                     <ShieldCheck className="h-4 w-4 text-primary" />
                     <span className="font-medium flex items-center gap-2">
                       Permits
-                      {(isAdmin || userRole === 'Site Manager') && pendingPtwCount > 0 && (
+                      {(userRole === 'Admin' || userRole === 'Site Manager') && pendingPtwCount > 0 && (
                         <div className="bg-red-600 text-white rounded-full font-black h-5 min-w-5 flex items-center justify-center text-[9px] shadow-sm animate-in zoom-in duration-300 px-1 shrink-0">
                           {pendingPtwCount}
                         </div>

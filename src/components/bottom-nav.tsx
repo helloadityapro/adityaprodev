@@ -31,12 +31,17 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { motion } from 'framer-motion';
+import { type PageKey } from '@/lib/access-control';
+
+interface BottomNavProps {
+  canShow: (key: PageKey) => boolean;
+}
 
 /**
  * Bottom navigation bar for mobile devices.
  * Features a centralized "+" Quick Actions hub.
  */
-export function BottomNav() {
+export function BottomNav({ canShow }: BottomNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useUser();
@@ -47,11 +52,11 @@ export function BottomNav() {
   const isDriver = userProfile?.role === 'Driver';
 
   const navItems = [
-    { label: 'Attendance', href: '/attendance', icon: CalendarCheck2 },
-    { label: 'My Tasks', href: '/tasks/list', icon: LayoutList },
+    { label: 'Attendance', href: '/attendance', icon: CalendarCheck2, key: 'attendance' as PageKey },
+    { label: 'My Tasks', href: '/tasks/list', icon: LayoutList, key: 'tasks' as PageKey },
     // Center position is reserved for Quick Actions hub
-    { label: 'My PtWs', href: '/ptw/list', icon: ShieldCheck },
-    { label: 'Profile', href: '/profile', icon: UserCircle2 },
+    { label: 'My PtWs', href: '/ptw/list', icon: ShieldCheck, key: 'permits' as PageKey },
+    { label: 'Profile', href: '/profile', icon: UserCircle2, key: 'reports' as PageKey }, // Profile always shown if reports is ok
   ];
 
   const quickActions = [
@@ -60,50 +65,60 @@ export function BottomNav() {
       icon: <Navigation className="h-4 w-4 text-indigo-500" />,
       href: '/site-visits/start',
       description: 'Check-in to a project site',
+      key: 'visits' as PageKey
     },
     {
       label: 'Request a Vehicle',
       icon: <Fuel className="h-4 w-4 text-orange-500" />,
       href: '/vehicles/request',
       description: 'Allotment for site trip',
+      key: 'trips' as PageKey
     },
     {
       label: 'Request PtW',
       icon: <FilePlus className="h-4 w-4 text-blue-500" />,
       href: '/ptw/raise',
       description: 'Request a new Permit',
+      key: 'permits' as PageKey
     },
     {
       label: 'Submit DPR',
       icon: <TableIcon className="h-4 w-4 text-amber-500" />,
       href: '/dpr/submit',
       description: 'Log daily site progress',
+      key: 'dpr' as PageKey
     },
     {
       label: 'Record Movement',
       icon: <ArrowLeftRight className="h-4 w-4 text-emerald-500" />,
       href: '/movements/record',
       description: 'Log material flow',
+      key: 'inventory' as PageKey
     },
     {
       label: 'Submit Requirement',
       icon: <Package className="h-4 w-4 text-purple-500" />,
       href: '/requirements/submit',
       description: 'Request site materials',
+      key: 'requirements' as PageKey
     },
     {
       label: 'Assign Task',
       icon: <CheckSquare className="h-4 w-4 text-slate-500" />,
       href: '/tasks/create',
       description: 'Delegate a new task',
+      key: 'tasks' as PageKey
     },
   ];
+
+  const filteredQuickActions = quickActions.filter(action => canShow(action.key));
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/80 backdrop-blur-xl pb-safe md:hidden shadow-[0_-4px_20px_0_rgba(0,0,0,0.05)]">
       <div className="flex h-16 items-center justify-around px-1">
         {/* Left Side Items */}
         {navItems.slice(0, 2).map((item) => {
+          if (!canShow(item.key) && item.label !== 'Attendance') return null;
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.href);
           return (
@@ -132,7 +147,7 @@ export function BottomNav() {
         })}
 
         {/* Center: Quick Actions Floating Button (Disabled for Drivers) */}
-        {!isDriver ? (
+        {!isDriver && filteredQuickActions.length > 0 ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <motion.div 
@@ -158,7 +173,7 @@ export function BottomNav() {
               <DropdownMenuSeparator className="bg-primary/5" />
               <ScrollArea className="max-h-[70vh]">
                 <div className="p-1">
-                  {quickActions.map((action) => (
+                  {filteredQuickActions.map((action) => (
                     <DropdownMenuItem
                       key={action.label}
                       onClick={() => router.push(action.href)}
@@ -192,6 +207,7 @@ export function BottomNav() {
 
         {/* Right Side Items */}
         {navItems.slice(2).map((item) => {
+          if (!canShow(item.key) && item.label !== 'Profile') return null;
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.href);
           

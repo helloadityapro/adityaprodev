@@ -24,8 +24,13 @@ import {
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion } from 'framer-motion';
+import { type PageKey } from '@/lib/access-control';
 
-export function QuickActions() {
+interface QuickActionsProps {
+  canShow: (key: PageKey) => boolean;
+}
+
+export function QuickActions({ canShow }: QuickActionsProps) {
   const router = useRouter();
 
   const actions = [
@@ -34,44 +39,55 @@ export function QuickActions() {
       icon: <Navigation className="mr-2 h-4 w-4 text-indigo-500" />,
       href: '/site-visits/start',
       description: 'Check-in to a project site',
+      key: 'visits' as PageKey
     },
     {
       label: 'Request a Vehicle',
       icon: <Fuel className="mr-2 h-4 w-4 text-orange-500" />,
       href: '/vehicles/request',
       description: 'Allotment for site trip',
+      key: 'trips' as PageKey
     },
     {
       label: 'Request PtW',
       icon: <FilePlus className="mr-2 h-4 w-4 text-blue-500" />,
       href: '/ptw/raise',
       description: 'Request a new Permit to Work',
+      key: 'permits' as PageKey
     },
     {
       label: 'Submit DPR',
       icon: <TableIcon className="mr-2 h-4 w-4 text-amber-500" />,
       href: '/dpr/submit',
       description: 'Log daily site progress',
+      key: 'dpr' as PageKey
     },
     {
       label: 'Record Movement',
       icon: <ArrowLeftRight className="mr-2 h-4 w-4 text-emerald-500" />,
       href: '/movements/record',
       description: 'Log material flow',
+      key: 'inventory' as PageKey
     },
     {
       label: 'Submit Requirement',
       icon: <Package className="mr-2 h-4 w-4 text-purple-500" />,
       href: '/requirements/submit',
       description: 'Request site materials',
+      key: 'requirements' as PageKey
     },
     {
       label: 'Assign Task',
       icon: <CheckSquare className="mr-2 h-4 w-4 text-slate-500" />,
       href: '/tasks/create',
       description: 'Delegate a new task',
+      key: 'tasks' as PageKey
     },
   ];
+
+  const filteredActions = actions.filter(action => canShow(action.key));
+
+  if (filteredActions.length === 0) return null;
 
   return (
     <DropdownMenu>
@@ -96,7 +112,7 @@ export function QuickActions() {
           QUICKLY
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {actions.map((action) => (
+        {filteredActions.map((action) => (
           <DropdownMenuItem
             key={action.href}
             onClick={() => router.push(action.href)}

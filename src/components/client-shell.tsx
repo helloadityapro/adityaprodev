@@ -195,7 +195,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       ? new Set(userProfile.customPermissions) 
       : new Set(roleConfigs?.find(c => c.id === userRoleStr)?.allowedPageKeys || []);
 
-    if (allowedKeys.size === 0) return true; 
+    if (allowedKeys.size === 0) return false; 
     
     return allowedKeys.has(pageKey);
   }, [user, userProfile, isUserLoading, isProfileLoading, pathname, isAuthPage, roleConfigs, userRoleStr]);
@@ -391,7 +391,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <MainNav userRole={userRole} userDepartment={userProfile?.department || ""} pendingPtwCount={pendingPtwCount} />
+          <MainNav userRole={userRole} userDepartment={userProfile?.department || ""} pendingPtwCount={pendingPtwCount} canShow={canShow} />
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="flex flex-col h-full overflow-hidden relative">
@@ -440,7 +440,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
               </AnimatePresence>
 
               <div className="hidden md:flex">
-                <QuickActions />
+                <QuickActions canShow={canShow} />
               </div>
               <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full h-8 w-8">
                 {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
@@ -472,7 +472,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
         </div>
-        <BottomNav />
+        <BottomNav canShow={canShow} />
       </SidebarInset>
     </SidebarProvider>
   );

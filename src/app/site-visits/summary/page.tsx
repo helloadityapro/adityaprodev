@@ -23,7 +23,9 @@ import {
   Building2,
   ArrowRight,
   Globe,
-  AreaChart
+  AreaChart,
+  FileText,
+  Eye
 } from 'lucide-react';
 import { format, startOfDay, endOfDay, parseISO, differenceInMinutes, isValid } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -381,3 +383,13 @@ function SummaryCard({ title, value, icon: Icon, color, description }: { title: 
     </Card>
   );
 }
+
+const calculateDurationStr = (start: any, end: any) => {
+  if (!start || !end) return '—';
+  const s = start.toDate ? start.toDate() : new Date(start);
+  const e = end.toDate ? end.toDate() : new Date(end);
+  const totalMinutes = differenceInMinutes(e, s);
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  return `${hours}h ${mins}m`;
+};
