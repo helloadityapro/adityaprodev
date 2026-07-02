@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -6,7 +5,7 @@ import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from "@
 import { collection, doc, query, where, or } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { History, Clock, User, MapPin, FileText, ArrowRight, Eye, Search, Calendar, FilterX, FileCheck } from "lucide-react";
+import { History, Clock, User, MapPin, FileText, ArrowRight, Eye, Search, Calendar, FilterX, FileCheck, LayoutDashboard } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, subDays, subMonths, subYears } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -165,9 +164,16 @@ export default function PtwActivitiesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1>PtW Activities</h1>
-        <p className="text-muted-foreground text-sm font-medium">Historical log of all permit-related actions and status changes.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1>PtW Activities</h1>
+          <p className="text-muted-foreground text-sm font-medium">Historical log of all permit-related actions and status changes.</p>
+        </div>
+        <Button asChild className="rounded-sm font-black uppercase text-[10px] tracking-widest h-10 px-6 shadow-md shadow-primary/20">
+          <Link href="/ptw/dashboard">
+            <LayoutDashboard className="h-3.5 w-3.5 mr-2" /> PtW Dashboard
+          </Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
