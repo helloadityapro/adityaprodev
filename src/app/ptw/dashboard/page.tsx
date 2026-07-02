@@ -180,7 +180,7 @@ export default function PtwDashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={handleExport} variant="outline" size="sm" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 mr-2">
-              <FileDown className="h-4 w-4 mr-2" /> Export Matrix
+              <FileDown className="h-4 w-4 mr-2" /> Export
             </Button>
             <Select value={dateFilter} onValueChange={setDateFilter}>
               <SelectTrigger className="h-10 w-[160px] rounded-sm font-black uppercase text-[10px] tracking-widest bg-secondary border-none">
