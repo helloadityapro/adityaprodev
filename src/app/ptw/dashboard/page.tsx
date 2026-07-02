@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, doc } from "firebase/firestore";
+import { collection, query, doc } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -15,18 +15,14 @@ import {
   FileDown, 
   Calendar,
   Building2,
-  Users,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck,
-  Activity
 } from "lucide-react";
-import { format, subDays, subMonths, isAfter, startOfDay, endOfDay } from "date-fns";
+import { format, subDays, subMonths, startOfDay, endOfDay } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 import { isSuperAdmin } from "@/lib/auth-constants";
@@ -52,7 +48,6 @@ export default function PtwDashboardPage() {
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
-
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -74,8 +69,6 @@ export default function PtwDashboardPage() {
 
   const queryDateRange = React.useMemo(() => {
     const today = new Date();
-    const todayStr = format(today, 'yyyy-MM-dd');
-    
     switch (dateFilter) {
       case 'today': return { start: startOfDay(today), end: endOfDay(today) };
       case 'yesterday': return { start: startOfDay(subDays(today, 1)), end: endOfDay(subDays(today, 1)) };
@@ -121,7 +114,7 @@ export default function PtwDashboardPage() {
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, clientWidth } = scrollContainerRef.current;
+      const { scrollLeft } = scrollContainerRef.current;
       const scrollTo = direction === 'left' ? scrollLeft - 300 : scrollLeft + 300;
       scrollContainerRef.current.scrollTo({ left: scrollTo, behavior: 'smooth' });
     }
@@ -284,22 +277,7 @@ export default function PtwDashboardPage() {
             </div>
           </CardContent>
         </Card>
-        <ScrollBar orientation="horizontal" />
       </div>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: string }) {
-  return (
-    <Card className="rounded-sm border-primary/10 shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
-        <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <Icon className={cn("h-3.5 w-3.5", color)} />
-      </CardHeader>
-      <CardContent className="p-4 pt-0">
-        <div className="text-2xl font-black">{value}</div>
-      </CardContent>
-    </Card>
   );
 }

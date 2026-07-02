@@ -401,8 +401,6 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
                 </Table>
               </TooltipProvider>
             </div>
-            <ScrollBar orientation="horizontal" />
-            <ScrollBar orientation="vertical" />
           </ScrollArea>
         </div>
         <div className="p-3 border-t bg-muted/5 flex items-center justify-center gap-6 shrink-0 relative z-10">

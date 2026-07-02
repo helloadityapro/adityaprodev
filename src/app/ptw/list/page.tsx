@@ -767,7 +767,7 @@ export default function PtwListPage() {
               <div className="min-w-[800px]">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/30">
+                    <TableRow>
                       <TableHead className="px-6 cursor-pointer hover:bg-muted/5" onClick={() => handleSort('serialNumber')}><div className="flex items-center">Serial & Site <SortIcon column="serialNumber" /></div></TableHead>
                       <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('ptwType')}><div className="flex items-center">Type <SortIcon column="ptwType" /></div></TableHead>
                       <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('status')}><div className="flex items-center">Status <SortIcon column="status" /></div></TableHead>
@@ -807,7 +807,6 @@ export default function PtwListPage() {
                   </TableBody>
                 </Table>
               </div>
-              <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </CardContent>
         </Card>
@@ -822,7 +821,7 @@ export default function PtwListPage() {
       </Dialog>
 
       <Dialog open={!!forwardingPermit} onOpenChange={(o) => !o && setForwardingPermit(null)}>
-        <DialogContent className="max-w-md w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
+        <DialogContent className="max-w-md w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[80vh] sm:h-auto max-h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 text-left">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2.5 rounded-sm"><Forward className="h-5 w-5 text-primary" /></div>

@@ -249,7 +249,6 @@ export default function DashboardPage() {
                   )}
                 </TableBody>
               </Table>
-              <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </div>
         </CardContent>
