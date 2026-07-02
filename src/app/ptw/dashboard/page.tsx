@@ -235,7 +235,7 @@ export default function PtwDashboardPage() {
                         <span className="font-black text-sm text-primary">{row.total}</span>
                       </TableCell>
                       {ptwTypes?.map(type => (
-                        <TableCell key={type.id} className="px-2 py-2 text-center border-r last:border-r-0">
+                        <TableCell key={`${row.id}-${type.id}`} className="px-2 py-2 text-center border-r last:border-r-0">
                           <span className={cn(
                             "font-bold text-[11px]",
                             row.typeCounts[type.name] > 0 ? "text-foreground" : "text-muted-foreground/20"
