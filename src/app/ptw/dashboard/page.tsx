@@ -14,6 +14,13 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  Info,
+  Building2,
+  Globe,
+  UserCog,
+  ShieldCheck,
+  TrendingUp,
+  AlertCircle
 } from 'lucide-react';
 import { format, subDays, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -22,11 +29,14 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { useSidebar } from '@/components/ui/sidebar';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function PtwDashboardPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+  const { isMobile } = useSidebar();
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
@@ -110,6 +120,16 @@ export default function PtwDashboardPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      {isMobile && (
+        <Alert className="bg-primary/5 border-primary/20 rounded-sm">
+          <Info className="h-4 w-4 text-primary" />
+          <AlertTitle className="text-[10px] font-black uppercase tracking-widest text-primary">View Optimization</AlertTitle>
+          <AlertDescription className="text-[11px] font-medium leading-relaxed">
+            This page is optimized for desktop view. Please open it in Chrome and <strong>Enable Desktop View</strong> for the best experience.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col gap-1">
         <Button variant="ghost" size="sm" onClick={() => router.push('/ptw/activities')} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Activities
@@ -157,17 +177,18 @@ export default function PtwDashboardPage() {
           <CardContent className="p-0 relative">
             <div 
               ref={scrollContainerRef}
-              className="overflow-x-auto overflow-y-hidden scrollbar-hide"
+              className="overflow-auto scrollbar-hide max-h-[70vh]"
             >
-              <Table className="border-collapse border-spacing-0 text-[10px]">
-                <TableHeader className="bg-muted/50 sticky top-0 z-20">
+              <Table className="border-separate border-spacing-0 text-[10px] w-full">
+                <TableHeader className="sticky top-0 z-40">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="min-w-[180px] font-black uppercase tracking-widest px-4 h-10 border-r">Company</TableHead>
-                    <TableHead className="min-w-[200px] font-black uppercase tracking-widest px-4 h-10 border-r">Project Name</TableHead>
-                    <TableHead className="min-w-[220px] font-black uppercase tracking-widest px-4 h-10 border-r text-primary">Assigned Personnel</TableHead>
-                    <TableHead className="min-w-[100px] font-black uppercase tracking-widest px-4 h-10 border-r text-center bg-primary/5 text-primary">Total</TableHead>
+                    <TableHead className="sticky left-0 z-50 min-w-[180px] font-black uppercase tracking-widest px-4 h-10 border-r border-b bg-muted/90 backdrop-blur shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Project Company</TableHead>
+                    <TableHead className="sticky left-[180px] z-50 min-w-[200px] font-black uppercase tracking-widest px-4 h-10 border-r border-b bg-muted/90 backdrop-blur shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Project Name</TableHead>
+                    <TableHead className="sticky left-[380px] z-50 min-w-[220px] font-black uppercase tracking-widest px-4 h-10 border-r border-b text-primary bg-muted/90 backdrop-blur shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Assigned Personnel</TableHead>
+                    <TableHead className="sticky left-[600px] z-50 min-w-[100px] font-black uppercase tracking-widest px-4 h-10 border-r border-b text-center bg-primary text-primary-foreground shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Total</TableHead>
+                    
                     {ptwTypes?.map(type => (
-                      <TableHead key={type.id} className="min-w-[140px] font-black uppercase tracking-tight text-center px-2 h-10 border-r last:border-r-0">
+                      <TableHead key={type.id} className="min-w-[140px] font-black uppercase tracking-tight text-center px-2 h-10 border-r border-b last:border-r-0 bg-muted/50 backdrop-blur">
                         {type.name}
                       </TableHead>
                     ))}
@@ -175,10 +196,10 @@ export default function PtwDashboardPage() {
                 </TableHeader>
                 <TableBody>
                   {dashboardData.length > 0 ? dashboardData.map((row) => (
-                    <TableRow key={row.id} className="hover:bg-muted/10 transition-colors border-b last:border-0 group">
-                      <TableCell className="px-4 py-2 font-bold text-muted-foreground border-r truncate max-w-[180px]">{row.projectCompany}</TableCell>
-                      <TableCell className="px-4 py-2 font-black text-foreground border-r truncate max-w-[200px]">{row.name}</TableCell>
-                      <TableCell className="px-4 py-2 border-r">
+                    <TableRow key={row.id} className="hover:bg-muted/10 transition-colors group">
+                      <TableCell className="sticky left-0 z-30 px-4 py-2 font-bold text-muted-foreground border-r border-b bg-background group-hover:bg-muted/5 truncate max-w-[180px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">{row.projectCompany}</TableCell>
+                      <TableCell className="sticky left-[180px] z-30 px-4 py-2 font-black text-foreground border-r border-b bg-background group-hover:bg-muted/5 truncate max-w-[200px] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">{row.name}</TableCell>
+                      <TableCell className="sticky left-[380px] z-30 px-4 py-2 border-r border-b bg-background group-hover:bg-muted/5 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                         <div className="flex flex-col gap-0.5 max-w-[220px]">
                           <div className="flex items-center gap-1.5 truncate">
                             <span className="text-[8px] font-black text-primary uppercase bg-primary/5 px-1 rounded-[2px] shrink-0">MGR</span>
@@ -190,11 +211,12 @@ export default function PtwDashboardPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="px-4 py-2 text-center border-r bg-primary/[0.02]">
+                      <TableCell className="sticky left-[600px] z-30 px-4 py-2 text-center border-r border-b bg-primary/[0.03] group-hover:bg-primary/[0.08] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                         <span className="font-black text-sm text-primary">{row.total}</span>
                       </TableCell>
+                      
                       {ptwTypes?.map(type => (
-                        <TableCell key={`${row.id}-${type.id}`} className="px-2 py-2 text-center border-r last:border-r-0">
+                        <TableCell key={`${row.id}-${type.id}`} className="px-2 py-2 text-center border-r border-b last:border-r-0">
                           <span className={cn(
                             "font-bold text-[11px]",
                             row.typeCounts[type.name] > 0 ? "text-foreground" : "text-muted-foreground/20"
@@ -218,7 +240,7 @@ export default function PtwDashboardPage() {
         </Card>
       </div>
 
-      {/* Floating Horizontal Scroll Controls - VIEWPORT FIXED */}
+      {/* Floating Horizontal Scroll Controls */}
       <div className="fixed right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-[60] no-print animate-in fade-in slide-in-from-right-4 duration-500">
         <Button 
           variant="secondary" 
