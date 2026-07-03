@@ -10,6 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { 
   Search, 
   Check, 
   ChevronsUpDown, 
@@ -245,7 +252,12 @@ export default function SiteVisitsSummaryPage() {
   };
 
   if (isProfileLoading || isUsersLoading) {
-    return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
+    return (
+      <div className="p-8 space-y-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
   }
 
   if (!isAdmin) return null;
@@ -530,5 +542,21 @@ function SummaryCard({ title, value, icon: Icon, color, description }: { title: 
         <p className="text-[9px] font-bold text-muted-foreground uppercase opacity-40">{description}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function Avatar({ className, children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <div className={cn("relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full", className)}>
+      {children}
+    </div>
+  );
+}
+
+function AvatarFallback({ className, children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <div className={cn("flex h-full w-full items-center justify-center rounded-full bg-muted", className)}>
+      {children}
+    </div>
   );
 }
