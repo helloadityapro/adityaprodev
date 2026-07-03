@@ -112,6 +112,10 @@ type EditHistoryEntry = {
     otherAttachments: Attachment[];
     customerRepName?: string;
     customerRepRemarks?: string;
+    tableNumber?: string;
+    tableSize?: string;
+    columnCount?: number;
+    moduleCount?: number;
   }
 };
 
@@ -467,7 +471,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           doc.rect(margin, currY, col1, h);
           doc.text(check.label.toUpperCase(), margin + 2, currY + 5.5);
 
-          // Combined Status & Remarks Column
           doc.rect(margin + col1, currY, colStatusRemarks, h);
           doc.text(combinedLines, margin + col1 + 2, currY + 5.5);
 
@@ -496,7 +499,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         doc.rect(margin, currY, col1, otherH);
         doc.text('OTHER REMARK (IF ANY)', margin + 2, currY + 5.5);
         
-        // Combined Status & Remarks Column for "Other"
         doc.rect(margin + col1, currY, colStatusRemarks, otherH);
         doc.text(otherRemLines, margin + col1 + 2, currY + 5.5);
 
@@ -572,7 +574,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       doc.save(`AdityaPro_MMS_Audit_Batch_${sortedItems[0].siteName.replace(/\s+/g, '_')}.pdf`);
       toast({ 
         title: 'Exported successfully', 
-        description: 'If the file does not download, please visit https://adityapro.in/ to download it.' 
+        description: 'Audit documentation has been generated and saved.' 
       });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Export Failed', description: error.message });
@@ -671,14 +673,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     setCustomEnd(format(new Date(), 'yyyy-MM-dd'));
   };
 
-  const getSafeTimestamp = (ts: any) => {
-    if (!ts) return 0;
-    if (ts.toDate) return ts.toDate().getTime();
-    if (ts instanceof Date) return ts.getTime();
-    const d = new Date(ts);
-    return isNaN(d.getTime()) ? 0 : d.getTime();
-  };
-
   if (isProfileLoading || siteLoading || instLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
@@ -761,7 +755,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
               <Input 
-                placeholder="Table / Auditor..." 
+                placeholder="Table Ref or Auditor..." 
                 className="pl-8 h-9 rounded-sm bg-background border-primary/10 text-xs" 
                 value={searchTerm} 
                 onChange={e => setSearchTerm(e.target.value)} 
@@ -1085,8 +1079,14 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                 <div className="p-6 md:p-8 space-y-10">
                   {viewingInstallation?.editHistory && viewingInstallation.editHistory.length > 0 ? (
                     <div className="space-y-8">
-                      {viewingInstallation.editHistory.sort((a, b) => {
-                        const getT = (ts: any) => ts?.toDate?.()?.getTime() || (ts instanceof Date ? ts.getTime() : new Date(ts).getTime() || 0);
+                      {[...viewingInstallation.editHistory].sort((a, b) => {
+                        const getT = (ts: any) => {
+                          if (!ts) return 0;
+                          if (typeof ts === 'string') return new Date(ts).getTime();
+                          if (ts.toDate) return ts.toDate().getTime();
+                          if (ts instanceof Date) return ts.getTime();
+                          return 0;
+                        };
                         return getT(b.timestamp) - getT(a.timestamp);
                       }).map((entry, eIdx) => {
                         const getSafeTime = (ts: any) => {
@@ -1110,7 +1110,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                               <div className="space-y-3">
                                 <Label className="text-[9px] font-black uppercase text-primary tracking-tighter">Previous State Summary</Label>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                  {entry.previousValues?.checks?.map((prevCheck, cIdx) => (
+                                  {entry.previousValues?.checks?.map((prevCheck: any, cIdx: number) => (
                                     <div key={cIdx} className="p-3 border rounded-sm bg-muted/5 space-y-2">
                                       <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-bold uppercase truncate pr-4">{prevCheck.label}</span>
