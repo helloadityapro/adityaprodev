@@ -17,7 +17,6 @@ import {
   FilterX, 
   Building2, 
   User, 
-  ClipboardCheck, 
   Eye, 
   ShieldCheck, 
   CheckCircle2, 
@@ -77,7 +76,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 
 type Site = { 
@@ -167,7 +165,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
-  const [viewingInstallation, setViewingInstallation] = React.useState<InstallationChecklist | null>(null);
   const [commentingRecord, setCommentingRecord] = React.useState<InstallationChecklist | null>(null);
   const [deletingRecord, setDeletingRecord] = React.useState<InstallationChecklist | null>(null);
   const [approvingRecord, setApprovingRecord] = React.useState<{ record: InstallationChecklist, type: 'Approved' | 'Rejected' } | null>(null);
@@ -343,27 +340,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         description: `Checklist for Table ${approvingRecord.record.tableNumber} updated.` 
       });
       setApprovingRecord(null);
-      setViewingInstallation(null);
     } catch (e: any) {
       toast({ variant: "destructive", title: "Action Failed", description: e.message });
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const handleUpdateCheckStatus = (checkIndex: number, newStatus: 'OK' | 'NOT OK' | 'Pending') => {
-    if (!viewingInstallation || !canApprove) return;
-
-    const updatedChecks = [...viewingInstallation.checks];
-    updatedChecks[checkIndex] = { ...updatedChecks[checkIndex], status: newStatus };
-
-    updateDocumentNonBlocking(doc(firestore, 'installation_checklists', viewingInstallation.id), {
-      checks: updatedChecks,
-      updatedAt: serverTimestamp()
-    });
-
-    setViewingInstallation({ ...viewingInstallation, checks: updatedChecks });
-    toast({ title: 'Point Updated', description: `Status set to ${newStatus} for ${updatedChecks[checkIndex].label}.` });
   };
 
   const exportToPDF = async (items: InstallationChecklist[]) => {
@@ -808,7 +789,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
 
         <div className="md:hidden space-y-3">
           {filteredInst.map((record) => (
-            <Card key={record.id} className="rounded-xl border-primary/5 shadow-sm overflow-hidden bg-card cursor-pointer" onClick={() => setViewingInstallation(record)}>
+            <Card key={record.id} className="rounded-xl border-primary/5 shadow-sm overflow-hidden bg-card cursor-pointer" onClick={() => router.push(`/checklists/data/${siteId}/mms/view/${record.id}`)}>
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 min-w-0">
@@ -838,7 +819,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setApprovingRecord({ record, type: 'Rejected' })}><ThumbsDown className="h-4 w-4" /></Button>
                     </div>
                   )}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" asChild><Link href={`/checklists/data/${siteId}/mms/view/${record.id}`}><Eye className="h-5 w-5" /></Link></Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"><MoreVertical className="h-5 w-5" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48 rounded-lg shadow-xl">
@@ -868,10 +849,10 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('user')}>
                       <div className="flex items-center">Auditor <AuditSortIcon column="user" /></div>
                     </TableHead>
-                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('status')}>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('status')}>
                       <div className="flex items-center">Status <AuditSortIcon column="status" /></div>
                     </TableHead>
-                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('updatedAt')}>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('updatedAt')}>
                       <div className="flex items-center">Last Edited <AuditSortIcon column="updatedAt" /></div>
                     </TableHead>
                     <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('comments')}>
@@ -882,14 +863,14 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                 </TableHeader>
                 <TableBody>
                   {filteredInst.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setViewingInstallation(record)}>
+                    <TableRow key={record.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => router.push(`/checklists/data/${siteId}/mms/view/${record.id}`)}>
                       <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
                       <TableCell><Badge variant="secondary" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10">{record.tableNumber}</Badge></TableCell>
                       <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3 w-3 text-primary opacity-50" />{record.userName}</div></TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <Badge variant="outline" className={cn(
-                            "rounded-sm text-[9px] font-black uppercase px-1.5 h-5 w-fit",
+                            "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
                             record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
                             record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
                             "bg-yellow-50 text-yellow-700 border-yellow-200"
@@ -916,7 +897,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setApprovingRecord({ record, type: 'Rejected' })} title="Reject"><CircleX className="h-4 w-4" /></Button>
                             </div>
                           )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingInstallation(record)} title="View Detail"><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/mms/view/${record.id}`} title="View Detail"><Eye className="h-4 w-4" /></Link></Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => exportToPDF([record])} title="Save PDF"><FileDown className="h-4 w-4" /></Button>
                           {(isAdmin || record.userId === user?.uid) && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingRecord(record)} title="Delete Record"><Trash2 className="h-4 w-4" /></Button>}
                         </div>
@@ -929,232 +910,6 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           </CardContent>
         </Card>
       </div>
-
-      <Dialog open={!!viewingInstallation} onOpenChange={(o) => !o && setViewingInstallation(null)}>
-        <DialogContent className="max-w-4xl w-[98vw] h-[90vh] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
-          <DialogHeader className="p-4 md:p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className="bg-primary/10 p-2 rounded-sm"><ShieldCheck className="h-4 w-4 md:h-5 md:w-5 text-primary" /></div>
-              <div className="min-w-0">
-                <DialogTitle className="text-sm md:text-xl font-black uppercase tracking-tight truncate">Audit Summary</DialogTitle>
-                <DialogDescription className="text-[8px] md:text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">{viewingInstallation?.siteName} • Table {viewingInstallation?.tableNumber}</DialogDescription>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pr-8">
-               <Badge variant="outline" className={cn(
-                  "rounded-sm text-[9px] font-black uppercase px-2 h-6 mr-2",
-                  viewingInstallation?.status === 'Approved' ? "bg-green-100 text-green-700 border-green-200" :
-                  viewingInstallation?.status === 'Rejected' ? "bg-red-100 text-red-700 border-red-100" :
-                  "bg-yellow-50 text-yellow-700 border-yellow-200"
-                )}>{viewingInstallation?.status || 'Pending'}</Badge>
-               <Button onClick={() => viewingInstallation && exportToPDF([viewingInstallation])} variant="outline" size="sm" className="h-8 md:h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary/20 text-primary">
-                 <FileDown className="h-3.5 w-3.5 mr-0 md:mr-1.5" /> <span className="hidden md:inline">PDF Report</span>
-               </Button>
-            </div>
-          </DialogHeader>
-
-          <Tabs defaultValue="current" className="flex-1 flex flex-col min-h-0">
-            <div className="bg-muted/10 border-b px-6">
-              <TabsList className="h-10 bg-transparent gap-6">
-                <TabsTrigger value="current" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-10 px-0 font-bold uppercase text-[10px] tracking-widest">Current Audit</TabsTrigger>
-                <TabsTrigger value="history" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-10 px-0 font-bold uppercase text-[10px] tracking-widest">Revision History</TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent value="current" className="flex-1 m-0 overflow-hidden flex flex-col">
-              <ScrollArea className="flex-1">
-                <div className="p-4 md:p-8 space-y-8 md:space-y-10 text-left">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Personnel</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.userName}</p></div>
-                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Table Config</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.tableSize || '—'}</p></div>
-                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Columns</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.columnCount || '—'}</p></div>
-                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Modules</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.moduleCount || '—'}</p></div>
-                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Customer Present</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.customerRepPresent ? `Yes (${viewingInstallation.customerRepName})` : 'No'}</p></div>
-                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Timestamp</Label><p className="text-[10px] md:text-xs font-mono font-bold">{viewingInstallation?.createdAt ? format(viewingInstallation.createdAt.toDate(), 'dd MMM yy, HH:mm') : '—'}</p></div>
-                  </div>
-                  <Separator />
-                  <div className="space-y-6">
-                    <Label className="text-[9px] md:text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" /> Verification Points Feed
-                    </Label>
-                    <div className="flex flex-col gap-4 md:gap-6">
-                      {viewingInstallation?.checks.map((check, idx) => (
-                        <div key={idx} className="flex flex-col gap-4 p-3 md:p-5 border rounded-sm bg-muted/5 group transition-colors hover:border-primary/20">
-                          <div className="flex-1 space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] md:text-[11px] font-black uppercase text-foreground">{check.label}</span>
-                              <div className="flex items-center gap-1">
-                                {canApprove ? (
-                                  <div className="flex items-center gap-1 border rounded-sm p-0.5 bg-background shadow-sm">
-                                    <Button 
-                                      variant="ghost" size="icon" 
-                                      className={cn("h-7 w-7 rounded-sm", check.status === 'OK' ? "bg-green-100 text-green-700" : "opacity-40 hover:bg-green-50")}
-                                      onClick={() => handleUpdateCheckStatus(idx, 'OK')}
-                                    >
-                                      <Check className="h-4 w-4" />
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" size="icon" 
-                                      className={cn("h-7 w-7 rounded-sm", check.status === 'NOT OK' ? "bg-red-100 text-red-700" : "opacity-40 hover:bg-red-50")}
-                                      onClick={() => handleUpdateCheckStatus(idx, 'NOT OK')}
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                    <Button 
-                                      variant="ghost" size="icon" 
-                                      className={cn("h-7 w-7 rounded-sm", check.status === 'Pending' ? "bg-amber-100 text-amber-700" : "opacity-40 hover:bg-green-50")}
-                                      onClick={() => handleUpdateCheckStatus(idx, 'Pending')}
-                                    >
-                                      <AlertTriangle className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <>
-                                    {check.status === 'OK' ? (
-                                      <Badge className="bg-green-50 text-green-700 border-green-200 uppercase font-black text-[7px] h-4">OK</Badge>
-                                    ) : check.status === 'NOT OK' ? (
-                                      <Badge className="bg-red-50 text-red-700 border-red-200 uppercase font-black text-[7px] h-4">NOT OK</Badge>
-                                    ) : (
-                                      <Badge className="bg-amber-50 text-amber-700 border-amber-200 uppercase font-black text-[7px] h-4">Pending</Badge>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <div className="space-y-1">
-                              <p className={cn(
-                                "text-[10px] font-black uppercase tracking-tight",
-                                check.status === 'OK' ? "text-green-600" : check.status === 'NOT OK' ? "text-red-600" : "text-amber-600"
-                              )}>
-                                Status: {check.status}
-                              </p>
-                              {check.remarks && (
-                                <p className="text-xs italic text-muted-foreground leading-relaxed">"{check.remarks}"</p>
-                              )}
-                            </div>
-                          </div>
-                          {check.attachments && check.attachments.length > 0 && (
-                            <div className="flex flex-wrap gap-2 md:gap-3">
-                              {check.attachments.map((file, fIdx) => (
-                                <div key={fIdx} className="relative aspect-video w-24 md:w-40 rounded-sm overflow-hidden border shadow-sm shrink-0 bg-muted cursor-pointer" onClick={() => openViewer(file, check.attachments!)}>
-                                  {isVideo(file) ? <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Film className="h-6 w-6 md:h-8 md:w-8 text-white opacity-40" /><PlayCircle className="absolute h-6 w-6 md:h-8 md:w-8 text-white" /></div> : <img src={file.url} className="w-full h-full object-cover" alt={file.name} />}
-                                  <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Maximize2 className="h-4 w-4 text-white" /></div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {viewingInstallation?.otherRemarks || (viewingInstallation?.otherAttachments && viewingInstallation.otherAttachments.length > 0) ? (
-                    <div className="space-y-6 pt-6 border-t border-dashed">
-                      <Label className="text-[9px] md:text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                        <MessageCircle className="h-4 w-4" /> Additional Observations
-                      </Label>
-                      <div className="p-4 sm:p-6 bg-muted/5 border rounded-sm space-y-4">
-                        {viewingInstallation.otherRemarks && (
-                          <p className="text-sm italic text-foreground/80 leading-relaxed">"{viewingInstallation.otherRemarks}"</p>
-                        )}
-                        {viewingInstallation.otherAttachments && viewingInstallation.otherAttachments.length > 0 && (
-                          <div className="flex flex-wrap gap-3">
-                            {viewingInstallation.otherAttachments.map((file, fIdx) => (
-                              <div key={fIdx} className="relative aspect-video w-24 md:w-40 rounded-sm overflow-hidden border shadow-sm shrink-0 bg-muted cursor-pointer" onClick={() => openViewer(file, viewingInstallation.otherAttachments!)}>
-                                {isVideo(file) ? <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Film className="h-6 w-6 md:h-8 md:w-8 text-white opacity-40" /><PlayCircle className="absolute h-6 w-6 md:h-8 md:w-8 text-white" /></div> : <img src={file.url} className="w-full h-full object-cover" alt={file.name} />}
-                                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Maximize2 className="h-4 w-4 text-white" /></div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-
-            <TabsContent value="history" className="flex-1 m-0 overflow-hidden flex flex-col bg-muted/5">
-              <ScrollArea className="flex-1">
-                <div className="p-6 md:p-8 space-y-10">
-                  {viewingInstallation?.editHistory && viewingInstallation.editHistory.length > 0 ? (
-                    <div className="space-y-8">
-                      {[...viewingInstallation.editHistory].sort((a, b) => {
-                        const getT = (ts: any) => {
-                          if (!ts) return 0;
-                          if (typeof ts === 'string') return new Date(ts).getTime();
-                          if (ts.toDate) return ts.toDate().getTime();
-                          if (ts instanceof Date) return ts.getTime();
-                          return 0;
-                        };
-                        return getT(b.timestamp) - getT(a.timestamp);
-                      }).map((entry, eIdx) => {
-                        const getSafeTime = (ts: any) => {
-                          if (!ts) return '—';
-                          try {
-                            const d = ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
-                            return format(d, 'dd MMM yyyy, HH:mm');
-                          } catch (e) { return '—'; }
-                        };
-                        
-                        return (
-                          <Card key={eIdx} className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-background">
-                            <CardHeader className="bg-muted/30 py-3 border-b flex flex-row items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <History className="h-4 w-4 text-primary" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">Revised by {entry.editedBy}</span>
-                              </div>
-                              <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{getSafeTime(entry.timestamp)}</span>
-                            </CardHeader>
-                            <CardContent className="p-4 space-y-6">
-                              <div className="space-y-3">
-                                <Label className="text-[9px] font-black uppercase text-primary tracking-tighter">Previous State Summary</Label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                  {entry.previousValues?.checks?.map((prevCheck: any, cIdx: number) => (
-                                    <div key={cIdx} className="p-3 border rounded-sm bg-muted/5 space-y-2">
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-bold uppercase truncate pr-4">{prevCheck.label}</span>
-                                        <Badge variant="outline" className={cn("h-4 text-[8px] font-black uppercase rounded-sm px-1", prevCheck.status === 'OK' ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700")}>{prevCheck.status}</Badge>
-                                      </div>
-                                      {prevCheck.remarks && <p className="text-[10px] italic text-muted-foreground truncate">"{prevCheck.remarks}"</p>}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              {entry.previousValues?.otherRemarks && (
-                                  <div className="space-y-1 p-3 bg-muted/10 border-l-2 border-primary/20">
-                                     <Label className="text-[8px] font-black uppercase text-muted-foreground">General Note</Label>
-                                     <p className="text-xs italic">"{entry.previousValues.otherRemarks}"</p>
-                                  </div>
-                              )}
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="py-24 text-center text-muted-foreground italic flex flex-col items-center justify-center gap-4 opacity-40 uppercase tracking-[0.2em]">
-                       <History className="h-12 w-12" />
-                       <p className="text-sm font-black">Initial Version Only</p>
-                       <p className="text-[9px] max-w-xs leading-relaxed">No revisions have been documented for this audit record since the original submission.</p>
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-          </Tabs>
-
-          <DialogFooter className="p-4 bg-muted/5 border-t shrink-0">
-             {isAdmin && (!viewingInstallation?.status || viewingInstallation.status === 'Pending') && (
-               <div className="flex-1 flex gap-2">
-                 <Button className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white font-black uppercase text-[10px] tracking-widest" onClick={() => setApprovingRecord({ record: viewingInstallation!, type: 'Approved' })}>Approve Audit</Button>
-                 <Button variant="destructive" className="flex-1 h-11 font-black uppercase text-[10px] tracking-widest" onClick={() => setApprovingRecord({ record: viewingInstallation!, type: 'Rejected' })}>Reject Audit</Button>
-               </div>
-             )}
-             <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 md:h-11 px-8 w-full sm:w-auto">Close Audit Log</Button></DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!approvingRecord} onOpenChange={() => setApprovingRecord(null)}>
         <DialogContent className="max-w-md w-[95vw] rounded-sm p-6">
