@@ -57,7 +57,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   CircleCheck,
-  CircleX
+  CircleX,
+  Pencil
 } from 'lucide-react';
 import { format, subDays, subMonths } from 'date-fns';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -99,6 +100,19 @@ type Comment = {
   createdAt: any;
 };
 
+type EditHistoryEntry = {
+  editedBy: string;
+  editedById: string;
+  timestamp: any;
+  previousValues: {
+    checks: any[];
+    otherRemarks: string;
+    otherAttachments: Attachment[];
+    customerRepName?: string;
+    customerRepRemarks?: string;
+  }
+};
+
 type InstallationChecklist = {
   id: string;
   siteId: string;
@@ -111,6 +125,10 @@ type InstallationChecklist = {
   userId: string;
   userName: string;
   createdAt: any;
+  updatedAt?: any;
+  updatedByName?: string;
+  updatedById?: string;
+  editHistory?: EditHistoryEntry[];
   checks: { key?: string; label: string; remarks: string; status: 'OK' | 'NOT OK' | 'Pending'; attachments?: Attachment[] }[];
   otherRemarks: string;
   otherAttachments?: Attachment[];
@@ -125,7 +143,7 @@ type InstallationChecklist = {
   processedAt?: any;
 };
 
-type AuditSortKey = 'date' | 'table' | 'user' | 'comments' | 'status';
+type AuditSortKey = 'date' | 'table' | 'user' | 'comments' | 'status' | 'updatedAt';
 
 export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteId: string }> }) {
   const resolvedParams = React.use(params);
@@ -227,6 +245,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       else if (key === 'user') { valA = a.userName.toLowerCase(); valB = b.userName.toLowerCase(); }
       else if (key === 'comments') { valA = a.comments?.length || 0; valB = b.comments?.length || 0; }
       else if (key === 'status') { valA = a.status || 'Pending'; valB = b.status || 'Pending'; }
+      else if (key === 'updatedAt') { valA = a.updatedAt?.toDate?.()?.getTime() || 0; valB = b.updatedAt?.toDate?.()?.getTime() || 0; }
 
       if (valA < valB) return direction === 'asc' ? -1 : 1;
       if (valA > valB) return direction === 'asc' ? 1 : -1;
@@ -662,7 +681,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         </Button>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1 min-w-0">
-            <h2 className="text-lg md:text-2xl font-black text-foreground uppercase tracking-tight flex items-center gap-2 md:gap-3 leading-tight">
+            <h2 className="text-lg md:text-2xl font-black text-foreground uppercase tracking-tight flex items-center gap-2 md:gap-3 leading-none">
               <Building2 className="h-5 w-5 md:h-6 md:w-6 text-primary shrink-0" />
               <span className="truncate">{site.name} : MMS Records</span>
             </h2>
@@ -680,7 +699,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           {isAdmin && (
             <Button onClick={() => router.push(`/checklists/data/${siteId}/mms/matrix`)} disabled={filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5">
               <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> 
-              View All Records
+              View Matrix
             </Button>
           )}
 
@@ -722,7 +741,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       <div className="flex flex-col gap-3 bg-card p-3 border border-primary/10 rounded-sm shadow-sm">
         <div className="flex flex-row items-end gap-2">
           <div className="flex-1 space-y-1">
-            <Label className="text-[9px] font-black uppercase text-muted-foreground px-1 hidden xs:block">Search</Label>
+            <Label className="text-[9px] font-black uppercase text-muted-foreground px-1 hidden xs:block">Search Registry</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
               <Input 
@@ -737,6 +756,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             <Label className="text-[9px] font-black uppercase text-muted-foreground px-1 hidden xs:block">Time Range</Label>
             <Select value={dateFilter} onValueChange={setDateFilter}>
               <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase">
+                <Calendar className="h-3.5 w-3.5 mr-1 opacity-50" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -770,9 +790,9 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
 
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <span className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-widest">
-            {filteredInst.length} {filteredInst.length === 1 ? 'Audit' : 'Audits'} Found
-          </span>
+          <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-[0.2em] px-3 h-6 border-none">
+            {filteredInst.length} Audits Indexed
+          </Badge>
         </div>
 
         <div className="md:hidden space-y-3">
@@ -794,23 +814,18 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                       record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
                       "bg-yellow-50 text-yellow-700 border-yellow-200"
                     )}>{record.status || 'Pending'}</Badge>
-                    {record.processedByName && (record.status === 'Approved' || record.status === 'Rejected') && (
-                      <span className="text-[7px] font-bold text-muted-foreground uppercase">By: {record.processedByName}</span>
-                    )}
                   </div>
                 </div>
                 
                 <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                  {(isAdmin || record.userId === user?.uid) && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => router.push(`/checklists/data/${siteId}/mms/edit/${record.id}`)}><Pencil className="h-4 w-4" /></Button>
+                  )}
                   {canApprove && (!record.status || record.status === 'Pending') && (
                     <div className="flex gap-1 mr-2">
                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setApprovingRecord({ record, type: 'Approved' })}><ThumbsUp className="h-4 w-4" /></Button>
                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setApprovingRecord({ record, type: 'Rejected' })}><ThumbsDown className="h-4 w-4" /></Button>
                     </div>
-                  )}
-                  {record.status === 'Rejected' && record.userId === user?.uid && (
-                    <Button variant="outline" size="sm" className="h-8 rounded-sm font-black text-[9px] uppercase tracking-widest border-amber-500 text-amber-700 hover:bg-amber-50 mr-2" asChild>
-                      <Link href={`/checklists/installation?correct=${record.id}`}><RotateCw className="h-3 w-3 mr-1" /> Resubmit</Link>
-                    </Button>
                   )}
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-5 w-5" /></Button>
                   <DropdownMenu>
@@ -845,6 +860,9 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('status')}>
                       <div className="flex items-center">Status <AuditSortIcon column="status" /></div>
                     </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('updatedAt')}>
+                      <div className="flex items-center">Last Edited <AuditSortIcon column="updatedAt" /></div>
+                    </TableHead>
                     <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('comments')}>
                       <div className="flex items-center justify-center">Comments <AuditSortIcon column="comments" /></div>
                     </TableHead>
@@ -865,29 +883,31 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                             record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
                             "bg-yellow-50 text-yellow-700 border-yellow-200"
                           )}>{record.status || 'Pending'}</Badge>
-                          {record.processedByName && (record.status === 'Approved' || record.status === 'Rejected') && (
-                            <span className="text-[8px] font-bold text-muted-foreground uppercase leading-tight">By: {record.processedByName}</span>
-                          )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {record.updatedAt ? (
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold">{record.updatedByName}</span>
+                            <span className="text-[9px] text-muted-foreground font-mono">{format(record.updatedAt.toDate(), 'dd/MM HH:mm')}</span>
+                          </div>
+                        ) : <span className="text-[10px] text-muted-foreground italic">—</span>}
                       </TableCell>
                       <TableCell className="text-center"><button onClick={(e) => { e.stopPropagation(); setCommentingRecord(record); }} className="h-7 text-[10px] font-bold uppercase gap-1.5 hover:bg-primary/5 text-muted-foreground hover:text-primary inline-flex items-center px-3 rounded-sm transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {record.comments?.length || 0}</button></TableCell>
                       <TableCell className="text-right px-6">
                         <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                          {(isAdmin || record.userId === user?.uid) && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/5" onClick={() => router.push(`/checklists/data/${siteId}/mms/edit/${record.id}`)} title="Edit Checklist"><Pencil className="h-4 w-4" /></Button>
+                          )}
                           {canApprove && (!record.status || record.status === 'Pending') && (
                             <div className="flex gap-1 mr-2">
                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setApprovingRecord({ record, type: 'Approved' })} title="Approve"><CircleCheck className="h-4 w-4" /></Button>
                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setApprovingRecord({ record, type: 'Rejected' })} title="Reject"><CircleX className="h-4 w-4" /></Button>
                             </div>
                           )}
-                          {record.status === 'Rejected' && record.userId === user?.uid && (
-                            <Button variant="outline" size="sm" className="h-8 rounded-sm font-black text-[9px] uppercase tracking-widest border-amber-500 text-amber-700 hover:bg-amber-50 mr-2" asChild>
-                              <Link href={`/checklists/installation?correct=${record.id}`}><RotateCw className="h-3 w-3 mr-1" /> Resubmit</Link>
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingInstallation(record)}><Eye className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => exportToPDF([record])}><FileDown className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setCommentingRecord(record)}><MessageCircle className="h-4 w-4" /></Button>
-                          {(isAdmin || record.userId === user?.uid) && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>}
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingInstallation(record)} title="View Detail"><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600" onClick={() => exportToPDF([record])} title="Save PDF"><FileDown className="h-4 w-4" /></Button>
+                          {(isAdmin || record.userId === user?.uid) && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeletingRecord(record)} title="Delete Record"><Trash2 className="h-4 w-4" /></Button>}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -921,171 +941,185 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                </Button>
             </div>
           </DialogHeader>
-          <ScrollArea className="flex-1">
-            <div className="p-4 md:p-8 space-y-8 md:space-y-10 text-left">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Personnel</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.userName}</p></div>
-                <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Table Config</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.tableSize || '—'}</p></div>
-                <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Columns</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.columnCount || '—'}</p></div>
-                <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Modules</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.moduleCount || '—'}</p></div>
-                <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Customer Present</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.customerRepPresent ? `Yes (${viewingInstallation.customerRepName})` : 'No'}</p></div>
-                <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Timestamp</Label><p className="text-[10px] md:text-xs font-mono font-bold">{viewingInstallation?.createdAt ? format(viewingInstallation.createdAt.toDate(), 'dd MMM yy, HH:mm') : '—'}</p></div>
-              </div>
-              <Separator />
-              <div className="space-y-6">
-                <Label className="text-[9px] md:text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4" /> Verification Points Feed
-                </Label>
-                <div className="flex flex-col gap-4 md:gap-6">
-                  {viewingInstallation?.checks.map((check, idx) => (
-                    <div key={idx} className="flex flex-col gap-4 p-3 md:p-5 border rounded-sm bg-muted/5 group transition-colors hover:border-primary/20">
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] md:text-[11px] font-black uppercase text-foreground">{check.label}</span>
-                          <div className="flex items-center gap-1">
-                            {canApprove ? (
-                              <div className="flex items-center gap-1 border rounded-sm p-0.5 bg-background shadow-sm">
-                                <Button 
-                                  variant="ghost" size="icon" 
-                                  className={cn("h-7 w-7 rounded-sm", check.status === 'OK' ? "bg-green-100 text-green-700" : "opacity-40 hover:bg-green-50")}
-                                  onClick={() => handleUpdateCheckStatus(idx, 'OK')}
-                                >
-                                  <Check className="h-4 w-4" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" size="icon" 
-                                  className={cn("h-7 w-7 rounded-sm", check.status === 'NOT OK' ? "bg-red-100 text-red-700" : "opacity-40 hover:bg-red-50")}
-                                  onClick={() => handleUpdateCheckStatus(idx, 'NOT OK')}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" size="icon" 
-                                  className={cn("h-7 w-7 rounded-sm", check.status === 'Pending' ? "bg-amber-100 text-amber-700" : "opacity-40 hover:bg-green-50")}
-                                  onClick={() => handleUpdateCheckStatus(idx, 'Pending')}
-                                >
-                                  <AlertTriangle className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <>
-                                {check.status === 'OK' ? (
-                                  <Badge className="bg-green-50 text-green-700 border-green-200 uppercase font-black text-[7px] h-4">OK</Badge>
-                                ) : check.status === 'NOT OK' ? (
-                                  <Badge className="bg-red-50 text-red-700 border-red-200 uppercase font-black text-[7px] h-4">NOT OK</Badge>
+
+          <Tabs defaultValue="current" className="flex-1 flex flex-col min-h-0">
+            <div className="bg-muted/10 border-b px-6">
+              <TabsList className="h-10 bg-transparent gap-6">
+                <TabsTrigger value="current" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-10 px-0 font-bold uppercase text-[10px] tracking-widest">Current Audit</TabsTrigger>
+                <TabsTrigger value="history" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none h-10 px-0 font-bold uppercase text-[10px] tracking-widest">Revision History</TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="current" className="flex-1 m-0 overflow-hidden flex flex-col">
+              <ScrollArea className="flex-1">
+                <div className="p-4 md:p-8 space-y-8 md:space-y-10 text-left">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Personnel</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.userName}</p></div>
+                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Table Config</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.tableSize || '—'}</p></div>
+                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Columns</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.columnCount || '—'}</p></div>
+                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Modules</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.moduleCount || '—'}</p></div>
+                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Customer Present</Label><p className="text-[10px] md:text-xs font-bold">{viewingInstallation?.customerRepPresent ? `Yes (${viewingInstallation.customerRepName})` : 'No'}</p></div>
+                    <div className="space-y-1"><Label className="text-[8px] md:text-[9px] font-black uppercase text-muted-foreground">Timestamp</Label><p className="text-[10px] md:text-xs font-mono font-bold">{viewingInstallation?.createdAt ? format(viewingInstallation.createdAt.toDate(), 'dd MMM yy, HH:mm') : '—'}</p></div>
+                  </div>
+                  <Separator />
+                  <div className="space-y-6">
+                    <Label className="text-[9px] md:text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" /> Verification Points Feed
+                    </Label>
+                    <div className="flex flex-col gap-4 md:gap-6">
+                      {viewingInstallation?.checks.map((check, idx) => (
+                        <div key={idx} className="flex flex-col gap-4 p-3 md:p-5 border rounded-sm bg-muted/5 group transition-colors hover:border-primary/20">
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] md:text-[11px] font-black uppercase text-foreground">{check.label}</span>
+                              <div className="flex items-center gap-1">
+                                {canApprove ? (
+                                  <div className="flex items-center gap-1 border rounded-sm p-0.5 bg-background shadow-sm">
+                                    <Button 
+                                      variant="ghost" size="icon" 
+                                      className={cn("h-7 w-7 rounded-sm", check.status === 'OK' ? "bg-green-100 text-green-700" : "opacity-40 hover:bg-green-50")}
+                                      onClick={() => handleUpdateCheckStatus(idx, 'OK')}
+                                    >
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" size="icon" 
+                                      className={cn("h-7 w-7 rounded-sm", check.status === 'NOT OK' ? "bg-red-100 text-red-700" : "opacity-40 hover:bg-red-50")}
+                                      onClick={() => handleUpdateCheckStatus(idx, 'NOT OK')}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" size="icon" 
+                                      className={cn("h-7 w-7 rounded-sm", check.status === 'Pending' ? "bg-amber-100 text-amber-700" : "opacity-40 hover:bg-green-50")}
+                                      onClick={() => handleUpdateCheckStatus(idx, 'Pending')}
+                                    >
+                                      <AlertTriangle className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 ) : (
-                                  <Badge className="bg-amber-50 text-amber-700 border-amber-200 uppercase font-black text-[7px] h-4">Pending</Badge>
+                                  <>
+                                    {check.status === 'OK' ? (
+                                      <Badge className="bg-green-50 text-green-700 border-green-200 uppercase font-black text-[7px] h-4">OK</Badge>
+                                    ) : check.status === 'NOT OK' ? (
+                                      <Badge className="bg-red-50 text-red-700 border-red-200 uppercase font-black text-[7px] h-4">NOT OK</Badge>
+                                    ) : (
+                                      <Badge className="bg-amber-50 text-amber-700 border-amber-200 uppercase font-black text-[7px] h-4">Pending</Badge>
+                                    )}
+                                  </>
                                 )}
-                              </>
-                            )}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <p className={cn(
+                                "text-[10px] font-black uppercase tracking-tight",
+                                check.status === 'OK' ? "text-green-600" : check.status === 'NOT OK' ? "text-red-600" : "text-amber-600"
+                              )}>
+                                Status: {check.status}
+                              </p>
+                              {check.remarks && (
+                                <p className="text-xs italic text-muted-foreground leading-relaxed">"{check.remarks}"</p>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        <div className="space-y-1">
-                          <p className={cn(
-                            "text-[10px] font-black uppercase tracking-tight",
-                            check.status === 'OK' ? "text-green-600" : check.status === 'NOT OK' ? "text-red-600" : "text-amber-600"
-                          )}>
-                            Status: {check.status}
-                          </p>
-                          {check.remarks && (
-                            <p className="text-xs italic text-muted-foreground leading-relaxed">"{check.remarks}"</p>
+                          {check.attachments && check.attachments.length > 0 && (
+                            <div className="flex flex-wrap gap-2 md:gap-3">
+                              {check.attachments.map((file, fIdx) => (
+                                <div key={fIdx} className="relative aspect-video w-24 md:w-40 rounded-sm overflow-hidden border shadow-sm shrink-0 bg-muted cursor-pointer" onClick={() => openViewer(file, check.attachments!)}>
+                                  {isVideo(file) ? <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Film className="h-6 w-6 md:h-8 md:w-8 text-white opacity-40" /><PlayCircle className="absolute h-6 w-6 md:h-8 md:w-8 text-white" /></div> : <img src={file.url} className="w-full h-full object-cover" alt={file.name} />}
+                                  <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Maximize2 className="h-4 w-4 text-white" /></div>
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
-                      </div>
-                      {check.attachments && check.attachments.length > 0 && (
-                        <div className="flex flex-wrap gap-2 md:gap-3">
-                          {check.attachments.map((file, fIdx) => (
-                            <div key={fIdx} className="relative aspect-video w-24 md:w-40 rounded-sm overflow-hidden border shadow-sm shrink-0 bg-muted cursor-pointer" onClick={() => openViewer(file, check.attachments!)}>
-                              {isVideo(file) ? <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Film className="h-6 w-6 md:h-8 md:w-8 text-white opacity-40" /><PlayCircle className="absolute h-6 w-6 md:h-8 md:w-8 text-white" /></div> : <img src={file.url} className="w-full h-full object-cover" alt={file.name} />}
-                              <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Maximize2 className="h-4 w-4 text-white" /></div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
 
-              {viewingInstallation?.otherRemarks || (viewingInstallation?.otherAttachments && viewingInstallation.otherAttachments.length > 0) ? (
-                <div className="space-y-6 pt-6 border-t border-dashed">
-                  <Label className="text-[9px] md:text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                    <MessageCircle className="h-4 w-4" /> Additional Observations
-                  </Label>
-                  <div className="p-4 sm:p-6 bg-muted/5 border rounded-sm space-y-4">
-                    {viewingInstallation.otherRemarks && (
-                      <p className="text-sm italic text-foreground/80 leading-relaxed">"{viewingInstallation.otherRemarks}"</p>
-                    )}
-                    {viewingInstallation.otherAttachments && viewingInstallation.otherAttachments.length > 0 && (
-                      <div className="flex flex-wrap gap-3">
-                        {viewingInstallation.otherAttachments.map((file, fIdx) => (
-                          <div key={fIdx} className="relative aspect-video w-24 md:w-40 rounded-sm overflow-hidden border shadow-sm shrink-0 bg-muted cursor-pointer" onClick={() => openViewer(file, viewingInstallation.otherAttachments!)}>
-                            {isVideo(file) ? <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Film className="h-6 w-6 md:h-8 md:w-8 text-white opacity-40" /><PlayCircle className="absolute h-6 w-6 md:h-8 md:w-8 text-white" /></div> : <img src={file.url} className="w-full h-full object-cover" alt={file.name} />}
-                            <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Maximize2 className="h-4 w-4 text-white" /></div>
+                  {viewingInstallation?.otherRemarks || (viewingInstallation?.otherAttachments && viewingInstallation.otherAttachments.length > 0) ? (
+                    <div className="space-y-6 pt-6 border-t border-dashed">
+                      <Label className="text-[9px] md:text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                        <MessageCircle className="h-4 w-4" /> Additional Observations
+                      </Label>
+                      <div className="p-4 sm:p-6 bg-muted/5 border rounded-sm space-y-4">
+                        {viewingInstallation.otherRemarks && (
+                          <p className="text-sm italic text-foreground/80 leading-relaxed">"{viewingInstallation.otherRemarks}"</p>
+                        )}
+                        {viewingInstallation.otherAttachments && viewingInstallation.otherAttachments.length > 0 && (
+                          <div className="flex flex-wrap gap-3">
+                            {viewingInstallation.otherAttachments.map((file, fIdx) => (
+                              <div key={fIdx} className="relative aspect-video w-24 md:w-40 rounded-sm overflow-hidden border shadow-sm shrink-0 bg-muted cursor-pointer" onClick={() => openViewer(file, viewingInstallation.otherAttachments!)}>
+                                {isVideo(file) ? <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Film className="h-6 w-6 md:h-8 md:w-8 text-white opacity-40" /><PlayCircle className="absolute h-6 w-6 md:h-8 md:w-8 text-white" /></div> : <img src={file.url} className="w-full h-full object-cover" alt={file.name} />}
+                                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Maximize2 className="h-4 w-4 text-white" /></div>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-
-              {viewingInstallation?.status && viewingInstallation.status !== 'Pending' && (
-                <div className="space-y-4 pt-6 border-t border-dashed">
-                  <Label className={cn(
-                    "text-[9px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-2",
-                    viewingInstallation.status === 'Approved' ? "text-green-700" : "text-red-700"
-                  )}>
-                    <ShieldCheck className="h-4 w-4" /> Authority Review Feedback
-                  </Label>
-                  <div className={cn(
-                    "p-4 border rounded-sm",
-                    viewingInstallation.status === 'Approved' ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
-                  )}>
-                    <div className="flex items-center justify-between mb-2">
-                       <Badge variant="outline" className={cn(
-                         "h-5 text-[8px] font-black uppercase rounded-sm px-1.5",
-                         viewingInstallation.status === 'Approved' ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                       )}>{viewingInstallation.status}</Badge>
-                       <span className="text-[10px] font-bold text-muted-foreground uppercase">{formatTimestamp(viewingInstallation.processedAt)}</span>
                     </div>
-                    <p className={cn("text-sm italic font-medium", viewingInstallation.status === 'Approved' ? "text-green-900" : "text-red-900")}>
-                      "{viewingInstallation.adminRemarks || 'Processed without additional remarks.'}"
-                    </p>
-                    <p className={cn("text-[8px] font-black uppercase mt-3", viewingInstallation.status === 'Approved' ? "text-green-700" : "text-red-700")}>
-                      Decision by: {viewingInstallation.processedByName || 'Authorized Administrator'}
-                    </p>
-                  </div>
+                  ) : null}
                 </div>
-              )}
+              </ScrollArea>
+            </TabsContent>
 
-              <div className="space-y-4 pt-6 border-t border-dashed">
-                <Label className="text-[9px] md:text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4" /> Compliance Undertaking
-                </Label>
-                <div className="p-4 bg-emerald-50/50 border border-emerald-100 rounded-sm flex items-start gap-3">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="text-xs font-bold text-emerald-900 leading-relaxed">
-                      Confirmed: I, {viewingInstallation?.userName}, hereby undertake and confirm that the information provided above is true and accurate as of the date of submission.
-                    </p>
-                    <p className="text-[8px] font-black text-emerald-700 uppercase tracking-tighter">Digitally Verified on {viewingInstallation?.createdAt ? format(viewingInstallation.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : '—'}</p>
-                  </div>
+            <TabsContent value="history" className="flex-1 m-0 overflow-hidden flex flex-col bg-muted/5">
+              <ScrollArea className="flex-1">
+                <div className="p-6 md:p-8 space-y-10">
+                  {viewingInstallation?.editHistory && viewingInstallation.editHistory.length > 0 ? (
+                    <div className="space-y-8">
+                      {viewingInstallation.editHistory.sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0)).map((entry, eIdx) => (
+                        <Card key={eIdx} className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-background">
+                          <CardHeader className="bg-muted/30 py-3 border-b flex flex-row items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <History className="h-4 w-4 text-primary" />
+                              <span className="text-[10px] font-black uppercase tracking-widest">Revised by {entry.editedBy}</span>
+                            </div>
+                            <span className="text-[9px] font-mono font-bold text-muted-foreground">{entry.timestamp ? format(entry.timestamp.toDate(), 'dd MMM yyyy, HH:mm') : '—'}</span>
+                          </CardHeader>
+                          <CardContent className="p-4 space-y-6">
+                            <div className="space-y-3">
+                              <Label className="text-[9px] font-black uppercase text-primary tracking-tighter">Previous State Summary</Label>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {entry.previousValues.checks.map((prevCheck, cIdx) => (
+                                  <div key={cIdx} className="p-3 border rounded-sm bg-muted/5 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[10px] font-bold uppercase truncate pr-4">{prevCheck.label}</span>
+                                      <Badge variant="outline" className={cn("h-4 text-[8px] font-black uppercase rounded-sm px-1", prevCheck.status === 'OK' ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700")}>{prevCheck.status}</Badge>
+                                    </div>
+                                    {prevCheck.remarks && <p className="text-[10px] italic text-muted-foreground truncate">"{prevCheck.remarks}"</p>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {entry.previousValues.otherRemarks && (
+                                <div className="space-y-1 p-3 bg-muted/10 border-l-2 border-primary/20">
+                                   <Label className="text-[8px] font-black uppercase text-muted-foreground">General Note</Label>
+                                   <p className="text-xs italic">"{entry.previousValues.otherRemarks}"</p>
+                                </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-24 text-center text-muted-foreground italic flex flex-col items-center justify-center gap-4 opacity-40 uppercase tracking-[0.2em]">
+                       <History className="h-12 w-12" />
+                       <p className="text-sm font-black">Initial Version Only</p>
+                       <p className="text-[9px] max-w-xs leading-relaxed">No revisions have been documented for this audit record since the original submission.</p>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
-          </ScrollArea>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+
           <DialogFooter className="p-4 bg-muted/5 border-t shrink-0">
-             {canApprove && (!viewingInstallation?.status || viewingInstallation.status === 'Pending') && (
+             {isAdmin && (!viewingInstallation?.status || viewingInstallation.status === 'Pending') && (
                <div className="flex-1 flex gap-2">
                  <Button className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white font-black uppercase text-[10px] tracking-widest" onClick={() => setApprovingRecord({ record: viewingInstallation!, type: 'Approved' })}>Approve Audit</Button>
                  <Button variant="destructive" className="flex-1 h-11 font-black uppercase text-[10px] tracking-widest" onClick={() => setApprovingRecord({ record: viewingInstallation!, type: 'Rejected' })}>Reject Audit</Button>
                </div>
-             )}
-             {viewingInstallation?.status === 'Rejected' && viewingInstallation.userId === user?.uid && (
-               <Button className="flex-1 h-11 bg-amber-600 hover:bg-amber-700 font-black uppercase text-[10px] tracking-widest" asChild>
-                 <Link href={`/checklists/installation?correct=${viewingInstallation.id}`}><RotateCw className="h-4 w-4 mr-2" /> Start Correction Flow</Link>
-               </Button>
              )}
              <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 md:h-11 px-8 w-full sm:w-auto">Close Audit Log</Button></DialogClose>
           </DialogFooter>
@@ -1178,10 +1212,4 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       </Dialog>
     </div>
   );
-}
-
-function formatTimestamp(ts: any) {
-  if (!ts) return '—';
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
-  return format(date, 'dd/MM/yyyy HH:mm');
 }
