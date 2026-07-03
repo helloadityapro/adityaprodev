@@ -77,6 +77,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 
 type Site = { 
@@ -85,6 +86,7 @@ type Site = {
   projectCompany?: string; 
   drawingUrl?: string; 
   drawingName?: string;
+  drawingUploadedById?: string;
 };
 
 type Attachment = {
@@ -269,7 +271,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
 
   const handleDrawingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !siteId) return;
+    if (!file || !siteId || !user) return;
     
     setIsUploadingDrawing(true);
     try {
@@ -287,6 +289,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       await updateDocumentNonBlocking(doc(firestore, 'sites', siteId), {
         drawingUrl: url,
         drawingName: file.name,
+        drawingUploadedById: user.uid,
         updatedAt: serverTimestamp()
       });
       
@@ -306,6 +309,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
       await updateDocumentNonBlocking(doc(firestore, 'sites', site.id), {
         drawingUrl: null,
         drawingName: null,
+        drawingUploadedById: null,
         updatedAt: serverTimestamp()
       });
       toast({ title: 'Drawing Removed' });
@@ -712,7 +716,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                   <span className="sm:hidden">Drawing</span>
                 </a>
               </Button>
-              {isAdmin && <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/10" onClick={() => setDeletingDrawing(site)}><Trash2 className="h-4 w-4" /></Button>}
+              {(isAdmin || site.drawingUploadedById === user?.uid) && (
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/10" onClick={() => setDeletingDrawing(site)} title="Delete Drawing">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           ) : (
             <div className="relative">
@@ -932,8 +940,8 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             <div className="flex items-center gap-2 pr-8">
                <Badge variant="outline" className={cn(
                   "rounded-sm text-[9px] font-black uppercase px-2 h-6 mr-2",
-                  viewingInstallation?.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                  viewingInstallation?.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                  viewingInstallation?.status === 'Approved' ? "bg-green-100 text-green-700 border-green-200" :
+                  viewingInstallation?.status === 'Rejected' ? "bg-red-100 text-red-700 border-red-100" :
                   "bg-yellow-50 text-yellow-700 border-yellow-200"
                 )}>{viewingInstallation?.status || 'Pending'}</Badge>
                <Button onClick={() => viewingInstallation && exportToPDF([viewingInstallation])} variant="outline" size="sm" className="h-8 md:h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary/20 text-primary">
@@ -1181,7 +1189,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           <DialogHeader className="sr-only"><DialogTitle>Audit Media Detail</DialogTitle></DialogHeader>
           <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-3 md:p-4 bg-gradient-to-b from-black/60 to-transparent no-print">
             <div className="flex items-center gap-2"><div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-3.5 w-3.5 text-white" /></div><span className="text-[8px] md:text-[10px] font-black text-white uppercase truncate max-w-[120px]">{viewFile?.name}</span></div>
-            <div className="flex items-center gap-1.5"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={resetViewer}><RotateCcw className="h-4 w-4" /></Button><Separator orientation="vertical" className="h-6 bg-white/20 mx-1 md:mx-2" /><DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-red-500"><X className="h-5 w-5" /></Button></DialogClose></div>
+            <div className="flex items-center gap-1.5"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button><Separator orientation="vertical" className="h-6 bg-white/20 mx-1 md:mx-2" /><DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-red-500"><X className="h-5 w-5" /></Button></DialogClose></div>
           </div>
           {viewFiles.length > 1 && (<><div className="absolute left-2 top-1/2 -translate-y-1/2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-6 w-6" /></Button></div><div className="absolute right-2 top-1/2 -translate-y-1/2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-6 w-6" /></Button></div></>)}
           <div ref={containerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDoubleClick={handleDoubleClick}>

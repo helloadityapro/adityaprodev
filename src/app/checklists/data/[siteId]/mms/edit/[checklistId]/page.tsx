@@ -32,7 +32,8 @@ import {
   FileImage, 
   ShieldCheck, 
   Check, 
-  AlertTriangle 
+  AlertTriangle,
+  Pencil
 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
