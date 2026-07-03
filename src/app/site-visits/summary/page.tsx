@@ -75,6 +75,7 @@ export default function SiteVisitsSummaryPage() {
   const router = useRouter();
 
   const [selectedUserIds, setSelectedUserIds] = React.useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = React.useState("");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [customStart, setCustomStart] = React.useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
   const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -139,8 +140,6 @@ export default function SiteVisitsSummaryPage() {
       }
 
       try {
-        // Since we allow multiple users, we fetch based on status and filter by ID array
-        // and date range client-side for precision in the prototype.
         const q = query(
           collection(firestore, 'site_visits'),
           where('status', '==', 'completed')
@@ -218,7 +217,6 @@ export default function SiteVisitsSummaryPage() {
 
     const workbook = XLSX.utils.book_new();
 
-    // Per user summary sheet
     const summaryData = userStats.map(s => ({
         'Personnel': s.username,
         'No. of Visits': s.visits,
@@ -228,7 +226,6 @@ export default function SiteVisitsSummaryPage() {
     const wsSummary = XLSX.utils.json_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(workbook, wsSummary, "Team Summary");
 
-    // Detail log sheet
     const detailData = filteredVisits.map(v => ({
       'Personnel': v.managerName,
       'Date': format(v.startTime.toDate(), 'dd MMM yyyy'),
@@ -249,6 +246,12 @@ export default function SiteVisitsSummaryPage() {
     setSelectedUserIds(prev => 
       prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]
     );
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedUserIds([]);
+    setDateFilter("7days");
   };
 
   if (isProfileLoading || isUsersLoading) {
@@ -365,9 +368,14 @@ export default function SiteVisitsSummaryPage() {
             </div>
           )}
 
-          <Button onClick={handleExport} disabled={filteredVisits.length === 0} variant="outline" size="sm" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 px-6">
-            <FileDown className="h-4 w-4 mr-2" /> Export
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleExport} disabled={filteredVisits.length === 0} variant="outline" size="sm" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 px-6">
+                <FileDown className="h-4 w-4 mr-2" /> Export
+            </Button>
+            <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 rounded-sm text-muted-foreground border border-primary/10">
+                <FilterX className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
