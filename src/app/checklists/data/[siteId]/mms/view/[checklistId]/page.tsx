@@ -35,6 +35,7 @@ import {
   ZoomOut, 
   RotateCcw, 
   X, 
+  XCircle,
   MessageCircle, 
   Check, 
   AlertTriangle, 
@@ -161,7 +162,7 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
     if (!audit || !newComment.trim() || !user || !userProfile) return;
     setIsProcessing(true);
     try {
-      await updateDocumentNonBlocking(auditRef, {
+      await updateDocumentNonBlocking(doc(firestore, 'installation_checklists', audit.id), {
         comments: arrayUnion({ userId: user.uid, userName: userProfile.username || user.email, text: newComment.trim(), createdAt: new Date().toISOString() })
       });
       setNewComment("");
@@ -288,7 +289,10 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
     const newY = e.clientY - startPan.y;
     const limitX = Math.max(0, (window.innerWidth * scale - window.innerWidth) / 2);
     const limitY = Math.max(0, (window.innerHeight * scale - window.innerHeight) / 2);
-    setPosition({ x: Math.min(Math.max(newX, -limitX), limitX), y: Math.min(Math.max(newY, -limitY), limitY) });
+    setPosition({
+      x: Math.min(Math.max(newX, -limitX), limitX),
+      y: Math.min(Math.max(newY, -limitY), limitY)
+    });
   };
   const handleMouseUp = () => setIsDragging(false);
   const handleDoubleClick = () => { if (viewFile && (isVideo(viewFile) || isHeic(viewFile))) return; if (scale > 1) { setScale(1); setPosition({ x: 0, y: 0 }); } else { setScale(2); } };
@@ -474,7 +478,7 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
                     <CardHeader className="bg-primary/5 py-3 px-6 border-b flex flex-row items-center justify-between space-y-0">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="rounded-sm bg-background font-black text-[9px] uppercase tracking-tighter border-primary/20">Version Snapshot</Badge>
-                        <span className="text-[11px] font-black text-foreground uppercase tracking-tight">{entry.editedBy}</span>
+                        <span className="text-11px font-black text-foreground uppercase tracking-tight">{entry.editedBy}</span>
                       </div>
                       <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{safeTime}</span>
                     </CardHeader>
@@ -606,7 +610,7 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
           </div>
           {viewFiles.length > 1 && (<><div className="absolute left-2 top-1/2 -translate-y-1/2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white shadow-2xl" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-6 w-6" /></Button></div><div className="absolute right-2 top-1/2 -translate-y-1/2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white shadow-2xl" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-6 w-6" /></Button></div></>)}
           <div ref={containerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDoubleClick={handleDoubleClick}>
-            <div ref={mediaRef} className={cn("transition-transform duration-200 ease-out flex items-center justify-center pointer-events-none w-fit h-fit", isDragging && "transition-none")} style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
+            <div ref={mediaRef} className={cn("transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit", isDragging && "transition-none")} style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
               {viewFile && (
                 isVideo(viewFile) ? (
                   <div className="pointer-events-auto"><video src={viewFile.url} controls autoPlay className="max-w-[90vw] max-h-[80vh] shadow-2xl rounded-sm" /></div>
@@ -620,7 +624,7 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
                     <Button asChild className="rounded-sm font-bold uppercase text-[10px] tracking-widest"><a href={viewFile.url} download={viewFile.name}><Download className="h-3.5 w-3.5 mr-2" /> Save Artifact</a></Button>
                   </div>
                 ) : (
-                  <img src={viewFile.url} className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm" alt="Evidence" />
+                  <img src={viewFile.url} className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" alt="Evidence View" draggable={false} />
                 )
               )}
             </div>
