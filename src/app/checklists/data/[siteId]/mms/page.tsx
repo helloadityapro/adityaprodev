@@ -671,6 +671,14 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     setCustomEnd(format(new Date(), 'yyyy-MM-dd'));
   };
 
+  const getSafeTimestamp = (ts: any) => {
+    if (!ts) return 0;
+    if (ts.toDate) return ts.toDate().getTime();
+    if (ts instanceof Date) return ts.getTime();
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  };
+
   if (isProfileLoading || siteLoading || instLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
@@ -772,6 +780,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                 <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
                 <SelectItem value="yesterday" className="text-[10px] font-bold uppercase">Yesterday</SelectItem>
                 <SelectItem value="7days" className="text-[10px] font-bold uppercase">Last 7 Days</SelectItem>
+                <SelectItem value="lastMonth" className="text-[10px] font-bold uppercase">Last Month</SelectItem>
                 <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom Range</SelectItem>
               </SelectContent>
             </Select>
@@ -1076,39 +1085,52 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                 <div className="p-6 md:p-8 space-y-10">
                   {viewingInstallation?.editHistory && viewingInstallation.editHistory.length > 0 ? (
                     <div className="space-y-8">
-                      {viewingInstallation.editHistory.sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0)).map((entry, eIdx) => (
-                        <Card key={eIdx} className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-background">
-                          <CardHeader className="bg-muted/30 py-3 border-b flex flex-row items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <History className="h-4 w-4 text-primary" />
-                              <span className="text-[10px] font-black uppercase tracking-widest">Revised by {entry.editedBy}</span>
-                            </div>
-                            <span className="text-[9px] font-mono font-bold text-muted-foreground">{entry.timestamp ? format(entry.timestamp.toDate(), 'dd MMM yyyy, HH:mm') : '—'}</span>
-                          </CardHeader>
-                          <CardContent className="p-4 space-y-6">
-                            <div className="space-y-3">
-                              <Label className="text-[9px] font-black uppercase text-primary tracking-tighter">Previous State Summary</Label>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {entry.previousValues.checks.map((prevCheck, cIdx) => (
-                                  <div key={cIdx} className="p-3 border rounded-sm bg-muted/5 space-y-2">
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-[10px] font-bold uppercase truncate pr-4">{prevCheck.label}</span>
-                                      <Badge variant="outline" className={cn("h-4 text-[8px] font-black uppercase rounded-sm px-1", prevCheck.status === 'OK' ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700")}>{prevCheck.status}</Badge>
-                                    </div>
-                                    {prevCheck.remarks && <p className="text-[10px] italic text-muted-foreground truncate">"{prevCheck.remarks}"</p>}
-                                  </div>
-                                ))}
+                      {viewingInstallation.editHistory.sort((a, b) => {
+                        const getT = (ts: any) => ts?.toDate?.()?.getTime() || (ts instanceof Date ? ts.getTime() : new Date(ts).getTime() || 0);
+                        return getT(b.timestamp) - getT(a.timestamp);
+                      }).map((entry, eIdx) => {
+                        const getSafeTime = (ts: any) => {
+                          if (!ts) return '—';
+                          try {
+                            const d = ts.toDate ? ts.toDate() : (ts instanceof Date ? ts : new Date(ts));
+                            return format(d, 'dd MMM yyyy, HH:mm');
+                          } catch (e) { return '—'; }
+                        };
+                        
+                        return (
+                          <Card key={eIdx} className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-background">
+                            <CardHeader className="bg-muted/30 py-3 border-b flex flex-row items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <History className="h-4 w-4 text-primary" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Revised by {entry.editedBy}</span>
                               </div>
-                            </div>
-                            {entry.previousValues.otherRemarks && (
-                                <div className="space-y-1 p-3 bg-muted/10 border-l-2 border-primary/20">
-                                   <Label className="text-[8px] font-black uppercase text-muted-foreground">General Note</Label>
-                                   <p className="text-xs italic">"{entry.previousValues.otherRemarks}"</p>
+                              <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{getSafeTime(entry.timestamp)}</span>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-6">
+                              <div className="space-y-3">
+                                <Label className="text-[9px] font-black uppercase text-primary tracking-tighter">Previous State Summary</Label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  {entry.previousValues?.checks?.map((prevCheck, cIdx) => (
+                                    <div key={cIdx} className="p-3 border rounded-sm bg-muted/5 space-y-2">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-bold uppercase truncate pr-4">{prevCheck.label}</span>
+                                        <Badge variant="outline" className={cn("h-4 text-[8px] font-black uppercase rounded-sm px-1", prevCheck.status === 'OK' ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700")}>{prevCheck.status}</Badge>
+                                      </div>
+                                      {prevCheck.remarks && <p className="text-[10px] italic text-muted-foreground truncate">"{prevCheck.remarks}"</p>}
+                                    </div>
+                                  ))}
                                 </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
+                              </div>
+                              {entry.previousValues?.otherRemarks && (
+                                  <div className="space-y-1 p-3 bg-muted/10 border-l-2 border-primary/20">
+                                     <Label className="text-[8px] font-black uppercase text-muted-foreground">General Note</Label>
+                                     <p className="text-xs italic">"{entry.previousValues.otherRemarks}"</p>
+                                  </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="py-24 text-center text-muted-foreground italic flex flex-col items-center justify-center gap-4 opacity-40 uppercase tracking-[0.2em]">
