@@ -103,7 +103,10 @@ export default function PtwDashboardPage() {
         else return false;
 
         const matchesDate = pDate >= start && pDate <= end;
-        const matchesUser = selectedUserIds.length === 0 || selectedUserIds.includes(p.siteEngineerId);
+        // Updated Logic: Count permit if selected user is the Engineer OR the Manager
+        const matchesUser = selectedUserIds.length === 0 || 
+                           selectedUserIds.includes(p.siteEngineerId) || 
+                           selectedUserIds.includes(p.siteManagerId);
         
         return p.siteId === site.id && matchesDate && matchesUser;
       });
@@ -281,7 +284,7 @@ export default function PtwDashboardPage() {
         <Card className="rounded-sm shadow-xl border-primary/10 overflow-hidden bg-background">
           <CardHeader className="bg-muted/30 border-b py-3 px-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
              <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-                <div className="relative w-full md:w-64">
+                <div className="relative w-full md:w-[320px]">
                     <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                     <Input 
                       placeholder="Filter site or client..." 
