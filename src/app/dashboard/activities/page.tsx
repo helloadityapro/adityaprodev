@@ -256,26 +256,26 @@ export default function ActivitiesPage() {
 
     const ptwCount = countInRange(permits, 'requestDate');
     const dprCount = countInRange(dprs, 'createdAt');
-    // Visits: Count of completed site visits
     const visitCount = countInRange(visits, 'startTime', (i) => i.status === 'completed');
-    // Vehicle Dispatches: Count of ongoing plus completed trips
     const dispatchCount = countInRange(vehicleReqs, 'requestDate', (i) => i.status === 'Ongoing' || i.status === 'Completed');
 
-    // Attendance Calculation: Count of Checked in employees
+    // Attendance Calculation aligned with Attendance Summary logic
+    const activeStaff = allPersonnel?.filter(p => !EXCLUDED_PERSONNEL.includes(p.username)) || [];
+    const activeStaffIds = new Set(activeStaff.map(p => p.id));
+
     const presentUserIds = new Set<string>();
     attendanceLogs?.forEach(log => {
         let d: Date | null = null;
         if (log.date) d = new Date(log.date);
         else if (log.createdAt?.toDate) d = log.createdAt.toDate();
         
-        if (d && d >= start && d <= end && log.userId) {
+        // Count as present if user is in active staff and has a record (ongoing or completed) in range
+        if (d && d >= start && d <= end && log.userId && activeStaffIds.has(log.userId)) {
             presentUserIds.add(log.userId);
         }
     });
 
-    const activeStaff = allPersonnel?.filter(p => !EXCLUDED_PERSONNEL.includes(p.username)) || [];
     const presentCount = presentUserIds.size;
-    // Absent: Count of Not checked in employees
     const absentCount = Math.max(0, activeStaff.length - presentCount);
 
     return {
