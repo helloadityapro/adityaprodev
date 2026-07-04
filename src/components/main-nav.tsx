@@ -56,7 +56,8 @@ import {
   Zap,
   FileBarChart,
   CalendarDays,
-  AreaChart
+  AreaChart,
+  Bell
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -71,7 +72,7 @@ import {
 } from "@/components/ui/sidebar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import * as React from "react"
-import { type PageKey } from "@/lib/access-control"
+import { type PageKey, slugifyRole } from "@/lib/access-control"
 
 interface MainNavProps {
   userRole: string;
@@ -102,6 +103,17 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                 <Link href="/reports">
                   <TrendingUp className="h-4 w-4 text-primary" />
                   <span className="font-bold">Dashboard</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+
+          {canShow('dashboard-activities') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Activities" isActive={pathname === '/dashboard/activities'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/dashboard/activities">
+                  <Bell className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Activities</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

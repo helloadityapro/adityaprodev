@@ -5,6 +5,7 @@
 
 export type PageKey = 
   | 'reports' 
+  | 'dashboard-activities'
   | 'documents' 
   | 'lms' 
   | 'rewards' 
@@ -65,6 +66,7 @@ export interface AppPage {
 
 export const APP_PAGES: AppPage[] = [
   { id: 'reports', label: 'Dashboard (Reports)', category: 'Main Hub', path: '/reports' },
+  { id: 'dashboard-activities', label: 'Activities', category: 'Main Hub', path: '/dashboard/activities' },
   { id: 'documents', label: 'Documents', category: 'Main Hub', path: '/documents' },
   { id: 'lms', label: 'Learning Hub', category: 'Main Hub', path: '/lms' },
   { id: 'rewards', label: 'Rewards', category: 'Main Hub', path: '/rewards' },
