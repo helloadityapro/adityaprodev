@@ -37,9 +37,8 @@ import {
   MapPin,
   Eye,
   Maximize2,
-  Minimize2,
-  CheckCircle2,
-  X
+  X,
+  CheckCircle2
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -63,6 +62,7 @@ import {
   DialogTrigger,
   DialogClose
 } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { slugifyRole } from '@/lib/access-control';
 import Link from 'next/link';
@@ -70,6 +70,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 type DataItem = {
   id: string;
+  siteId?: string;
   siteName: string;
   title?: string;
   itemName?: string;
@@ -102,11 +103,15 @@ type DataItem = {
   pickupLocation?: string;
   dropLocation?: string;
   vehicleDetails?: string;
+  driverId?: string;
   driverName?: string;
   uploadedByName?: string;
   createdBy?: string;
   comments?: any[];
   updatedAt?: any;
+  startTime?: any;
+  endTime?: any;
+  approvalDate?: any;
 };
 
 type RecentActivity = {
@@ -131,7 +136,6 @@ export default function ActivitiesPage() {
   const { user } = useUser();
   const firestore = useFirestore();
 
-  // Requirements: Keep default time window as Today
   const [dateFilter, setDateFilter] = React.useState<string>("today");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -183,8 +187,17 @@ export default function ActivitiesPage() {
   const { data: wos } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('project_wos'), [firestore, isAdmin, user]));
   const { data: payments } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('payments', 'date'), [firestore, isAdmin, user]));
   const { data: redemptions } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('redemption_requests'), [firestore, isAdmin, user]));
-  const { data: vehicleReqs } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('vehicle_assignments', 'requestDate'), [firestore, isAdmin, user]));
+  
+  const { data: vehicleReqs } = useCollection<DataItem>(useMemoFirebase(() => {
+    const colRef = collection(firestore, 'vehicle_assignments');
+    if (isAdmin) return query(colRef, orderBy('requestDate', 'desc'), limit(queryLimit));
+    return query(colRef, or(where('userId', '==', user?.uid), where('driverId', '==', user?.uid)), limit(queryLimit));
+  }, [firestore, isAdmin, user]));
+
   const { data: siteDocs } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('site_documents'), [firestore, isAdmin, user]));
+  const { data: usersList } = useCollection<DataItem>(useMemoFirebase(() => isAdmin ? collection(firestore, 'users') : null, [firestore, isAdmin]));
+  const { data: siteGroups } = useCollection<DataItem>(useMemoFirebase(() => isAdmin ? collection(firestore, 'site_groups') : null, [firestore, isAdmin]));
+  const { data: lmsCourses } = useCollection<DataItem>(useMemoFirebase(() => collection(firestore, 'lms_courses'), [firestore]));
 
   const queryDateRange = React.useMemo(() => {
     const today = new Date();
@@ -218,7 +231,7 @@ export default function ActivitiesPage() {
 
       if (d && d >= start && d <= end) {
         if (isOwnDataOnly && !isAdmin) {
-            const hasAccess = !item.siteName || assignedIds.has(item.siteId || '') || item.userId === user?.uid;
+            const hasAccess = !item.siteName || assignedIds.has(item.siteId || '') || item.userId === user?.uid || (item as any)[userField] === userProfile?.username;
             if (!hasAccess) return;
         }
 
@@ -244,22 +257,70 @@ export default function ActivitiesPage() {
     };
 
     permits?.forEach(p => addItem(p, 'Permit', 'Compliance', ShieldCheck, 'text-blue-600', 'requestDate', 'siteEngineerName', `${p.siteEngineerName} requested a ${p.ptwType} permit for ${p.siteName}`, `/ptw/list?view=${p.id}`));
-    tasks?.forEach(t => addItem(t, 'Task', 'Operations', CheckSquare, 'text-slate-600', 'createdAt', 'assignedToName', `${t.assignedByName} assigned task "${t.title}" to ${t.assignedToName} for ${t.siteName}`, `/tasks/list`));
+    
+    tasks?.forEach(t => {
+      if (t.status === 'Completed') addItem(t, 'Task Finished', 'Operations', CheckCircle2, 'text-green-600', 'updatedAt', 'assignedToName', `${t.assignedToName} finished task: "${t.title}" for ${t.siteName}`, `/tasks/list`);
+      else addItem(t, 'Task', 'Operations', CheckSquare, 'text-slate-600', 'createdAt', 'assignedByName', `${t.assignedByName} assigned task "${t.title}" to ${t.assignedToName} for ${t.siteName}`, `/tasks/list`);
+    });
+
     dprs?.forEach(d => addItem(d, 'DPR', 'Reporting', FileText, 'text-amber-600', 'createdAt', 'userName', `${d.userName} submitted a DPR for ${d.siteName}`, `/dpr/list`));
-    movements?.forEach(m => addItem(m, 'Movement', 'Inventory', ArrowLeftRight, 'text-emerald-600', 'createdAt', 'userName', `${m.userName} recorded a ${m.movementType} for ${m.itemName} at ${m.siteName}`, `/movements/list`));
+    movements?.forEach(m => addItem(m, 'Movement', 'Inventory', ArrowLeftRight, 'text-emerald-600', 'createdAt', 'userName', `${m.userName} recorded a material ${m.movementType} for ${m.itemName} at ${m.siteName}`, `/movements/list`));
     requirements?.forEach(r => addItem(r, 'Requirement', 'Procurement', ClipboardList, 'text-purple-600', 'createdAt', 'userName', `${r.userName} raised a requirement for ${r.itemName} at ${r.siteName}`, `/requirements/list`));
-    expenses?.forEach(e => addItem(e, 'Expense', 'Finance', Wallet, 'text-indigo-600', 'createdAt', 'userName', `${e.userName} submitted an expense: "${e.title}"`, `/expenses/list?view=${e.id}`));
-    visits?.forEach(v => addItem(v, 'Site Visit', 'Visits', Navigation, 'text-rose-600', 'startTime', 'managerName', `${v.managerName} started a visit at ${v.siteName}`, `/site-visits/${v.id}`));
-    pos?.forEach(p => addItem(p, 'Purchase Order', 'Procurement', ShoppingBag, 'text-blue-700', 'createdAt', 'createdByName', `${p.createdByName} generated PO ${p.poNumber} for ${p.siteName}`, `/projects/${p.siteId}?tab=po`));
-    wos?.forEach(w => addItem(w, 'Work Order', 'Procurement', Gavel, 'text-slate-700', 'createdAt', 'createdByName', `${w.createdByName} issued WO ${w.woNumber} for ${w.siteName}`, `/projects/${w.siteId}?tab=wo`));
-    payments?.forEach(p => addItem(p, 'Payment', 'Finance', IndianRupee, 'text-emerald-700', 'date', 'recordedByName', `${p.recordedByName} recorded payment against ${p.referenceNumber}`, `/payments/project-wise`));
+    expenses?.forEach(e => addItem(e, 'Expense', 'Finance', Wallet, 'text-indigo-600', 'createdAt', 'userName', `${e.userName} submitted an expense claim: "${e.title}"`, `/expenses/list?view=${e.id}`));
+    
+    visits?.forEach(v => {
+      if (v.status === 'completed') addItem(v, 'Site Visit End', 'Visits', Flag, 'text-rose-700', 'endTime', 'managerName', `${v.managerName} finished a site visit at ${v.siteName}`, `/site-visits/${v.id}`);
+      else addItem(v, 'Site Visit Start', 'Visits', Navigation, 'text-rose-600', 'startTime', 'managerName', `${v.managerName} started a site visit at ${v.siteName}`, `/site-visits/${v.id}`);
+    });
+
+    pos?.forEach(p => addItem(p, 'Purchase Order', 'Procurement', ShoppingBag, 'text-blue-700', 'createdAt', 'createdByName', `${p.createdByName} generated a Purchase Order ${p.poNumber} for ${p.siteName}`, `/projects/${p.siteId}?tab=po`));
+    wos?.forEach(w => addItem(w, 'Work Order', 'Procurement', Gavel, 'text-slate-700', 'createdAt', 'createdByName', `${w.createdByName} issued a Work Order ${w.woNumber} for ${w.siteName}`, `/projects/${w.siteId}?tab=wo`));
+    payments?.forEach(p => addItem(p, 'Payment', 'Finance', IndianRupee, 'text-emerald-700', 'date', 'recordedByName', `${p.recordedByName} recorded a payment against ${p.referenceNumber} for ${p.siteName}`, `/payments/project-wise`));
     redemptions?.forEach(r => addItem(r, 'Redemption', 'Rewards', CreditCard, 'text-green-600', 'createdAt', 'userName', `${r.userName} requested points redemption`, `/rewards`));
-    installationChecklists?.forEach(cl => addItem(cl, 'Checklist', 'Quality', ClipboardCheck, 'text-cyan-600', 'createdAt', 'userName', `${cl.userName} submitted MMS audit for Table ${cl.tableNumber}`, `/checklists/data`));
-    vehicleReqs?.forEach(v => addItem(v, 'Trip', 'Fleet', Fuel, 'text-orange-500', 'requestDate', 'userName', `${v.userName} requested vehicle for trip to ${v.dropLocation}`, `/vehicles/trips/manage`));
+    
+    installationChecklists?.forEach(cl => {
+      addItem(cl, 'Checklist', 'Quality', ClipboardCheck, 'text-cyan-600', 'createdAt', 'userName', `${cl.userName} submitted MMS audit for Table ${cl.tableNumber}`, `/checklists/data`);
+      if (cl.comments && cl.comments.length > 0) {
+        cl.comments.forEach((c: any, cIdx: number) => {
+          let cd: Date | null = null;
+          const cval = c.createdAt;
+          if (cval?.toDate) cd = cval.toDate();
+          else if (cval) cd = new Date(cval);
+          if (cd && cd >= start && cd <= end) {
+            const sentence = `${c.userName} commented on Table ${cl.tableNumber} audit for ${cl.siteName}`;
+            if (sentence.toLowerCase().includes(searchTerm.toLowerCase())) {
+              agg.push({
+                id: `Comment-${cl.id}-${cIdx}-${cd.getTime()}`,
+                type: 'Audit Comment',
+                module: 'Quality',
+                icon: MessageCircle,
+                color: 'text-cyan-800',
+                sentence,
+                userName: c.userName,
+                timestamp: cd,
+                siteName: cl.siteName,
+                link: `/checklists/data`
+              });
+            }
+          }
+        });
+      }
+    });
+
+    vehicleReqs?.forEach(v => {
+      if (v.status === 'Pending') addItem(v, 'Trip Request', 'Fleet', Fuel, 'text-orange-500', 'requestDate', 'userName', `${v.userName} requested vehicle for trip to ${v.pickupLocation}`, `/vehicles/trips/manage`);
+      else if (v.status === 'Approved') addItem(v, 'Trip Allotted', 'Fleet', CarFront, 'text-blue-500', 'approvalDate', 'userName', `Vehicle ${v.vehicleDetails} allotted to ${v.userName} with driver ${v.driverName}`, `/vehicles/trips/manage`);
+      else if (v.status === 'Ongoing') addItem(v, 'Trip Start', 'Fleet', PlayCircle, 'text-blue-700', 'startTime', 'userName', `${v.userName} started a journey with ${v.vehicleDetails}`, `/vehicles/trips/manage`);
+      else if (v.status === 'Completed') addItem(v, 'Trip End', 'Fleet', Flag, 'text-emerald-700', 'endTime', 'userName', `${v.userName} arrived at ${v.dropLocation}. Journey complete.`, `/vehicles/trips/manage`);
+    });
+
     siteDocs?.forEach(doc => addItem(doc, 'Document', 'Files', FileUp, 'text-sky-600', 'createdAt', 'uploadedByName', `${doc.uploadedByName} uploaded "${doc.fileName}"`, `/documents/${doc.siteId}`));
+    usersList?.forEach(u => addItem(u, 'User Registry', 'Systems', UserPlus, 'text-purple-600', 'createdAt', 'username', `New user added to registry: ${u.username}`, `/settings/users`));
+    siteGroups?.forEach(g => addItem(g, 'Site Group', 'Registry', Tags, 'text-pink-600', 'createdAt', 'createdByName', `New site cluster defined: "${g.name}"`, `/projects/groups`));
+    lmsCourses?.forEach(c => addItem(c, 'Course Published', 'LMS', BookOpen, 'text-indigo-700', 'createdAt', 'createdBy', `New training curriculum published: "${c.title}"`, `/lms/admin`));
 
     return agg.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [permits, tasks, dprs, movements, requirements, expenses, visits, pos, wos, payments, redemptions, installationChecklists, vehicleReqs, siteDocs, queryDateRange, searchTerm, isAdmin, user, userProfile, roleConfigs, userRoleStr]);
+  }, [permits, tasks, dprs, movements, requirements, expenses, visits, pos, wos, payments, redemptions, installationChecklists, vehicleReqs, siteDocs, usersList, siteGroups, lmsCourses, queryDateRange, searchTerm, isAdmin, user, userProfile, roleConfigs, userRoleStr]);
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -268,57 +329,78 @@ export default function ActivitiesPage() {
 
   if (isProfileLoading) return <div className="p-8"><Skeleton className="h-12 w-48" /></div>;
 
-  const ActivityFeed = ({ isFull = false }: { isFull?: boolean }) => (
-    <div className={cn("space-y-0 divide-y divide-border/50", isFull ? "p-0" : "")}>
-      <AnimatePresence initial={false}>
-        {activities.length > 0 ? activities.map((activity) => (
-          <motion.div 
-            key={activity.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="group"
-          >
-            <Link href={activity.link} className="flex gap-4 p-4 hover:bg-muted/30 transition-colors items-start">
-              <div className="p-2 bg-muted rounded-md h-fit shrink-0 group-hover:bg-primary/5 transition-colors">
-                <activity.icon className={cn("h-4 w-4", activity.color)} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm text-foreground leading-snug">
-                  {activity.sentence}
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{activity.module}</span>
-                  <span className="h-1 w-1 rounded-full bg-border" />
-                  <span className="text-[10px] text-muted-foreground font-bold truncate">{activity.siteName}</span>
+  const ActivityTable = () => (
+    <Table className="min-w-full table-fixed">
+      <TableHeader className="bg-muted/30 sticky top-0 z-20">
+        <TableRow className="h-9">
+          <TableHead className="w-[80px] text-[10px] font-black uppercase text-center px-2">Time</TableHead>
+          <TableHead className="w-[120px] text-[10px] font-black uppercase px-2">Participation</TableHead>
+          <TableHead className="text-[10px] font-black uppercase px-2">Audit Narrative</TableHead>
+          <TableHead className="w-[180px] text-[10px] font-black uppercase px-2 text-right">Context</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        <AnimatePresence initial={false}>
+          {activities.length > 0 ? activities.map((activity) => (
+            <TableRow key={activity.id} className="group hover:bg-primary/[0.03] transition-colors border-b border-border/50">
+              <TableCell className="px-2 py-3">
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] font-mono font-black text-foreground">{format(activity.timestamp, 'HH:mm')}</span>
+                  <span className="text-[8px] font-bold text-muted-foreground uppercase">{format(activity.timestamp, 'dd MMM')}</span>
                 </div>
-              </div>
-              <div className="text-right shrink-0 flex flex-col items-end">
-                <span className="text-[10px] font-mono font-black text-foreground">{format(activity.timestamp, 'HH:mm')}</span>
-                <span className="text-[8px] font-bold text-muted-foreground uppercase">{format(activity.timestamp, 'dd MMM')}</span>
-              </div>
-            </Link>
-          </motion.div>
-        )) : (
-          <div className="py-32 flex flex-col items-center justify-center text-center gap-2 opacity-30">
-            <Bell className="h-12 w-12" />
-            <p className="text-sm font-black uppercase tracking-widest">No activity for this period</p>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
+              </TableCell>
+              <TableCell className="px-2 py-3">
+                <div className="flex items-center gap-2">
+                  <div className={cn("p-1.5 rounded-sm bg-muted shrink-0 group-hover:bg-background transition-colors shadow-sm", activity.color)}>
+                    <activity.icon className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-tight truncate">{activity.userName}</span>
+                </div>
+              </TableCell>
+              <TableCell className="px-2 py-3">
+                <motion.div 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex flex-col gap-1"
+                >
+                  <p className="text-xs font-black text-foreground leading-none">
+                    {activity.sentence}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-black text-primary uppercase tracking-widest">{activity.module}</span>
+                    <Link href={activity.link} className="text-[9px] font-bold text-primary/60 hover:text-primary underline decoration-dashed underline-offset-4 uppercase">
+                      View Source
+                    </Link>
+                  </div>
+                </motion.div>
+              </TableCell>
+              <TableCell className="px-2 py-3 text-right">
+                <div className="flex items-center justify-end gap-1.5 text-[10px] font-bold text-muted-foreground uppercase truncate">
+                  <MapPin className="h-3 w-3 text-primary opacity-30" />
+                  <span className="truncate max-w-[150px]">{activity.siteName}</span>
+                </div>
+              </TableCell>
+            </TableRow>
+          )) : (
+            <TableRow>
+              <TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20 tracking-widest">
+                No participatory logs discovered for this window
+              </TableCell>
+            </TableRow>
+          )}
+        </AnimatePresence>
+      </TableBody>
+    </Table>
   );
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500 pb-20">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-          <Bell className="h-5 w-5 text-primary" /> Activities
+          <Bell className="h-5 w-5 text-primary" /> Centralized Audit Log
         </h1>
         
         <div className="flex items-center gap-2">
-          {/* Requirements: Time Range Presets */}
           <Select value={dateFilter} onValueChange={setDateFilter}>
             <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase w-[130px]">
               <Calendar className="h-3.5 w-3.5 mr-1.5 opacity-50" />
@@ -331,7 +413,7 @@ export default function ActivitiesPage() {
               <SelectItem value="last-week" className="text-[10px] font-bold uppercase">Last Week</SelectItem>
               <SelectItem value="this-month" className="text-[10px] font-bold uppercase">This Month</SelectItem>
               <SelectItem value="last-month" className="text-[10px] font-bold uppercase">Last Month</SelectItem>
-              <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom Range</SelectItem>
+              <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom</SelectItem>
             </SelectContent>
           </Select>
 
@@ -342,10 +424,10 @@ export default function ActivitiesPage() {
             </div>
           )}
 
-          <div className="relative hidden md:block w-64">
+          <div className="relative hidden md:block w-48 lg:w-64">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input 
-              placeholder="Search feed..." 
+              placeholder="Filter narrative..." 
               className="pl-8 h-9 rounded-sm border-primary/20 bg-background text-[10px] font-bold"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
@@ -362,23 +444,25 @@ export default function ActivitiesPage() {
         </div>
       </div>
 
-      <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden">
+      <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-background">
         <CardContent className="p-0">
-          <ActivityFeed />
+          <ScrollArea className="h-[calc(100vh-280px)] w-full">
+            <ActivityTable />
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
         </CardContent>
       </Card>
 
-      {/* Requirement: Full Screen View Dialog */}
       <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
         <DialogContent className="max-w-none w-screen h-screen m-0 p-0 border-none rounded-none shadow-none bg-background flex flex-col">
           <DialogHeader className="p-4 border-b bg-muted/10 shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <Bell className="h-5 w-5 text-primary" />
-              <DialogTitle className="text-lg font-black uppercase tracking-tight">Full-Screen Activity Audit</DialogTitle>
+              <DialogTitle className="text-lg font-black uppercase tracking-tight">Full-Screen Audit Audit</DialogTitle>
             </div>
             <div className="flex items-center gap-3">
                <Badge variant="outline" className="h-7 rounded-sm font-black uppercase text-[10px] bg-primary/5 text-primary border-primary/20">
-                {activities.length} Events Indexed
+                {activities.length} Events Participated
                </Badge>
                <DialogClose asChild>
                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-destructive/10 hover:text-destructive">
@@ -391,65 +475,24 @@ export default function ActivitiesPage() {
             <div className="flex items-center gap-3 flex-1">
                <Search className="h-4 w-4 text-muted-foreground" />
                <Input 
-                placeholder="Search logs in real-time..." 
+                placeholder="Search participations..." 
                 className="max-w-md border-none focus-visible:ring-0 bg-transparent text-lg font-bold"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 autoFocus
                />
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Filter By Range:</span>
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="h-9 w-40 rounded-sm border-primary/20 font-bold text-xs uppercase">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="yesterday">Yesterday</SelectItem>
-                  <SelectItem value="this-week">This Week</SelectItem>
-                  <SelectItem value="last-week">Last Week</SelectItem>
-                  <SelectItem value="this-month">This Month</SelectItem>
-                  <SelectItem value="last-month">Last Month</SelectItem>
-                  <SelectItem value="custom">Custom Range</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
           <ScrollArea className="flex-1">
-            <div className="max-w-5xl mx-auto py-10 px-6">
-              <ActivityFeed isFull />
+            <div className="max-w-5xl mx-auto py-6">
+              <ActivityTable />
             </div>
           </ScrollArea>
-          <div className="p-4 border-t bg-muted/5 text-center shrink-0">
-             <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.4em]">End of Audit Feed</p>
+          <div className="p-3 border-t bg-muted/5 text-center shrink-0">
+             <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.4em]">Proprietary Audit Feed • Aditya Green Energy</p>
           </div>
         </DialogContent>
       </Dialog>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, description, color }: { title: string, value: number, icon: any, description: string, color: string }) {
-  const colors = { 
-    blue: 'bg-blue-500/10 text-blue-600 border-blue-200', 
-    amber: 'bg-amber-500/10 text-amber-600 border-amber-200', 
-    emerald: 'bg-emerald-500/10 text-emerald-600 border-emerald-200', 
-    purple: 'bg-purple-500/10 text-purple-600 border-purple-200', 
-    slate: 'bg-slate-500/10 text-slate-600 border-slate-200' 
-  };
-  return (
-    <Card className="rounded-sm border-primary/10 shadow-sm hover:shadow-md transition-all">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 p-3 sm:p-4">
-        <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <div className={cn("p-1 rounded-sm border shrink-0", (colors as any)[color])}>
-          <Icon className="h-3 w-3 md:h-3.5 md:w-3.5" />
-        </div>
-      </CardHeader>
-      <CardContent className="p-3 sm:p-4 pt-0">
-        <div className="text-xl md:text-2xl font-black tracking-tight">{value}</div>
-        <p className="text-[8px] sm:text-[9px] text-muted-foreground mt-1 font-bold uppercase tracking-tighter truncate opacity-60">{description}</p>
-      </CardContent>
-    </Card>
   );
 }
