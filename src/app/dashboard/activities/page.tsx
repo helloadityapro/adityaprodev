@@ -6,6 +6,21 @@ import { collection, query, where, doc, orderBy, limit, or, getDocs } from 'fire
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip as RechartsTooltip, 
+  ResponsiveContainer, 
+  Cell, 
+  PieChart, 
+  Pie, 
+  Legend,
+  AreaChart,
+  Area
+} from 'recharts';
+import { 
   Bell,
   Search,
   Calendar,
@@ -133,7 +148,7 @@ type AccessConfig = {
   ownDataOnly?: boolean;
 };
 
-const EXCLUDED_PERSONNEL = ["Khalil Choudhary", "Imtiyaz Kazi", "Jayesh Bajaj", "Vipul Joisher"];
+const EXCLUDED_PERSONNEL = ["Khalil Choudhary", "Imtiyaz Kazi", "Jayesh Bajaj", "Vipul Joisher", "Demo Admin", "Demo Manager", "Demo User"];
 
 export default function ActivitiesPage() {
   const { user } = useUser();
@@ -182,7 +197,7 @@ export default function ActivitiesPage() {
     const colRef = collection(firestore, 'site_visits');
     if (isAdmin) return query(colRef, orderBy('startTime', 'desc'), limit(queryLimit));
     return query(colRef, or(where('managerId', '==', user?.uid), where('siteManagerId', '==', user?.uid)), limit(queryLimit));
-  }, [firestore, isAdmin, user]));
+  }, [firestore, user, isAdmin]));
 
   const { data: installationChecklists } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('installation_checklists'), [firestore, isAdmin, user]));
   const { data: expenses } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('expenses'), [firestore, isAdmin, user]));
@@ -241,10 +256,12 @@ export default function ActivitiesPage() {
 
     const ptwCount = countInRange(permits, 'requestDate');
     const dprCount = countInRange(dprs, 'createdAt');
-    const visitCount = countInRange(visits, 'startTime');
-    const dispatchCount = countInRange(vehicleReqs, 'requestDate', (i) => i.status === 'Ongoing');
+    // Visits: Count of completed site visits
+    const visitCount = countInRange(visits, 'startTime', (i) => i.status === 'completed');
+    // Vehicle Dispatches: Count of ongoing plus completed trips
+    const dispatchCount = countInRange(vehicleReqs, 'requestDate', (i) => i.status === 'Ongoing' || i.status === 'Completed');
 
-    // Attendance Calculation
+    // Attendance Calculation: Count of Checked in employees
     const presentUserIds = new Set<string>();
     attendanceLogs?.forEach(log => {
         let d: Date | null = null;
@@ -258,6 +275,7 @@ export default function ActivitiesPage() {
 
     const activeStaff = allPersonnel?.filter(p => !EXCLUDED_PERSONNEL.includes(p.username)) || [];
     const presentCount = presentUserIds.size;
+    // Absent: Count of Not checked in employees
     const absentCount = Math.max(0, activeStaff.length - presentCount);
 
     return {
@@ -332,11 +350,11 @@ export default function ActivitiesPage() {
 
     pos?.forEach(p => addItem(p, 'Purchase Order', 'Procurement', ShoppingBag, 'text-blue-700', 'createdAt', 'createdByName', `${p.createdByName} generated a Purchase Order ${p.poNumber} for ${p.siteName}`, `/projects/${p.siteId}?tab=po`));
     wos?.forEach(w => addItem(w, 'Work Order', 'Procurement', Gavel, 'text-slate-700', 'createdAt', 'createdByName', `${w.createdByName} issued a Work Order ${w.woNumber} for ${w.siteName}`, `/projects/${w.siteId}?tab=wo`));
-    payments?.forEach(p => addItem(p, 'Payment', 'Finance', IndianRupee, 'text-emerald-700', 'date', 'recordedByName', `${p.recordedByName} recorded a payment against ${p.referenceNumber} for ${p.siteName}`, `/payments/project-wise`));
-    redemptions?.forEach(r => addItem(r, 'Redemption', 'Rewards', CreditCard, 'text-green-600', 'createdAt', 'userName', `${r.userName} requested points redemption`, `/rewards`));
+    payments?.forEach(p => addItem(p, 'Payment', 'Finance', IndianRupee, 'text-emerald-700', 'date', 'recordedByName', `${p.recordedByName} recorded a payment of ₹${p.amount?.toLocaleString()} against ${p.referenceNumber} for ${p.siteName}`, `/payments/project-wise`));
+    redemptions?.forEach(r => addItem(r, 'Redemption', 'Rewards', CreditCard, 'text-green-600', 'createdAt', 'userName', `${r.userName} requested a points redemption of ₹${r.amountInRs?.toLocaleString()}`, `/settings/rewards`));
     
     installationChecklists?.forEach(cl => {
-      addItem(cl, 'Checklist', 'Quality', ClipboardCheck, 'text-cyan-600', 'createdAt', 'userName', `${cl.userName} submitted MMS audit for Table ${cl.tableNumber}`, `/checklists/data`);
+      addItem(cl, 'Checklist', 'Quality', ClipboardCheck, 'text-cyan-600', 'createdAt', 'userName', `${cl.userName} submitted an MMS audit for Table ${cl.tableNumber} at ${cl.siteName}`, `/checklists/data`);
       if (cl.comments && cl.comments.length > 0) {
         cl.comments.forEach((c: any, cIdx: number) => {
           let cd: Date | null = null;
@@ -365,7 +383,7 @@ export default function ActivitiesPage() {
     });
 
     vehicleReqs?.forEach(v => {
-      if (v.status === 'Pending') addItem(v, 'Trip Request', 'Fleet', Fuel, 'text-orange-500', 'requestDate', 'userName', `${v.userName} requested vehicle for trip to ${v.pickupLocation}`, `/vehicles/trips/manage`);
+      if (v.status === 'Pending') addItem(v, 'Trip Request', 'Fleet', Fuel, 'text-orange-500', 'requestDate', 'userName', `${v.userName} requested a vehicle for trip to ${v.pickupLocation}`, `/vehicles/trips/manage`);
       else if (v.status === 'Approved') addItem(v, 'Trip Allotted', 'Fleet', CarFront, 'text-blue-500', 'approvalDate', 'userName', `Vehicle ${v.vehicleDetails} allotted to ${v.userName} with driver ${v.driverName}`, `/vehicles/trips/manage`);
       else if (v.status === 'Ongoing') addItem(v, 'Trip Start', 'Fleet', PlayCircle, 'text-blue-700', 'startTime', 'userName', `${v.userName} started a journey with ${v.vehicleDetails}`, `/vehicles/trips/manage`);
       else if (v.status === 'Completed') addItem(v, 'Trip End', 'Fleet', Flag, 'text-emerald-700', 'endTime', 'userName', `${v.userName} arrived at ${v.dropLocation}. Journey complete.`, `/vehicles/trips/manage`);
@@ -444,7 +462,10 @@ export default function ActivitiesPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-[9px] font-black text-muted-foreground/80 uppercase tracking-[0.2em]">{activity.module}</span>
                       <span className="h-1 w-1 rounded-full bg-border" />
-                      <span className="text-[9px] font-bold text-muted-foreground/60 uppercase truncate">{activity.siteName}</span>
+                      <div className="flex items-center gap-1 text-[9px] font-bold text-muted-foreground/60 uppercase truncate">
+                        <MapPin className="h-2.5 w-2.5 opacity-40" />
+                        {activity.siteName}
+                      </div>
                       <Link href={activity.link} className="text-[9px] font-black text-primary/60 hover:text-primary underline decoration-dashed underline-offset-4 uppercase ml-3 transition-colors">
                         View
                       </Link>
