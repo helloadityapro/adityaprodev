@@ -38,7 +38,8 @@ import {
   Eye,
   Maximize2,
   X,
-  CheckCircle2
+  CheckCircle2,
+  Users
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -132,6 +133,8 @@ type AccessConfig = {
   ownDataOnly?: boolean;
 };
 
+const EXCLUDED_PERSONNEL = ["Khalil Choudhary", "Imtiyaz Kazi", "Jayesh Bajaj", "Vipul Joisher"];
+
 export default function ActivitiesPage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -194,8 +197,15 @@ export default function ActivitiesPage() {
     return query(colRef, or(where('userId', '==', user?.uid), where('driverId', '==', user?.uid)), limit(queryLimit));
   }, [firestore, isAdmin, user]));
 
+  const { data: attendanceLogs } = useCollection<DataItem>(useMemoFirebase(() => {
+    const colRef = collection(firestore, 'attendance');
+    if (isAdmin) return query(colRef, limit(queryLimit));
+    return query(colRef, where('userId', '==', user?.uid), limit(queryLimit));
+  }, [firestore, isAdmin, user]));
+
+  const { data: allPersonnel } = useCollection<UserProfile>(useMemoFirebase(() => collection(firestore, 'users'), [firestore]));
+
   const { data: siteDocs } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('site_documents'), [firestore, isAdmin, user]));
-  const { data: usersList } = useCollection<DataItem>(useMemoFirebase(() => isAdmin ? collection(firestore, 'users') : null, [firestore, isAdmin]));
   const { data: siteGroups } = useCollection<DataItem>(useMemoFirebase(() => isAdmin ? collection(firestore, 'site_groups') : null, [firestore, isAdmin]));
   const { data: lmsCourses } = useCollection<DataItem>(useMemoFirebase(() => collection(firestore, 'lms_courses'), [firestore]));
 
@@ -212,6 +222,53 @@ export default function ActivitiesPage() {
       default: return { start: startOfDay(today), end: endOfDay(today) };
     }
   }, [dateFilter, customStart, customEnd]);
+
+  const summaryStats = React.useMemo(() => {
+    const { start, end } = queryDateRange;
+    
+    const countInRange = (list: DataItem[] | null, dateField: string, filter?: (i: DataItem) => boolean) => {
+        if (!list) return 0;
+        return list.filter(item => {
+            let d: Date | null = null;
+            const val = (item as any)[dateField];
+            if (val?.toDate) d = val.toDate();
+            else if (val) d = new Date(val);
+            const matchesDate = d && d >= start && d <= end;
+            const matchesFilter = filter ? filter(item) : true;
+            return matchesDate && matchesFilter;
+        }).length;
+    };
+
+    const ptwCount = countInRange(permits, 'requestDate');
+    const dprCount = countInRange(dprs, 'createdAt');
+    const visitCount = countInRange(visits, 'startTime');
+    const dispatchCount = countInRange(vehicleReqs, 'requestDate', (i) => i.status === 'Ongoing');
+
+    // Attendance Calculation
+    const presentUserIds = new Set<string>();
+    attendanceLogs?.forEach(log => {
+        let d: Date | null = null;
+        if (log.date) d = new Date(log.date);
+        else if (log.createdAt?.toDate) d = log.createdAt.toDate();
+        
+        if (d && d >= start && d <= end && log.userId) {
+            presentUserIds.add(log.userId);
+        }
+    });
+
+    const activeStaff = allPersonnel?.filter(p => !EXCLUDED_PERSONNEL.includes(p.username)) || [];
+    const presentCount = presentUserIds.size;
+    const absentCount = Math.max(0, activeStaff.length - presentCount);
+
+    return {
+        ptw: ptwCount,
+        dpr: dprCount,
+        visits: visitCount,
+        dispatches: dispatchCount,
+        present: presentCount,
+        absent: absentCount
+    };
+  }, [permits, dprs, visits, vehicleReqs, attendanceLogs, allPersonnel, queryDateRange]);
 
   const activities = React.useMemo(() => {
     const agg: RecentActivity[] = [];
@@ -315,12 +372,11 @@ export default function ActivitiesPage() {
     });
 
     siteDocs?.forEach(doc => addItem(doc, 'Document', 'Files', FileUp, 'text-sky-600', 'createdAt', 'uploadedByName', `${doc.uploadedByName} uploaded "${doc.fileName}"`, `/documents/${doc.siteId}`));
-    usersList?.forEach(u => addItem(u, 'User Registry', 'Systems', UserPlus, 'text-purple-600', 'createdAt', 'username', `New user added to registry: ${u.username}`, `/settings/users`));
     siteGroups?.forEach(g => addItem(g, 'Site Group', 'Registry', Tags, 'text-pink-600', 'createdAt', 'createdByName', `New site cluster defined: "${g.name}"`, `/projects/groups`));
     lmsCourses?.forEach(c => addItem(c, 'Course Published', 'LMS', BookOpen, 'text-indigo-700', 'createdAt', 'createdBy', `New training curriculum published: "${c.title}"`, `/lms/admin`));
 
     return agg.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [permits, tasks, dprs, movements, requirements, expenses, visits, pos, wos, payments, redemptions, installationChecklists, vehicleReqs, siteDocs, usersList, siteGroups, lmsCourses, queryDateRange, searchTerm, isAdmin, user, userProfile, roleConfigs, userRoleStr]);
+  }, [permits, tasks, dprs, movements, requirements, expenses, visits, pos, wos, payments, redemptions, installationChecklists, vehicleReqs, siteDocs, siteGroups, lmsCourses, queryDateRange, searchTerm, isAdmin, user, userProfile, roleConfigs, userRoleStr]);
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -329,12 +385,37 @@ export default function ActivitiesPage() {
 
   if (isProfileLoading) return <div className="p-8"><Skeleton className="h-12 w-48" /></div>;
 
+  const AnalyticsSummary = () => (
+    <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-background mb-4">
+      <CardContent className="p-0">
+        <div className="flex flex-wrap divide-x divide-border/40">
+          <StatBox label="PtWs" value={summaryStats.ptw} icon={ShieldCheck} color="text-blue-600" />
+          <StatBox label="DPRs" value={summaryStats.dpr} icon={FileText} color="text-amber-600" />
+          <StatBox label="Visits" value={summaryStats.visits} icon={Navigation} color="text-rose-600" />
+          <StatBox label="Dispatches" value={summaryStats.dispatches} icon={Fuel} color="text-orange-500" />
+          <StatBox label="Present" value={summaryStats.present} icon={CheckCircle2} color="text-emerald-600" />
+          <StatBox label="Absent" value={summaryStats.absent} icon={X} color="text-red-500" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  const StatBox = ({ label, value, icon: Icon, color }: { label: string, value: number, icon: any, color: string }) => (
+    <div className="flex-1 min-w-[120px] p-4 flex items-center justify-between group hover:bg-muted/10 transition-colors">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">{label}</span>
+        <span className="text-xl font-black tabular-nums leading-none">{value}</span>
+      </div>
+      <Icon className={cn("h-5 w-5 opacity-20 group-hover:opacity-100 transition-opacity", color)} />
+    </div>
+  );
+
   const ActivityTable = () => (
     <Table className="min-w-full">
       <TableHeader className="bg-muted/30 sticky top-0 z-20 shadow-sm">
         <TableRow className="h-10">
           <TableHead className="w-[100px] text-[10px] font-black uppercase text-center px-4">Time</TableHead>
-          <TableHead className="text-[10px] font-black uppercase px-4">Activity Audit Feed</TableHead>
+          <TableHead className="text-[10px] font-black uppercase px-4">Activity detail</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -365,7 +446,7 @@ export default function ActivitiesPage() {
                       <span className="h-1 w-1 rounded-full bg-border" />
                       <span className="text-[9px] font-bold text-muted-foreground/60 uppercase truncate">{activity.siteName}</span>
                       <Link href={activity.link} className="text-[9px] font-black text-primary/60 hover:text-primary underline decoration-dashed underline-offset-4 uppercase ml-3 transition-colors">
-                        Open Record
+                        View
                       </Link>
                     </div>
                   </div>
@@ -391,7 +472,7 @@ export default function ActivitiesPage() {
     <div className="space-y-4 animate-in fade-in duration-500 pb-20">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-          <Bell className="h-5 w-5 text-primary" /> Activity Hub
+          <Bell className="h-5 w-5 text-primary" /> Activities
         </h1>
         
         <div className="flex items-center gap-2">
@@ -421,7 +502,7 @@ export default function ActivitiesPage() {
           <div className="relative hidden md:block w-48 lg:w-64">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input 
-              placeholder="Search narrative..." 
+              placeholder="Search" 
               className="pl-8 h-9 rounded-sm border-primary/20 bg-background text-[10px] font-bold"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
@@ -438,9 +519,11 @@ export default function ActivitiesPage() {
         </div>
       </div>
 
+      <AnalyticsSummary />
+
       <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-background">
         <CardContent className="p-0">
-          <ScrollArea className="h-[calc(100vh-220px)] w-full">
+          <ScrollArea className="h-[calc(100vh-280px)] w-full">
             <ActivityTable />
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -465,18 +548,21 @@ export default function ActivitiesPage() {
                </DialogClose>
             </div>
           </DialogHeader>
-          <div className="p-4 border-b bg-muted/5 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1">
-               <Search className="h-5 w-5 text-muted-foreground" />
-               <Input 
-                placeholder="Search audit narrative..." 
-                className="max-w-md border-none focus-visible:ring-0 bg-transparent text-lg font-bold"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                autoFocus
-               />
+          <div className="p-4 border-b bg-muted/5 flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 flex-1">
+                 <Search className="h-5 w-5 text-muted-foreground" />
+                 <Input 
+                  placeholder="Search audit narrative..." 
+                  className="max-w-md border-none focus-visible:ring-0 bg-transparent text-lg font-bold"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  autoFocus
+                 />
+              </div>
+              <Badge variant="secondary" className="font-mono text-[10px] h-6 px-3">{dateFilter}</Badge>
             </div>
-            <Badge variant="secondary" className="font-mono text-[10px] h-6 px-3">{dateFilter}</Badge>
+            <AnalyticsSummary />
           </div>
           <ScrollArea className="flex-1">
             <div className="max-w-5xl mx-auto py-10">
