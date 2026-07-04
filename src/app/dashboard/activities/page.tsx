@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, where, doc, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, query, where, doc, orderBy, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -37,9 +37,10 @@ import {
   Clock,
   User as UserIcon,
   Building2,
-  Globe
+  Globe,
+  MapPin
 } from 'lucide-react';
-import { format, subDays, subWeeks, subMonths, startOfDay, endOfDay, isWithinInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
