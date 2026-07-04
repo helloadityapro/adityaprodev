@@ -45,6 +45,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import { 
   Select, 
   SelectContent, 
@@ -281,7 +283,7 @@ export default function ActivitiesPage() {
           ) : (
             <div className="flex-1" />
           )}
-          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
+          <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setDateFilter("today"); }} className="h-10 w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
             <FilterX className="h-4 w-4" />
           </Button>
         </div>
@@ -347,29 +349,5 @@ export default function ActivitiesPage() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, color, description }: { title: string, value: number, icon: any, color: string, description: string }) {
-  const colors = { 
-    primary: "bg-primary/5 border-primary/10 text-primary",
-    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
-    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
-    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
-    purple: "bg-purple-500/5 border-purple-500/10 text-purple-600",
-    slate: "bg-slate-500/5 border-slate-500/10 text-slate-600"
-  };
-
-  return (
-    <Card className={cn("rounded-sm border shadow-sm group hover:shadow-md transition-all", (colors as any)[color])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-4">
-        <CardTitle className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">{title}</CardTitle>
-        <Icon className="h-4 w-4 opacity-70 group-hover:scale-110 transition-transform" />
-      </CardHeader>
-      <CardContent className="p-4 pt-0">
-        <div className="text-2xl font-black tabular-nums">{value}</div>
-        <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-40 mt-0.5">{description}</p>
-      </CardContent>
-    </Card>
   );
 }
