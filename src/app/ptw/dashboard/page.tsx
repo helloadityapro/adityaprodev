@@ -23,7 +23,11 @@ import {
   AlertCircle,
   ArrowUp,
   ArrowDown,
-  FileDown
+  FileDown,
+  Users,
+  Check,
+  ChevronsUpDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { format, subDays, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -35,6 +39,12 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import * as XLSX from 'xlsx';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+
+type SortKey = 'company' | 'name' | 'total' | string;
 
 export default function PtwDashboardPage() {
   const firestore = useFirestore();
@@ -44,6 +54,11 @@ export default function PtwDashboardPage() {
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [selectedUserIds, setSelectedUserIds] = React.useState<string[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = React.useState("");
+  const [isUserPopoverOpen, setIsUserPopoverOpen] = React.useState(false);
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'total', direction: 'desc' });
+  
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -80,7 +95,7 @@ export default function PtwDashboardPage() {
 
     const { start, end } = queryDateRange;
 
-    return allSites.map(site => {
+    let result = allSites.map(site => {
       const sitePermits = allPermits.filter(p => {
         let pDate: Date;
         if (p.requestDate?.toDate) pDate = p.requestDate.toDate();
@@ -88,7 +103,9 @@ export default function PtwDashboardPage() {
         else return false;
 
         const matchesDate = pDate >= start && pDate <= end;
-        return p.siteId === site.id && matchesDate;
+        const matchesUser = selectedUserIds.length === 0 || selectedUserIds.includes(p.siteEngineerId);
+        
+        return p.siteId === site.id && matchesDate && matchesUser;
       });
 
       const typeCounts: Record<string, number> = {};
@@ -110,8 +127,52 @@ export default function PtwDashboardPage() {
     }).filter(row => 
       row.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       row.projectCompany.toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => b.total - a.total);
-  }, [allSites, allPermits, ptwTypes, allUsers, searchTerm, queryDateRange]);
+    );
+
+    // Sorting
+    result.sort((a, b) => {
+      const { key, direction } = sortConfig;
+      let valA: any = '';
+      let valB: any = '';
+
+      if (key === 'company') {
+        valA = a.projectCompany.toLowerCase();
+        valB = b.projectCompany.toLowerCase();
+      } else if (key === 'name') {
+        valA = a.name.toLowerCase();
+        valB = b.name.toLowerCase();
+      } else if (key === 'total') {
+        valA = a.total;
+        valB = b.total;
+      } else if (key.startsWith('type_')) {
+        const typeName = key.replace('type_', '');
+        valA = a.typeCounts[typeName] || 0;
+        valB = b.typeCounts[typeName] || 0;
+      }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [allSites, allPermits, ptwTypes, allUsers, searchTerm, queryDateRange, selectedUserIds, sortConfig]);
+
+  const selectionTotal = React.useMemo(() => {
+    return dashboardData.reduce((sum, row) => sum + row.total, 0);
+  }, [dashboardData]);
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30 shrink-0" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary shrink-0" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary shrink-0" />;
+  };
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
@@ -145,6 +206,23 @@ export default function PtwDashboardPage() {
     XLSX.utils.book_append_sheet(wb, ws, "PtW Compliance Matrix");
     XLSX.writeFile(wb, `PtW_Dashboard_${format(queryDateRange.start, 'yyyyMMdd')}.xlsx`);
   };
+
+  const toggleUser = (id: string) => {
+    setSelectedUserIds(prev => 
+      prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]
+    );
+  };
+
+  const filteredEngineers = React.useMemo(() => {
+    if (!allUsers) return [];
+    return allUsers
+      .filter(u => u.role === 'Site Engineer' || u.role === 'Site Manager')
+      .filter(u => 
+        u.username?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+        u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
+      )
+      .sort((a, b) => (a.username || "").localeCompare(b.username || ""));
+  }, [allUsers, userSearchQuery]);
 
   if (isProfileLoading || sitesLoading || typesLoading || usersLoading || permitsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
@@ -201,16 +279,78 @@ export default function PtwDashboardPage() {
 
       <div className="relative group">
         <Card className="rounded-sm shadow-xl border-primary/10 overflow-hidden bg-background">
-          <CardHeader className="bg-muted/30 border-b py-3 px-4">
-             <div className="relative max-w-sm">
-                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                <Input 
-                  placeholder="Filter site or client..." 
-                  className="pl-8 h-9 text-[11px] font-bold bg-background border-primary/10" 
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                />
+          <CardHeader className="bg-muted/30 border-b py-3 px-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+             <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+                <div className="relative w-full md:w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input 
+                      placeholder="Filter site or client..." 
+                      className="pl-8 h-9 text-[11px] font-bold bg-background border-primary/10" 
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                    />
+                </div>
+
+                <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full md:w-[240px] justify-between h-9 rounded-sm font-bold border-primary/10 bg-background text-[11px] uppercase tracking-tight">
+                        <div className="flex items-center gap-2 truncate">
+                          <Users className="h-3.5 w-3.5 text-primary opacity-60" />
+                          <span className="truncate">
+                              {selectedUserIds.length === 0 ? "Filter Personnel" : 
+                               selectedUserIds.length === 1 ? allUsers?.find(u => u.id === selectedUserIds[0])?.username :
+                               `${selectedUserIds.length} Users`}
+                          </span>
+                        </div>
+                        <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[280px] p-0 rounded-sm shadow-2xl border-primary/10" align="start">
+                      <div className="flex items-center border-b px-3 bg-muted/20">
+                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                        <Input 
+                          placeholder="Search personnel..." 
+                          className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm bg-transparent" 
+                          value={userSearchQuery}
+                          onChange={(e) => setUserSearchQuery(e.target.value)}
+                        />
+                      </div>
+                      <ScrollArea className="h-[250px]">
+                        <div className="p-2 space-y-1">
+                          {filteredEngineers.map(u => (
+                            <div 
+                              key={u.id} 
+                              className={cn(
+                                  "flex items-center space-x-3 p-2 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer group",
+                                  selectedUserIds.includes(u.id) && "bg-primary/5"
+                              )}
+                              onClick={() => toggleUser(u.id)}
+                            >
+                              <Checkbox checked={selectedUserIds.includes(u.id)} className="rounded-[4px]" />
+                              <div className="flex flex-col min-w-0">
+                                <span className={cn("text-xs font-bold truncate transition-colors", selectedUserIds.includes(u.id) ? "text-primary" : "text-foreground")}>{u.username}</span>
+                                <span className="text-[8px] text-muted-foreground uppercase font-black tracking-tighter opacity-60">{u.role}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                      {selectedUserIds.length > 0 && (
+                          <div className="p-2 border-t bg-muted/5 flex gap-2">
+                              <Button variant="ghost" className="h-8 flex-1 rounded-sm text-[9px] font-black uppercase" onClick={() => setSelectedUserIds([])}>Clear</Button>
+                              <Button variant="secondary" className="h-8 flex-1 rounded-sm text-[9px] font-black uppercase" onClick={() => setIsUserPopoverOpen(false)}>Apply</Button>
+                          </div>
+                      )}
+                    </PopoverContent>
+                </Popover>
              </div>
+
+             {selectedUserIds.length > 0 && (
+               <Badge variant="outline" className="bg-primary text-white border-none rounded-full h-8 px-4 font-black uppercase text-[10px] tracking-widest shadow-lg animate-in zoom-in duration-300">
+                  <ShieldCheck className="h-3.5 w-3.5 mr-2" />
+                  Selection Aggregate: {selectionTotal} PtWs
+               </Badge>
+             )}
           </CardHeader>
           <CardContent className="p-0 relative">
             <div 
@@ -220,14 +360,45 @@ export default function PtwDashboardPage() {
               <Table className="border-separate border-spacing-0 text-[10px] min-w-full w-max table-fixed">
                 <TableHeader className="sticky top-0 z-40">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="sticky left-0 z-50 w-[180px] min-w-[180px] font-black uppercase tracking-widest px-4 h-10 border-r border-b bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Project Company</TableHead>
-                    <TableHead className="sticky left-[180px] z-50 w-[200px] min-w-[200px] font-black uppercase tracking-widest px-4 h-10 border-r border-b bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Project Name</TableHead>
+                    <TableHead 
+                      className="sticky left-0 z-50 w-[180px] min-w-[180px] cursor-pointer hover:bg-muted transition-colors px-4 h-10 border-r border-b bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                      onClick={() => handleSort('company')}
+                    >
+                      <div className="flex items-center justify-between">
+                         <span className="font-black uppercase tracking-widest">Project Company</span>
+                         <SortIcon column="company" />
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="sticky left-[180px] z-50 w-[200px] min-w-[200px] cursor-pointer hover:bg-muted transition-colors px-4 h-10 border-r border-b bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                      onClick={() => handleSort('name')}
+                    >
+                      <div className="flex items-center justify-between">
+                         <span className="font-black uppercase tracking-widest">Project Name</span>
+                         <SortIcon column="name" />
+                      </div>
+                    </TableHead>
                     <TableHead className="sticky left-[380px] z-50 w-[220px] min-w-[220px] font-black uppercase tracking-widest px-4 h-10 border-r border-b text-primary bg-background shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Assigned Personnel</TableHead>
-                    <TableHead className="sticky left-[600px] z-50 w-[100px] min-w-[100px] font-black uppercase tracking-widest px-4 h-10 border-r border-b text-center bg-primary text-primary-foreground shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Total</TableHead>
+                    <TableHead 
+                      className="sticky left-[600px] z-50 w-[100px] min-w-[100px] cursor-pointer hover:bg-primary/90 transition-colors px-4 h-10 border-r border-b text-center bg-primary text-primary-foreground shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                      onClick={() => handleSort('total')}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                         <span className="font-black uppercase tracking-widest">Total</span>
+                         <SortIcon column="total" />
+                      </div>
+                    </TableHead>
                     
                     {ptwTypes?.map(type => (
-                      <TableHead key={`head-${type.id}`} className="w-[140px] min-w-[140px] font-black uppercase tracking-tight text-center px-2 h-10 border-r border-b last:border-r-0 bg-muted/50 backdrop-blur">
-                        {type.name}
+                      <TableHead 
+                        key={`head-${type.id}`} 
+                        className="w-[140px] min-w-[140px] cursor-pointer hover:bg-muted transition-colors px-2 h-10 border-r border-b last:border-r-0 bg-muted/50 backdrop-blur"
+                        onClick={() => handleSort(`type_${type.name}`)}
+                      >
+                        <div className="flex items-center justify-center gap-1">
+                           <span className="font-black uppercase tracking-tight text-center leading-tight truncate">{type.name}</span>
+                           <SortIcon column={`type_${type.name}`} />
+                        </div>
                       </TableHead>
                     ))}
                   </TableRow>
