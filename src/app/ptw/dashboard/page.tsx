@@ -54,6 +54,8 @@ export default function PtwDashboardPage() {
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [customStart, setCustomStart] = React.useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
+  const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [selectedUserIds, setSelectedUserIds] = React.useState<string[]>([]);
   const [userSearchQuery, setUserSearchQuery] = React.useState("");
   const [isUserPopoverOpen, setIsUserPopoverOpen] = React.useState(false);
@@ -86,9 +88,10 @@ export default function PtwDashboardPage() {
       case '7days': return { start: startOfDay(subDays(today, 7)), end: endOfDay(today) };
       case 'lastMonth': return { start: startOfDay(subMonths(today, 1)), end: endOfDay(today) };
       case 'lastYear': return { start: startOfDay(subDays(today, 365)), end: endOfDay(today) };
+      case 'custom': return { start: startOfDay(new Date(customStart)), end: endOfDay(new Date(customEnd)) };
       default: return { start: new Date(0), end: new Date(2100, 0, 1) };
     }
-  }, [dateFilter]);
+  }, [dateFilter, customStart, customEnd]);
 
   const dashboardData = React.useMemo(() => {
     if (!allSites || !allPermits || !ptwTypes || !allUsers) return [];
@@ -103,7 +106,7 @@ export default function PtwDashboardPage() {
         else return false;
 
         const matchesDate = pDate >= start && pDate <= end;
-        // Updated Logic: Count permit if selected user is the Engineer OR the Manager
+        // Count permit if selected user is the Engineer OR the Manager
         const matchesUser = selectedUserIds.length === 0 || 
                            selectedUserIds.includes(p.siteEngineerId) || 
                            selectedUserIds.includes(p.siteManagerId);
@@ -259,10 +262,28 @@ export default function PtwDashboardPage() {
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Site-wise performance & volume analytics</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={handleExport} variant="outline" size="sm" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 mr-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={handleExport} variant="outline" size="sm" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
               <FileDown className="h-4 w-4 mr-2" /> Export
             </Button>
+            
+            {dateFilter === 'custom' && (
+              <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2 duration-300">
+                <Input 
+                  type="date" 
+                  value={customStart} 
+                  onChange={e => setCustomStart(e.target.value)} 
+                  className="h-10 w-[140px] rounded-sm font-bold text-[10px] bg-background border-primary/20" 
+                />
+                <Input 
+                  type="date" 
+                  value={customEnd} 
+                  onChange={e => setCustomEnd(e.target.value)} 
+                  className="h-10 w-[140px] rounded-sm font-bold text-[10px] bg-background border-primary/20" 
+                />
+              </div>
+            )}
+
             <Select value={dateFilter} onValueChange={setDateFilter}>
               <SelectTrigger className="h-10 w-[160px] rounded-sm font-black uppercase text-[10px] tracking-widest bg-secondary border-none">
                 <Calendar className="mr-2 h-3.5 w-3.5" /><SelectValue />
@@ -274,6 +295,7 @@ export default function PtwDashboardPage() {
                 <SelectItem value="lastMonth" className="text-[10px] font-black uppercase">Last Month</SelectItem>
                 <SelectItem value="lastYear" className="text-[10px] font-black uppercase">Last Year</SelectItem>
                 <SelectItem value="allTime" className="text-[10px] font-black uppercase">All Time</SelectItem>
+                <SelectItem value="custom" className="text-[10px] font-black uppercase text-primary">Custom Range</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -351,7 +373,7 @@ export default function PtwDashboardPage() {
              {selectedUserIds.length > 0 && (
                <Badge variant="outline" className="bg-primary text-white border-none rounded-full h-8 px-4 font-black uppercase text-[10px] tracking-widest shadow-lg animate-in zoom-in duration-300">
                   <ShieldCheck className="h-3.5 w-3.5 mr-2" />
-                  Selection Aggregate: {selectionTotal} PtWs
+                  {selectionTotal} PtWs
                </Badge>
              )}
           </CardHeader>
