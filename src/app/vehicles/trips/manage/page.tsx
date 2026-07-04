@@ -59,10 +59,13 @@ import {
   ArrowUpDown,
   ZoomIn,
   ZoomOut,
+  RotateCcw as RotateIcon,
   ChevronLeft,
   ChevronRight,
   IndianRupee,
-  PieChart
+  PieChart,
+  MoreVertical,
+  Forward
 } from 'lucide-react';
 import { format, parse, subDays, subMonths, subYears, startOfDay, endOfDay } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -111,6 +114,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { sendNotification } from '@/lib/notifications';
 import { getPageKeyByPath, type PageKey, slugifyRole } from "@/lib/access-control";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
 
@@ -317,7 +326,6 @@ export default function ManageAllTripsPage() {
     }
 
     return result.filter(trip => {
-      // Filter by Requested Date as per requirements
       const rDate = trip.requestDate?.toDate?.() || new Date(trip.requestDate);
       const rDateStr = format(rDate, 'yyyy-MM-dd');
       const matchesDate = rDateStr >= start && rDateStr <= end;
@@ -347,6 +355,34 @@ export default function ManageAllTripsPage() {
       completed: assignments.filter(a => a.status === 'Completed').length,
     };
   }, [assignments]);
+
+  const handleExport = () => {
+    if (filteredAssignments.length === 0) return;
+    
+    const exportData = filteredAssignments.map(trip => {
+        const distance = (trip.endReading && trip.startReading) ? (trip.endReading - trip.startReading).toFixed(1) : '—';
+        
+        return {
+            'Trip Date': trip.tripDate,
+            'Personnel': trip.userName,
+            'Status': trip.status,
+            'Vehicle': trip.vehicleDetails || '—',
+            'Ownership': trip.vehicleOwnership || '—',
+            'Driver': trip.driverName || '—',
+            'Pickup': trip.pickupLocation,
+            'Drop': trip.dropLocation || '—',
+            'Purpose': trip.purpose,
+            'Distance (KM)': distance,
+            'Reporting Time': trip.reportingTime,
+            'Request Logged': trip.requestDate ? format(trip.requestDate.toDate(), 'dd/MM/yyyy HH:mm') : '—'
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Trips Registry");
+    XLSX.writeFile(wb, `AdityaPro_Trips_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  };
 
   const availableVehiclesForAllotment = React.useMemo(() => {
     if (!vehicles) return [];
@@ -561,14 +597,14 @@ export default function ManageAllTripsPage() {
     setDetailsAssignment(null);
     const params = new URLSearchParams(searchParams.toString());
     params.delete('view');
-    router.replace(`${pathname}?${params.toString()}`);
+    router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
   const openViewer = (url: string, trip: Assignment) => {
     const urls = [trip.startReadingPhoto, trip.endReadingPhoto].filter(Boolean) as string[];
     const index = urls.indexOf(url);
     setViewUrls(urls);
-    setCurrentFileIndex(index >= 0 ? index : 0);
+    setCurrentUrlIndex(index >= 0 ? index : 0);
     setViewUrl(url);
     setZoom(1);
   };
@@ -592,6 +628,9 @@ export default function ManageAllTripsPage() {
           </div>
           
           <div className="flex items-center gap-2">
+            <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+                <FileDown className="h-4 w-4 mr-2" /> Export
+            </Button>
             {(isAdmin || isManager || isHR) && (
               <Button 
                 variant="outline" 
@@ -697,6 +736,12 @@ export default function ManageAllTripsPage() {
       <div className="mt-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsContent value="registry" className="animate-in fade-in-50 duration-300 m-0">
+            <div className="flex items-center justify-between px-1 mb-4">
+              <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-6 border-none">
+                {filteredAssignments.length} Logs Indexed
+              </Badge>
+            </div>
+            
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
               {filteredAssignments.length > 0 ? filteredAssignments.map((trip) => (
@@ -765,6 +810,12 @@ export default function ManageAllTripsPage() {
           </TabsContent>
 
           <TabsContent value="queue" className="animate-in fade-in-50 duration-300 m-0">
+            <div className="flex items-center justify-between px-1 mb-4">
+              <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-6 border-none">
+                {filteredAssignments.filter(a => a.status === 'Pending').length} Pending Allotment
+              </Badge>
+            </div>
+            
             <div className="md:hidden space-y-4">
               {filteredAssignments.filter(a => a.status === 'Pending').length > 0 ? filteredAssignments.filter(a => a.status === 'Pending').map((trip) => (
                 <TripMobileCard 
@@ -838,7 +889,7 @@ export default function ManageAllTripsPage() {
       <ScheduledTripsDialog assignments={assignments || []} allUsers={allUsers || []} open={isScheduledTripsOpen} onOpenChange={setIsScheduledTripsOpen} />
 
       <Dialog open={!!approvalTarget} onOpenChange={(o) => !o && setApprovalState(null)}>
-        <DialogContent className="max-w-xl w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[80vh] sm:h-auto max-h-[90vh]">
+        <DialogContent className="max-w-xl w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[80vh] sm:h-auto max-h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Fuel className="h-5 w-5 text-primary" /></div>
@@ -1002,7 +1053,7 @@ export default function ManageAllTripsPage() {
             <DialogTitle>Audit Media Viewer</DialogTitle>
             <DialogDescription>Verification media for vehicle trip audit.</DialogDescription>
           </DialogHeader>
-          <div className="absolute top-4 left-4 flex gap-2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }}><ZoomIn className="h-4 w-4" /></Button><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }}><ZoomOut className="h-4 w-4" /></Button><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }}><RotateCcw className="h-5 w-5" /></Button></div>
+          <div className="absolute top-4 left-4 flex gap-2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }}><ZoomIn className="h-4 w-4" /></Button><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }}><ZoomOut className="h-4 w-4" /></Button><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }}><RotateIcon className="h-5 w-5" /></Button></div>
           <div className="relative w-full h-full overflow-auto p-4 flex"><div ref={viewerRef} className={cn("m-auto transition-transform duration-200", zoom > 1 ? "cursor-move" : "cursor-default")} style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}>{viewUrl && <img src={viewUrl} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Evidence" />}</div></div>
         </DialogContent>
       </Dialog>
