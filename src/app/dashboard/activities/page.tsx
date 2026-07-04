@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Bell,
   Search,
-  Filter,
   Calendar,
   ShieldCheck,
   FileText,
@@ -33,11 +32,8 @@ import {
   BookOpen,
   History,
   FilterX,
-  ChevronRight,
   Clock,
   User as UserIcon,
-  Building2,
-  Globe,
   MapPin,
   Eye
 } from 'lucide-react';
@@ -46,9 +42,8 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { 
   Select, 
   SelectContent, 
@@ -144,7 +139,6 @@ export default function ActivitiesPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
-  // Base Data Fetching with strict filtering
   const queryLimit = 1000;
 
   const getFilteredQuery = (coll: string, dateField: string = 'createdAt') => {
@@ -153,7 +147,6 @@ export default function ActivitiesPage() {
     return query(colRef, where('userId', '==', user?.uid), limit(queryLimit));
   };
 
-  // Specialized queries for different modules
   const { data: permits } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'permits_to_work');
     if (isAdmin) return query(colRef, orderBy('requestDate', 'desc'), limit(queryLimit));
@@ -167,7 +160,7 @@ export default function ActivitiesPage() {
   const { data: tasks } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'tasks');
     if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(queryLimit));
-    return query(colRef, where('assignedToId', '==', user?.uid), limit(queryLimit));
+    return query(colRef, or(where('assignedToId', '==', user?.uid), where('assignedById', '==', user?.uid)), limit(queryLimit));
   }, [firestore, isAdmin, user]));
 
   const { data: visits } = useCollection<DataItem>(useMemoFirebase(() => {
@@ -216,7 +209,6 @@ export default function ActivitiesPage() {
       else if (val) d = new Date(val);
 
       if (d && d >= start && d <= end) {
-        // Strict sovereignty check
         if (isOwnDataOnly && !isAdmin) {
             const hasAccess = !item.siteId || assignedIds.has(item.siteId) || item.userId === user?.uid;
             if (!hasAccess) return;
@@ -405,22 +397,5 @@ export default function ActivitiesPage() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, color, description }: { title: string, value: number, icon: any, color: string, description: string }) {
-  return (
-    <Card className="rounded-sm border-primary/10 shadow-sm hover:shadow-md transition-all">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 p-3 md:p-4">
-        <CardTitle className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
-        <div className={cn("p-1 rounded-sm border shrink-0", color)}>
-          <Icon className="h-3 w-3 md:h-3.5 md:w-3.5" />
-        </div>
-      </CardHeader>
-      <CardContent className="p-3 md:p-4 pt-0">
-        <div className="text-xl md:text-2xl font-black tracking-tight">{value}</div>
-        <p className="text-[8px] md:text-[9px] text-muted-foreground mt-1 font-bold uppercase tracking-tighter truncate opacity-60">{description}</p>
-      </CardContent>
-    </Card>
   );
 }
