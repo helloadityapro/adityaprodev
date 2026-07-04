@@ -200,15 +200,21 @@ export default function SiteVisitsSummaryPage() {
   const globalSummary = React.useMemo(() => {
     const totalVisits = filteredVisits.length;
     let totalMinutes = 0;
+    const uniqueDays = new Set<string>();
 
     filteredVisits.forEach(v => {
       totalMinutes += calculateDurationMins(v.startTime, v.endTime);
+      if (v.startTime) {
+        const date = v.startTime.toDate ? v.startTime.toDate() : new Date(v.startTime);
+        uniqueDays.add(format(date, 'yyyy-MM-dd'));
+      }
     });
 
     return {
       totalVisits,
       totalTime: calculateDurationStr(totalMinutes),
-      avgTime: totalVisits > 0 ? calculateDurationStr(Math.round(totalMinutes / totalVisits)) : '0h 0m'
+      avgTime: totalVisits > 0 ? calculateDurationStr(Math.round(totalMinutes / totalVisits)) : '0h 0m',
+      uniqueDays: uniqueDays.size
     };
   }, [filteredVisits]);
 
@@ -383,14 +389,15 @@ export default function SiteVisitsSummaryPage() {
         <div className="flex flex-col items-center justify-center py-40 text-center bg-card border border-dashed rounded-sm border-primary/20">
           <div className="p-6 rounded-full bg-primary/5 mb-4"><Users className="h-12 w-12 text-primary/30" /></div>
           <h3 className="text-xl font-bold uppercase tracking-tight">Personnel Selection Required</h3>
-          <p className="text-muted-foreground max-w-sm mx-auto mt-2 text-sm font-medium">
+          <p className="text-muted-foreground max-sm mx-auto mt-2 text-sm font-medium">
             Please choose one or more team members from the filter to generate a comparative visit analysis.
           </p>
         </div>
       ) : (
         <div className="space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 animate-in slide-in-from-bottom-4 duration-500">
             <SummaryCard title="Aggregate Visits" value={globalSummary.totalVisits} icon={Navigation} color="blue" description="Total in range" />
+            <SummaryCard title="Workdays Active" value={globalSummary.uniqueDays} icon={Calendar} color="amber" description="Distinct days visited" />
             <SummaryCard title="Total Field Time" value={globalSummary.totalTime} icon={Clock} color="primary" description="Team aggregate" />
             <SummaryCard title="Avg. Visit Cycle" value={globalSummary.avgTime} icon={Timer} color="emerald" description="Efficiency metric" />
           </div>
@@ -530,11 +537,12 @@ export default function SiteVisitsSummaryPage() {
   );
 }
 
-function SummaryCard({ title, value, icon: Icon, color, description }: { title: string, value: string | number, icon: any, color: 'primary' | 'emerald' | 'blue', description: string }) {
+function SummaryCard({ title, value, icon: Icon, color, description }: { title: string, value: string | number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber', description: string }) {
   const colors = {
     primary: "bg-primary/5 border-primary/10 text-primary",
     emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
     blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
+    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
   };
 
   return (
