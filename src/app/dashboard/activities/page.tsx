@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, where, doc, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, doc, orderBy, limit, or } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -150,7 +150,7 @@ export default function ActivitiesPage() {
   const { data: permits } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'permits_to_work');
     if (isAdmin) return query(colRef, orderBy('requestDate', 'desc'), limit(queryLimit));
-    return query(colRef, where('siteEngineerId', '==', user?.uid), limit(queryLimit));
+    return query(colRef, or(where('siteManagerId', '==', user?.uid), where('siteEngineerId', '==', user?.uid)), limit(queryLimit));
   }, [firestore, isAdmin, user]));
 
   const { data: dprs } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('dprs'), [firestore, isAdmin, user]));
@@ -166,7 +166,7 @@ export default function ActivitiesPage() {
   const { data: visits } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'site_visits');
     if (isAdmin) return query(colRef, orderBy('startTime', 'desc'), limit(queryLimit));
-    return query(colRef, where('managerId', '==', user?.uid), limit(queryLimit));
+    return query(colRef, or(where('managerId', '==', user?.uid), where('siteManagerId', '==', user?.uid)), limit(queryLimit));
   }, [firestore, isAdmin, user]));
 
   const { data: installationChecklists } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('installation_checklists'), [firestore, isAdmin, user]));
