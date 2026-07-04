@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, where, doc, orderBy, limit, or } from 'firebase/firestore';
+import { collection, query, where, doc, orderBy, limit, or, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -330,61 +330,55 @@ export default function ActivitiesPage() {
   if (isProfileLoading) return <div className="p-8"><Skeleton className="h-12 w-48" /></div>;
 
   const ActivityTable = () => (
-    <Table className="min-w-full table-fixed">
-      <TableHeader className="bg-muted/30 sticky top-0 z-20">
-        <TableRow className="h-9">
-          <TableHead className="w-[80px] text-[10px] font-black uppercase text-center px-2">Time</TableHead>
-          <TableHead className="w-[120px] text-[10px] font-black uppercase px-2">Participation</TableHead>
-          <TableHead className="text-[10px] font-black uppercase px-2">Audit Narrative</TableHead>
-          <TableHead className="w-[180px] text-[10px] font-black uppercase px-2 text-right">Context</TableHead>
+    <Table className="min-w-full">
+      <TableHeader className="bg-muted/30 sticky top-0 z-20 shadow-sm">
+        <TableRow className="h-10">
+          <TableHead className="w-[100px] text-[10px] font-black uppercase text-center px-4">Time</TableHead>
+          <TableHead className="text-[10px] font-black uppercase px-4">Activity Audit Feed</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         <AnimatePresence initial={false}>
           {activities.length > 0 ? activities.map((activity) => (
-            <TableRow key={activity.id} className="group hover:bg-primary/[0.03] transition-colors border-b border-border/50">
-              <TableCell className="px-2 py-3">
-                <div className="flex flex-col items-center">
-                  <span className="text-[10px] font-mono font-black text-foreground">{format(activity.timestamp, 'HH:mm')}</span>
-                  <span className="text-[8px] font-bold text-muted-foreground uppercase">{format(activity.timestamp, 'dd MMM')}</span>
+            <TableRow key={activity.id} className="group hover:bg-primary/[0.02] transition-colors border-b border-border/40">
+              <TableCell className="px-4 py-4 align-top w-[100px]">
+                <div className="flex flex-col items-center gap-0.5">
+                  <span className="text-[11px] font-mono font-black text-foreground">{format(activity.timestamp, 'HH:mm')}</span>
+                  <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">{format(activity.timestamp, 'dd MMM')}</span>
                 </div>
               </TableCell>
-              <TableCell className="px-2 py-3">
-                <div className="flex items-center gap-2">
-                  <div className={cn("p-1.5 rounded-sm bg-muted shrink-0 group-hover:bg-background transition-colors shadow-sm", activity.color)}>
-                    <activity.icon className="h-3.5 w-3.5" />
+              <TableCell className="px-4 py-4">
+                <div className="flex items-start gap-4">
+                  <div className={cn("p-2 rounded-sm bg-muted shrink-0 group-hover:bg-background transition-all shadow-sm border border-border/10", activity.color)}>
+                    <activity.icon className="h-4 w-4" />
                   </div>
-                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-tight truncate">{activity.userName}</span>
-                </div>
-              </TableCell>
-              <TableCell className="px-2 py-3">
-                <motion.div 
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex flex-col gap-1"
-                >
-                  <p className="text-xs font-black text-foreground leading-none">
-                    {activity.sentence}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-black text-primary uppercase tracking-widest">{activity.module}</span>
-                    <Link href={activity.link} className="text-[9px] font-bold text-primary/60 hover:text-primary underline decoration-dashed underline-offset-4 uppercase">
-                      View Source
-                    </Link>
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <motion.p 
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="text-xs sm:text-sm font-bold text-foreground leading-snug"
+                    >
+                      {activity.sentence}
+                    </motion.p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-muted-foreground/80 uppercase tracking-[0.2em]">{activity.module}</span>
+                      <span className="h-1 w-1 rounded-full bg-border" />
+                      <span className="text-[9px] font-bold text-muted-foreground/60 uppercase truncate">{activity.siteName}</span>
+                      <Link href={activity.link} className="text-[9px] font-black text-primary/60 hover:text-primary underline decoration-dashed underline-offset-4 uppercase ml-3 transition-colors">
+                        Open Record
+                      </Link>
+                    </div>
                   </div>
-                </motion.div>
-              </TableCell>
-              <TableCell className="px-2 py-3 text-right">
-                <div className="flex items-center justify-end gap-1.5 text-[10px] font-bold text-muted-foreground uppercase truncate">
-                  <MapPin className="h-3 w-3 text-primary opacity-30" />
-                  <span className="truncate max-w-[150px]">{activity.siteName}</span>
                 </div>
               </TableCell>
             </TableRow>
           )) : (
             <TableRow>
-              <TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20 tracking-widest">
-                No participatory logs discovered for this window
+              <TableCell colSpan={2} className="h-64 text-center">
+                <div className="flex flex-col items-center justify-center gap-2 opacity-20">
+                  <History className="h-12 w-12" />
+                  <p className="text-[11px] uppercase font-black tracking-[0.3em] text-muted-foreground">Zero Audit Records Found</p>
+                </div>
               </TableCell>
             </TableRow>
           )}
@@ -397,7 +391,7 @@ export default function ActivitiesPage() {
     <div className="space-y-4 animate-in fade-in duration-500 pb-20">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-          <Bell className="h-5 w-5 text-primary" /> Centralized Audit Log
+          <Bell className="h-5 w-5 text-primary" /> Activity Hub
         </h1>
         
         <div className="flex items-center gap-2">
@@ -413,7 +407,7 @@ export default function ActivitiesPage() {
               <SelectItem value="last-week" className="text-[10px] font-bold uppercase">Last Week</SelectItem>
               <SelectItem value="this-month" className="text-[10px] font-bold uppercase">This Month</SelectItem>
               <SelectItem value="last-month" className="text-[10px] font-bold uppercase">Last Month</SelectItem>
-              <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom</SelectItem>
+              <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom Range</SelectItem>
             </SelectContent>
           </Select>
 
@@ -427,18 +421,18 @@ export default function ActivitiesPage() {
           <div className="relative hidden md:block w-48 lg:w-64">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <Input 
-              placeholder="Filter narrative..." 
+              placeholder="Search narrative..." 
               className="pl-8 h-9 rounded-sm border-primary/20 bg-background text-[10px] font-bold"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
 
-          <Button variant="ghost" size="icon" onClick={() => setIsFullscreen(true)} className="h-9 w-9 rounded-sm border border-primary/10 text-primary">
+          <Button variant="ghost" size="icon" onClick={() => setIsFullscreen(true)} className="h-9 w-9 rounded-sm border border-primary/10 text-primary hover:bg-primary hover:text-white transition-all shadow-sm" title="Maximize View">
             <Maximize2 className="h-4 w-4" />
           </Button>
 
-          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-9 w-9 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
+          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-9 w-9 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10" title="Clear Filters">
             <FilterX className="h-4 w-4" />
           </Button>
         </div>
@@ -446,7 +440,7 @@ export default function ActivitiesPage() {
 
       <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-background">
         <CardContent className="p-0">
-          <ScrollArea className="h-[calc(100vh-280px)] w-full">
+          <ScrollArea className="h-[calc(100vh-220px)] w-full">
             <ActivityTable />
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -461,8 +455,8 @@ export default function ActivitiesPage() {
               <DialogTitle className="text-lg font-black uppercase tracking-tight">Full-Screen Audit Audit</DialogTitle>
             </div>
             <div className="flex items-center gap-3">
-               <Badge variant="outline" className="h-7 rounded-sm font-black uppercase text-[10px] bg-primary/5 text-primary border-primary/20">
-                {activities.length} Events Participated
+               <Badge variant="outline" className="h-7 rounded-sm font-black uppercase text-[10px] bg-primary/5 text-primary border-primary/20 shadow-none">
+                {activities.length} Participations Logged
                </Badge>
                <DialogClose asChild>
                  <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-destructive/10 hover:text-destructive">
@@ -473,23 +467,24 @@ export default function ActivitiesPage() {
           </DialogHeader>
           <div className="p-4 border-b bg-muted/5 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 flex-1">
-               <Search className="h-4 w-4 text-muted-foreground" />
+               <Search className="h-5 w-5 text-muted-foreground" />
                <Input 
-                placeholder="Search participations..." 
+                placeholder="Search audit narrative..." 
                 className="max-w-md border-none focus-visible:ring-0 bg-transparent text-lg font-bold"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 autoFocus
                />
             </div>
+            <Badge variant="secondary" className="font-mono text-[10px] h-6 px-3">{dateFilter}</Badge>
           </div>
           <ScrollArea className="flex-1">
-            <div className="max-w-5xl mx-auto py-6">
+            <div className="max-w-5xl mx-auto py-10">
               <ActivityTable />
             </div>
           </ScrollArea>
-          <div className="p-3 border-t bg-muted/5 text-center shrink-0">
-             <p className="text-[8px] font-black text-muted-foreground uppercase tracking-[0.4em]">Proprietary Audit Feed • Aditya Green Energy</p>
+          <div className="p-4 border-t bg-muted/5 text-center shrink-0">
+             <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-40">Aditya Pro Proprietary Audit Engine</p>
           </div>
         </DialogContent>
       </Dialog>
