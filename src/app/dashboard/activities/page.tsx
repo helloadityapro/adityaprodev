@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useUser, useDoc, useFirestore, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser, useDoc, useMemoFirebase, useCollection, useFirestore } from '@/firebase';
 import { collection, query, where, doc, orderBy, limit, or, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -172,51 +172,53 @@ export default function ActivitiesPage() {
     return query(colRef, where('userId', '==', user?.uid), limit(queryLimit));
   };
 
-  const { data: permits } = useCollection<DataItem>(useMemoFirebase(() => {
+  const { data: permits, isLoading: permitsLoading } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'permits_to_work');
     if (isAdmin) return query(colRef, orderBy('requestDate', 'desc'), limit(queryLimit));
     return query(colRef, or(where('siteManagerId', '==', user?.uid), where('siteEngineerId', '==', user?.uid)), limit(queryLimit));
   }, [firestore, isAdmin, user]));
 
-  const { data: dprs } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('dprs'), [firestore, isAdmin, user]));
-  const { data: movements } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('material_movements'), [firestore, isAdmin, user]));
-  const { data: requirements } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('requirements'), [firestore, isAdmin, user]));
+  const { data: dprs, isLoading: dprsLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('dprs'), [firestore, isAdmin, user]));
+  const { data: movements, isLoading: movementsLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('material_movements'), [firestore, isAdmin, user]));
+  const { data: requirements, isLoading: requirementsLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('requirements'), [firestore, isAdmin, user]));
   
-  const { data: tasks } = useCollection<DataItem>(useMemoFirebase(() => {
+  const { data: tasks, isLoading: tasksLoading } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'tasks');
     if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(queryLimit));
     return query(colRef, or(where('assignedToId', '==', user?.uid), where('assignedById', '==', user?.uid)), limit(queryLimit));
   }, [firestore, isAdmin, user]));
 
-  const { data: visits } = useCollection<DataItem>(useMemoFirebase(() => {
+  const { data: visits, isLoading: visitsLoading } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'site_visits');
     if (isAdmin) return query(colRef, orderBy('startTime', 'desc'), limit(queryLimit));
-    return query(colRef, or(where('managerId', '==', user?.uid), where('siteManagerId', '==', user?.uid)), limit(queryLimit));
+    return query(colRef, or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid)), limit(queryLimit));
   }, [firestore, user, isAdmin]));
 
-  const { data: installationChecklists } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('installation_checklists'), [firestore, isAdmin, user]));
-  const { data: expenses } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('expenses'), [firestore, isAdmin, user]));
-  const { data: pos } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('project_pos'), [firestore, isAdmin, user]));
-  const { data: wos } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('project_wos'), [firestore, isAdmin, user]));
-  const { data: payments } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('payments', 'date'), [firestore, isAdmin, user]));
-  const { data: redemptions } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('redemption_requests'), [firestore, isAdmin, user]));
+  const { data: installationChecklists, isLoading: instLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('installation_checklists'), [firestore, isAdmin, user]));
+  const { data: expenses, isLoading: expensesLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('expenses'), [firestore, isAdmin, user]));
+  const { data: pos, isLoading: posLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('project_pos'), [firestore, isAdmin, user]));
+  const { data: wos, isLoading: wosLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('project_wos'), [firestore, isAdmin, user]));
+  const { data: payments, isLoading: paymentsLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('payments', 'date'), [firestore, isAdmin, user]));
+  const { data: redemptions, isLoading: redemptionsLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('redemption_requests'), [firestore, isAdmin, user]));
   
-  const { data: vehicleReqs } = useCollection<DataItem>(useMemoFirebase(() => {
+  const { data: vehicleReqs, isLoading: vehicleReqsLoading } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'vehicle_assignments');
     if (isAdmin) return query(colRef, orderBy('requestDate', 'desc'), limit(queryLimit));
     return query(colRef, or(where('userId', '==', user?.uid), where('driverId', '==', user?.uid)), limit(queryLimit));
   }, [firestore, isAdmin, user]));
 
-  const { data: attendanceLogs } = useCollection<DataItem>(useMemoFirebase(() => {
+  const { data: attendanceLogs, isLoading: attendanceLoading } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'attendance');
     return query(colRef, orderBy('createdAt', 'desc'), limit(queryLimit));
   }, [firestore]));
 
-  const { data: allPersonnel } = useCollection<UserProfile>(useMemoFirebase(() => collection(firestore, 'users'), [firestore]));
+  const { data: allPersonnel, isLoading: personnelLoading } = useCollection<UserProfile>(useMemoFirebase(() => collection(firestore, 'users'), [firestore]));
 
-  const { data: siteDocs } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('site_documents'), [firestore, isAdmin, user]));
-  const { data: siteGroups } = useCollection<DataItem>(useMemoFirebase(() => isAdmin ? collection(firestore, 'site_groups') : null, [firestore, isAdmin]));
-  const { data: lmsCourses } = useCollection<DataItem>(useMemoFirebase(() => collection(firestore, 'lms_courses'), [firestore]));
+  const { data: siteDocs, isLoading: docsLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('site_documents'), [firestore, isAdmin, user]));
+  const { data: siteGroups, isLoading: groupsLoading } = useCollection<DataItem>(useMemoFirebase(() => isAdmin ? collection(firestore, 'site_groups') : null, [firestore, isAdmin]));
+  const { data: lmsCourses, isLoading: lmsLoading } = useCollection<DataItem>(useMemoFirebase(() => collection(firestore, 'lms_courses'), [firestore]));
+
+  const isLoadingTotal = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || visitsLoading || instLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading || attendanceLoading || personnelLoading || vehicleReqsLoading || docsLoading || groupsLoading || lmsLoading;
 
   const queryDateRange = React.useMemo(() => {
     const today = new Date();
@@ -233,6 +235,8 @@ export default function ActivitiesPage() {
   }, [dateFilter, customStart, customEnd]);
 
   const summaryStats = React.useMemo(() => {
+    if (isLoadingTotal) return null;
+    
     const { start, end } = queryDateRange;
     
     const countInRange = (list: DataItem[] | null, dateField: string, filter?: (i: DataItem) => boolean) => {
@@ -278,9 +282,11 @@ export default function ActivitiesPage() {
         present: presentCount,
         absent: absentCount
     };
-  }, [permits, dprs, visits, vehicleReqs, attendanceLogs, allPersonnel, queryDateRange]);
+  }, [permits, dprs, visits, vehicleReqs, attendanceLogs, allPersonnel, queryDateRange, isLoadingTotal]);
 
   const activities = React.useMemo(() => {
+    if (isLoadingTotal) return [];
+    
     const agg: RecentActivity[] = [];
     const { start, end } = queryDateRange;
 
@@ -379,7 +385,7 @@ export default function ActivitiesPage() {
     lmsCourses?.forEach(c => addItem(c, 'Course Published', 'LMS', BookOpen, 'text-indigo-700', 'createdAt', 'createdBy', `New training curriculum published: "${c.title}"`, `/lms/admin`));
 
     return agg.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [permits, tasks, dprs, movements, requirements, expenses, visits, pos, wos, payments, redemptions, installationChecklists, vehicleReqs, siteDocs, siteGroups, lmsCourses, queryDateRange, searchTerm, isAdmin, user, userProfile, roleConfigs, userRoleStr]);
+  }, [permits, tasks, dprs, movements, requirements, expenses, visits, pos, wos, payments, redemptions, installationChecklists, vehicleReqs, siteDocs, siteGroups, lmsCourses, queryDateRange, searchTerm, isAdmin, user, userProfile, roleConfigs, userRoleStr, isLoadingTotal]);
 
   const toggleFullscreen = () => {
     const next = !isFullscreen;
@@ -398,22 +404,26 @@ export default function ActivitiesPage() {
     <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-background mb-4">
       <CardContent className="p-0">
         <div className="flex flex-wrap divide-x divide-border/40">
-          <StatBox label="PtWs" value={summaryStats.ptw} icon={ShieldCheck} color="text-blue-600" />
-          <StatBox label="DPRs" value={summaryStats.dpr} icon={FileText} color="text-amber-600" />
-          <StatBox label="Visits" value={summaryStats.visits} icon={Navigation} color="text-rose-600" />
-          <StatBox label="Dispatches" value={summaryStats.dispatches} icon={Fuel} color="text-orange-500" />
-          <StatBox label="Present" value={summaryStats.present} icon={CheckCircle2} color="text-emerald-600" />
-          <StatBox label="Absent" value={summaryStats.absent} icon={X} color="text-red-500" />
+          <StatBox label="PtWs" value={summaryStats?.ptw} icon={ShieldCheck} color="text-blue-600" isLoading={isLoadingTotal} />
+          <StatBox label="DPRs" value={summaryStats?.dpr} icon={FileText} color="text-amber-600" isLoading={isLoadingTotal} />
+          <StatBox label="Visits" value={summaryStats?.visits} icon={Navigation} color="text-rose-600" isLoading={isLoadingTotal} />
+          <StatBox label="Dispatches" value={summaryStats?.dispatches} icon={Fuel} color="text-orange-500" isLoading={isLoadingTotal} />
+          <StatBox label="Present" value={summaryStats?.present} icon={CheckCircle2} color="text-emerald-600" isLoading={isLoadingTotal} />
+          <StatBox label="Absent" value={summaryStats?.absent} icon={X} color="text-red-500" isLoading={isLoadingTotal} />
         </div>
       </CardContent>
     </Card>
   );
 
-  const StatBox = ({ label, value, icon: Icon, color }: { label: string, value: number, icon: any, color: string }) => (
+  const StatBox = ({ label, value, icon: Icon, color, isLoading }: { label: string, value?: number, icon: any, color: string, isLoading: boolean }) => (
     <div className="flex-1 min-w-[120px] p-4 flex items-center justify-between group hover:bg-muted/10 transition-colors">
       <div className="flex flex-col gap-0.5">
         <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">{label}</span>
-        <span className="text-xl font-black tabular-nums leading-none">{value}</span>
+        {isLoading ? (
+          <Skeleton className="h-7 w-12 bg-muted/60" />
+        ) : (
+          <span className="text-xl font-black tabular-nums leading-none">{value}</span>
+        )}
       </div>
       <Icon className={cn("h-5 w-5 opacity-20 group-hover:opacity-100 transition-opacity", color)} />
     </div>
@@ -429,44 +439,63 @@ export default function ActivitiesPage() {
       </TableHeader>
       <TableBody>
         <AnimatePresence initial={false}>
-          {activities.length > 0 ? activities.map((activity) => (
-            <TableRow key={activity.id} className="group hover:bg-primary/[0.02] transition-colors border-b border-border/40 overflow-hidden">
-              <TableCell className="px-4 py-4 align-top w-[100px]">
-                <div className="flex flex-col items-center gap-0.5">
-                  <span className="text-[11px] font-mono font-black text-foreground">{format(activity.timestamp, 'HH:mm')}</span>
-                  <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">{format(activity.timestamp, 'dd MMM')}</span>
-                </div>
-              </TableCell>
-              <TableCell className="px-4 py-4">
-                <motion.div 
-                  initial={{ opacity: 0, x: -30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                  className="flex items-start gap-4"
-                >
-                  <div className={cn("p-2 rounded-sm bg-muted shrink-0 group-hover:bg-background transition-all shadow-sm border border-border/10", activity.color)}>
-                    <activity.icon className="h-4 w-4" />
-                  </div>
-                  <div className="flex flex-col gap-1 min-w-0">
-                    <p className="text-xs sm:text-sm font-bold text-foreground leading-snug">
-                      {activity.sentence}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-black text-muted-foreground/80 uppercase tracking-[0.2em]">{activity.module}</span>
-                      <span className="h-1 w-1 rounded-full bg-border" />
-                      <div className="flex items-center gap-1 text-[9px] font-bold text-muted-foreground/60 uppercase truncate">
-                        <MapPin className="h-2.5 w-2.5 opacity-40" />
-                        {activity.siteName}
-                      </div>
-                      <Link href={activity.link} className="text-[9px] font-black text-primary/60 hover:text-primary underline decoration-dashed underline-offset-4 uppercase ml-3 transition-colors">
-                        View
-                      </Link>
+          {isLoadingTotal ? (
+            Array.from({ length: 12 }).map((_, i) => (
+              <TableRow key={`skeleton-${i}`} className="border-b border-border/20">
+                <TableCell className="px-4 py-4 w-[100px]">
+                  <Skeleton className="h-4 w-12 mx-auto bg-muted/60" />
+                </TableCell>
+                <TableCell className="px-4 py-4">
+                  <div className="flex items-start gap-4">
+                    <Skeleton className="h-8 w-8 rounded-sm bg-muted/60" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/4 bg-muted/60" />
+                      <Skeleton className="h-3 w-1/4 bg-muted/40" />
                     </div>
                   </div>
-                </motion.div>
-              </TableCell>
-            </TableRow>
-          )) : (
+                </TableCell>
+              </TableRow>
+            ))
+          ) : activities.length > 0 ? (
+            activities.map((activity) => (
+              <TableRow key={activity.id} className="group hover:bg-primary/[0.02] transition-colors border-b border-border/40 overflow-hidden">
+                <TableCell className="px-4 py-4 align-top w-[100px]">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-[11px] font-mono font-black text-foreground">{format(activity.timestamp, 'HH:mm')}</span>
+                    <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">{format(activity.timestamp, 'dd MMM')}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="px-4 py-4">
+                  <motion.div 
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                    className="flex items-start gap-4"
+                  >
+                    <div className={cn("p-2 rounded-sm bg-muted shrink-0 group-hover:bg-background transition-all shadow-sm border border-border/10", activity.color)}>
+                      <activity.icon className="h-4 w-4" />
+                    </div>
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-bold text-foreground leading-snug">
+                        {activity.sentence}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black text-muted-foreground/80 uppercase tracking-[0.2em]">{activity.module}</span>
+                        <span className="h-1 w-1 rounded-full bg-border" />
+                        <div className="flex items-center gap-1 text-[9px] font-bold text-muted-foreground/60 uppercase truncate">
+                          <MapPin className="h-2.5 w-2.5 opacity-40" />
+                          {activity.siteName}
+                        </div>
+                        <Link href={activity.link} className="text-[9px] font-black text-primary/60 hover:text-primary underline decoration-dashed underline-offset-4 uppercase ml-3 transition-colors">
+                          View
+                        </Link>
+                      </div>
+                    </div>
+                  </motion.div>
+                </TableCell>
+              </TableRow>
+            ))
+          ) : (
             <TableRow>
               <TableCell colSpan={2} className="h-64 text-center">
                 <div className="flex flex-col items-center justify-center gap-2 opacity-20">
@@ -561,7 +590,7 @@ export default function ActivitiesPage() {
             <div className="flex items-center gap-4 flex-1">
               <Search className="h-5 w-5 text-muted-foreground" />
               <Input 
-                placeholder="Search audit narrative..." 
+                placeholder="Search" 
                 className="max-w-md border-none focus-visible:ring-0 bg-transparent text-lg font-bold"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
@@ -590,7 +619,7 @@ export default function ActivitiesPage() {
         
         {isFullscreen && (
           <div className="p-4 pt-4 text-center shrink-0 border-t bg-muted/5 mt-4 rounded-sm">
-             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-40">Aditya Pro Proprietary Audit Engine</p>
+             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-40">Aditya Pro</p>
           </div>
         )}
       </div>
