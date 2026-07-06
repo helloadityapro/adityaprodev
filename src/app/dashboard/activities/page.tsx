@@ -191,7 +191,7 @@ export default function ActivitiesPage() {
   const { data: visits, isLoading: visitsLoading } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'site_visits');
     if (isAdmin) return query(colRef, orderBy('startTime', 'desc'), limit(queryLimit));
-    return query(colRef, or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid)), limit(queryLimit));
+    return query(colRef, or(where('managerId', '==', user?.uid), where('siteManagerId', '==', user?.uid)), limit(queryLimit));
   }, [firestore, user, isAdmin]));
 
   const { data: installationChecklists, isLoading: instLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('installation_checklists'), [firestore, isAdmin, user]));
@@ -420,7 +420,7 @@ export default function ActivitiesPage() {
       <div className="flex flex-col gap-0.5">
         <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">{label}</span>
         {isLoading ? (
-          <Skeleton className="h-7 w-12 bg-muted/60" />
+          <Skeleton className="h-7 w-12 bg-muted/90" />
         ) : (
           <span className="text-xl font-black tabular-nums leading-none">{value}</span>
         )}
@@ -443,14 +443,14 @@ export default function ActivitiesPage() {
             Array.from({ length: 12 }).map((_, i) => (
               <TableRow key={`skeleton-${i}`} className="border-b border-border/20">
                 <TableCell className="px-4 py-4 w-[100px]">
-                  <Skeleton className="h-4 w-12 mx-auto bg-muted/60" />
+                  <Skeleton className="h-4 w-12 mx-auto bg-muted/90" />
                 </TableCell>
                 <TableCell className="px-4 py-4">
                   <div className="flex items-start gap-4">
-                    <Skeleton className="h-8 w-8 rounded-sm bg-muted/60" />
+                    <Skeleton className="h-8 w-8 rounded-sm bg-muted/90" />
                     <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-3/4 bg-muted/60" />
-                      <Skeleton className="h-3 w-1/4 bg-muted/40" />
+                      <Skeleton className="h-4 w-3/4 bg-muted/80" />
+                      <Skeleton className="h-3 w-1/4 bg-muted/70" />
                     </div>
                   </div>
                 </TableCell>
