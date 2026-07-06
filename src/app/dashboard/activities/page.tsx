@@ -52,6 +52,7 @@ import {
   MapPin,
   Eye,
   Maximize2,
+  Minimize2,
   X,
   CheckCircle2,
   Users
@@ -420,7 +421,7 @@ export default function ActivitiesPage() {
 
   const ActivityTable = () => (
     <Table className="min-w-full">
-      <TableHeader className="bg-muted/30 sticky top-0 z-20 shadow-sm">
+      <TableHeader className="bg-muted sticky top-0 z-20 shadow-sm">
         <TableRow className="h-10">
           <TableHead className="w-[100px] text-[10px] font-black uppercase text-center px-4">Time</TableHead>
           <TableHead className="text-[10px] font-black uppercase px-4">Activity detail</TableHead>
@@ -571,8 +572,8 @@ export default function ActivitiesPage() {
               <Badge variant="outline" className="h-8 rounded-sm font-black uppercase text-[10px] bg-primary/5 text-primary border-primary/20">
                 {activities.length} Events Logged
               </Badge>
-              <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="h-10 w-10 rounded-full hover:bg-destructive/10 hover:text-destructive">
-                <X className="h-6 w-6" />
+              <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="h-10 w-10 rounded-full hover:bg-primary/10 text-primary">
+                <Minimize2 className="h-6 w-6" />
               </Button>
             </div>
           </div>
@@ -597,3 +598,23 @@ export default function ActivitiesPage() {
   );
 }
 
+function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'red' }) {
+  const colors = {
+    primary: "bg-primary/5 border-primary/10 text-primary",
+    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
+    red: "bg-red-500/5 border-red-500/10 text-red-600",
+  };
+
+  return (
+    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
+        <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
+      </CardHeader>
+      <CardContent className="p-3 sm:p-4 pt-0 sm:p-6 sm:pt-0">
+        <div className="text-xl sm:text-2xl font-bold">{value}</div>
+      </CardContent>
+    </Card>
+  );
+}
