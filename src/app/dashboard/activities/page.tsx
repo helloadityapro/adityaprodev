@@ -218,7 +218,7 @@ export default function ActivitiesPage() {
   const { data: siteGroups, isLoading: groupsLoading } = useCollection<DataItem>(useMemoFirebase(() => isAdmin ? collection(firestore, 'site_groups') : null, [firestore, isAdmin]));
   const { data: lmsCourses, isLoading: lmsLoading } = useCollection<DataItem>(useMemoFirebase(() => collection(firestore, 'lms_courses'), [firestore]));
 
-  const isLoadingTotal = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || visitsLoading || instLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading || attendanceLoading || personnelLoading || vehicleReqsLoading || docsLoading || groupsLoading || lmsLoading;
+  const isLoadingTotal = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || (isAdmin && (visitsLoading || instLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading || usersListLoading || vehicleReqsLoading || docsLoading || groupsLoading || lmsCoursesLoading || lmsModulesLoading));
 
   const queryDateRange = React.useMemo(() => {
     const today = new Date();
@@ -304,8 +304,18 @@ export default function ActivitiesPage() {
 
       if (d && d >= start && d <= end) {
         if (isOwnDataOnly && !isAdmin) {
-            const hasAccess = !item.siteName || assignedIds.has(item.siteId || '') || item.userId === user?.uid || (item as any)[userField] === userProfile?.username;
-            if (!hasAccess) return;
+            const isParticipant = 
+              item.userId === user?.uid || 
+              item.assignedToId === user?.uid || 
+              item.assignedById === user?.uid ||
+              item.siteEngineerId === user?.uid ||
+              item.siteManagerId === user?.uid ||
+              item.driverId === user?.uid ||
+              (item as any)[userField] === userProfile?.username;
+
+            const hasSiteAccess = !item.siteName || assignedIds.has(item.siteId || '');
+            
+            if (!isParticipant && !hasSiteAccess) return;
         }
 
         const textMatch = sentence.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -331,8 +341,8 @@ export default function ActivitiesPage() {
 
     permits?.forEach(p => addItem(p, 'Permit', 'Compliance', ShieldCheck, 'text-blue-600', 'requestDate', 'siteEngineerName', `${p.siteEngineerName} requested a ${p.ptwType} permit for ${p.siteName}`, `/ptw/list?view=${p.id}`));
     tasks?.forEach(t => {
-      if (t.status === 'Completed') addItem(t, 'Task Finished', 'Operations', CheckCircle2, 'text-green-600', 'updatedAt', 'assignedToName', `${t.assignedToName} finished task: "${t.title}" for ${t.siteName}`, `/tasks/list`);
-      else addItem(t, 'Task', 'Operations', CheckSquare, 'text-slate-600', 'createdAt', 'assignedByName', `${t.assignedByName} assigned task "${t.title}" to ${t.assignedToName} for ${t.siteName}`, `/tasks/list`);
+      if (t.status === 'Completed') addItem(t, 'Task Finished', 'Tasks', CheckCircle2, 'text-green-600', 'updatedAt', 'assignedToName', `${t.assignedToName} finished task: "${t.title}" for ${t.siteName}`, `/tasks/list`);
+      else addItem(t, 'Task', 'Tasks', CheckSquare, 'text-slate-600', 'createdAt', 'assignedByName', `${t.assignedByName} assigned task "${t.title}" to ${t.assignedToName} for ${t.siteName}`, `/tasks/list`);
     });
     dprs?.forEach(d => addItem(d, 'DPR', 'Reporting', FileText, 'text-amber-600', 'createdAt', 'userName', `${d.userName} submitted a DPR for ${d.siteName}`, `/dpr/list`));
     movements?.forEach(m => addItem(m, 'Movement', 'Inventory', ArrowLeftRight, 'text-emerald-600', 'createdAt', 'userName', `${m.userName} recorded a material ${m.movementType} for ${m.itemName} at ${m.siteName}`, `/movements/list`));
@@ -480,7 +490,7 @@ export default function ActivitiesPage() {
                         {activity.sentence}
                       </p>
                       <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-black text-muted-foreground/80 uppercase tracking-[0.2em]">{activity.module}</span>
+                        <span className="text-[9px] font-black uppercase text-muted-foreground/80 tracking-[0.2em]">{activity.module}</span>
                         <span className="h-1 w-1 rounded-full bg-border" />
                         <div className="flex items-center gap-1 text-[9px] font-bold text-muted-foreground/60 uppercase truncate">
                           <MapPin className="h-2.5 w-2.5 opacity-40" />
