@@ -2,8 +2,8 @@
 
 import * as React from 'react';
 import { useUser, useDoc, useMemoFirebase, useCollection, useFirestore } from '@/firebase';
-import { collection, query, where, doc, orderBy, limit, or, getDocs } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { collection, query, where, doc, orderBy, limit, or } from 'firebase/firestore';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   BarChart, 
@@ -218,7 +218,7 @@ export default function ActivitiesPage() {
   const { data: siteGroups, isLoading: groupsLoading } = useCollection<DataItem>(useMemoFirebase(() => isAdmin ? collection(firestore, 'site_groups') : null, [firestore, isAdmin]));
   const { data: lmsCourses, isLoading: lmsLoading } = useCollection<DataItem>(useMemoFirebase(() => collection(firestore, 'lms_courses'), [firestore]));
 
-  const isLoadingTotal = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || (isAdmin && (visitsLoading || instLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading || usersListLoading || vehicleReqsLoading || docsLoading || groupsLoading || lmsCoursesLoading || lmsModulesLoading));
+  const isLoadingTotal = isProfileLoading || permitsLoading || dprsLoading || movementsLoading || requirementsLoading || tasksLoading || (isAdmin && (visitsLoading || instLoading || expensesLoading || posLoading || wosLoading || paymentsLoading || redemptionsLoading || personnelLoading || vehicleReqsLoading || docsLoading || groupsLoading || lmsLoading || attendanceLoading));
 
   const queryDateRange = React.useMemo(() => {
     const today = new Date();
@@ -634,26 +634,5 @@ export default function ActivitiesPage() {
         )}
       </div>
     </div>
-  );
-}
-
-function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'red' }) {
-  const colors = {
-    primary: "bg-primary/5 border-primary/10 text-primary",
-    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
-    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
-    red: "bg-red-500/5 border-red-500/10 text-red-600",
-  };
-
-  return (
-    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6">
-        <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
-      </CardHeader>
-      <CardContent className="p-3 sm:p-4 pt-0 sm:p-6 sm:pt-0">
-        <div className="text-xl sm:text-2xl font-bold">{value}</div>
-      </CardContent>
-    </Card>
   );
 }
