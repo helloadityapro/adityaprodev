@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -76,29 +77,29 @@ export function GlobalSearch() {
   
   const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
 
-  // DEFERRED DATA FETCHING: Only fetch these when search is actually relevant
-  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  // OPTIMIZATION: Only fetch search context data when search is actually OPEN
+  const userProfileRef = useMemoFirebase(() => (isOpen && user) ? doc(firestore, 'users', user.uid) : null, [firestore, user, isOpen]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
 
-  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const roleConfigsQuery = useMemoFirebase(() => (isOpen && user) ? collection(firestore, 'system_settings', 'access', 'roles') : null, [firestore, user, isOpen]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
-  const sitesQuery = useMemoFirebase(() => query(collection(firestore, 'sites'), limit(1000)), [firestore]);
+  const sitesQuery = useMemoFirebase(() => (isOpen && user) ? query(collection(firestore, 'sites'), limit(1000)) : null, [firestore, user, isOpen]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
-  const groupsQuery = useMemoFirebase(() => collection(firestore, 'site_groups'), [firestore]);
+  const groupsQuery = useMemoFirebase(() => (isOpen && user) ? collection(firestore, 'site_groups') : null, [firestore, user, isOpen]);
   const { data: groups } = useCollection<any>(groupsQuery);
 
-  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
+  const overridesQuery = useMemoFirebase(() => (isOpen && user) ? collection(firestore, 'team_mapping_overrides') : null, [firestore, user, isOpen]);
   const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
   const teamQuery = useMemoFirebase(() => {
-    if (!isManager || !user) return null;
+    if (!isOpen || !isManager || !user) return null;
     return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
-  }, [firestore, user, isManager]);
+  }, [firestore, user, isManager, isOpen]);
   const { data: teamMembers } = useCollection<any>(teamQuery);
 
   React.useEffect(() => {

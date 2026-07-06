@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -23,6 +24,7 @@ import {
   where,
   doc,
   writeBatch,
+  limit,
 } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -52,7 +54,8 @@ export function UserNotifications() {
     if (!user) return null;
     return query(
       collection(firestore, 'notifications'),
-      where('userId', '==', user.uid)
+      where('userId', '==', user.uid),
+      limit(50) // OPTIMIZATION: Cap notifications to reduce document reads on startup
     );
   }, [user, firestore]);
 

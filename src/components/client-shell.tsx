@@ -1,9 +1,10 @@
+
 'use client';
 
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser, useDoc, useMemoFirebase, useAuth, setDocumentNonBlocking, useCollection, useFirestore, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, getDocs } from "firebase/firestore";
+import { collection, doc, query, where, serverTimestamp, getDocs, orderBy, limit } from "firebase/firestore";
 import UserNav from "@/components/user-nav";
 import { MainNav } from "@/components/main-nav";
 import {
@@ -196,7 +197,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAuthorized = React.useMemo(() => {
     if (isAuthPage || isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
-    if (isUserLoading || isProfileLoading || !userProfile) return true;
+    // OPTIMIZATION: Wait for roleConfigs to load to prevent "Access Restricted" flicker
+    if (isUserLoading || isProfileLoading || !userProfile || !roleConfigs) return true;
 
     // Direct Checklist pages are usually open to all workers
     if (pathname.startsWith('/checklists')) return true;
@@ -267,14 +269,15 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     const colRef = collection(firestore, 'permits_to_work');
     
     if (userRole === 'Admin') {
-      return query(colRef, where('status', '==', 'ManagerApproved'));
+      return query(colRef, where('status', '==', 'ManagerApproved'), limit(100));
     }
     
     if (userRole === 'Site Manager') {
       return query(
         colRef, 
         where('status', '==', 'Pending'),
-        where('siteManagerId', '==', user.uid)
+        where('siteManagerId', '==', user.uid),
+        limit(100)
       );
     }
     
@@ -287,7 +290,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const notificationsQuery = useMemoFirebase(() => {
     if (!user) return null;
-    return query(collection(firestore, 'notifications'), where('userId', '==', user.uid));
+    return query(
+      collection(firestore, 'notifications'), 
+      where('userId', '==', user.uid),
+      orderBy('createdAt', 'desc'),
+      limit(20) // Only need the most recent for shell-level toasts/indicators
+    );
   }, [user, firestore]);
   const { data: unsortedNotifications } = useCollection<Notification>(notificationsQuery);
 

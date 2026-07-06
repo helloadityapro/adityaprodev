@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -164,7 +165,8 @@ export default function ActivitiesPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
-  const queryLimit = 1000;
+  // OPTIMIZATION: Use a smaller limit for feed items to reduce initial payload size
+  const queryLimit = 200;
 
   const getFilteredQuery = (coll: string, dateField: string = 'createdAt') => {
     const colRef = collection(firestore, coll);
@@ -209,7 +211,7 @@ export default function ActivitiesPage() {
 
   const { data: attendanceLogs, isLoading: attendanceLoading } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'attendance');
-    return query(colRef, orderBy('createdAt', 'desc'), limit(queryLimit));
+    return query(colRef, orderBy('createdAt', 'desc'), limit(500)); // Slightly more for attendance analytics
   }, [firestore]));
 
   const { data: allPersonnel, isLoading: personnelLoading } = useCollection<UserProfile>(useMemoFirebase(() => collection(firestore, 'users'), [firestore]));
