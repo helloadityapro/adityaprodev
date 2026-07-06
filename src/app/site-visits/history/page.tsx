@@ -86,8 +86,7 @@ const calculateDurationMins = (start: any, end: any) => {
   return differenceInMinutes(e, s);
 };
 
-const calculateDurationStr = (start: any, end: any) => {
-  const mins = calculateDurationMins(start, end);
+const calculateDurationStr = (mins: number) => {
   if (mins === 0) return '—';
   if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
@@ -276,7 +275,7 @@ export default function SiteVisitsHistoryPage() {
                   </div>
                   <div className="flex items-center gap-1.5 text-xs font-bold text-primary shrink-0">
                     <Timer className="h-3.5 w-3.5" />
-                    {calculateDurationStr(visit.startTime, visit.endTime)}
+                    {calculateDurationStr(calculateDurationMins(visit.startTime, visit.endTime))}
                   </div>
                 </div>
                 <div className="pt-2 border-t border-primary/5 flex justify-end">
@@ -325,7 +324,7 @@ export default function SiteVisitsHistoryPage() {
                             </TableCell>
                           )}
                           <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">{visit.purpose || '—'}</Badge></TableCell>
-                          <TableCell><div className="flex items-center gap-1.5 text-xs font-bold text-primary"><Timer className="h-3 w-3" />{calculateDurationStr(visit.startTime, visit.endTime)}</div></TableCell>
+                          <TableCell><div className="flex items-center gap-1.5 text-xs font-bold text-primary"><Timer className="h-3 w-3" />{calculateDurationStr(calculateDurationMins(visit.startTime, visit.endTime))}</div></TableCell>
                           <TableCell><Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{visit.status}</Badge></TableCell>
                           <TableCell className="text-right px-6"><Button variant="ghost" size="sm" asChild className="rounded-sm text-primary"><Link href={`/site-visits/${visit.id}`}><FileText className="h-4 w-4 mr-1.5" />View Report</Link></Button></TableCell>
                         </TableRow>
@@ -414,14 +413,19 @@ export default function SiteVisitsHistoryPage() {
 
       <div className="space-y-4">
         <Tabs value={locationTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="bg-muted/50 border border-primary/10 p-1 h-11 max-w-sm mb-6">
-            <TabsTrigger value="site" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
-              <Building2 className="h-3.5 w-3.5 mr-2" /> Site Visits
-            </TabsTrigger>
-            <TabsTrigger value="other" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
-              <Globe className="h-3.5 w-3.5 mr-2" /> Other Visits
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <TabsList className="bg-muted/50 border border-primary/10 p-1 h-11 max-w-sm m-0">
+              <TabsTrigger value="site" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
+                <Building2 className="h-3.5 w-3.5 mr-2" /> Site Visits
+              </TabsTrigger>
+              <TabsTrigger value="other" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
+                <Globe className="h-3.5 w-3.5 mr-2" /> Other Visits
+              </TabsTrigger>
+            </TabsList>
+            <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-8 border-none w-fit">
+              {filteredVisits.length} Records Indexed
+            </Badge>
+          </div>
 
           <TabsContent value="site" className="mt-0 space-y-4 animate-in fade-in-50 duration-300">
             {renderResults()}
