@@ -70,19 +70,12 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger,
-  DialogClose
-} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { slugifyRole } from '@/lib/access-control';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSidebar } from '@/components/ui/sidebar';
 
 type DataItem = {
   id: string;
@@ -153,6 +146,7 @@ const EXCLUDED_PERSONNEL = ["Khalil Choudhary", "Imtiyaz Kazi", "Jayesh Bajaj", 
 export default function ActivitiesPage() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { setOpen } = useSidebar();
 
   const [dateFilter, setDateFilter] = React.useState<string>("today");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -214,9 +208,8 @@ export default function ActivitiesPage() {
 
   const { data: attendanceLogs } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'attendance');
-    if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(queryLimit));
-    return query(colRef, where('userId', '==', user?.uid), limit(queryLimit));
-  }, [firestore, isAdmin, user]));
+    return query(colRef, orderBy('createdAt', 'desc'), limit(queryLimit));
+  }, [firestore]));
 
   const { data: allPersonnel } = useCollection<UserProfile>(useMemoFirebase(() => collection(firestore, 'users'), [firestore]));
 
@@ -259,20 +252,15 @@ export default function ActivitiesPage() {
     const visitCount = countInRange(visits, 'startTime', (i) => i.status === 'completed');
     const dispatchCount = countInRange(vehicleReqs, 'requestDate', (i) => i.status === 'Ongoing' || i.status === 'Completed');
 
-    // Attendance Calculation aligned with Attendance Summary logic
     const activeStaff = allPersonnel?.filter(p => !EXCLUDED_PERSONNEL.includes(p.username)) || [];
     const activeStaffIds = new Set(activeStaff.map(p => p.id));
 
     const presentUserIds = new Set<string>();
-    
-    // Exact yyyy-MM-dd match logic to replicate Summary Dashboard correctly
     const startStr = format(start, 'yyyy-MM-dd');
     const endStr = format(end, 'yyyy-MM-dd');
 
     attendanceLogs?.forEach(log => {
         const logDate = log.date || (log.createdAt?.toDate ? format(log.createdAt.toDate(), 'yyyy-MM-dd') : null);
-        
-        // Count as present if user is in active staff and has a record (ongoing or completed) for a date in range
         if (logDate && logDate >= startStr && logDate <= endStr && log.userId && activeStaffIds.has(log.userId)) {
             presentUserIds.add(log.userId);
         }
@@ -335,27 +323,22 @@ export default function ActivitiesPage() {
     };
 
     permits?.forEach(p => addItem(p, 'Permit', 'Compliance', ShieldCheck, 'text-blue-600', 'requestDate', 'siteEngineerName', `${p.siteEngineerName} requested a ${p.ptwType} permit for ${p.siteName}`, `/ptw/list?view=${p.id}`));
-    
     tasks?.forEach(t => {
       if (t.status === 'Completed') addItem(t, 'Task Finished', 'Operations', CheckCircle2, 'text-green-600', 'updatedAt', 'assignedToName', `${t.assignedToName} finished task: "${t.title}" for ${t.siteName}`, `/tasks/list`);
       else addItem(t, 'Task', 'Operations', CheckSquare, 'text-slate-600', 'createdAt', 'assignedByName', `${t.assignedByName} assigned task "${t.title}" to ${t.assignedToName} for ${t.siteName}`, `/tasks/list`);
     });
-
     dprs?.forEach(d => addItem(d, 'DPR', 'Reporting', FileText, 'text-amber-600', 'createdAt', 'userName', `${d.userName} submitted a DPR for ${d.siteName}`, `/dpr/list`));
     movements?.forEach(m => addItem(m, 'Movement', 'Inventory', ArrowLeftRight, 'text-emerald-600', 'createdAt', 'userName', `${m.userName} recorded a material ${m.movementType} for ${m.itemName} at ${m.siteName}`, `/movements/list`));
     requirements?.forEach(r => addItem(r, 'Requirement', 'Procurement', ClipboardList, 'text-purple-600', 'createdAt', 'userName', `${r.userName} raised a requirement for ${r.itemName} at ${r.siteName}`, `/requirements/list`));
     expenses?.forEach(e => addItem(e, 'Expense', 'Finance', Wallet, 'text-indigo-600', 'createdAt', 'userName', `${e.userName} submitted an expense claim: "${e.title}"`, `/expenses/list?view=${e.id}`));
-    
     visits?.forEach(v => {
       if (v.status === 'completed') addItem(v, 'Site Visit End', 'Visits', Flag, 'text-rose-700', 'endTime', 'managerName', `${v.managerName} finished a site visit at ${v.siteName}`, `/site-visits/${v.id}`);
       else addItem(v, 'Site Visit Start', 'Visits', Navigation, 'text-rose-600', 'startTime', 'managerName', `${v.managerName} started a site visit at ${v.siteName}`, `/site-visits/${v.id}`);
     });
-
     pos?.forEach(p => addItem(p, 'Purchase Order', 'Procurement', ShoppingBag, 'text-blue-700', 'createdAt', 'createdByName', `${p.createdByName} generated a Purchase Order ${p.poNumber} for ${p.siteName}`, `/projects/${p.siteId}?tab=po`));
     wos?.forEach(w => addItem(w, 'Work Order', 'Procurement', Gavel, 'text-slate-700', 'createdAt', 'createdByName', `${w.createdByName} issued a Work Order ${w.woNumber} for ${w.siteName}`, `/projects/${w.siteId}?tab=wo`));
     payments?.forEach(p => addItem(p, 'Payment', 'Finance', IndianRupee, 'text-emerald-700', 'date', 'recordedByName', `${p.recordedByName} recorded a payment of ₹${p.amount?.toLocaleString()} against ${p.referenceNumber} for ${p.siteName}`, `/payments/project-wise`));
     redemptions?.forEach(r => addItem(r, 'Redemption', 'Rewards', CreditCard, 'text-green-600', 'createdAt', 'userName', `${r.userName} requested a points redemption of ₹${r.amountInRs?.toLocaleString()}`, `/settings/rewards`));
-    
     installationChecklists?.forEach(cl => {
       addItem(cl, 'Checklist', 'Quality', ClipboardCheck, 'text-cyan-600', 'createdAt', 'userName', `${cl.userName} submitted an MMS audit for Table ${cl.tableNumber} at ${cl.siteName}`, `/checklists/data`);
       if (cl.comments && cl.comments.length > 0) {
@@ -384,20 +367,24 @@ export default function ActivitiesPage() {
         });
       }
     });
-
     vehicleReqs?.forEach(v => {
       if (v.status === 'Pending') addItem(v, 'Trip Request', 'Fleet', Fuel, 'text-orange-500', 'requestDate', 'userName', `${v.userName} requested a vehicle for trip to ${v.pickupLocation}`, `/vehicles/trips/manage`);
       else if (v.status === 'Approved') addItem(v, 'Trip Allotted', 'Fleet', CarFront, 'text-blue-500', 'approvalDate', 'userName', `Vehicle ${v.vehicleDetails} allotted to ${v.userName} with driver ${v.driverName}`, `/vehicles/trips/manage`);
       else if (v.status === 'Ongoing') addItem(v, 'Trip Start', 'Fleet', PlayCircle, 'text-blue-700', 'startTime', 'userName', `${v.userName} started a journey with ${v.vehicleDetails}`, `/vehicles/trips/manage`);
       else if (v.status === 'Completed') addItem(v, 'Trip End', 'Fleet', Flag, 'text-emerald-700', 'endTime', 'userName', `${v.userName} arrived at ${v.dropLocation}. Journey complete.`, `/vehicles/trips/manage`);
     });
-
     siteDocs?.forEach(doc => addItem(doc, 'Document', 'Files', FileUp, 'text-sky-600', 'createdAt', 'uploadedByName', `${doc.uploadedByName} uploaded "${doc.fileName}"`, `/documents/${doc.siteId}`));
     siteGroups?.forEach(g => addItem(g, 'Site Group', 'Registry', Tags, 'text-pink-600', 'createdAt', 'createdByName', `New site cluster defined: "${g.name}"`, `/projects/groups`));
     lmsCourses?.forEach(c => addItem(c, 'Course Published', 'LMS', BookOpen, 'text-indigo-700', 'createdAt', 'createdBy', `New training curriculum published: "${c.title}"`, `/lms/admin`));
 
     return agg.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }, [permits, tasks, dprs, movements, requirements, expenses, visits, pos, wos, payments, redemptions, installationChecklists, vehicleReqs, siteDocs, siteGroups, lmsCourses, queryDateRange, searchTerm, isAdmin, user, userProfile, roleConfigs, userRoleStr]);
+
+  const toggleFullscreen = () => {
+    const next = !isFullscreen;
+    setIsFullscreen(next);
+    setOpen(!next);
+  };
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -442,7 +429,7 @@ export default function ActivitiesPage() {
       <TableBody>
         <AnimatePresence initial={false}>
           {activities.length > 0 ? activities.map((activity) => (
-            <TableRow key={activity.id} className="group hover:bg-primary/[0.02] transition-colors border-b border-border/40">
+            <TableRow key={activity.id} className="group hover:bg-primary/[0.02] transition-colors border-b border-border/40 overflow-hidden">
               <TableCell className="px-4 py-4 align-top w-[100px]">
                 <div className="flex flex-col items-center gap-0.5">
                   <span className="text-[11px] font-mono font-black text-foreground">{format(activity.timestamp, 'HH:mm')}</span>
@@ -450,18 +437,19 @@ export default function ActivitiesPage() {
                 </div>
               </TableCell>
               <TableCell className="px-4 py-4">
-                <div className="flex items-start gap-4">
+                <motion.div 
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                  className="flex items-start gap-4"
+                >
                   <div className={cn("p-2 rounded-sm bg-muted shrink-0 group-hover:bg-background transition-all shadow-sm border border-border/10", activity.color)}>
                     <activity.icon className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col gap-1 min-w-0">
-                    <motion.p 
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="text-xs sm:text-sm font-bold text-foreground leading-snug"
-                    >
+                    <p className="text-xs sm:text-sm font-bold text-foreground leading-snug">
                       {activity.sentence}
-                    </motion.p>
+                    </p>
                     <div className="flex items-center gap-2">
                       <span className="text-[9px] font-black text-muted-foreground/80 uppercase tracking-[0.2em]">{activity.module}</span>
                       <span className="h-1 w-1 rounded-full bg-border" />
@@ -474,7 +462,7 @@ export default function ActivitiesPage() {
                       </Link>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               </TableCell>
             </TableRow>
           )) : (
@@ -494,110 +482,118 @@ export default function ActivitiesPage() {
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500 pb-20">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-          <Bell className="h-5 w-5 text-primary" /> Activities
-        </h1>
-        
-        <div className="flex items-center gap-2">
-          <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase w-[130px]">
-              <Calendar className="h-3.5 w-3.5 mr-1.5 opacity-50" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
-              <SelectItem value="yesterday" className="text-[10px] font-bold uppercase">Yesterday</SelectItem>
-              <SelectItem value="this-week" className="text-[10px] font-bold uppercase">This Week</SelectItem>
-              <SelectItem value="last-week" className="text-[10px] font-bold uppercase">Last Week</SelectItem>
-              <SelectItem value="this-month" className="text-[10px] font-bold uppercase">This Month</SelectItem>
-              <SelectItem value="last-month" className="text-[10px] font-bold uppercase">Last Month</SelectItem>
-              <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
+      <AnimatePresence mode="wait">
+        {!isFullscreen && (
+          <motion.div 
+            key="header-standard"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex items-center justify-between gap-4 overflow-hidden"
+          >
+            <h1 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+              <Bell className="h-5 w-5 text-primary" /> Activities
+            </h1>
+            
+            <div className="flex items-center gap-2">
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase w-[130px]">
+                  <Calendar className="h-3.5 w-3.5 mr-1.5 opacity-50" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
+                  <SelectItem value="yesterday" className="text-[10px] font-bold uppercase">Yesterday</SelectItem>
+                  <SelectItem value="this-week" className="text-[10px] font-bold uppercase">This Week</SelectItem>
+                  <SelectItem value="last-week" className="text-[10px] font-bold uppercase">Last Week</SelectItem>
+                  <SelectItem value="this-month" className="text-[10px] font-bold uppercase">This Month</SelectItem>
+                  <SelectItem value="last-month" className="text-[10px] font-bold uppercase">Last Month</SelectItem>
+                  <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
 
-          {dateFilter === 'custom' && (
-            <div className="flex items-center gap-2 animate-in slide-in-from-right-2 duration-300">
-              <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-9 w-32 rounded-sm border-primary/20 text-[10px]" />
-              <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-9 w-32 rounded-sm border-primary/20 text-[10px]" />
-            </div>
-          )}
+              {dateFilter === 'custom' && (
+                <div className="flex items-center gap-2 animate-in slide-in-from-right-2 duration-300">
+                  <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-9 w-32 rounded-sm border-primary/20 text-[10px]" />
+                  <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-9 w-32 rounded-sm border-primary/20 text-[10px]" />
+                </div>
+              )}
 
-          <div className="relative hidden md:block w-48 lg:w-64">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-            <Input 
-              placeholder="Search" 
-              className="pl-8 h-9 rounded-sm border-primary/20 bg-background text-[10px] font-bold"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          <Button variant="ghost" size="icon" onClick={() => setIsFullscreen(true)} className="h-9 w-9 rounded-sm border border-primary/10 text-primary hover:bg-primary hover:text-white transition-all shadow-sm" title="Maximize View">
-            <Maximize2 className="h-4 w-4" />
-          </Button>
-
-          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-9 w-9 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10" title="Clear Filters">
-            <FilterX className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      <AnalyticsSummary />
-
-      <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden bg-background">
-        <CardContent className="p-0">
-          <ScrollArea className="h-[calc(100vh-280px)] w-full">
-            <ActivityTable />
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </CardContent>
-      </Card>
-
-      <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
-        <DialogContent className="max-w-none w-screen h-screen m-0 p-0 border-none rounded-none shadow-none bg-background flex flex-col">
-          <DialogHeader className="p-4 border-b bg-muted/10 shrink-0 flex flex-row items-center justify-between space-y-0">
-            <div className="flex items-center gap-3">
-              <Bell className="h-5 w-5 text-primary" />
-              <DialogTitle className="text-lg font-black uppercase tracking-tight">Full-Screen Audit Audit</DialogTitle>
-            </div>
-            <div className="flex items-center gap-3">
-               <Badge variant="outline" className="h-7 rounded-sm font-black uppercase text-[10px] bg-primary/5 text-primary border-primary/20 shadow-none">
-                {activities.length} Participations Logged
-               </Badge>
-               <DialogClose asChild>
-                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-destructive/10 hover:text-destructive">
-                   <X className="h-5 w-5" />
-                 </Button>
-               </DialogClose>
-            </div>
-          </DialogHeader>
-          <div className="p-4 border-b bg-muted/5 flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 flex-1">
-                 <Search className="h-5 w-5 text-muted-foreground" />
-                 <Input 
-                  placeholder="Search audit narrative..." 
-                  className="max-w-md border-none focus-visible:ring-0 bg-transparent text-lg font-bold"
+              <div className="relative hidden md:block w-48 lg:w-64">
+                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input 
+                  placeholder="Search" 
+                  className="pl-8 h-9 rounded-sm border-primary/20 bg-background text-[10px] font-bold"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  autoFocus
-                 />
+                />
               </div>
-              <Badge variant="secondary" className="font-mono text-[10px] h-6 px-3">{dateFilter}</Badge>
+
+              <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="h-9 w-9 rounded-sm border border-primary/10 text-primary hover:bg-primary hover:text-white transition-all shadow-sm" title="Maximize View">
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+
+              <Button variant="ghost" size="icon" onClick={clearFilters} className="h-9 w-9 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10" title="Clear Filters">
+                <FilterX className="h-4 w-4" />
+              </Button>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {!isFullscreen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            className="overflow-hidden"
+          >
             <AnalyticsSummary />
-          </div>
-          <ScrollArea className="flex-1">
-            <div className="max-w-5xl mx-auto py-10">
-              <ActivityTable />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className={cn("relative transition-all duration-500 ease-in-out", isFullscreen && "fixed inset-0 z-[100] bg-background p-4 flex flex-col")}>
+        {isFullscreen && (
+          <div className="flex items-center justify-between mb-4 shrink-0 bg-muted/10 p-4 rounded-sm border border-primary/5">
+            <div className="flex items-center gap-4 flex-1">
+              <Search className="h-5 w-5 text-muted-foreground" />
+              <Input 
+                placeholder="Search audit narrative..." 
+                className="max-w-md border-none focus-visible:ring-0 bg-transparent text-lg font-bold"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                autoFocus
+              />
             </div>
-          </ScrollArea>
-          <div className="p-4 border-t bg-muted/5 text-center shrink-0">
-             <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-40">Aditya Pro Proprietary Audit Engine</p>
+            <div className="flex items-center gap-4">
+              <Badge variant="outline" className="h-8 rounded-sm font-black uppercase text-[10px] bg-primary/5 text-primary border-primary/20">
+                {activities.length} Events Logged
+              </Badge>
+              <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="h-10 w-10 rounded-full hover:bg-destructive/10 hover:text-destructive">
+                <X className="h-6 w-6" />
+              </Button>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+        
+        <Card className={cn("rounded-sm border-primary/10 shadow-sm overflow-hidden bg-background flex-1 flex flex-col", isFullscreen && "shadow-2xl border-2")}>
+          <CardContent className="p-0 flex-1 overflow-hidden flex flex-col">
+            <ScrollArea className="h-full w-full">
+              <ActivityTable />
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </CardContent>
+        </Card>
+        
+        {isFullscreen && (
+          <div className="p-4 pt-4 text-center shrink-0 border-t bg-muted/5 mt-4 rounded-sm">
+             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-40">Aditya Pro Proprietary Audit Engine</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
