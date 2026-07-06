@@ -214,7 +214,7 @@ export default function ActivitiesPage() {
 
   const { data: attendanceLogs } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'attendance');
-    if (isAdmin) return query(colRef, limit(queryLimit));
+    if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(queryLimit));
     return query(colRef, where('userId', '==', user?.uid), limit(queryLimit));
   }, [firestore, isAdmin, user]));
 
@@ -264,13 +264,16 @@ export default function ActivitiesPage() {
     const activeStaffIds = new Set(activeStaff.map(p => p.id));
 
     const presentUserIds = new Set<string>();
+    
+    // Exact yyyy-MM-dd match logic to replicate Summary Dashboard correctly
+    const startStr = format(start, 'yyyy-MM-dd');
+    const endStr = format(end, 'yyyy-MM-dd');
+
     attendanceLogs?.forEach(log => {
-        let d: Date | null = null;
-        if (log.date) d = new Date(log.date);
-        else if (log.createdAt?.toDate) d = log.createdAt.toDate();
+        const logDate = log.date || (log.createdAt?.toDate ? format(log.createdAt.toDate(), 'yyyy-MM-dd') : null);
         
-        // Count as present if user is in active staff and has a record (ongoing or completed) in range
-        if (d && d >= start && d <= end && log.userId && activeStaffIds.has(log.userId)) {
+        // Count as present if user is in active staff and has a record (ongoing or completed) for a date in range
+        if (logDate && logDate >= startStr && logDate <= endStr && log.userId && activeStaffIds.has(log.userId)) {
             presentUserIds.add(log.userId);
         }
     });
