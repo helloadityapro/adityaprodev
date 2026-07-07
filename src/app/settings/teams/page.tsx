@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where, getDocs, writeBatch, serverTimestamp, arrayUnion, getDoc, and } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -46,7 +46,8 @@ import {
   FilterX,
   Database,
   Workflow,
-  ListChecks
+  ListChecks,
+  Globe
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -153,7 +154,6 @@ export default function TeamMappingPage() {
   const [isAssignUserPopoverOpen, setIsAssignUserPopoverOpen] = React.useState(false);
   const [localSiteIds, setLocalSiteIds] = React.useState<string[]>([]);
   const [siteSearch, setSiteSearch] = React.useState("");
-  const [isSiteSearchOpen, setIsSiteSearchOpen] = React.useState(false);
 
   const [isMapping, setIsMapping] = React.useState(false);
   const [isAddingOverride, setIsAddingOverride] = React.useState(false);
@@ -310,15 +310,6 @@ export default function TeamMappingPage() {
     }
   };
 
-  const handleAddGroupSites = (groupId: string) => {
-    const group = siteGroups?.find(g => g.id === groupId);
-    if (!group) return;
-    
-    const newIds = new Set([...localSiteIds, ...group.siteIds]);
-    setLocalSiteIds(Array.from(newIds));
-    toast({ title: 'Group Sites Added', description: `Imported ${group.siteIds.length} locations from "${group.name}".` });
-  };
-
   const handleRemoveOverride = async (override: MappingOverride) => {
     try {
       deleteDocumentNonBlocking(doc(firestore, 'team_mapping_overrides', override.id));
@@ -379,14 +370,6 @@ export default function TeamMappingPage() {
       (u.email || '').toLowerCase().includes(assignUserSearch.toLowerCase())
     ).sort((a, b) => (a.username || "").localeCompare(b.username || ""));
   }, [allUsers, assignUserSearch]);
-
-  const availableSitesToAllot = React.useMemo(() => {
-    if (!allSites) return [];
-    return allSites.filter(s => 
-      !localSiteIds.includes(s.id) && 
-      s.name.toLowerCase().includes(siteSearch.toLowerCase())
-    );
-  }, [allSites, localSiteIds, siteSearch]);
 
   const handleOpenSiteAccess = (user: User) => {
     setAssignUser(user);
@@ -543,92 +526,112 @@ export default function TeamMappingPage() {
               </div>
 
               {assignUser && (
-                <div className="mt-8 space-y-10 animate-in fade-in slide-in-from-top-2">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Select Sites */}
-                    <div className="space-y-4">
-                      <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2 px-1">
-                        <PlusCircle className="h-3.5 w-3.5" /> Authorize Individuals
-                      </Label>
-                      <div className="p-4 bg-muted/20 border rounded-sm space-y-4">
-                        <Popover open={isSiteSearchOpen} onOpenChange={setIsSiteSearchOpen}>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full justify-between h-11 font-bold text-xs uppercase border-primary/10 bg-background">
-                              Add specific site...
-                              <ChevronsUpDown className="ml-2 h-4 w-4 opacity-30" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                            <div className="flex items-center border-b px-3">
-                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                              <Input placeholder="Filter sites..." className="h-10 w-full border-none focus-visible:ring-0 text-xs" value={siteSearch} onChange={e => setSiteSearch(e.target.value)} />
-                            </div>
-                            <ScrollArea className="h-[200px]">
-                              {availableSitesToAllot.map(s => (
-                                <Button key={s.id} variant="ghost" className="w-full justify-start h-10 text-xs text-left" onClick={() => { setLocalSiteIds(prev => [...prev, s.id]); setIsSiteSearchOpen(false); }}>{s.name}</Button>
-                              ))}
-                            </ScrollArea>
-                          </PopoverContent>
-                        </Popover>
-                      </div>
+                <div className="mt-8 space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between bg-muted/20 p-4 rounded-sm border">
+                    <div className="relative w-full md:w-80">
+                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        placeholder="Filter project registry..." 
+                        className="pl-9 h-9 rounded-sm bg-background border-primary/10"
+                        value={siteSearch}
+                        onChange={e => setSiteSearch(e.target.value)}
+                      />
                     </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground mr-2">Quick Toggle Group:</Label>
+                      {siteGroups?.map(group => {
+                        const ids = group.siteIds || [];
+                        const allIn = ids.length > 0 && ids.every((id: string) => localSiteIds.includes(id));
+                        return (
+                          <Badge 
+                            key={group.id} 
+                            variant="outline" 
+                            className={cn(
+                              "cursor-pointer h-7 px-3 rounded-full font-bold text-[10px] transition-all",
+                              allIn ? "bg-primary text-white border-primary shadow-sm" : "hover:bg-primary/5 text-primary border-primary/20"
+                            )}
+                            onClick={() => {
+                              if (allIn) setLocalSiteIds(prev => prev.filter(id => !ids.includes(id)));
+                              else setLocalSiteIds(prev => Array.from(new Set([...prev, ...ids])));
+                            }}
+                          >
+                            {allIn ? <Check className="h-3 w-3 mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
+                            {group.name}
+                          </Badge>
+                        );
+                      })}
+                      {(!siteGroups || siteGroups.length === 0) && <span className="text-[10px] italic text-muted-foreground opacity-40">No clusters defined</span>}
+                    </div>
+                  </div>
 
-                    {/* Select Groups */}
-                    <div className="space-y-4">
-                      <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2 px-1">
-                        <Tags className="h-3.5 w-3.5" /> Authorize by Group
-                      </Label>
-                      <div className="p-4 bg-primary/[0.02] border border-primary/10 rounded-sm space-y-4">
-                        <Select onValueChange={handleAddGroupSites}>
-                          <SelectTrigger className="h-11 font-bold text-xs uppercase border-primary/20 bg-background">
-                            <SelectValue placeholder="Add all sites from group..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {siteGroups?.map(g => (
-                              <SelectItem key={g.id} value={g.id} className="text-xs font-bold">{g.name} ({g.siteIds?.length || 0} sites)</SelectItem>
+                  <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden bg-background">
+                    <CardHeader className="py-3 px-6 border-b bg-muted/5 flex flex-row items-center justify-between">
+                       <div className="flex items-center gap-2">
+                          <LayoutGrid className="h-4 w-4 text-primary" />
+                          <CardTitle className="text-xs font-black uppercase tracking-widest">Global Site Authorization</CardTitle>
+                       </div>
+                       <div className="flex items-center gap-3">
+                          <Badge variant="secondary" className="rounded-sm font-black text-[10px] px-2 h-6 bg-primary/10 text-primary border-none">{localSiteIds.length} Assigned</Badge>
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-[9px] font-black text-destructive uppercase hover:bg-destructive/5" onClick={() => setLocalSiteIds([])}>Clear All</Button>
+                       </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="max-h-[450px] overflow-auto custom-scrollbar">
+                        <Table className="border-separate border-spacing-0">
+                          <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead className="w-12 text-center border-b">
+                                <Checkbox 
+                                  checked={allSites && allSites.length > 0 && localSiteIds.length === allSites.length} 
+                                  onCheckedChange={(checked) => {
+                                    if (checked) setLocalSiteIds(allSites?.map(s => s.id) || []);
+                                    else setLocalSiteIds([]);
+                                  }}
+                                />
+                              </TableHead>
+                              <TableHead className="text-[10px] font-black uppercase tracking-widest border-b">Project Name</TableHead>
+                              <TableHead className="text-[10px] font-black uppercase tracking-widest border-b">Company</TableHead>
+                              <TableHead className="text-right px-6 text-[10px] font-black uppercase tracking-widest w-24 border-b">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {allSites?.filter(s => s.name.toLowerCase().includes(siteSearch.toLowerCase()) || s.projectCompany.toLowerCase().includes(siteSearch.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map(site => (
+                              <TableRow 
+                                key={site.id} 
+                                className={cn("hover:bg-primary/[0.01] transition-colors cursor-pointer group", localSiteIds.includes(site.id) && "bg-primary/[0.03]")}
+                                onClick={() => {
+                                  setLocalSiteIds(prev => prev.includes(site.id) ? prev.filter(id => id !== site.id) : [...prev, site.id]);
+                                }}
+                              >
+                                <TableCell className="text-center" onClick={e => e.stopPropagation()}>
+                                  <Checkbox checked={localSiteIds.includes(site.id)} onCheckedChange={() => {
+                                    setLocalSiteIds(prev => prev.includes(site.id) ? prev.filter(id => id !== site.id) : [...prev, site.id]);
+                                  }} />
+                                </TableCell>
+                                <TableCell className="py-3.5">
+                                  <span className={cn("text-sm font-bold tracking-tight transition-colors", localSiteIds.includes(site.id) ? "text-primary" : "text-foreground")}>{site.name}</span>
+                                </TableCell>
+                                <TableCell className="text-[10px] font-bold text-muted-foreground uppercase opacity-60 group-hover:opacity-100 transition-opacity">{site.projectCompany}</TableCell>
+                                <TableCell className="text-right px-6">
+                                  {localSiteIds.includes(site.id) ? (
+                                    <Badge className="h-5 text-[8px] font-black bg-primary text-white border-none uppercase tracking-tighter">Authorized</Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="h-5 text-[8px] font-black text-muted-foreground/20 border-border/50 uppercase tracking-tighter">Restricted</Badge>
+                                  )}
+                                </TableCell>
+                              </TableRow>
                             ))}
-                            {(!siteGroups || siteGroups.length === 0) && <SelectItem value="none" disabled>No groups defined</SelectItem>}
-                          </SelectContent>
-                        </Select>
+                          </TableBody>
+                        </Table>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between border-b pb-2">
-                       <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">
-                        Current Access Registry ({localSiteIds.length})
-                       </Label>
-                       <Button variant="ghost" size="sm" className="h-7 text-[9px] font-black uppercase text-destructive" onClick={() => setLocalSiteIds([])}>Clear All</Button>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                       {localSiteIds.length > 0 ? localSiteIds.map(sid => {
-                         const site = allSites?.find(s => s.id === sid);
-                         return (
-                           <div key={sid} className="p-3 bg-muted/20 border rounded-sm flex items-center justify-between group hover:border-primary/30 transition-all">
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-xs font-bold truncate">{site?.name || "Unknown"}</span>
-                                <span className="text-[8px] font-black uppercase text-muted-foreground/60">{site?.projectCompany || "—"}</span>
-                              </div>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all" onClick={() => setLocalSiteIds(prev => prev.filter(id => id !== sid))}>
-                                <X className="h-3 w-3" />
-                              </Button>
-                           </div>
-                         );
-                       }) : (
-                         <div className="col-span-full py-12 text-center text-[10px] font-black uppercase text-muted-foreground/30 italic tracking-widest">
-                            No site authorizations active for this personnel
-                         </div>
-                       )}
-                    </div>
-                  </div>
-
-                  <div className="pt-8 border-t flex justify-end">
-                     <Button onClick={handleSaveSiteAccess} disabled={isUpdatingSites} className="h-14 min-w-[280px] font-black uppercase tracking-widest text-[11px] shadow-xl shadow-primary/20">
+                    </CardContent>
+                    <CardFooter className="bg-muted/10 border-t p-6 flex justify-end">
+                      <Button onClick={handleSaveSiteAccess} disabled={isUpdatingSites} className="h-14 min-w-[280px] font-black uppercase tracking-[0.2em] text-[11px] shadow-xl shadow-primary/20 transition-all active:scale-95">
                         {isUpdatingSites ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Save className="h-5 w-5 mr-2" />}
-                        Save Site Authorizations
-                     </Button>
-                  </div>
+                        Finalize Authorizations
+                      </Button>
+                    </CardFooter>
+                  </Card>
                 </div>
               )}
             </CardContent>
@@ -889,140 +892,6 @@ export default function TeamMappingPage() {
             >
               {isUpdatingLink ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               Confirm Change
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!assignUser} onOpenChange={(o) => !o && setAssignUser(null)}>
-        <DialogContent className="max-w-2xl w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background h-[95vh] sm:h-auto sm:max-h-[90vh] flex flex-col">
-          <DialogHeader className="p-6 pb-2 shrink-0 text-left space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-primary/10 text-primary rounded-sm">
-                <MapPin className="h-5 w-5" />
-              </div>
-              <DialogTitle className="text-xl font-black uppercase tracking-tight">Manage Site Access</DialogTitle>
-            </div>
-            <DialogDescription className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 leading-relaxed">
-              Assign sites to <strong className="text-foreground">{assignUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="p-6 space-y-6 flex-1 overflow-hidden flex flex-col">
-            <div className="p-4 bg-primary/[0.03] border border-primary/10 rounded-sm space-y-3 shrink-0">
-              <Label className="text-[10px] font-black uppercase text-primary/80 tracking-widest px-1">Select Site to Add</Label>
-              <Popover open={isSiteSearchOpen} onOpenChange={setIsSiteSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    role="combobox" 
-                    className={cn(
-                      "w-full justify-between h-11 rounded-sm border-primary/20 bg-background font-bold text-xs text-left",
-                      "hover:bg-primary/5 transition-all px-4"
-                    )}
-                  >
-                    <span className="truncate">Search project site...</span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 rounded-sm shadow-2xl border-primary/10" align="start">
-                  <div className="flex items-center border-b px-3 py-2 bg-muted/20">
-                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50 text-primary" />
-                    <Input 
-                      placeholder="Search sites..." 
-                      className="h-8 w-full border-none focus-visible:ring-0 bg-transparent px-0 text-sm font-medium"
-                      value={siteSearch}
-                      onChange={e => setSiteSearch(e.target.value)}
-                    />
-                  </div>
-                  <ScrollArea className="h-[200px]">
-                    <div className="p-1">
-                      {availableSitesToAllot.length > 0 ? availableSitesToAllot.map(site => (
-                        <Button 
-                          key={site.id} 
-                          variant="ghost" 
-                          className="w-full justify-start h-auto py-2.5 px-3 text-left rounded-sm mb-0.5 hover:bg-primary/5 hover:text-primary group"
-                          onClick={() => {
-                            setLocalSiteIds(prev => [...prev, site.id]);
-                            setSiteSearch("");
-                            setIsSiteSearchOpen(false);
-                          }}
-                        >
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-sm truncate">{site.name}</span>
-                            <span className="text-[9px] uppercase font-bold opacity-50 truncate group-hover:opacity-100">{site.projectCompany}</span>
-                          </div>
-                        </Button>
-                      )) : (
-                        <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground/40 italic leading-relaxed">No available sites discovered</div>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2 flex-1 flex flex-col min-h-0">
-              <Label className="text-[10px] font-black uppercase text-muted-foreground/60 tracking-widest px-1 shrink-0">Authorized Site Access</Label>
-              <div className="border rounded-sm flex-1 flex flex-col overflow-hidden bg-background shadow-inner">
-                <Table>
-                  <TableHeader className="bg-muted/30 sticky top-0 z-10">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="text-[9px] font-black uppercase tracking-widest h-9 px-5">Site Name</TableHead>
-                      <TableHead className="text-[9px] font-black uppercase tracking-widest h-9">Company</TableHead>
-                      <TableHead className="w-12 h-9"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow className="h-0"><TableCell colSpan={3} className="p-0 h-0 border-none"></TableCell></TableRow>
-                  </TableBody>
-                </Table>
-                <ScrollArea className="flex-1">
-                  <Table>
-                    <TableBody>
-                      {localSiteIds.length > 0 ? localSiteIds.map(sid => {
-                        const site = allSites?.find(s => s.id === sid);
-                        return (
-                          <TableRow key={sid} className="hover:bg-muted/5 transition-colors border-b-border/30 last:border-0 group">
-                            <TableCell className="px-5 py-3 font-bold text-sm">{site?.name || '—'}</TableCell>
-                            <TableCell className="text-[10px] font-medium text-muted-foreground uppercase">{site?.projectCompany || '—'}</TableCell>
-                            <TableCell className="text-right pr-5">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm"
-                                onClick={() => setLocalSiteIds(prev => prev.filter(id => id !== sid))}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      }) : (
-                        <TableRow>
-                          <TableCell colSpan={3} className="h-40 text-center text-xs font-medium text-muted-foreground/40 italic uppercase font-bold tracking-widest">No project sites assigned</TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="p-4 bg-muted/5 border-t flex items-center justify-between gap-3 shrink-0 flex-col sm:flex-row">
-            <DialogClose asChild>
-              <Button variant="outline" className="w-full sm:flex-1 rounded-sm font-bold uppercase text-[10px] h-11 tracking-widest">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button 
-              disabled={isUpdatingSites} 
-              onClick={handleSaveSiteAccess}
-              className="w-full sm:flex-1 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg tracking-widest"
-            >
-              {isUpdatingSites ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              Save Updates
             </Button>
           </DialogFooter>
         </DialogContent>
