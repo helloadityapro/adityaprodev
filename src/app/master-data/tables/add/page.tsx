@@ -17,6 +17,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Check, ChevronsUpDown, Loader2, LayoutGrid, Building2, ListPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { isSuperAdmin } from "@/lib/auth-constants";
+import { slugifyRole } from "@/lib/access-control";
 
 const tableSchema = z.object({
   siteId: z.string().min(1, "Project site is required"),
@@ -36,12 +38,36 @@ export default function AddTableConfigurationPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
-  const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<any>(roleConfigsQuery);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
+
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+
+  const accessibleSites = React.useMemo(() => {
+    if (!allSites || !userProfile) return [];
+    if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
+    
+    const roleId = userProfile.role ? slugifyRole(userProfile.role) : 'none';
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
+
+    if (!isOwnDataOnly) return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
+
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    const filtered = allSites.filter(s => siteIds.has(s.id));
+    return Array.from(new Map(filtered.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites, userProfile, isAdmin, roleConfigs]);
+
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
+  const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
 
   const form = useForm<z.infer<typeof tableSchema>>({
     resolver: zodResolver(tableSchema),
@@ -58,10 +84,10 @@ export default function AddTableConfigurationPage() {
     try {
       await addDocumentNonBlocking(collection(firestore, 'table_configurations'), {
         ...values,
-        members: [], // Initialized as empty since BoM source is removed
+        members: [], 
         createdAt: serverTimestamp(),
         userId: user?.uid,
-        userName: user?.displayName || user?.email
+        userName: userProfile?.username || user?.email
       });
 
       toast({ title: "Configuration Added", description: `Table "${values.tableName}" has been saved.` });
@@ -72,7 +98,9 @@ export default function AddTableConfigurationPage() {
     }
   };
 
-  const filteredSites = allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())) || [];
+  const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
+
+  if (isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   return (
     <div className="space-y-8 max-w-2xl mx-auto pb-20">
@@ -96,8 +124,8 @@ export default function AddTableConfigurationPage() {
                   <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
-                        <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
-                          {field.value ? allSites?.find(s => s.id === field.value)?.name : "Select site..."}
+                        <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>
+                          {field.value ? accessibleSites.find(s => s.id === field.value)?.name : "Select authorized site..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -24,6 +23,7 @@ import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
+import { slugifyRole } from "@/lib/access-control";
 
 const taskSchema = z.object({
   taskCategory: z.enum(["Site-related", "Other"], { required_error: "Please select a task category" }),
@@ -57,6 +57,7 @@ type UserProfile = {
   siteManagerId?: string;
   assignedProjectIds?: string[];
   pointsMultiplier?: number;
+  ownDataOnly?: boolean;
 };
 
 type RewardSettings = {
@@ -70,25 +71,34 @@ export default function CreateTaskPage() {
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
-  // Sites query - Global selection allowed for all users
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<any>(roleConfigsQuery);
+
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
-  // Users query - Global selection allowed for all users
-  const usersQuery = useMemoFirebase(() => {
-    return collection(firestore, 'users');
-  }, [firestore]);
+  const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allRegisteredUsers } = useCollection<UserProfile>(usersQuery);
 
   const accessibleSites = React.useMemo(() => {
-    if (!allSites) return [];
-    return Array.from(new Map(allSites.map(s => [s.name, s])).values())
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [allSites]);
+    if (!allSites || !userProfile) return [];
+    if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
+    
+    const roleId = userProfile.role ? slugifyRole(userProfile.role) : 'none';
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
+
+    if (!isOwnDataOnly) return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
+
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    const filtered = allSites.filter(s => siteIds.has(s.id));
+    return Array.from(new Map(filtered.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites, userProfile, isAdmin, roleConfigs]);
 
   const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
   const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
@@ -153,16 +163,14 @@ export default function CreateTaskPage() {
         updatedAt: serverTimestamp(),
       };
 
-      const taskRef = await addDocumentNonBlocking(collection(firestore, 'tasks'), taskData);
+      await addDocumentNonBlocking(collection(firestore, 'tasks'), taskData);
 
-      // Reward Points Logic for Assigner
       const rate = rewardSettings?.taskAssignment ?? 0.25;
       const multiplier = userProfile.pointsMultiplier || 1;
       updateDocumentNonBlocking(doc(firestore, 'users', user.uid), {
         totalPoints: increment(rate * multiplier)
       });
 
-      // Send Platform and Push Notification to Assignee
       sendNotification(firestore, {
         userId: values.assignedToId,
         title: "New Task Assigned",
@@ -171,19 +179,6 @@ export default function CreateTaskPage() {
         push: true
       });
 
-      // Notify Admins
-      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
-      const adminDocs = await getDocs(adminsQuery);
-      adminDocs.forEach(adminDoc => {
-        if (adminDoc.id === user.uid || adminDoc.id === values.assignedToId) return;
-        sendNotification(firestore, {
-          userId: adminDoc.id,
-          title: "New Task Logged",
-          description: `${userProfile.username} assigned "${values.title}" to ${assignedUser?.username}.`,
-          link: "/tasks/list",
-        });
-      });
-      
       setSubmittedTask({
         title: values.title,
         siteName: taskData.siteName,
@@ -191,16 +186,18 @@ export default function CreateTaskPage() {
         assigneeMobile: assignedUser?.mobile
       });
       setIsSubmitted(true);
-      setIsSubmitting(false);
-      toast({ title: "Task Assigned", description: "The task has been successfully created. Points updated." });
+      toast({ title: "Task Assigned", description: "The task has been successfully created." });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
+    } finally {
       setIsSubmitting(false);
     }
   };
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
   const filteredUsers = allRegisteredUsers?.filter(u => u.username.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.email.toLowerCase().includes(userSearchQuery.toLowerCase())) || [];
+
+  if (isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   if (isSubmitted && submittedTask) {
     return (
@@ -310,7 +307,7 @@ export default function CreateTaskPage() {
                               watchCategory === 'Other' && "opacity-50 grayscale bg-muted"
                             )}
                           >
-                            {field.value || "Select any site..."}
+                            {field.value || "Select authorized site..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -339,7 +336,7 @@ export default function CreateTaskPage() {
                               <span className="truncate">{site.name}</span>
                             </Button>
                           )) : (
-                            <div className="p-4 text-center text-sm text-muted-foreground">No sites found.</div>
+                            <div className="p-4 text-center text-sm text-muted-foreground italic">No authorized sites found.</div>
                           )}
                         </ScrollArea>
                       </PopoverContent>
@@ -463,7 +460,7 @@ export default function CreateTaskPage() {
               <div className="flex justify-end gap-4 pt-4 border-t">
                 <Button variant="ghost" type="button" onClick={() => router.back()} className="rounded-sm font-bold">Cancel</Button>
                 <Button type="submit" className="min-w-[150px] h-12 rounded-sm font-black uppercase tracking-widest shadow-lg" disabled={isSubmitting}>
-                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> DISPATCHING...</> : "Assign Task"}
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Assign Task"}
                 </Button>
               </div>
             </form>
