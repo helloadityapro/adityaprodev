@@ -44,7 +44,9 @@ import {
   Tags,
   LayoutGrid,
   FilterX,
-  Database
+  Database,
+  Workflow,
+  ListChecks
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -73,6 +75,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { slugifyRole } from '@/lib/access-control';
 
 type User = {
   id: string;
@@ -213,13 +216,6 @@ export default function TeamMappingPage() {
     } finally {
         setIsReconciling(false);
     }
-  };
-
-  const handleSort = (key: SortKey) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
   };
 
   const handleAssign = async () => {
@@ -898,7 +894,7 @@ export default function TeamMappingPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!siteAccessUser} onOpenChange={(o) => !o && setSiteAccessUser(null)}>
+      <Dialog open={!!assignUser} onOpenChange={(o) => !o && setAssignUser(null)}>
         <DialogContent className="max-w-2xl w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background h-[95vh] sm:h-auto sm:max-h-[90vh] flex flex-col">
           <DialogHeader className="p-6 pb-2 shrink-0 text-left space-y-2">
             <div className="flex items-center gap-3">
@@ -908,7 +904,7 @@ export default function TeamMappingPage() {
               <DialogTitle className="text-xl font-black uppercase tracking-tight">Manage Site Access</DialogTitle>
             </div>
             <DialogDescription className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 leading-relaxed">
-              Assign sites to <strong className="text-foreground">{siteAccessUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
+              Assign sites to <strong className="text-foreground">{assignUser?.username}</strong>. Engineer sites automatically sync to their reporting manager.
             </DialogDescription>
           </DialogHeader>
           
