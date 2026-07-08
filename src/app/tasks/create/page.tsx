@@ -139,11 +139,6 @@ export default function CreateTaskPage() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: "updates"
-  } as any);
-
   const watchCategory = form.watch('taskCategory');
   const watchedUsers = form.watch('assignedUserIds');
   const watchedRoles = form.watch('assignedRoles');
