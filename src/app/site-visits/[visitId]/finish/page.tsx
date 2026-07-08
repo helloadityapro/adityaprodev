@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
-import { collection, doc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, getDocs, updateDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,8 @@ import {
   ChevronUp,
   ArrowUp,
   Globe,
-  Building2
+  Building2,
+  RefreshCw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -56,6 +57,9 @@ type TaskItem = {
   photoUrl: string | null;
   localPhoto?: string | null;
 };
+
+// Global cache to track background uploads across component unmounts
+const activeUploadTasks: Record<string, boolean> = {};
 
 export default function FinishSiteVisitPage({ params }: { params: Promise<{ visitId: string }> }) {
   const { visitId } = React.use(params);
@@ -82,6 +86,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
   const [customerNames, setCustomerNames] = React.useState("");
   const [tasks, setTasks] = React.useState<TaskItem[]>([{ text: "", photoUrl: null }]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSuccess, setIsSuccess] = React.useState(false);
   const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
 
   React.useEffect(() => {
@@ -218,39 +223,58 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
       u8arr[n] = bstr.charCodeAt(n);
     }
     return new Blob([u8arr], { type: mime });
-  }
+  };
 
-  const processTaskPhotosSequential = async () => {
-    const storage = getStorage(firebaseApp);
-    const uploadedTasks = [];
-    
-    for (let i = 0; i < tasks.length; i++) {
-      const task = tasks[i];
-      if (task.localPhoto) {
-        const blob = dataURLtoBlob(task.localPhoto);
-        const fileName = `task_${i}_photo`;
-        const taskPhotoRef = ref(storage, `site_visits/${user!.uid}/task_${i}_${Date.now()}.jpg`);
-        const uploadTask = uploadBytesResumable(taskPhotoRef, blob);
-        
-        await new Promise((resolve, reject) => {
-          uploadTask.on('state_changed', 
-            (snapshot) => {
-              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-              setUploadProgress(prev => ({ ...prev, [fileName]: progress }));
-            },
-            reject,
-            async () => {
-              const url = await getDownloadURL(uploadTask.snapshot.ref);
-              uploadedTasks.push({ text: task.text, photoUrl: url });
-              resolve(url);
-            }
-          );
-        });
-      } else {
-        uploadedTasks.push({ text: task.text, photoUrl: task.photoUrl });
+  /**
+   * Performs the background upload of all media files.
+   */
+  const processVisitUploadsInBackground = async (
+    targetVisitId: string, 
+    selfieData: string, 
+    tasksData: TaskItem[], 
+    userId: string,
+    vRef: any
+  ) => {
+    if (activeUploadTasks[targetVisitId]) return;
+    activeUploadTasks[targetVisitId] = true;
+
+    try {
+      const storage = getStorage(firebaseApp);
+      
+      // 1. Upload Selfie
+      const selfieBlob = dataURLtoBlob(selfieData);
+      const selfieStorageRef = ref(storage, `site_visits/${userId}/selfie_${targetVisitId}_${Date.now()}.jpg`);
+      await uploadBytesResumable(selfieStorageRef, selfieBlob);
+      const selfieUrl = await getDownloadURL(selfieStorageRef);
+
+      // 2. Upload Task Photos
+      const finalTasks: any[] = [];
+      for (let i = 0; i < tasksData.length; i++) {
+        const task = tasksData[i];
+        if (task.localPhoto) {
+          const blob = dataURLtoBlob(task.localPhoto);
+          const taskPhotoRef = ref(storage, `site_visits/${userId}/task_${targetVisitId}_${i}_${Date.now()}.jpg`);
+          await uploadBytesResumable(taskPhotoRef, blob);
+          const url = await getDownloadURL(taskPhotoRef);
+          finalTasks.push({ text: task.text, photoUrl: url });
+        } else {
+          finalTasks.push({ text: task.text, photoUrl: task.photoUrl });
+        }
       }
+
+      // 3. Finalize Status
+      await updateDoc(vRef, {
+        selfieUrl,
+        tasks: finalTasks.filter(t => t.text.trim() !== "" || t.photoUrl),
+        status: 'completed',
+        updatedAt: serverTimestamp()
+      });
+
+    } catch (error) {
+      console.error("Background upload failed:", error);
+    } finally {
+      delete activeUploadTasks[targetVisitId];
     }
-    return uploadedTasks;
   };
 
   const handleSaveProgress = async () => {
@@ -258,9 +282,33 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
     setIsSubmitting(true);
     setUploadProgress({});
     try {
-      const finalTasks = await processTaskPhotosSequential();
+      // For immediate manual saves, we still block to ensure consistency as it's not a final "Finish" action
+      const storage = getStorage(firebaseApp);
+      const uploadedTasks = [];
+      
+      for (let i = 0; i < tasks.length; i++) {
+        const task = tasks[i];
+        if (task.localPhoto) {
+          const blob = dataURLtoBlob(task.localPhoto);
+          const fileName = `task_${i}_photo`;
+          const taskPhotoRef = ref(storage, `site_visits/${user.uid}/task_${i}_${Date.now()}.jpg`);
+          const uploadTask = uploadBytesResumable(taskPhotoRef, blob);
+          
+          const url: string = await new Promise((resolve, reject) => {
+            uploadTask.on('state_changed', 
+              (snapshot) => setUploadProgress(prev => ({ ...prev, [fileName]: (snapshot.bytesTransferred / snapshot.totalBytes) * 100 })),
+              reject,
+              async () => resolve(await getDownloadURL(uploadTask.snapshot.ref))
+            );
+          });
+          uploadedTasks.push({ text: task.text, photoUrl: url });
+        } else {
+          uploadedTasks.push({ text: task.text, photoUrl: task.photoUrl });
+        }
+      }
+
       await updateDocumentNonBlocking(visitRef, {
-        tasks: finalTasks.filter(t => t.text.trim() !== "" || t.photoUrl),
+        tasks: uploadedTasks.filter(t => t.text.trim() !== "" || t.photoUrl),
         updatedAt: serverTimestamp()
       });
       toast({ title: 'Draft Saved', description: 'Action items updated. Status remains active.' });
@@ -290,63 +338,34 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
     }
 
     setIsSubmitting(true);
-    setUploadProgress({});
     const endLocation = await getCurrentLocation();
 
     try {
-      const storage = getStorage(firebaseApp);
-      
-      const selfieBlob = dataURLtoBlob(selfie);
-      const selfieRef = ref(storage, `site_visits/${user.uid}/selfie_${Date.now()}.jpg`);
-      const selfieUploadTask = uploadBytesResumable(selfieRef, selfieBlob);
-      
-      const selfieUrl: string = await new Promise((resolve, reject) => {
-        selfieUploadTask.on('state_changed', 
-          (snapshot) => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            setUploadProgress(prev => ({ ...prev, 'Verification Selfie': progress }));
-          },
-          reject,
-          async () => {
-            const url = await getDownloadURL(selfieUploadTask.snapshot.ref);
-            resolve(url);
-          }
-        );
-      });
-
-      const finalTasks = await processTaskPhotosSequential();
-
-      await updateDocumentNonBlocking(visitRef, {
+      // 1. Immediate Firestore Update (Text and Status Only)
+      const initialUpdate = {
         endTime: serverTimestamp(),
         endLat: endLocation?.lat || visit.startLat,
         endLng: endLocation?.lng || visit.startLng,
-        selfieUrl,
         purpose,
         details,
-        tasks: finalTasks.filter(t => t.text.trim() !== "" || t.photoUrl),
         customerAvailable: customerAvailable === "yes",
         customerNames: customerAvailable === "yes" ? customerNames : "",
-        status: 'completed',
+        status: 'pending_upload', // New temporary status
         updatedAt: serverTimestamp()
-      });
+      };
 
-      // Notify Admins
-      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
-      const adminDocs = await getDocs(adminsQuery);
-      adminDocs.forEach(adminDoc => {
-        sendNotification(firestore, {
-          userId: adminDoc.id,
-          title: "Presence Concluded",
-          description: `${visit.managerName} published a final audit for "${visit.siteName}".`,
-          link: `/site-visits/${visit.id}`,
-          push: true
-        });
-      });
+      await updateDoc(visitRef, initialUpdate);
 
-      toast({ variant: 'success', title: 'Report Published', description: `Audit for ${visit.siteName} concluded and documented.` });
-      router.push('/site-visits/history');
+      // 2. Trigger Background Sync
+      processVisitUploadsInBackground(visitId, selfie, tasks, user.uid, visitRef);
+
+      // 3. Show Success View
+      setIsSuccess(true);
+      toast({ variant: 'success', title: 'Report Saved', description: 'Text report archived. Media is syncing in background.' });
+      
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Submission Failed', description: e.message });
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -359,14 +378,45 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
       <div className="p-8 flex flex-col items-center justify-center text-center gap-4 min-h-[60vh]">
         <CheckCircle2 className="h-16 w-16 text-green-500" />
         <h2 className="text-2xl font-bold">Audit Completed</h2>
-        <p className="text-muted-foreground">The report for {visit.siteName} has already been published.</p>
+        <p className="text-muted-foreground">The report for {visit.siteName} has been published.</p>
         <Button onClick={() => router.push('/site-visits/history')} className="rounded-sm font-bold shadow-md">View History</Button>
       </div>
     );
   }
 
+  // If already syncing, show success UI directly
+  if (visit.status === 'pending_upload' || isSuccess) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh] px-4 animate-in fade-in zoom-in-95 duration-500">
+        <Card className="max-w-md w-full rounded-sm shadow-2xl border-primary/20">
+          <CardHeader className="text-center pt-8">
+            <div className="flex justify-center mb-6">
+              <div className="bg-primary/10 p-6 rounded-full relative">
+                <Loader2 className="h-16 w-16 text-primary animate-spin" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-black uppercase tracking-tight text-primary">Report Saved</CardTitle>
+            <CardDescription className="text-base font-medium text-muted-foreground mt-2 leading-relaxed">
+              Your site visit report for <strong>{visit.siteName}</strong> has been archived. 
+              We are now syncing the images and videos in the background. 
+              <br/><br/>
+              You can safely navigate away or return to the active hub.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="space-y-4 pb-8 px-8 flex flex-col">
+            <Button className="w-full h-12 text-sm font-black uppercase tracking-widest shadow-lg" onClick={() => router.push("/site-visits/active")}>
+              Active Presence Hub
+            </Button>
+            <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase text-muted-foreground" onClick={() => router.push("/dashboard")}>
+              Go to Dashboard
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
   const isSite = visit.locationType !== 'other';
-  const labelPrefix = isSite ? "Site" : "Location";
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto pb-20 px-2 sm:px-4">
@@ -422,7 +472,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                             className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity" 
                             onClick={() => removeTaskPhoto(idx)}
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-3.5 w-3.5" />
                           </Button>
                         )}
                       </div>

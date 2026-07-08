@@ -5,7 +5,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@
 import { collection, doc, query, where, or, and } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, User, Building2, Globe } from "lucide-react";
+import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, User, Building2, Globe, RefreshCw } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,7 +23,7 @@ type SiteVisit = {
   startTime: any;
   startLat: number;
   startLng: number;
-  status: 'ongoing' | 'completed';
+  status: 'ongoing' | 'completed' | 'pending_upload';
   locationType?: 'site' | 'other';
 };
 
@@ -42,27 +42,29 @@ export default function ActiveSiteVisitsPage() {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'site_visits');
     
-    // Admins monitor all ongoing visits
+    // Admins monitor all ongoing and syncing visits
     if (isAdmin) {
-      return query(colRef, where('status', '==', 'ongoing'));
+      return query(colRef, where('status', 'in', ['ongoing', 'pending_upload']));
     }
 
-    // Managers see their own and their team's ongoing visits
+    // Managers see their own and their team's active visits
     if (isManager) {
         return query(
             colRef,
             and(
-              where('status', '==', 'ongoing'),
+              where('status', 'in', ['ongoing', 'pending_upload']),
               or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid))
             )
         );
     }
     
-    // Engineers only see their own ongoing visit
+    // Engineers only see their own active visits
     return query(
       colRef,
-      where('managerId', '==', user.uid),
-      where('status', '==', 'ongoing')
+      and(
+        where('managerId', '==', user.uid),
+        where('status', 'in', ['ongoing', 'pending_upload'])
+      )
     );
   }, [firestore, user, isAdmin, isManager, isProfileLoading]);
 
@@ -104,8 +106,10 @@ export default function ActiveSiteVisitsPage() {
         <div className="grid gap-6">
           {sortedVisits.map((visit) => {
             const isSite = visit.locationType !== 'other';
+            const isSyncing = visit.status === 'pending_upload';
+
             return (
-              <Card key={visit.id} className="border-l-4 border-l-primary shadow-md overflow-hidden animate-in fade-in slide-in-from-left-4 duration-500">
+              <Card key={visit.id} className={cn("border-l-4 shadow-md overflow-hidden animate-in fade-in slide-in-from-left-4 duration-500", isSyncing ? "border-l-blue-400 opacity-80" : "border-l-primary")}>
                 <CardHeader className="bg-primary/5 pb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -113,16 +117,24 @@ export default function ActiveSiteVisitsPage() {
                         {isSite ? <Building2 className="h-3 w-3" /> : <Globe className="h-3 w-3" />} 
                         {isSite ? "Project Site" : "Other Location"}
                       </Badge>
-                      <Badge className="bg-primary text-white font-bold uppercase text-[10px] tracking-widest rounded-sm h-6 px-3 border-none">Active</Badge>
+                      {isSyncing ? (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 animate-pulse font-bold uppercase text-[10px] tracking-widest rounded-sm h-6 px-3">
+                          <RefreshCw className="h-3 w-3 mr-1.5 animate-spin" /> Syncing Media...
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-primary text-white font-bold uppercase text-[10px] tracking-widest rounded-sm h-6 px-3 border-none">Active</Badge>
+                      )}
                       <div className="flex items-center text-xs text-muted-foreground gap-1 ml-2">
                         <Clock className="h-3 w-3" />
                         Started {formatDistanceToNow(visit.startTime?.toDate() || new Date(), { addSuffix: true })}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[10px] font-black text-primary uppercase">
-                      <Timer className="h-3 w-3 animate-pulse" />
-                      In progress
-                    </div>
+                    {!isSyncing && (
+                      <div className="flex items-center gap-1.5 text-[10px] font-black text-primary uppercase">
+                        <Timer className="h-3 w-3 animate-pulse" />
+                        In progress
+                      </div>
+                    )}
                   </div>
                   <div className="mt-2 flex flex-col gap-1">
                     <CardTitle className="text-2xl font-black text-foreground">{visit.siteName}</CardTitle>
@@ -155,14 +167,16 @@ export default function ActiveSiteVisitsPage() {
                     <div className="bg-muted/30 p-4 rounded-sm border border-dashed flex flex-col justify-center items-center text-center gap-2">
                       <HardHat className="h-8 w-8 text-primary/40" />
                       <p className="text-xs text-muted-foreground italic font-medium leading-relaxed">
-                        {visit.managerId === user?.uid 
-                          ? `Continue documenting your ${isSite ? 'site' : 'field'} activities. You can save progress multiple times.`
-                          : `Personnel is currently active at ${visit.siteName}.`}
+                        {isSyncing 
+                          ? "This report has been finalized. Attachments are currently being synchronized to the organizational archives."
+                          : visit.managerId === user?.uid 
+                            ? `Continue documenting your ${isSite ? 'site' : 'field'} activities. You can save progress multiple times.`
+                            : `Personnel is currently active at ${visit.siteName}.`}
                       </p>
                     </div>
                   </div>
                 </CardContent>
-                {visit.managerId === user?.uid && (
+                {visit.managerId === user?.uid && !isSyncing && (
                   <CardFooter className="bg-muted/10 border-t p-4">
                     <Button 
                       className="w-full h-12 text-lg font-black rounded-sm shadow-md" 

@@ -280,7 +280,7 @@ export default function CreateTaskPage() {
 
       <Card className="shadow-md border-primary/10 rounded-sm">
         <CardHeader>
-          <CardTitle>Multi-User Task Form</CardTitle>
+          <CardTitle>Assign New Task</CardTitle>
           <CardDescription>Select project context and specify assignees by individual selection or role.</CardDescription>
         </CardHeader>
         <CardContent>
