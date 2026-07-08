@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp, increment, getDoc, and } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp, increment, getDoc, and, limit, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,6 +39,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { slugifyRole } from "@/lib/access-control";
 
 type Attachment = {
   url: string;
@@ -71,7 +73,9 @@ export default function DPRListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [activeTab, setActiveTab] = React.useState<string>("site");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -83,7 +87,7 @@ export default function DPRListPage() {
   // Viewer State
   const [viewUrl, setViewUrl] = React.useState<string | null>(null);
   const [viewUrls, setViewUrls] = React.useState<string[]>([]);
-  const [currentFileIndex, setCurrentFileIndex] = React.useState(0);
+  const [currentUrlIndex, setCurrentUrlIndex] = React.useState(0);
   const [scale, setScale] = React.useState(1);
   const [position, setPosition] = React.useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = React.useState(false);
@@ -114,6 +118,7 @@ export default function DPRListPage() {
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
+  const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
   const dprsQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
@@ -163,7 +168,7 @@ export default function DPRListPage() {
     
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+      : roleConfigs?.find(c => c.id === userRoleStr)?.ownDataOnly ?? false;
 
     const { start, end } = queryDateRange;
     let result = dprs;
@@ -194,7 +199,7 @@ export default function DPRListPage() {
         const dateB = new Date(b.reportDate || (b.createdAt?.toDate?.() || 0)).getTime();
         return dateB - dateA;
     });
-  }, [dprs, searchTerm, queryDateRange, userProfile, roleConfigs, isSuper, activeTab]);
+  }, [dprs, searchTerm, queryDateRange, userProfile, roleConfigs, isSuper, activeTab, userRoleStr]);
 
   const handleDelete = async () => {
     if (!deletingDpr || !firestore) return;
@@ -241,7 +246,6 @@ export default function DPRListPage() {
   };
 
   const handleWhatsAppShare = async (dpr: DPR) => {
-    // Attempt file share first if attachments exist
     if (navigator.share && dpr.attachments && dpr.attachments.length > 0) {
       try {
         const filesToShare: File[] = [];
@@ -262,7 +266,6 @@ export default function DPRListPage() {
       }
     }
 
-    // Fallback: Text only with links
     const mediaLinks = dpr.attachments?.length ? `\n\n*Attachments:*\n${dpr.attachments.map((a, i) => `${i + 1}. ${a.url}`).join('\n')}` : '';
     const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${dpr.siteName}\n*Date:* ${format(new Date(dpr.reportDate), 'dd MMM yyyy')}\n*Submitted By:* ${dpr.userName}\n\n*Activities:*\n${dpr.description}${mediaLinks}`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
@@ -482,7 +485,7 @@ export default function DPRListPage() {
                   </TableCell>
                   <TableCell className="text-right px-6 no-print">
                       <div className="flex justify-end items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(dpr)} title="Share to WhatsApp">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(dpr)} title="Share on WhatsApp">
                               <Share2 className="h-4 w-4" />
                           </Button>
                           {dpr.userId === user?.uid && (
@@ -691,7 +694,7 @@ export default function DPRListPage() {
               </div>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
                 <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
-                  {currentFileIndex + 1} / {viewUrls.length}
+                  {currentUrlIndex + 1} / {viewUrls.length}
                 </Badge>
               </div>
             </>
