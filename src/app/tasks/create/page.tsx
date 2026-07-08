@@ -24,6 +24,7 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
 import { slugifyRole } from "@/lib/access-control";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const taskSchema = z.object({
   taskCategory: z.enum(["Site-related", "Other"], { required_error: "Please select a task category" }),
@@ -202,7 +203,7 @@ export default function CreateTaskPage() {
   if (isSubmitted && submittedTask) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
+        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300 rounded-sm">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
               <div className="bg-primary/10 p-4 rounded-full">
@@ -460,7 +461,7 @@ export default function CreateTaskPage() {
               <div className="flex justify-end gap-4 pt-4 border-t">
                 <Button variant="ghost" type="button" onClick={() => router.back()} className="rounded-sm font-bold">Cancel</Button>
                 <Button type="submit" className="min-w-[150px] h-12 rounded-sm font-black uppercase tracking-widest shadow-lg" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Assign Task"}
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> DISPATCHING...</> : "Assign Task"}
                 </Button>
               </div>
             </form>
