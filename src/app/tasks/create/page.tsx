@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, CheckCircle2, LayoutGrid, Globe, Users, Plus, X } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, CheckCircle2, LayoutGrid, Globe, Users, Plus, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";

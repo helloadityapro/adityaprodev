@@ -7,7 +7,27 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, subDays, subMonths } from "date-fns";
-import { ListTodo, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, CheckCircle2, MapPin, Users, ChevronDown, ChevronUp, ShieldCheck, Save } from "lucide-react";
+import { 
+  ListTodo, 
+  Search, 
+  Pencil, 
+  Trash2, 
+  Loader2, 
+  Clock, 
+  Calendar, 
+  FilterX, 
+  CheckCircle2, 
+  MapPin, 
+  Users, 
+  ChevronDown, 
+  ChevronUp, 
+  ShieldCheck, 
+  Save,
+  User,
+  CircleCheck,
+  CircleX,
+  Eye
+} from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
