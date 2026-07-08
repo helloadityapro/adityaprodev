@@ -333,7 +333,7 @@ export default function SubmitDPRPage() {
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="site" id="dpr-site" />
                           <Label htmlFor="dpr-site" className="font-bold cursor-pointer flex items-center gap-1.5 text-xs uppercase">
-                            <Building2 className="h-3.5 w-3.5 text-primary" /> Groundmount Projects
+                            <Building2 className="h-3.5 w-3.5 text-primary" />Projects
                           </Label>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -470,7 +470,7 @@ export default function SubmitDPRPage() {
 
               <div className="space-y-4">
                 <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                  <FileUp className="h-4 w-4 text-primary" /> Attach Visual Evidence (Images / Videos)
+                  <FileUp className="h-4 w-4 text-primary" /> Add Attachments (Images / Videos)
                 </Label>
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-4">

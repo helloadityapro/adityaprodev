@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, subDays, subMonths, subYears } from "date-fns";
-import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, MessageCircle, User, Building2, Globe, ImageIcon, Film, Maximize2, PlayCircle, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, X, Download, FileImage } from "lucide-react";
+import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, MessageCircle, User, Building2, Globe, ImageIcon, Film, Maximize2, PlayCircle, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, X, Download, FileImage, Share2 } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -240,7 +240,29 @@ export default function DPRListPage() {
     setEditingDpr(null);
   };
 
-  const handleWhatsAppShare = (dpr: DPR) => {
+  const handleWhatsAppShare = async (dpr: DPR) => {
+    // Attempt file share first if attachments exist
+    if (navigator.share && dpr.attachments && dpr.attachments.length > 0) {
+      try {
+        const filesToShare: File[] = [];
+        for (const att of dpr.attachments) {
+          const response = await fetch(att.url);
+          const blob = await response.blob();
+          filesToShare.push(new File([blob], att.name, { type: att.contentType }));
+        }
+        
+        await navigator.share({
+          files: filesToShare,
+          title: `DPR: ${dpr.siteName}`,
+          text: `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${dpr.siteName}\n*Date:* ${format(new Date(dpr.reportDate), 'dd MMM yyyy')}\n*Submitted By:* ${dpr.userName}\n\n*Activities:*\n${dpr.description}`,
+        });
+        return;
+      } catch (e) {
+        console.warn("Direct file share failed, falling back to text link", e);
+      }
+    }
+
+    // Fallback: Text only with links
     const mediaLinks = dpr.attachments?.length ? `\n\n*Attachments:*\n${dpr.attachments.map((a, i) => `${i + 1}. ${a.url}`).join('\n')}` : '';
     const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${dpr.siteName}\n*Date:* ${format(new Date(dpr.reportDate), 'dd MMM yyyy')}\n*Submitted By:* ${dpr.userName}\n\n*Activities:*\n${dpr.description}${mediaLinks}`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
@@ -408,7 +430,7 @@ export default function DPRListPage() {
                 <TableHead>Location / Site</TableHead>
                 <TableHead>User</TableHead>
                 <TableHead className="min-w-[300px]">Update & Activity</TableHead>
-                <TableHead>Evidence</TableHead>
+                <TableHead>Attachments</TableHead>
                 <TableHead className="text-right px-6 no-print">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -460,8 +482,8 @@ export default function DPRListPage() {
                   </TableCell>
                   <TableCell className="text-right px-6 no-print">
                       <div className="flex justify-end items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(dpr)} title="Push to WhatsApp">
-                              <MessageCircle className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(dpr)} title="Share to WhatsApp">
+                              <Share2 className="h-4 w-4" />
                           </Button>
                           {dpr.userId === user?.uid && (
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setEditingDpr(dpr)}>
@@ -649,7 +671,7 @@ export default function DPRListPage() {
           <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent no-print">
             <div className="flex items-center gap-3">
               <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
-              <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px]">Evidence Artifact</span>
+              <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px]">Attachments</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-5 w-5" /></Button>
@@ -674,13 +696,13 @@ export default function DPRListPage() {
               </div>
             </>
           )}
-          <div ref={viewerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDoubleClick={handleDoubleClick}>
+          <div ref={containerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDoubleClick={handleDoubleClick}>
             <div ref={mediaRef} className={cn("transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit", isDragging && "transition-none")} style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
               {viewUrl && (
                 isVideoUrl(viewUrl) ? (
                   <div className="pointer-events-auto"><video src={viewUrl} controls autoPlay className="max-w-[90vw] max-h-[80vh] shadow-2xl rounded-sm" /></div>
                 ) : (
-                  <img src={viewUrl} className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" alt="Audit Evidence" draggable={false} />
+                  <img src={viewUrl} className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" alt="Attachments" draggable={false} />
                 )
               )}
             </div>
