@@ -83,12 +83,14 @@ export default function DPRListPage() {
   // Viewer State
   const [viewUrl, setViewUrl] = React.useState<string | null>(null);
   const [viewUrls, setViewUrls] = React.useState<string[]>([]);
-  const [currentUrlIndex, setCurrentUrlIndex] = React.useState(0);
-  const [zoom, setZoom] = React.useState(1);
+  const [currentFileIndex, setCurrentFileIndex] = React.useState(0);
+  const [scale, setScale] = React.useState(1);
   const [position, setPosition] = React.useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = React.useState(false);
   const [startPan, setStartPan] = React.useState({ x: 0, y: 0 });
+  
   const viewerRef = React.useRef<HTMLDivElement>(null);
+  const mediaRef = React.useRef<HTMLDivElement>(null);
 
   // Persistence logic for active tab
   React.useEffect(() => {
@@ -104,7 +106,7 @@ export default function DPRListPage() {
   };
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<any>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
@@ -256,12 +258,29 @@ export default function DPRListPage() {
   };
 
   const resetViewer = () => { setScale(1); setPosition({ x: 0, y: 0 }); };
+
   const openViewer = (url: string, dpr: DPR) => {
     const urls = dpr.attachments?.map(a => a.url) || [];
     const index = urls.indexOf(url);
     setViewUrls(urls);
     setCurrentUrlIndex(index >= 0 ? index : 0);
     setViewUrl(url);
+    resetViewer();
+  };
+
+  const nextUrl = () => {
+    if (viewUrls.length <= 1) return;
+    const nextIdx = (currentUrlIndex + 1) % viewUrls.length;
+    setCurrentUrlIndex(nextIdx);
+    setViewUrl(viewUrls[nextIdx]);
+    resetViewer();
+  };
+
+  const prevUrl = () => {
+    if (viewUrls.length <= 1) return;
+    const prevIdx = (currentUrlIndex - 1 + viewUrls.length) % viewUrls.length;
+    setCurrentUrlIndex(prevIdx);
+    setViewUrl(viewUrls[prevIdx]);
     resetViewer();
   };
 
@@ -289,6 +308,16 @@ export default function DPRListPage() {
   };
 
   const handleMouseUp = () => setIsDragging(false);
+
+  const handleDoubleClick = () => {
+    if (viewUrl && isVideoUrl(viewUrl)) return;
+    if (scale > 1) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    } else {
+      setScale(2);
+    }
+  };
 
   function renderTable() {
     return (
@@ -633,10 +662,10 @@ export default function DPRListPage() {
           {viewUrls.length > 1 && (
             <>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); const prevIdx = (currentFileIndex - 1 + viewUrls.length) % viewUrls.length; setCurrentFileIndex(prevIdx); setViewUrl(viewUrls[prevIdx]); resetViewer(); }}><ChevronLeft className="h-8 w-8" /></Button>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); prevUrl(); }}><ChevronLeft className="h-8 w-8" /></Button>
               </div>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); const nextIdx = (currentFileIndex + 1) % viewUrls.length; setCurrentFileIndex(nextIdx); setViewUrl(viewUrls[nextIdx]); resetViewer(); }}><ChevronRight className="h-8 w-8" /></Button>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); nextUrl(); }}><ChevronRight className="h-8 w-8" /></Button>
               </div>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
                 <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
@@ -645,8 +674,8 @@ export default function DPRListPage() {
               </div>
             </>
           )}
-          <div ref={viewerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
-            <div className={cn("transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit", isDragging && "transition-none")} style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
+          <div ref={viewerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDoubleClick={handleDoubleClick}>
+            <div ref={mediaRef} className={cn("transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit", isDragging && "transition-none")} style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
               {viewUrl && (
                 isVideoUrl(viewUrl) ? (
                   <div className="pointer-events-auto"><video src={viewUrl} controls autoPlay className="max-w-[90vw] max-h-[80vh] shadow-2xl rounded-sm" /></div>
