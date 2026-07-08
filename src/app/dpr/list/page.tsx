@@ -405,7 +405,7 @@ export default function DPRListPage() {
 
               <div className="space-y-2">
                 {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx) => (
-                  <p key={pIdx} className="text-xs italic text-muted-foreground leading-relaxed line-clamp-3">
+                  <p key={pIdx} className="text-xs italic text-primary leading-relaxed line-clamp-3">
                     "{para.trim()}"
                   </p>
                 ))}
@@ -480,7 +480,7 @@ export default function DPRListPage() {
                       <div className="space-y-3 mb-3">
                           {dpr.description.split('\n\n').filter(p => p.trim() !== '').map((para, pIdx, arr) => (
                               <React.Fragment key={pIdx}>
-                                  <p className="text-sm italic text-muted-foreground leading-relaxed">
+                                  <p className="text-sm italic text-primary leading-relaxed">
                                       "{para.trim()}"
                                   </p>
                                   {pIdx < arr.length - 1 && (

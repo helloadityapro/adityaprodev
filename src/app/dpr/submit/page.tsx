@@ -251,8 +251,7 @@ export default function SubmitDPRPage() {
 
   const triggerWhatsApp = () => {
     if (!submittedDpr) return;
-    const mediaLinks = submittedDpr.attachments?.length ? `\n\n*Attachments:*\n${submittedDpr.attachments.map((a, i) => `${i + 1}. ${a.url}`).join('\n')}` : '';
-    const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${submittedDpr.siteName}\n*Date:* ${format(new Date(submittedDpr.date), 'dd MMM yyyy')}\n*Submitted By:* ${userProfile?.username || user?.email}\n\n*Activities:*\n${submittedDpr.description}${mediaLinks}`;
+    const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${submittedDpr.siteName}\n*Date:* ${format(new Date(submittedDpr.date), 'dd MMM yyyy')}\n*Submitted By:* ${userProfile?.username || user?.email}\n\n*Activities:*\n${submittedDpr.description}`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
