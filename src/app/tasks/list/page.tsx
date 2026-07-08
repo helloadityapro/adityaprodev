@@ -1,14 +1,13 @@
-
 "use client";
 
 import * as React from "react";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
 import { collection, doc, query, where, serverTimestamp, increment, getDoc, limit, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, subDays, subMonths, subYears } from "date-fns";
-import { ListTodo, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, CheckCircle2, AlertCircle, User, MapPin, MoreHorizontal, ArrowRight } from "lucide-react";
+import { format } from "date-fns";
+import { ListTodo, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, CheckCircle2, AlertCircle, User, MapPin, MoreHorizontal, ArrowRight, Users, ChevronDown, ChevronUp, History, ShieldCheck } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +40,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
+import { slugifyRole } from "@/lib/access-control";
+
+type AssigneeState = {
+  userId: string;
+  userName: string;
+  status: "To-do" | "In Progress" | "Completed" | "Cancelled";
+  remarks?: string;
+  updatedAt: any;
+};
 
 type Task = {
   id: string;
@@ -50,6 +58,8 @@ type Task = {
   description: string;
   assignedToId: string;
   assignedToName: string;
+  assigneeIds: string[];
+  assigneeStates: Record<string, AssigneeState>;
   assignedById: string;
   assignedByName: string;
   priority: "Low" | "Medium" | "High";
@@ -84,7 +94,7 @@ function PriorityBadge({ priority }: { priority: string }) {
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, className }: { status: string, className?: string }) {
   const config = {
     "To-do": "bg-slate-100 text-slate-800 border-slate-200",
     "In Progress": "bg-blue-100 text-blue-800 border-blue-200",
@@ -92,17 +102,24 @@ function StatusBadge({ status }: { status: string }) {
     "Cancelled": "bg-red-100 text-red-800 border-red-200",
   };
   return (
-    <Badge variant="outline" className={cn("rounded-sm text-[10px] font-bold uppercase", (config as any)[status])}>
+    <Badge variant="outline" className={cn("rounded-sm text-[9px] font-bold uppercase", (config as any)[status], className)}>
       {status}
     </Badge>
   );
 }
+
+const formatTimestamp = (ts: any) => {
+  if (!ts) return '—';
+  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
+  return format(date, 'dd MMM, HH:mm');
+};
 
 export default function TaskListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
+  
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [activeTab, setActiveTab] = React.useState("all");
@@ -111,10 +128,12 @@ export default function TaskListPage() {
   const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   
   const [actionTask, setActionTask] = React.useState<Task | null>(null);
+  const [selectedUpdateUserId, setSelectedUpdateUserId] = React.useState<string>("");
   const [pendingStatus, setPendingStatus] = React.useState<Task['status'] | "">("");
   
   const [isUpdating, setIsUpdating] = React.useState(false);
   const [deletingTask, setDeletingTask] = React.useState<Task | null>(null);
+  const [expandedTaskIds, setExpandedTaskIds] = React.useState<Set<string>>(new Set());
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -136,30 +155,12 @@ export default function TaskListPage() {
   const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'rewards'), [firestore]);
   const { data: rewardSettings } = useDoc<RewardSettings>(settingsRef);
 
-  const queryDateRange = React.useMemo(() => {
-    const today = new Date();
-    const todayStr = format(today, 'yyyy-MM-dd');
-    
-    switch (dateFilter) {
-      case 'today':
-        return { start: todayStr, end: todayStr };
-      case 'yesterday':
-        const yesterday = format(subDays(today, 1), 'yyyy-MM-dd');
-        return { start: yesterday, end: yesterday };
-      case '7days':
-        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
-      case 'lastMonth':
-        return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
-      case 'lastYear':
-        return { start: format(subYears(today, 1), 'yyyy-MM-dd'), end: todayStr };
-      case 'allTime':
-        return { start: '1970-01-01', end: '2099-12-31' };
-      case 'custom':
-        return { start: customStart, end: customEnd };
-      default:
-        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
-    }
-  }, [dateFilter, customStart, customEnd]);
+  const toggleExpand = (id: string) => {
+    const next = new Set(expandedTaskIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setExpandedTaskIds(next);
+  };
 
   const filteredTasks = React.useMemo(() => {
     if (!tasks || !userProfile) return [];
@@ -169,7 +170,7 @@ export default function TaskListPage() {
 
     if (!isAdmin) {
       list = list.filter(task => 
-        task.assignedToId === user?.uid || task.assignedById === user?.uid
+        (task.assigneeIds || []).includes(user?.uid || "") || task.assignedById === user?.uid
       );
     }
 
@@ -180,7 +181,7 @@ export default function TaskListPage() {
     if (isOwnDataOnly && !isSuper) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
       list = list.filter(task => {
-        if (task.assignedToId === user?.uid || task.assignedById === user?.uid) return true;
+        if ((task.assigneeIds || []).includes(user?.uid || "") || task.assignedById === user?.uid) return true;
         if (!task.siteId) return true;
         return assignedIds.has(task.siteId);
       });
@@ -192,12 +193,12 @@ export default function TaskListPage() {
 
       const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         task.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.assignedToName.toLowerCase().includes(searchTerm.toLowerCase());
+        (task.assigneeIds || []).some(id => task.assigneeStates?.[id]?.userName.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
       
       const matchesTab = activeTab === 'all' || 
-        (activeTab === 'my-tasks' && task.assignedToId === user?.uid) ||
+        (activeTab === 'my-tasks' && (task.assigneeIds || []).includes(user?.uid || "")) ||
         (activeTab === 'assigned-by-me' && task.assignedById === user?.uid);
 
       const matchesDate = tDateStr >= start && tDateStr <= end;
@@ -213,7 +214,7 @@ export default function TaskListPage() {
   }, [tasks, searchTerm, statusFilter, activeTab, user, userProfile, roleConfigs, isSuper, isAdmin, queryDateRange, userRoleStr]);
 
   const stats = React.useMemo(() => {
-    const myTasks = filteredTasks.filter(t => t.assignedToId === user?.uid);
+    const myTasks = filteredTasks.filter(t => (t.assigneeIds || []).includes(user?.uid || ""));
     return {
       todo: myTasks.filter(t => t.status === 'To-do').length,
       inProgress: myTasks.filter(t => t.status === 'In Progress').length,
@@ -225,23 +226,39 @@ export default function TaskListPage() {
     if (!actionTask || !pendingStatus) return;
     setIsUpdating(true);
     
-    const nextStatus = pendingStatus;
-
-    if (actionTask.status === 'Completed' && nextStatus === 'Completed') {
-        setActionTask(null);
-        setIsUpdating(false);
-        return;
-    }
+    const targetUserId = selectedUpdateUserId || user?.uid;
+    if (!targetUserId) return;
 
     const taskRef = doc(firestore, 'tasks', actionTask.id);
+    const newStates = { ...(actionTask.assigneeStates || {}) };
+    
+    const wasCompleted = newStates[targetUserId]?.status === 'Completed';
+    const isNowCompleted = pendingStatus === 'Completed';
+
+    newStates[targetUserId] = {
+        ...newStates[targetUserId],
+        userId: targetUserId,
+        status: pendingStatus as any,
+        remarks: remarks || "",
+        updatedAt: new Date().toISOString()
+    };
+
+    // Calculate overall status logic
+    const allStates = Object.values(newStates);
+    let overallStatus: Task['status'] = "In Progress";
+    if (allStates.every(s => s.status === 'Completed')) overallStatus = "Completed";
+    else if (allStates.every(s => s.status === 'To-do')) overallStatus = "To-do";
+    else if (allStates.every(s => s.status === 'Cancelled')) overallStatus = "Cancelled";
+    else if (allStates.some(s => s.status === 'In Progress' || s.status === 'Completed')) overallStatus = "In Progress";
+
     updateDocumentNonBlocking(taskRef, {
-        status: nextStatus,
-        remarks: remarks || actionTask.remarks || "",
+        assigneeStates: newStates,
+        status: overallStatus,
         updatedAt: serverTimestamp()
     });
 
-    if (nextStatus === 'Completed' && actionTask.status !== 'Completed') {
-        const assigneeRef = doc(firestore, 'users', actionTask.assignedToId);
+    if (isNowCompleted && !wasCompleted) {
+        const assigneeRef = doc(firestore, 'users', targetUserId);
         const assigneeDoc = await getDoc(assigneeRef);
         if (assigneeDoc.exists()) {
             const assigneeData = assigneeDoc.data();
@@ -254,7 +271,7 @@ export default function TaskListPage() {
             });
             
             sendNotification(firestore, {
-                userId: actionTask.assignedToId,
+                userId: targetUserId,
                 title: "Points Earned!",
                 description: `You earned ${pointsToAdd.toFixed(2)} points for completing task: "${actionTask.title}".`,
                 link: `/rewards`,
@@ -266,30 +283,18 @@ export default function TaskListPage() {
     if (actionTask.assignedById !== user?.uid) {
         sendNotification(firestore, {
             userId: actionTask.assignedById,
-            title: `Task Update: ${nextStatus}`,
-            description: `${userProfile?.username || 'Team member'} marked task "${actionTask.title}" as ${nextStatus}.`,
+            title: `Task Progress: ${pendingStatus}`,
+            description: `${newStates[targetUserId]?.userName} marked their status as ${pendingStatus} for "${actionTask.title}".`,
             link: "/tasks/list",
-            push: true
+            push: false
         });
     }
 
-    // Notify Admins
-    const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
-    const adminDocs = await getDocs(adminsQuery);
-    adminDocs.forEach(adminDoc => {
-      sendNotification(firestore, {
-        userId: adminDoc.id,
-        title: "Task Processed",
-        description: `Task "${actionTask.title}" (${actionTask.siteName}) was marked as ${nextStatus} by ${userProfile.username}.`,
-        link: "/tasks/list",
-        push: true
-      });
-    });
-
-    toast({ title: "Task Updated", description: `Status changed to ${nextStatus}. Points updated if applicable.` });
+    toast({ title: "Progress Recorded", description: `Internal status updated for ${newStates[targetUserId]?.userName}.` });
     setIsUpdating(false);
     setActionTask(null);
     setPendingStatus("");
+    setSelectedUpdateUserId("");
   };
 
   const handleDelete = async () => {
@@ -312,9 +317,9 @@ export default function TaskListPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2">
-            <ListTodo className="h-8 w-8" /> Tasks Audit
+            <ListTodo className="h-8 w-8" /> Task Board
           </h1>
-          <p className="text-muted-foreground text-sm font-medium">Monitor and update authorized site activity assignments.</p>
+          <p className="text-muted-foreground text-sm font-medium">Monitor and update site activity assignments.</p>
         </div>
         <Button onClick={() => router.push('/tasks/create')} className="rounded-sm font-bold shadow-md">
           Assign New Task
@@ -353,8 +358,8 @@ export default function TaskListPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
               <TabsList className="grid w-full grid-cols-3 md:w-[400px] rounded-sm bg-muted/50 h-9 p-1">
-                <TabsTrigger value="all" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">All Records</TabsTrigger>
-                <TabsTrigger value="my-tasks" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">Assigned To Me</TabsTrigger>
+                <TabsTrigger value="all" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">All Tasks</TabsTrigger>
+                <TabsTrigger value="my-tasks" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">My Tasks</TabsTrigger>
                 <TabsTrigger value="assigned-by-me" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">Assigned By Me</TabsTrigger>
               </TabsList>
             </Tabs>
@@ -363,7 +368,7 @@ export default function TaskListPage() {
               <div className="relative flex-1 md:w-64">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input 
-                  placeholder="Search..." 
+                  placeholder="Search title or personnel..." 
                   className="pl-9 h-9 rounded-sm border-primary/20 text-xs"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -383,7 +388,7 @@ export default function TaskListPage() {
 
           <div className="flex flex-col md:flex-row items-end gap-4 w-full border-t pt-4">
             <div className="w-full md:w-[200px] space-y-1">
-              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Time Range</Label>
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Created Window</Label>
               <Select value={dateFilter} onValueChange={setDateFilter}>
                 <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
                   <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
@@ -394,7 +399,6 @@ export default function TaskListPage() {
                   <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
                   <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
                   <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
-                  <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
                   <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
                   <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
                 </SelectContent>
@@ -423,7 +427,7 @@ export default function TaskListPage() {
 
         <div className="md:hidden space-y-4">
           {filteredTasks.length > 0 ? filteredTasks.map((task) => (
-            <Card key={task.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => { setActionTask(task); setPendingStatus(task.status); }}>
+            <Card key={task.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => toggleExpand(task.id)}>
               <CardContent className="p-4 space-y-4">
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex flex-col gap-1 min-w-0">
@@ -438,42 +442,68 @@ export default function TaskListPage() {
                     <MapPin className="h-3 w-3 text-primary/60" />
                     <span>{task.siteName}</span>
                   </div>
-                  <PriorityBadge priority={task.priority} />
+                  <div className="flex items-center gap-2">
+                    <PriorityBadge priority={task.priority} />
+                    <Badge variant="secondary" className="text-[8px] font-black h-5 px-1.5 uppercase rounded-sm bg-primary/5 text-primary border-none">
+                      <Users className="h-2.5 w-2.5 mr-1" /> {task.assigneeIds?.length || 1} Assignees
+                    </Badge>
+                  </div>
                 </div>
 
+                {expandedTaskIds.has(task.id) && (
+                   <div className="pt-4 border-t space-y-4 animate-in slide-in-from-top-1">
+                      <Label className="text-[9px] font-black uppercase text-primary tracking-widest">Personnel Progress Breakdown</Label>
+                      <div className="space-y-3">
+                         {Object.values(task.assigneeStates || {}).map(s => (
+                           <div key={s.userId} className="p-3 bg-muted/20 border rounded-sm space-y-2">
+                              <div className="flex justify-between items-center">
+                                 <span className="text-xs font-bold text-foreground">{s.userName}</span>
+                                 <StatusBadge status={s.status} className="h-4 px-1 text-[7px]" />
+                              </div>
+                              {s.remarks && <p className="text-[10px] italic text-muted-foreground leading-snug">"{s.remarks}"</p>}
+                              <div className="flex items-center justify-between text-[8px] font-bold text-muted-foreground uppercase pt-1 border-t border-border/20">
+                                 <span>Last Active:</span>
+                                 <span className="font-mono">{formatTimestamp(s.updatedAt)}</span>
+                              </div>
+                           </div>
+                         ))}
+                      </div>
+                   </div>
+                )}
+
                 <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
-                  <div className="grid grid-cols-2 gap-4 flex-1">
-                    <div className="flex flex-col">
-                      <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Assigned To</span>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <User className="h-2.5 w-2.5 text-primary" />
-                        <span className="text-[10px] font-bold truncate">{task.assignedToName}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col border-l pl-4 border-primary/5">
-                      <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Assigned By</span>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <User className="h-2.5 w-2.5 text-muted-foreground" />
-                        <span className="text-[10px] font-bold truncate">{task.assignedByName}</span>
-                      </div>
-                    </div>
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Assigner</span>
+                    <span className="text-[10px] font-bold truncate">{task.assignedByName}</span>
                   </div>
-                  <div className="flex gap-1 shrink-0 ml-2">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+                  <div className="flex gap-1 shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+                    {((task.assigneeIds || []).includes(user?.uid || "") || isAdmin || task.assignedById === user?.uid) && (
+                      <Button 
+                        variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" 
+                        onClick={() => { 
+                          setActionTask(task); 
+                          setSelectedUpdateUserId(isAdmin || task.assignedById === user?.uid ? (task.assigneeIds[0] || "") : (user?.uid || ""));
+                          setPendingStatus(task.assigneeStates?.[isAdmin || task.assignedById === user?.uid ? task.assigneeIds[0] : (user?.uid || "")]?.status || "To-do"); 
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
                     {isAdmin && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={(e) => { e.stopPropagation(); setDeletingTask(task); }}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingTask(task)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      {expandedTaskIds.has(task.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
           )) : (
             <div className="text-center py-12 text-muted-foreground italic bg-muted/5 rounded-sm border-2 border-dashed">
-              No tasks found for the selected time range.
+              No tasks found matching criteria.
             </div>
           )}
         </div>
@@ -483,102 +513,187 @@ export default function TaskListPage() {
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="w-12"></TableHead>
                     <TableHead className="w-32">Due Date</TableHead>
-                    <TableHead>Task & Site</TableHead>
+                    <TableHead>Task Details</TableHead>
                     <TableHead>Priority</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead>Assigned By</TableHead>
+                    <TableHead>Personnel</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right px-6">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTasks.map((task) => (
-                    <TableRow key={task.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => { setActionTask(task); setPendingStatus(task.status); }}>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-muted-foreground uppercase tracking-tight">Due By</span>
-                          <span className="font-mono text-sm font-bold text-primary">{format(new Date(task.dueDate), 'dd MMM yy')}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-bold text-sm leading-tight">{task.title}</span>
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
-                            <MapPin className="h-3 w-3" /> {task.siteName}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell><PriorityBadge priority={task.priority} /></TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 text-primary" />
-                          <span className="text-xs font-bold">{task.assignedToName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-xs font-medium">{task.assignedByName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell><StatusBadge status={task.status} /></TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end items-center gap-1" onClick={e => e.stopPropagation()}>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm" 
-                            onClick={() => { setActionTask(task); setPendingStatus(task.status); }}
-                            title="Update Status"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                          {isAdmin && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingTask(task)}>
-                              <Trash2 className="h-4 w-4" />
+                  {filteredTasks.map((task) => {
+                    const assignees = Object.values(task.assigneeStates || {});
+                    const completedCount = assignees.filter(s => s.status === 'Completed').length;
+                    
+                    return (
+                      <React.Fragment key={task.id}>
+                        <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => toggleExpand(task.id)}>
+                          <TableCell className="pl-4">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm">
+                              {expandedTaskIds.has(task.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-mono text-sm font-bold text-primary">{format(new Date(task.dueDate), 'dd MMM yy')}</span>
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase">Target</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-bold text-sm leading-tight text-foreground">{task.title}</span>
+                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+                                <MapPin className="h-3 w-3 text-primary/40" /> {task.siteName}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell><PriorityBadge priority={task.priority} /></TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <Users className="h-3.5 w-3.5 text-primary opacity-40" />
+                                <span className="text-xs font-bold">{task.assigneeIds?.length || 1} Assignees</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <Badge variant="secondary" className="h-4 px-1.5 text-[8px] font-black uppercase bg-green-50 text-green-700 border-green-200">
+                                  {completedCount} Finished
+                                </Badge>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell><StatusBadge status={task.status} /></TableCell>
+                          <TableCell className="text-right px-6">
+                            <div className="flex justify-end items-center gap-1" onClick={e => e.stopPropagation()}>
+                              {((task.assigneeIds || []).includes(user?.uid || "") || isAdmin || task.assignedById === user?.uid) && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm" 
+                                  onClick={() => { 
+                                    setActionTask(task); 
+                                    setSelectedUpdateUserId(isAdmin || task.assignedById === user?.uid ? (task.assigneeIds[0] || "") : (user?.uid || ""));
+                                    setPendingStatus(task.assigneeStates?.[isAdmin || task.assignedById === user?.uid ? task.assigneeIds[0] : (user?.uid || "")]?.status || "To-do");
+                                  }}
+                                  title="Record Progress"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {isAdmin && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingTask(task)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {expandedTaskIds.has(task.id) && (
+                          <TableRow className="bg-primary/[0.01]">
+                            <TableCell colSpan={7} className="p-0 border-b">
+                              <div className="p-6 px-20 space-y-6 animate-in slide-in-from-top-1 duration-200">
+                                <div className="flex items-center gap-2 border-b pb-2">
+                                  <ShieldCheck className="h-4 w-4 text-primary" />
+                                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Consolidated Performance Audit</h4>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                  {Object.values(task.assigneeStates || {}).map((s) => (
+                                    <Card key={s.userId} className="rounded-sm shadow-sm border-primary/5">
+                                      <CardHeader className="p-3 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0">
+                                        <div className="flex items-center gap-2">
+                                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center font-black text-[10px] text-primary">{s.userName.charAt(0).toUpperCase()}</div>
+                                          <span className="font-bold text-xs">{s.userName}</span>
+                                        </div>
+                                        <StatusBadge status={s.status} className="h-4 px-1.5 text-[8px]" />
+                                      </CardHeader>
+                                      <CardContent className="p-3 space-y-3">
+                                        <div className="flex flex-col gap-1">
+                                          <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Latest Update</span>
+                                          <p className="text-[11px] font-medium leading-relaxed italic text-foreground/80">
+                                            "{s.remarks || 'Task acknowledged. Progress pending details.'}"
+                                          </p>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground/60 border-t pt-2 mt-1">
+                                          <Clock className="h-3 w-3" />
+                                          <span>Last logged: {formatTimestamp(s.updatedAt)}</span>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
       </div>
 
-      <Dialog open={!!actionTask} onOpenChange={() => { setActionTask(null); setPendingStatus(""); }}>
+      <Dialog open={!!actionTask} onOpenChange={() => { setActionTask(null); setPendingStatus(""); setSelectedUpdateUserId(""); }}>
         <DialogContent className="rounded-sm max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Update Task Status</DialogTitle>
-            <DialogDescription>
-              Record progress for: <strong>{actionTask?.title}</strong>
+          <DialogHeader className="p-0 border-b pb-4">
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Record Task Progress</DialogTitle>
+            <DialogDescription className="text-xs font-medium">
+              Updating audit log for: <strong className="text-primary">{actionTask?.title}</strong>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
             <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase text-muted-foreground">Description</Label>
-              <p className="text-sm p-3 bg-muted/20 border rounded-sm italic">"{actionTask?.description}"</p>
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Master Description</Label>
+              <p className="text-sm p-4 bg-muted/20 border rounded-sm italic leading-relaxed">"{actionTask?.description}"</p>
             </div>
+
+            {(isAdmin || actionTask?.assignedById === user?.uid) ? (
+               <div className="space-y-2 p-4 border rounded-sm bg-primary/5 border-primary/10">
+                  <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Select Personnel to Audit</Label>
+                  <Select value={selectedUpdateUserId} onValueChange={(val) => {
+                    setSelectedUpdateUserId(val);
+                    setPendingStatus(actionTask?.assigneeStates?.[val]?.status || "To-do");
+                  }}>
+                    <SelectTrigger className="h-11 rounded-sm bg-background">
+                      <SelectValue placeholder="Target Member..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.values(actionTask?.assigneeStates || {}).map(s => (
+                        <SelectItem key={s.userId} value={s.userId} className="text-xs font-bold">{s.userName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+               </div>
+            ) : (
+              <div className="p-4 bg-primary/5 rounded-sm flex items-center gap-3">
+                <User className="h-5 w-5 text-primary" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-black uppercase text-muted-foreground">Self Audit</span>
+                  <span className="text-sm font-black">{userProfile?.username}</span>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Current Status</Label>
-                <div className="mt-1"><StatusBadge status={actionTask?.status || "To-do"} /></div>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Current State</Label>
+                <div className="mt-1">
+                  <StatusBadge status={actionTask?.assigneeStates?.[selectedUpdateUserId || user?.uid || ""]?.status || "To-do"} className="h-8 px-3" />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label>Set New Status</Label>
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Update To</Label>
                 <Select value={pendingStatus} onValueChange={(val: any) => setPendingStatus(val)}>
-                  <SelectTrigger className="rounded-sm h-9">
+                  <SelectTrigger className="rounded-sm h-11 border-primary/20 bg-background font-bold text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map(opt => (
-                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                      <SelectItem key={opt} value={opt} className="text-xs font-bold">{opt}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -586,23 +701,27 @@ export default function TaskListPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="task-remarks">Update Remarks / Progress Note</Label>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground" htmlFor="task-remarks">Progress Report / Findings</Label>
               <Textarea 
                 id="task-remarks" 
-                placeholder="Briefly explain current progress or issues..." 
-                defaultValue={actionTask?.remarks}
-                className="rounded-sm" 
+                placeholder="Detail current accomplishments or blockers..." 
+                defaultValue={actionTask?.assigneeStates?.[selectedUpdateUserId || user?.uid || ""]?.remarks}
+                className="rounded-sm min-h-[120px]" 
               />
             </div>
           </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
-            <Button className="rounded-sm" onClick={() => {
-              const remarks = (document.getElementById('task-remarks') as HTMLTextAreaElement)?.value || "";
-              handleUpdateStatus(remarks);
-            }}>
-              {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Remarks
+          <DialogFooter className="bg-muted/10 p-6 -mx-6 -mb-6 border-t gap-3 flex flex-col sm:flex-row">
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-11 tracking-widest">Cancel</Button></DialogClose>
+            <Button 
+              className="rounded-sm font-black uppercase text-[10px] h-11 tracking-widest px-8 shadow-lg shadow-primary/20" 
+              onClick={() => {
+                const remarks = (document.getElementById('task-remarks') as HTMLTextAreaElement)?.value || "";
+                handleUpdateStatus(remarks);
+              }}
+              disabled={isUpdating || !pendingStatus}
+            >
+              {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Publish Update
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -611,15 +730,17 @@ export default function TaskListPage() {
       <AlertDialog open={!!deletingTask} onOpenChange={(o) => !o && setDeletingTask(null)}>
         <AlertDialogContent className="rounded-sm">
             <AlertDialogHeader>
-                <AlertDialogTitle>Remove Task?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    This will permanently delete task <strong>{deletingTask?.title}</strong>. This action cannot be undone.
+                <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
+                  <Trash2 className="h-5 w-5" /> Purge Task Record
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+                    Permanently delete <strong>{deletingTask?.title}</strong>? This removes all assignee history and progress logs.
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                    Delete Task
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg">
+                    Confirm Removal
                 </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>

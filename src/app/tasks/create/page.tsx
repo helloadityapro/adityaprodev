@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, MessageCircle, CheckCircle2, LayoutGrid, Globe } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, MessageCircle, CheckCircle2, LayoutGrid, Globe, Users, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
@@ -25,13 +25,16 @@ import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
 import { slugifyRole } from "@/lib/access-control";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 const taskSchema = z.object({
   taskCategory: z.enum(["Site-related", "Other"], { required_error: "Please select a task category" }),
   siteName: z.string().optional(),
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().min(5, "Description must be at least 5 characters"),
-  assignedToId: z.string().min(1, "Please assign a user"),
+  assignedUserIds: z.array(z.string()).default([]),
+  assignedRoles: z.array(z.string()).default([]),
   priority: z.enum(["Low", "Medium", "High"], { required_error: "Priority is required" }),
   dueDate: z.string().min(1, "Due date is required"),
 }).refine((data) => {
@@ -42,6 +45,11 @@ const taskSchema = z.object({
 }, {
   message: "Site selection is mandatory for site-related tasks",
   path: ["siteName"],
+}).refine((data) => {
+  return data.assignedUserIds.length > 0 || data.assignedRoles.length > 0;
+}, {
+  message: "Assign at least one user or role",
+  path: ["assignedUserIds"],
 });
 
 type Site = {
@@ -85,6 +93,9 @@ export default function CreateTaskPage() {
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allRegisteredUsers } = useCollection<UserProfile>(usersQuery);
 
+  const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
+  const { data: availableRoles } = useCollection<{ name: string }>(rolesQuery);
+
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
     if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -108,9 +119,11 @@ export default function CreateTaskPage() {
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   const [isUserPopoverOpen, setIsUserPopoverOpen] = React.useState(false);
   const [userSearchQuery, setUserSearchQuery] = React.useState("");
+  const [isRolePopoverOpen, setIsRolePopoverOpen] = React.useState(false);
+
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
-  const [submittedTask, setSubmittedTask] = React.useState<{ title: string, siteName: string, assigneeName: string, assigneeMobile?: string } | null>(null);
+  const [submittedTask, setSubmittedTask] = React.useState<{ title: string, siteName: string, count: number } | null>(null);
 
   const form = useForm<z.infer<typeof taskSchema>>({
     resolver: zodResolver(taskSchema),
@@ -119,13 +132,16 @@ export default function CreateTaskPage() {
       siteName: "", 
       title: "",
       description: "",
-      assignedToId: "",
+      assignedUserIds: [],
+      assignedRoles: [],
       priority: "Medium",
       dueDate: format(new Date(), 'yyyy-MM-dd'),
     },
   });
 
   const watchCategory = form.watch('taskCategory');
+  const watchedUsers = form.watch('assignedUserIds');
+  const watchedRoles = form.watch('assignedRoles');
 
   React.useEffect(() => {
     if (watchCategory === 'Other') {
@@ -133,30 +149,54 @@ export default function CreateTaskPage() {
     }
   }, [watchCategory, form]);
 
-  const triggerWhatsApp = (title: string, site: string, mobile?: string) => {
-    if (!mobile) {
-      toast({ variant: 'destructive', title: 'No Mobile', description: 'Assigned user does not have a mobile number linked for WhatsApp notifications.' });
-      return;
-    }
-    const cleanMobile = mobile.replace(/\D/g, '');
-    const formattedMobile = cleanMobile.length === 10 ? `91${cleanMobile}` : cleanMobile;
-    const message = `Hello, a new task has been assigned to you.\n\nTask: ${title}\nContext: ${site || "General"}\n\nPlease check your Aditya Pro dashboard for details.\nLink: ${window.location.origin}/tasks/list`;
-    const url = `https://wa.me/${formattedMobile}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
-  };
-
   const onSubmit = async (values: z.infer<typeof taskSchema>) => {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
     try {
-      const assignedUser = allRegisteredUsers?.find(u => u.id === values.assignedToId);
+      // Resolve final set of assignees from roles and individual IDs
+      const roleUsers = allRegisteredUsers?.filter(u => values.assignedRoles.includes(u.role || "")) || [];
+      const individualUsers = allRegisteredUsers?.filter(u => values.assignedUserIds.includes(u.id)) || [];
+      
+      const assigneeMap = new Map<string, UserProfile>();
+      [...roleUsers, ...individualUsers].forEach(u => assigneeMap.set(u.id, u));
+      const finalAssigneesList = Array.from(assigneeMap.values());
+
+      if (finalAssigneesList.length === 0) {
+        toast({ variant: "destructive", title: "Assignment Error", description: "No valid personnel found for selection." });
+        setIsSubmitting(false);
+        return;
+      }
+
       const selectedSiteObj = values.siteName ? accessibleSites.find(s => s.name === values.siteName) : null;
       
+      const assigneeStates: Record<string, any> = {};
+      finalAssigneesList.forEach(a => {
+        assigneeStates[a.id] = {
+          userId: a.id,
+          userName: a.username || a.email || "Unknown",
+          status: "To-do",
+          updatedAt: new Date().toISOString(),
+          remarks: ""
+        };
+      });
+
       const taskData = {
-        ...values,
+        taskCategory: values.taskCategory,
         siteId: selectedSiteObj?.id || "",
         siteName: values.taskCategory === 'Site-related' ? (values.siteName || "Unknown") : "Other",
-        assignedToName: assignedUser?.username || assignedUser?.email || "Unknown",
+        title: values.title,
+        description: values.description,
+        priority: values.priority,
+        dueDate: values.dueDate,
+        
+        // Primary assignee for legacy support/summary
+        assignedToId: finalAssigneesList[0].id,
+        assignedToName: finalAssigneesList[0].username || finalAssigneesList[0].email || "Unknown",
+        
+        // Multi-assignee fields
+        assigneeIds: finalAssigneesList.map(a => a.id),
+        assigneeStates: assigneeStates,
+        
         assignedById: user.uid,
         assignedByName: userProfile.username || user.email || "Unknown",
         status: "To-do",
@@ -172,22 +212,23 @@ export default function CreateTaskPage() {
         totalPoints: increment(rate * multiplier)
       });
 
-      sendNotification(firestore, {
-        userId: values.assignedToId,
-        title: "New Task Assigned",
-        description: `${userProfile.username} assigned you a new task: "${values.title}" for ${taskData.siteName}.`,
-        link: "/tasks/list",
-        push: true
+      finalAssigneesList.forEach(assignee => {
+        sendNotification(firestore, {
+          userId: assignee.id,
+          title: "New Task Assigned",
+          description: `${userProfile.username} assigned you a new task: "${values.title}" for ${taskData.siteName}.`,
+          link: "/tasks/list",
+          push: true
+        });
       });
 
       setSubmittedTask({
         title: values.title,
         siteName: taskData.siteName,
-        assigneeName: assignedUser?.username || "Personnel",
-        assigneeMobile: assignedUser?.mobile
+        count: finalAssigneesList.length
       });
       setIsSubmitted(true);
-      toast({ title: "Task Assigned", description: "The task has been successfully created." });
+      toast({ title: "Task Assigned", description: `Task delegated to ${finalAssigneesList.length} personnel.` });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
@@ -210,31 +251,22 @@ export default function CreateTaskPage() {
                 <CheckCircle2 className="h-12 w-12 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold">Task Assigned</CardTitle>
+            <CardTitle className="text-2xl font-bold">Task Distributed</CardTitle>
             <CardDescription className="text-base">
-              The task <strong className="text-primary">"{submittedTask.title}"</strong> has been successfully delegated to {submittedTask.assigneeName}.
+              The task <strong className="text-primary">"{submittedTask.title}"</strong> has been successfully assigned to {submittedTask.count} personnel.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button 
-              className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm shadow-md" 
-              onClick={() => triggerWhatsApp(submittedTask.title, submittedTask.siteName, submittedTask.assigneeMobile)}
-            >
-              <MessageCircle className="mr-2 h-5 w-5" />
-              Notify via WhatsApp
+            <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => router.push('/tasks/list')}>
+              View Task Board
             </Button>
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-11 rounded-sm" onClick={() => router.push('/tasks/list')}>
-                View Task List
-              </Button>
-              <Button variant="secondary" className="h-11 rounded-sm" onClick={() => {
-                setIsSubmitted(false);
-                setSubmittedTask(null);
-                form.reset();
-              }}>
-                Assign Another
-              </Button>
-            </div>
+            <Button className="w-full h-11 rounded-sm font-bold" onClick={() => {
+              setIsSubmitted(false);
+              setSubmittedTask(null);
+              form.reset();
+            }}>
+              Assign Another Task
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -247,13 +279,13 @@ export default function CreateTaskPage() {
         <h1 className="flex items-center gap-2">
           <CheckSquare className="h-8 w-8" /> Assign New Task
         </h1>
-        <p className="text-muted-foreground">Create and delegate work items to any site personnel.</p>
+        <p className="text-muted-foreground">Delegate work items to specific personnel or entire roles.</p>
       </div>
 
       <Card className="shadow-md border-primary/10 rounded-sm">
         <CardHeader>
-          <CardTitle>Task Assignment Form</CardTitle>
-          <CardDescription>Specify the task context and delegate it to the appropriate personnel.</CardDescription>
+          <CardTitle>Multi-User Task Form</CardTitle>
+          <CardDescription>Select project context and specify assignees by individual selection or role.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -308,7 +340,7 @@ export default function CreateTaskPage() {
                               watchCategory === 'Other' && "opacity-50 grayscale bg-muted"
                             )}
                           >
-                            {field.value || "Select authorized site..."}
+                            {field.value || "Select site..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
@@ -321,7 +353,6 @@ export default function CreateTaskPage() {
                             className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
                             value={siteSearchQuery} 
                             onChange={(e) => setSiteSearchQuery(e.target.value)} 
-                            onKeyDown={(e) => e.stopPropagation()}
                           />
                         </div>
                         <ScrollArea className="h-[200px]">
@@ -346,64 +377,106 @@ export default function CreateTaskPage() {
                   </FormItem>
                 )} />
 
-                <FormField control={form.control} name="assignedToId" render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Assign To</FormLabel>
-                    <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button 
-                            variant="outline" 
-                            role="combobox" 
-                            className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}
-                          >
-                            {field.value ? allRegisteredUsers?.find(u => u.id === field.value)?.username : "Select personnel..."}
-                            <UserPlus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                        <div className="flex items-center border-b px-3">
-                          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input 
-                            placeholder="Search all personnel..." 
-                            className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
-                            value={userSearchQuery} 
-                            onChange={(e) => setUserSearchQuery(e.target.value)}
-                            onKeyDown={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                        <ScrollArea className="h-[200px]">
-                          {filteredUsers.length > 0 ? filteredUsers.map((u) => (
-                            <Button 
-                                key={u.id} 
-                                type="button" 
-                                variant="ghost" 
-                                className="w-full justify-start font-normal text-left" 
-                                onClick={() => { field.onChange(u.id); setIsUserPopoverOpen(false); }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4 shrink-0", u.id === field.value ? "opacity-100" : "opacity-0")} />
-                              <div className="flex flex-col">
-                                <span className="truncate">{u.username}</span>
-                                <span className="text-[10px] text-muted-foreground">{u.role}</span>
-                              </div>
-                            </Button>
-                          )) : (
-                            <div className="p-4 text-center text-sm text-muted-foreground">No personnel found.</div>
-                          )}
-                        </ScrollArea>
-                      </PopoverContent>
-                    </Popover>
+                <FormField control={form.control} name="dueDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Due Date</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input type="date" {...field} className="rounded-sm pr-10 h-11" />
+                        <Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Assign To (Multiple Targets)</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div className="space-y-1.5">
+                      <Label className="text-[9px] font-bold uppercase text-muted-foreground">Target Roles</Label>
+                      <Popover open={isRolePopoverOpen} onOpenChange={setIsRolePopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full justify-between font-normal rounded-sm h-11", watchedRoles.length === 0 && "text-muted-foreground")}>
+                            <span className="truncate">{watchedRoles.length > 0 ? `${watchedRoles.length} Roles Selected` : "Select Roles..."}</span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <ScrollArea className="h-[200px]">
+                            <div className="p-2 space-y-1">
+                              {availableRoles?.map((role) => (
+                                <div 
+                                  key={role.name} 
+                                  className={cn(
+                                    "flex items-center space-x-3 p-2.5 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer group",
+                                    watchedRoles.includes(role.name) && "bg-primary/5"
+                                  )}
+                                  onClick={() => {
+                                    const next = watchedRoles.includes(role.name) ? watchedRoles.filter(r => r !== role.name) : [...watchedRoles, role.name];
+                                    form.setValue('assignedRoles', next);
+                                  }}
+                                >
+                                  <Checkbox checked={watchedRoles.includes(role.name)} className="rounded-full" />
+                                  <span className={cn("text-xs font-bold uppercase transition-colors", watchedRoles.includes(role.name) ? "text-primary" : "text-foreground")}>{role.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </PopoverContent>
+                      </Popover>
+                   </div>
+
+                   <div className="space-y-1.5">
+                      <Label className="text-[9px] font-bold uppercase text-muted-foreground">Target Individuals</Label>
+                      <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full justify-between font-normal rounded-sm h-11", watchedUsers.length === 0 && "text-muted-foreground")}>
+                            <span className="truncate">{watchedUsers.length > 0 ? `${watchedUsers.length} Personnel Selected` : "Choose Personnel..."}</span>
+                            <UserPlus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                          <div className="flex items-center border-b px-3 bg-muted/20">
+                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                            <Input placeholder="Search personnel..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-xs bg-transparent" value={userSearchQuery} onChange={e => setUserSearchQuery(e.target.value)} />
+                          </div>
+                          <ScrollArea className="h-[250px]">
+                            <div className="p-2 space-y-1">
+                              {filteredUsers.map(u => (
+                                <div 
+                                  key={u.id} 
+                                  className={cn(
+                                    "flex items-center space-x-3 p-2.5 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer group",
+                                    watchedUsers.includes(u.id) && "bg-primary/5"
+                                  )}
+                                  onClick={() => {
+                                    const next = watchedUsers.includes(u.id) ? watchedUsers.filter(id => id !== u.id) : [...watchedUsers, u.id];
+                                    form.setValue('assignedUserIds', next);
+                                  }}
+                                >
+                                  <Checkbox checked={watchedUsers.includes(u.id)} className="rounded-full" />
+                                  <div className="flex flex-col min-w-0">
+                                    <span className={cn("text-xs font-bold truncate transition-colors", watchedUsers.includes(u.id) ? "text-primary" : "text-foreground")}>{u.username}</span>
+                                    <span className="text-[8px] text-muted-foreground uppercase font-black tracking-tight">{u.role}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </PopoverContent>
+                      </Popover>
+                   </div>
+                </div>
+                <FormMessage />
               </div>
 
               <FormField control={form.control} name="title" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Task Title</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Conduct module mounting audit" {...field} className="rounded-sm h-11" />
+                    <Input placeholder="e.g., Quality audit for block A" {...field} className="rounded-sm h-11" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -411,11 +484,11 @@ export default function CreateTaskPage() {
 
               <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Detailed Instructions</FormLabel>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Description & Deliverables</FormLabel>
                   <FormControl>
                     <Textarea 
-                      placeholder="Explain exactly what needs to be done..." 
-                      rows={4} 
+                      placeholder="Detail the work requirements..." 
+                      rows={5} 
                       {...field} 
                       className="rounded-sm" 
                     />
@@ -427,7 +500,7 @@ export default function CreateTaskPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="priority" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Priority</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Priority Level</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger className="rounded-sm h-11">
@@ -443,25 +516,12 @@ export default function CreateTaskPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-
-                <FormField control={form.control} name="dueDate" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Due Date</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input type="date" {...field} className="rounded-sm pr-10 h-11" />
-                        <Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
               </div>
 
               <div className="flex justify-end gap-4 pt-4 border-t">
                 <Button variant="ghost" type="button" onClick={() => router.back()} className="rounded-sm font-bold">Cancel</Button>
-                <Button type="submit" className="min-w-[150px] h-12 rounded-sm font-black uppercase tracking-widest shadow-lg" disabled={isSubmitting}>
-                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> DISPATCHING...</> : "Assign Task"}
+                <Button type="submit" className="min-w-[220px] h-12 rounded-sm font-black uppercase tracking-widest shadow-lg" disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> DISPATCHING...</> : "Distribute Task"}
                 </Button>
               </div>
             </form>
