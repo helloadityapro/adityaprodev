@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp, increment, getDoc } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp, increment, getDoc, and } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -89,7 +89,7 @@ export default function DPRListPage() {
   const [isDragging, setIsDragging] = React.useState(false);
   const [startPan, setStartPan] = React.useState({ x: 0, y: 0 });
   
-  const viewerRef = React.useRef<HTMLDivElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const mediaRef = React.useRef<HTMLDivElement>(null);
 
   // Persistence logic for active tab
@@ -574,7 +574,7 @@ export default function DPRListPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-11 max-w-sm mb-6">
+        <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-11 mb-6">
           <TabsTrigger value="site" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
             <Building2 className="h-3.5 w-3.5 mr-2" /> Groundmount
           </TabsTrigger>
@@ -674,8 +674,8 @@ export default function DPRListPage() {
               <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px]">Attachments</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-5 w-5" /></Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button>
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button>
               <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
               <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-red-500"><X className="h-6 w-6" /></Button></DialogClose>
