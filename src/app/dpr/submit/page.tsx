@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
 import { collection, doc, serverTimestamp, increment, query, where, getDocs, and } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -262,13 +262,9 @@ export default function SubmitDPRPage() {
   if (isSubmitted && submittedDpr) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
+        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300 rounded-sm">
           <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="bg-primary/10 p-4 rounded-full">
-                <CheckCircle2 className="h-12 w-12 text-primary" />
-              </div>
-            </div>
+            <div className="flex justify-center mb-4"><div className="bg-primary/10 p-4 rounded-full"><CheckCircle2 className="h-12 w-12 text-primary" /></div></div>
             <CardTitle className="text-2xl font-bold">DPR Submitted</CardTitle>
             <CardDescription className="text-base">
               The Daily Progress Report for <strong className="text-primary">{submittedDpr.siteName}</strong> has been logged.
