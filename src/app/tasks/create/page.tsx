@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import * as React from "react";
 import { useForm } from "react-hook-form";
@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, MessageCircle, CheckCircle2, LayoutGrid, Globe, Users, Plus, X } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, CheckCircle2, LayoutGrid, Globe, Users, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
@@ -139,6 +139,11 @@ export default function CreateTaskPage() {
     },
   });
 
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "updates"
+  } as any);
+
   const watchCategory = form.watch('taskCategory');
   const watchedUsers = form.watch('assignedUserIds');
   const watchedRoles = form.watch('assignedRoles');
@@ -188,10 +193,6 @@ export default function CreateTaskPage() {
         description: values.description,
         priority: values.priority,
         dueDate: values.dueDate,
-        
-        // Primary assignee for legacy support/summary
-        assignedToId: finalAssigneesList[0].id,
-        assignedToName: finalAssigneesList[0].username || finalAssigneesList[0].email || "Unknown",
         
         // Multi-assignee fields
         assigneeIds: finalAssigneesList.map(a => a.id),
@@ -277,7 +278,7 @@ export default function CreateTaskPage() {
     <div className="space-y-8 max-w-2xl mx-auto">
       <div className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2">
-          <CheckSquare className="h-8 w-8" /> Assign New Task
+          <CheckSquare className="h-8 w-8 text-primary" /> Assign New Task
         </h1>
         <p className="text-muted-foreground">Delegate work items to specific personnel or entire roles.</p>
       </div>
@@ -410,7 +411,7 @@ export default function CreateTaskPage() {
                                 <div 
                                   key={role.name} 
                                   className={cn(
-                                    "flex items-center space-x-3 p-2.5 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer group",
+                                    "flex items-center space-x-2 p-2.5 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer group",
                                     watchedRoles.includes(role.name) && "bg-primary/5"
                                   )}
                                   onClick={() => {
