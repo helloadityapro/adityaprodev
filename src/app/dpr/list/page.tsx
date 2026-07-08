@@ -1,16 +1,45 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, or, serverTimestamp, increment, getDoc, and, limit, getDocs } from "firebase/firestore";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { format, subDays, subMonths, subYears } from "date-fns";
-import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, MessageCircle, User, Building2, Globe, ImageIcon, Film, Maximize2, PlayCircle, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, X, Download, FileImage, Share2 } from "lucide-react";
-import { isSuperAdmin } from "@/lib/auth-constants";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import * as React from 'react';
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc, query, where, or, serverTimestamp, increment, getDoc, and, limit, getDocs } from 'firebase/firestore';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { format, subDays, subMonths, subYears } from 'date-fns';
+import { 
+  FileText, 
+  Search, 
+  Pencil, 
+  Trash2, 
+  Loader2, 
+  Clock, 
+  Calendar, 
+  FilterX, 
+  MessageCircle, 
+  User, 
+  Building2, 
+  Globe, 
+  ImageIcon, 
+  Film, 
+  Maximize2, 
+  PlayCircle, 
+  ZoomIn, 
+  ZoomOut, 
+  RotateCcw, 
+  ChevronLeft, 
+  ChevronRight, 
+  X, 
+  Download, 
+  FileImage, 
+  Share2,
+  Tags,
+  ChevronDown,
+  Check
+} from 'lucide-react';
+import { isSuperAdmin } from '@/lib/auth-constants';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -19,7 +48,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,18 +58,20 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
-import { slugifyRole } from "@/lib/access-control";
+} from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
+import { slugifyRole } from '@/lib/access-control';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type Attachment = {
   url: string;
@@ -74,11 +105,14 @@ export default function DPRListPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
+  
   const [searchTerm, setSearchTerm] = React.useState("");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [activeTab, setActiveTab] = React.useState<string>("site");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
+  
   const [editingDpr, setEditingDpr] = React.useState<DPR | null>(null);
   const [deletingDpr, setDeletingDpr] = React.useState<DPR | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
@@ -114,6 +148,9 @@ export default function DPRListPage() {
 
   const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+
+  const siteGroupsQuery = useMemoFirebase(() => collection(firestore, 'site_groups'), [firestore]);
+  const { data: siteGroups } = useCollection<any>(siteGroupsQuery);
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
@@ -181,6 +218,15 @@ export default function DPRListPage() {
       });
     }
 
+    // Site Group Filter
+    if (selectedGroupIds.length > 0 && activeTab === 'site' && siteGroups) {
+      const allowedSiteIds = new Set<string>();
+      siteGroups.filter(g => selectedGroupIds.includes(g.id)).forEach(g => {
+        g.siteIds?.forEach((id: string) => allowedSiteIds.add(id));
+      });
+      result = result.filter(dpr => allowedSiteIds.has(dpr.siteId));
+    }
+
     result = result.filter(dpr => {
       const matchesTab = (dpr.dprType || 'site') === activeTab;
       if (!matchesTab) return false;
@@ -199,7 +245,7 @@ export default function DPRListPage() {
         const dateB = new Date(b.reportDate || (b.createdAt?.toDate?.() || 0)).getTime();
         return dateB - dateA;
     });
-  }, [dprs, searchTerm, queryDateRange, userProfile, roleConfigs, isSuper, activeTab, userRoleStr]);
+  }, [dprs, searchTerm, queryDateRange, userProfile, roleConfigs, isSuper, activeTab, userRoleStr, selectedGroupIds, siteGroups]);
 
   const handleDelete = async () => {
     if (!deletingDpr || !firestore) return;
@@ -246,7 +292,6 @@ export default function DPRListPage() {
   };
 
   const handleWhatsAppShare = (dpr: DPR) => {
-    // Latest Requirement: Exclude all attachments and links from the WhatsApp message
     const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${dpr.siteName}\n*Date:* ${format(new Date(dpr.reportDate), 'dd MMM yyyy')}\n*Submitted By:* ${dpr.userName}\n\n*Activities:*\n${dpr.description}`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
@@ -255,6 +300,7 @@ export default function DPRListPage() {
   const clearFilters = () => {
     setSearchTerm("");
     setDateFilter("7days");
+    setSelectedGroupIds([]);
   };
 
   const isVideoUrl = (url: string) => {
@@ -507,8 +553,8 @@ export default function DPRListPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
-        <div className="md:col-span-2 space-y-1">
+      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+        <div className="md:col-span-2 lg:col-span-2 space-y-1">
           <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search Records</Label>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
@@ -519,6 +565,58 @@ export default function DPRListPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Site Groups</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                disabled={activeTab !== 'site'}
+                className={cn(
+                  "w-full justify-between h-9 md:h-10 rounded-sm border-primary/20 bg-background text-xs font-bold uppercase",
+                  selectedGroupIds.length > 0 && "border-primary text-primary"
+                )}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Tags className="h-3.5 w-3.5 opacity-50" />
+                  <span className="truncate">
+                    {selectedGroupIds.length === 0 ? "All Groups" : `${selectedGroupIds.length} Groups`}
+                  </span>
+                </div>
+                <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 p-0 rounded-sm border-primary/10 shadow-2xl overflow-hidden">
+              <div className="bg-primary/5 p-3 border-b">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Organizational Groups</h3>
+              </div>
+              <ScrollArea className="h-[250px]">
+                <div className="p-2 space-y-1">
+                  {siteGroups?.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "")).map((group: any) => (
+                    <div 
+                      key={group.id} 
+                      className={cn(
+                        "flex items-center space-x-2 p-2 rounded-sm hover:bg-muted/50 transition-colors cursor-pointer",
+                        selectedGroupIds.includes(group.id) && "bg-primary/10"
+                      )}
+                      onClick={() => setSelectedGroupIds(prev => prev.includes(group.id) ? prev.filter(id => id !== group.id) : [...prev, group.id])}
+                    >
+                      <Checkbox checked={selectedGroupIds.includes(group.id)} onCheckedChange={() => {}} />
+                      <span className="text-xs font-bold uppercase truncate">{group.name}</span>
+                    </div>
+                  ))}
+                  {(!siteGroups || siteGroups.length === 0) && (
+                    <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground opacity-30">No groups registered</p>
+                  )}
+                </div>
+              </ScrollArea>
+              {selectedGroupIds.length > 0 && (
+                <Button variant="ghost" onClick={() => setSelectedGroupIds([])} className="w-full rounded-none h-8 text-[9px] font-black uppercase text-primary border-t">Reset Filter</Button>
+              )}
+            </PopoverContent>
+          </Popover>
         </div>
         
         <div className="space-y-1">
@@ -562,7 +660,7 @@ export default function DPRListPage() {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-11 mb-6">
           <TabsTrigger value="site" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
-            <Building2 className="h-3.5 w-3.5 mr-2" /> Groundmount
+            <Building2 className="h-3.5 w-3.5 mr-2" /> Projects
           </TabsTrigger>
           <TabsTrigger value="other" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
             <Globe className="h-3.5 w-3.5 mr-2" /> Others
