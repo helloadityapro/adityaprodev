@@ -75,7 +75,6 @@ export default function DPRListPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [activeTab, setActiveTab] = React.useState<string>("site");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -95,6 +94,7 @@ export default function DPRListPage() {
   
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mediaRef = React.useRef<HTMLDivElement>(null);
+  const viewerRef = React.useRef<HTMLDivElement>(null);
 
   // Persistence logic for active tab
   React.useEffect(() => {
@@ -209,8 +209,8 @@ export default function DPRListPage() {
         const managerId = deletingDpr.siteManagerId;
 
         const engRef = doc(firestore, 'users', engineerId);
-        const engDoc = await getDoc(engRef);
-        const multiplier = engDoc.exists() ? engDoc.data()?.pointsMultiplier || 1 : 1;
+        const engSnap = await getDoc(engRef);
+        const multiplier = engSnap.exists() ? engSnap.data()?.pointsMultiplier || 1 : 1;
         
         updateDocumentNonBlocking(engRef, {
             totalPoints: increment(-(1.0 * multiplier))
@@ -245,29 +245,9 @@ export default function DPRListPage() {
     setEditingDpr(null);
   };
 
-  const handleWhatsAppShare = async (dpr: DPR) => {
-    if (navigator.share && dpr.attachments && dpr.attachments.length > 0) {
-      try {
-        const filesToShare: File[] = [];
-        for (const att of dpr.attachments) {
-          const response = await fetch(att.url);
-          const blob = await response.blob();
-          filesToShare.push(new File([blob], att.name, { type: att.contentType }));
-        }
-        
-        await navigator.share({
-          files: filesToShare,
-          title: `DPR: ${dpr.siteName}`,
-          text: `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${dpr.siteName}\n*Date:* ${format(new Date(dpr.reportDate), 'dd MMM yyyy')}\n*Submitted By:* ${dpr.userName}\n\n*Activities:*\n${dpr.description}`,
-        });
-        return;
-      } catch (e) {
-        console.warn("Direct file share failed, falling back to text link", e);
-      }
-    }
-
-    const mediaLinks = dpr.attachments?.length ? `\n\n*Attachments:*\n${dpr.attachments.map((a, i) => `${i + 1}. ${a.url}`).join('\n')}` : '';
-    const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${dpr.siteName}\n*Date:* ${format(new Date(dpr.reportDate), 'dd MMM yyyy')}\n*Submitted By:* ${dpr.userName}\n\n*Activities:*\n${dpr.description}${mediaLinks}`;
+  const handleWhatsAppShare = (dpr: DPR) => {
+    // Latest Requirement: Exclude all attachments and links from the WhatsApp message
+    const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${dpr.siteName}\n*Date:* ${format(new Date(dpr.reportDate), 'dd MMM yyyy')}\n*Submitted By:* ${dpr.userName}\n\n*Activities:*\n${dpr.description}`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -282,7 +262,10 @@ export default function DPRListPage() {
     return lowUrl.includes('.mp4') || lowUrl.includes('.mov') || lowUrl.includes('.webm') || lowUrl.includes('.ogg');
   };
 
-  const resetViewer = () => { setScale(1); setPosition({ x: 0, y: 0 }); };
+  const resetViewer = () => { 
+    setScale(1); 
+    setPosition({ x: 0, y: 0 }); 
+  };
 
   const openViewer = (url: string, dpr: DPR) => {
     const urls = dpr.attachments?.map(a => a.url) || [];
@@ -404,7 +387,7 @@ export default function DPRListPage() {
               )}
 
               <div className="pt-2 border-t flex justify-end items-center gap-2">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(dpr)} title="Push to WhatsApp">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={(e) => { e.stopPropagation(); handleWhatsAppShare(dpr); }} title="Push to WhatsApp">
                   <MessageCircle className="h-4 w-4" />
                 </Button>
                 {dpr.userId === user?.uid && (
