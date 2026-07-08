@@ -9,19 +9,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
 import { collection, doc, serverTimestamp, increment, query, where, getDocs, and } from "firebase/firestore";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Check, ChevronsUpDown, Loader2, FilePlus, Calendar, Plus, Trash2, MessageCircle, CheckCircle2, Building2, Globe } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, FilePlus, Calendar, Plus, Trash2, MessageCircle, CheckCircle2, Building2, Globe, FileUp, X, FileText, ImageIcon, Film } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import imageCompression from 'browser-image-compression';
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 const dprSchema = z.object({
   dprType: z.enum(['site', 'other'], { required_error: "Please select a category." }),
@@ -61,6 +65,7 @@ type MappingOverride = {
 
 export default function SubmitDPRPage() {
   const firestore = useFirestore();
+  const firebaseApp = useFirebaseApp();
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
@@ -92,7 +97,6 @@ export default function SubmitDPRPage() {
         return Array.from(new Map(allSites.map(s => [s.name, s])).values());
     }
     
-    // Sovereignty Logic
     const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
     if (isManager) {
       allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
@@ -114,7 +118,10 @@ export default function SubmitDPRPage() {
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
-  const [submittedDpr, setSubmittedDpr] = React.useState<{ siteName: string, date: string, description: string } | null>(null);
+  const [submittedDpr, setSubmittedDpr] = React.useState<{ siteName: string, date: string, description: string, attachments: any[] } | null>(null);
+  
+  const [localFiles, setLocalFiles] = React.useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
 
   const form = useForm<z.infer<typeof dprSchema>>({
     resolver: zodResolver(dprSchema),
@@ -133,12 +140,40 @@ export default function SubmitDPRPage() {
 
   const watchDprType = form.watch('dprType');
 
+  const uploadFile = async (file: File, userId: string): Promise<any> => {
+    let blob: Blob = file;
+    if (file.type.startsWith('image/')) {
+      try {
+        blob = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 1920 });
+      } catch (e) { console.warn("Compression skipped", e); }
+    }
+    const storage = getStorage(firebaseApp);
+    const path = `dprs/${userId}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+    const storageRef = ref(storage, path);
+    const uploadTask = uploadBytesResumable(storageRef, blob);
+    
+    return new Promise((resolve, reject) => {
+      uploadTask.on('state_changed', 
+        (snapshot) => setUploadProgress(prev => ({ ...prev, [file.name]: (snapshot.bytesTransferred / snapshot.totalBytes) * 100 })), 
+        reject, 
+        () => getDownloadURL(uploadTask.snapshot.ref).then(url => resolve({ url, contentType: file.type, name: file.name }))
+      );
+    });
+  };
+
   const onSubmit = async (values: z.infer<typeof dprSchema>) => {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
+    setUploadProgress({});
     try {
       const combinedDescription = values.updates.map(u => u.value.trim()).join('\n\n');
       const siteId = values.dprType === 'site' ? accessibleSites.find(s => s.name === values.siteName)?.id : 'other';
+
+      const attachments = [];
+      for (const file of localFiles) {
+        const uploaded = await uploadFile(file, user.uid);
+        attachments.push(uploaded);
+      }
 
       let effectiveSiteManagerId = userProfile.siteManagerId || null;
       
@@ -156,6 +191,7 @@ export default function SubmitDPRPage() {
         siteName: values.siteName,
         reportDate: values.reportDate,
         description: combinedDescription,
+        attachments,
         userId: user.uid,
         userName: userProfile?.username || user.email,
         siteManagerId: effectiveSiteManagerId,
@@ -200,11 +236,11 @@ export default function SubmitDPRPage() {
       setSubmittedDpr({
         siteName: values.siteName,
         date: values.reportDate,
-        description: combinedDescription
+        description: combinedDescription,
+        attachments
       });
       setIsSubmitted(true);
       toast({ title: "Success", description: "DPR submitted. Points awarded successfully." });
-      form.reset({ dprType: 'site', siteName: "", reportDate: format(new Date(), 'yyyy-MM-dd'), updates: [{ value: "" }] });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
     } finally {
@@ -214,7 +250,8 @@ export default function SubmitDPRPage() {
 
   const triggerWhatsApp = () => {
     if (!submittedDpr) return;
-    const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${submittedDpr.siteName}\n*Date:* ${format(new Date(submittedDpr.date), 'dd MMM yyyy')}\n*Submitted By:* ${userProfile?.username || user?.email}\n\n*Activities:*\n${submittedDpr.description}`;
+    const mediaLinks = submittedDpr.attachments?.length ? `\n\n*Attachments:*\n${submittedDpr.attachments.map((a, i) => `${i + 1}. ${a.url}`).join('\n')}` : '';
+    const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${submittedDpr.siteName}\n*Date:* ${format(new Date(submittedDpr.date), 'dd MMM yyyy')}\n*Submitted By:* ${userProfile?.username || user?.email}\n\n*Activities:*\n${submittedDpr.description}${mediaLinks}`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -251,6 +288,8 @@ export default function SubmitDPRPage() {
               <Button variant="secondary" className="h-11 rounded-sm" onClick={() => {
                 setIsSubmitted(false);
                 setSubmittedDpr(null);
+                form.reset();
+                setLocalFiles([]);
               }}>
                 Submit New
               </Button>
@@ -273,7 +312,7 @@ export default function SubmitDPRPage() {
       <Card className="shadow-md border-primary/10 rounded-sm">
         <CardHeader>
           <CardTitle>Daily Progress Report Form</CardTitle>
-          <CardDescription>Break down your updates into paragraphs using the (+) button.</CardDescription>
+          <CardDescription>Break down your updates and attach media for visual evidence.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -377,7 +416,7 @@ export default function SubmitDPRPage() {
                     <FormControl>
                       <div className="relative">
                         <Input type="date" {...field} className="rounded-sm pr-10 h-11" />
-                        <Calendar className="absolute right-3 top-3 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -428,6 +467,51 @@ export default function SubmitDPRPage() {
                 >
                   <Plus className="mr-2 h-4 w-4" /> Add New Paragraph
                 </Button>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <FileUp className="h-4 w-4 text-primary" /> Attach Visual Evidence (Images / Videos)
+                </Label>
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-4">
+                    {localFiles.map((file, idx) => (
+                      <div key={idx} className="relative w-24 h-24 rounded-sm overflow-hidden border bg-muted group">
+                         {file.type.startsWith('image/') ? (
+                           <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" />
+                         ) : (
+                           <div className="w-full h-full flex flex-col items-center justify-center gap-1">
+                             <Film className="h-6 w-6 text-muted-foreground" />
+                             <span className="text-[8px] font-black uppercase text-muted-foreground">Video</span>
+                           </div>
+                         )}
+                         <Button 
+                           type="button" 
+                           variant="destructive" size="icon" 
+                           className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity" 
+                           onClick={() => setLocalFiles(prev => prev.filter((_, i) => i !== idx))}
+                         >
+                           <X className="h-3 w-3" />
+                         </Button>
+                         {uploadProgress[file.name] !== undefined && (
+                           <div className="absolute bottom-0 left-0 right-0">
+                             <Progress value={uploadProgress[file.name]} className="h-1 rounded-none" />
+                           </div>
+                         )}
+                      </div>
+                    ))}
+                    <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed rounded-sm cursor-pointer hover:bg-muted/50 transition-colors">
+                      <Plus className="h-6 w-6 text-muted-foreground/50" />
+                      <span className="text-[8px] font-black uppercase text-muted-foreground/40 mt-1">Add Media</span>
+                      <input 
+                        type="file" multiple accept="image/*,video/*" className="hidden" 
+                        onChange={(e) => setLocalFiles(prev => [...prev, ...Array.from(e.target.files || [])])} 
+                      />
+                    </label>
+                  </div>
+                </div>
               </div>
 
               <div className="flex justify-end gap-4 pt-4 border-t">

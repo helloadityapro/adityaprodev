@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, subDays, subMonths, subYears } from "date-fns";
-import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, MessageCircle, User, Building2, Globe } from "lucide-react";
+import { FileText, Search, Pencil, Trash2, Loader2, Clock, Calendar, FilterX, MessageCircle, User, Building2, Globe, ImageIcon, Film, Maximize2, PlayCircle, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, X, Download, FileImage } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogClose
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -35,6 +36,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+
+type Attachment = {
+  url: string;
+  name: string;
+  contentType: string;
+};
 
 type DPR = {
   id: string;
@@ -49,6 +59,7 @@ type DPR = {
   editedBy?: string;
   editedAt?: any;
   dprType?: 'site' | 'other';
+  attachments?: Attachment[];
 };
 
 type AccessConfig = {
@@ -68,6 +79,16 @@ export default function DPRListPage() {
   const [editingDpr, setEditingDpr] = React.useState<DPR | null>(null);
   const [deletingDpr, setDeletingDpr] = React.useState<DPR | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
+
+  // Viewer State
+  const [viewUrl, setViewUrl] = React.useState<string | null>(null);
+  const [viewUrls, setViewUrls] = React.useState<string[]>([]);
+  const [currentUrlIndex, setCurrentUrlIndex] = React.useState(0);
+  const [zoom, setZoom] = React.useState(1);
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [startPan, setStartPan] = React.useState({ x: 0, y: 0 });
+  const viewerRef = React.useRef<HTMLDivElement>(null);
 
   // Persistence logic for active tab
   React.useEffect(() => {
@@ -154,7 +175,6 @@ export default function DPRListPage() {
     }
 
     result = result.filter(dpr => {
-      // Logic: Default to 'site' if dprType is missing (historical data)
       const matchesTab = (dpr.dprType || 'site') === activeTab;
       if (!matchesTab) return false;
 
@@ -219,7 +239,8 @@ export default function DPRListPage() {
   };
 
   const handleWhatsAppShare = (dpr: DPR) => {
-    const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${dpr.siteName}\n*Date:* ${format(new Date(dpr.reportDate), 'dd MMM yyyy')}\n*Submitted By:* ${dpr.userName}\n\n*Activities:*\n${dpr.description}`;
+    const mediaLinks = dpr.attachments?.length ? `\n\n*Attachments:*\n${dpr.attachments.map((a, i) => `${i + 1}. ${a.url}`).join('\n')}` : '';
+    const message = `*Aditya Pro - Daily Progress Report*\n\n*Site:* ${dpr.siteName}\n*Date:* ${format(new Date(dpr.reportDate), 'dd MMM yyyy')}\n*Submitted By:* ${dpr.userName}\n\n*Activities:*\n${dpr.description}${mediaLinks}`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -228,6 +249,46 @@ export default function DPRListPage() {
     setSearchTerm("");
     setDateFilter("7days");
   };
+
+  const isVideoUrl = (url: string) => {
+    const lowUrl = url.toLowerCase();
+    return lowUrl.includes('.mp4') || lowUrl.includes('.mov') || lowUrl.includes('.webm') || lowUrl.includes('.ogg');
+  };
+
+  const resetViewer = () => { setScale(1); setPosition({ x: 0, y: 0 }); };
+  const openViewer = (url: string, dpr: DPR) => {
+    const urls = dpr.attachments?.map(a => a.url) || [];
+    const index = urls.indexOf(url);
+    setViewUrls(urls);
+    setCurrentUrlIndex(index >= 0 ? index : 0);
+    setViewUrl(url);
+    resetViewer();
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!viewUrl || isVideoUrl(viewUrl)) return;
+    const delta = e.deltaY > 0 ? -0.2 : 0.2;
+    const newScale = Math.min(Math.max(scale + delta, 1), 4);
+    setScale(newScale);
+    if (newScale === 1) setPosition({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scale <= 1 || (viewUrl && isVideoUrl(viewUrl))) return;
+    setIsDragging(true);
+    setStartPan({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || scale <= 1) return;
+    const newX = e.clientX - startPan.x;
+    const newY = e.clientY - startPan.y;
+    const limitX = Math.max(0, (window.innerWidth * scale - window.innerWidth) / 2);
+    const limitY = Math.max(0, (window.innerHeight * scale - window.innerHeight) / 2);
+    setPosition({ x: Math.min(Math.max(newX, -limitX), limitX), y: Math.min(Math.max(newY, -limitY), limitY) });
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
 
   function renderTable() {
     return (
@@ -243,9 +304,15 @@ export default function DPRListPage() {
                   </span>
                   <h3 className="font-bold text-sm leading-tight text-foreground truncate">{dpr.siteName}</h3>
                 </div>
-                <Badge variant="outline" className="text-[8px] font-black uppercase rounded-sm border-primary/20 text-primary">
-                  DPR
-                </Badge>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge variant="outline" className="text-[8px] font-black uppercase rounded-sm border-primary/20 text-primary">
+                    DPR
+                  </Badge>
+                  <div className="flex gap-1.5">
+                    {dpr.attachments?.some(a => isVideoUrl(a.url)) && <Film className="h-3 w-3 text-primary/40" />}
+                    {dpr.attachments?.some(a => !isVideoUrl(a.url)) && <ImageIcon className="h-3 w-3 text-primary/40" />}
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
@@ -260,6 +327,20 @@ export default function DPRListPage() {
                   </p>
                 ))}
               </div>
+
+              {dpr.attachments && dpr.attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {dpr.attachments.map((att, attIdx) => (
+                    <div key={attIdx} className="relative w-12 h-12 rounded-sm overflow-hidden border bg-muted cursor-pointer" onClick={() => openViewer(att.url, dpr)}>
+                      {isVideoUrl(att.url) ? (
+                        <div className="w-full h-full flex items-center justify-center bg-slate-900"><Film className="h-4 w-4 text-white/40" /></div>
+                      ) : (
+                        <img src={att.url} className="w-full h-full object-cover" alt="Audit" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {dpr.editedBy && (
                 <div className="flex items-center gap-1.5 text-[9px] text-primary/70 font-medium bg-primary/5 p-1.5 rounded-sm">
@@ -298,6 +379,7 @@ export default function DPRListPage() {
                 <TableHead>Location / Site</TableHead>
                 <TableHead>User</TableHead>
                 <TableHead className="min-w-[300px]">Update & Activity</TableHead>
+                <TableHead>Evidence</TableHead>
                 <TableHead className="text-right px-6 no-print">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -337,6 +419,16 @@ export default function DPRListPage() {
                           </div>
                       )}
                   </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1.5 w-24">
+                      {dpr.attachments?.map((att, idx) => (
+                        <div key={idx} className="relative w-8 h-8 rounded-sm overflow-hidden border bg-muted cursor-pointer hover:border-primary/50 transition-colors" onClick={() => openViewer(att.url, dpr)}>
+                           {isVideoUrl(att.url) ? <Film className="w-full h-full p-1.5 text-primary/40" /> : <img src={att.url} className="w-full h-full object-cover" alt="DPR Proof" />}
+                        </div>
+                      ))}
+                      {(!dpr.attachments || dpr.attachments.length === 0) && <span className="text-[10px] italic text-muted-foreground/30">None</span>}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right px-6 no-print">
                       <div className="flex justify-end items-center gap-1">
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleWhatsAppShare(dpr)} title="Push to WhatsApp">
@@ -357,7 +449,7 @@ export default function DPRListPage() {
                 </TableRow>
               )) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic text-xs">No records found.</TableCell>
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">No records found.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -369,7 +461,7 @@ export default function DPRListPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
+      <div className="flex flex-col gap-1 no-print">
         <div className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2">
             <FileText className="h-8 w-8 text-primary" /> DPR Data Registry
@@ -404,6 +496,7 @@ export default function DPRListPage() {
               <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
               <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
               <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+              <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
               <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
               <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
             </SelectContent>
@@ -519,6 +612,52 @@ export default function DPRListPage() {
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Media Viewer Dialog */}
+      <Dialog open={!!viewUrl} onOpenChange={(o) => { if(!o) { resetViewer(); setViewUrl(null); setViewUrls([]); } }}>
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
+          <DialogHeader className="sr-only"><DialogTitle>Audit Media Viewer</DialogTitle></DialogHeader>
+          <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent no-print">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
+              <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px]">Evidence Artifact</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button>
+              <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
+              <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-red-500"><X className="h-6 w-6" /></Button></DialogClose>
+            </div>
+          </div>
+          {viewUrls.length > 1 && (
+            <>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); const prevIdx = (currentFileIndex - 1 + viewUrls.length) % viewUrls.length; setCurrentFileIndex(prevIdx); setViewUrl(viewUrls[prevIdx]); resetViewer(); }}><ChevronLeft className="h-8 w-8" /></Button>
+              </div>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); const nextIdx = (currentFileIndex + 1) % viewUrls.length; setCurrentFileIndex(nextIdx); setViewUrl(viewUrls[nextIdx]); resetViewer(); }}><ChevronRight className="h-8 w-8" /></Button>
+              </div>
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
+                <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
+                  {currentFileIndex + 1} / {viewUrls.length}
+                </Badge>
+              </div>
+            </>
+          )}
+          <div ref={viewerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+            <div className={cn("transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit", isDragging && "transition-none")} style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
+              {viewUrl && (
+                isVideoUrl(viewUrl) ? (
+                  <div className="pointer-events-auto"><video src={viewUrl} controls autoPlay className="max-w-[90vw] max-h-[80vh] shadow-2xl rounded-sm" /></div>
+                ) : (
+                  <img src={viewUrl} className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" alt="Audit Evidence" draggable={false} />
+                )
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
