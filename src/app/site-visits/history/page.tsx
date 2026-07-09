@@ -101,6 +101,7 @@ export default function SiteVisitsHistoryPage() {
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
+  const [deptFilter, setDeptFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [locationTab, setLocationTab] = React.useState<string>("site");
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -136,6 +137,9 @@ export default function SiteVisitsHistoryPage() {
 
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
   const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+
+  const deptsQuery = useMemoFirebase(() => collection(firestore, 'user_departments'), [firestore]);
+  const { data: allDepts } = useCollection<{ name: string }>(deptsQuery);
 
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
@@ -215,11 +219,12 @@ export default function SiteVisitsHistoryPage() {
         (v.managerName || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || v.status === statusFilter;
+      const matchesDept = deptFilter === 'all' || v.department === deptFilter;
       const matchesDate = vDateStr >= start && vDateStr <= end;
       
       const matchesLocation = v.locationType === locationTab || (locationTab === 'site' && (!v.locationType || v.locationType === 'site'));
       
-      return matchesSearch && matchesStatus && matchesDate && matchesLocation;
+      return matchesSearch && matchesStatus && matchesDept && matchesDate && matchesLocation;
     });
 
     return result.sort((a, b) => {
@@ -234,7 +239,7 @@ export default function SiteVisitsHistoryPage() {
       if (valA > valB) return direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [visits, searchTerm, statusFilter, sortConfig, userProfile, isAdmin, accessibleSiteIds, user, queryDateRange, locationTab]);
+  }, [visits, searchTerm, statusFilter, deptFilter, sortConfig, userProfile, isAdmin, accessibleSiteIds, user, queryDateRange, locationTab]);
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -251,6 +256,7 @@ export default function SiteVisitsHistoryPage() {
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
+    setDeptFilter("all");
     setDateFilter("7days");
   };
 
@@ -352,7 +358,7 @@ export default function SiteVisitsHistoryPage() {
         <p className="text-muted-foreground">Historical records of presence logs from authorized locations.</p>
       </div>
 
-      <div className="bg-card p-4 border rounded-sm shadow-sm no-print">
+      <div className="bg-card p-4 border rounded-sm shadow-sm no-print space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
           <div className="md:col-span-2 space-y-1.5">
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Context</Label>
@@ -393,6 +399,24 @@ export default function SiteVisitsHistoryPage() {
             <Button variant="ghost" size="icon" onClick={clearFilters} title="Clear Filters" className="h-11 w-11 rounded-sm border border-transparent hover:border-primary/10">
               <FilterX className="h-4 w-4" />
             </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="w-full md:w-64 space-y-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Filter by Department</Label>
+            <Select value={deptFilter} onValueChange={setDeptFilter}>
+              <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+                <Building2 className="h-4 w-4 mr-2 opacity-50" />
+                <SelectValue placeholder="All Departments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs font-bold uppercase">All Departments</SelectItem>
+                {allDepts?.map(dept => (
+                  <SelectItem key={dept.name} value={dept.name} className="text-xs font-bold uppercase">{dept.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         
