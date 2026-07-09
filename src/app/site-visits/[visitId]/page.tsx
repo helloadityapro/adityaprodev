@@ -26,6 +26,7 @@ import {
   ZoomIn, 
   ZoomOut, 
   RotateCcw, 
+  RotateCw,
   Building2, 
   ChevronLeft, 
   ChevronRight, 
@@ -42,7 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
@@ -80,12 +81,15 @@ const formatTimestamp = (ts: any) => {
   return format(date, 'dd MMM yyyy HH:mm');
 };
 
-const calculateDuration = (start: any, end: any) => {
-  if (!start || !end) return '—';
+const calculateDurationMins = (start: any, end: any) => {
+  if (!start || !end) return 0;
   const s = start.toDate ? start.toDate() : new Date(start);
   const e = end.toDate ? end.toDate() : new Date(end);
-  const mins = differenceInMinutes(e, s);
-  
+  return differenceInMinutes(e, s);
+};
+
+const calculateDurationStr = (mins: number) => {
+  if (mins === 0) return '—';
   if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
   const remMins = mins % 60;
@@ -101,57 +105,35 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
   const [viewUrls, setViewUrls] = React.useState<string[]>([]);
   const [currentUrlIndex, setCurrentUrlIndex] = React.useState(0);
   const [zoom, setZoom] = React.useState(1);
+  const [rotation, setRotation] = React.useState(0);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const [startPan, setStartPan] = React.useState({ x: 0, y: 0 });
 
   const viewerRef = React.useRef<HTMLDivElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
   const visitRef = useMemoFirebase(() => doc(firestore, 'site_visits', visitId), [firestore, visitId]);
   const { data: visit, isLoading } = useDoc<SiteVisit>(visitRef);
 
   // Zoom logic for media preview
   React.useEffect(() => {
-    const el = viewerRef.current;
+    const el = containerRef.current;
     if (!el || !viewUrl) return;
 
     const onWheel = (e: WheelEvent) => {
+      if (isVideoUrl(viewUrl)) return;
       e.preventDefault();
       setZoom(prev => {
         const delta = e.deltaY > 0 ? -0.2 : 0.2;
-        return Math.min(Math.max(prev + delta, 0.5), 4);
+        const next = Math.min(Math.max(prev + delta, 0.5), 4);
+        if (next === 1) setPosition({ x: 0, y: 0 });
+        return next;
       });
     };
 
-    let initialDist = 0;
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        initialDist = Math.hypot(
-          e.touches[0].pageX - e.touches[1].pageX,
-          e.touches[0].pageY - e.touches[1].pageY
-        );
-      }
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        e.preventDefault();
-        const dist = Math.hypot(
-          e.touches[0].pageX - e.touches[1].pageX,
-          e.touches[0].pageY - e.touches[1].pageY
-        );
-        const delta = (dist - initialDist) / 100;
-        setZoom(prev => Math.min(Math.max(prev + delta, 0.5), 4));
-        initialDist = dist;
-      }
-    };
-
     el.addEventListener('wheel', onWheel, { passive: false });
-    el.addEventListener('touchstart', onTouchStart);
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-
-    return () => {
-      el.removeEventListener('wheel', onWheel);
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-    };
+    return () => el.removeEventListener('wheel', onWheel);
   }, [viewUrl]);
 
   const handlePrint = () => {
@@ -160,13 +142,19 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
     }
   };
 
+  const resetViewer = () => {
+    setZoom(1);
+    setRotation(0);
+    setPosition({ x: 0, y: 0 });
+  };
+
   const openViewer = (url: string) => {
     const urls = [visit?.selfieUrl, ...(visit?.tasks?.map(t => t.photoUrl) || [])].filter(Boolean) as string[];
     const index = urls.indexOf(url);
     setViewUrls(urls);
     setCurrentUrlIndex(index >= 0 ? index : 0);
     setViewUrl(url);
-    setZoom(1);
+    resetViewer();
   };
 
   const nextUrl = () => {
@@ -174,7 +162,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
     const nextIdx = (currentUrlIndex + 1) % viewUrls.length;
     setCurrentUrlIndex(nextIdx);
     setViewUrl(viewUrls[nextIdx]);
-    setZoom(1);
+    resetViewer();
   };
 
   const prevUrl = () => {
@@ -182,7 +170,43 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
     const prevIdx = (currentUrlIndex - 1 + viewUrls.length) % viewUrls.length;
     setCurrentUrlIndex(prevIdx);
     setViewUrl(viewUrls[prevIdx]);
-    setZoom(1);
+    resetViewer();
+  };
+
+  const rotate = () => {
+    setRotation(prev => (prev + 90) % 360);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1 || (viewUrl && isVideoUrl(viewUrl))) return;
+    setIsDragging(true);
+    setStartPan({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || zoom <= 1) return;
+    const newX = e.clientX - startPan.x;
+    const newY = e.clientY - startPan.y;
+    
+    // Boundary limits roughly based on scale
+    const limitX = Math.max(0, (window.innerWidth * zoom - window.innerWidth) / 2);
+    const limitY = Math.max(0, (window.innerHeight * zoom - window.innerHeight) / 2);
+
+    setPosition({
+      x: Math.min(Math.max(newX, -limitX), limitX),
+      y: Math.min(Math.max(newY, -limitY), limitY)
+    });
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
+  const handleDoubleClick = () => {
+    if (viewUrl && isVideoUrl(viewUrl)) return;
+    if (zoom > 1) {
+      resetViewer();
+    } else {
+      setZoom(2);
+    }
   };
 
   const isVideoUrl = (url: string) => {
@@ -229,7 +253,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
             <div className="space-y-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge className={cn("h-6 text-[10px] uppercase font-black px-3 rounded-sm border-none shadow-sm", visit.status === 'ongoing' ? "bg-amber-500 text-white" : "bg-green-600 text-white")}>
-                  {visit.status}
+                  {visit.status === 'pending_upload' ? 'Syncing...' : visit.status}
                 </Badge>
                 <div className="flex items-center gap-1.5 text-[9px] font-black text-muted-foreground uppercase bg-white/50 px-2.5 py-1 rounded-sm border border-primary/10">
                   <FolderArchive className="h-3 w-3" /> Audit ID: {visit.id.slice(0, 8)}
@@ -259,7 +283,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
                 <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Total Duration</p>
                 <div className="flex items-center justify-center gap-2 text-primary font-black text-2xl">
                   <Timer className="h-6 w-6" />
-                  {calculateDuration(visit.startTime, visit.endTime)}
+                  {calculateDurationStr(calculateDurationMins(visit.startTime, visit.endTime))}
                 </div>
               </div>
             </div>
@@ -309,7 +333,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
                         <span>Arrival: {visit.startLat.toFixed(5)}, {visit.startLng.toFixed(5)}</span>
                         <Button variant="ghost" size="icon" className="h-6 w-6 text-primary no-print" asChild>
                           <a href={`https://www.google.com/maps/search/?api=1&query=${visit.startLat},${visit.startLng}`} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-3 w-3" />
+                            <ExternalLink className="h-3.5 w-3.5" />
                           </a>
                         </Button>
                       </div>
@@ -318,7 +342,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
                           <span>Departure: {visit.endLat.toFixed(5)}, {visit.endLng.toFixed(5)}</span>
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-primary no-print" asChild>
                             <a href={`https://www.google.com/maps/search/?api=1&query=${visit.endLat},${visit.endLng}`} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-3 w-3" />
+                              <ExternalLink className="h-3.5 w-3.5" />
                             </a>
                           </Button>
                         </div>
@@ -421,61 +445,75 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
         </CardFooter>
       </Card>
 
-      {/* Media Preview Overlay */}
-      <Dialog open={!!viewUrl} onOpenChange={(o) => { if(!o) { setZoom(1); setViewUrl(null); setViewUrls([]); } }}>
+      {/* Advanced Media Viewer Dialog */}
+      <Dialog open={!!viewUrl} onOpenChange={(o) => { if(!o) { resetViewer(); setViewUrl(null); setViewUrls([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
           <DialogHeader className="sr-only">
-            <DialogTitle>Visit Media Detail</DialogTitle>
+            <DialogTitle>Audit Media Viewer</DialogTitle>
+            <DialogDescription>Verification media details</DialogDescription>
           </DialogHeader>
           
-          <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.min(prev + 0.25, 4)); }} title="Zoom In">
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(prev => Math.max(prev - 0.25, 0.5)); }} title="Zoom Out">
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white border-none" onClick={(e) => { e.stopPropagation(); setZoom(1); }} title="Reset Zoom">
-              <RotateCcw className="h-5 w-5" />
-            </Button>
+          <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent no-print">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px]">Media Audit</span>
+                <span className="text-[8px] font-bold text-white/50 uppercase">{currentFileIndex + 1} of {viewUrls.length} File{viewUrls.length > 1 ? 's' : ''}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => setZoom(prev => Math.min(prev + 0.5, 4))} title="Zoom In"><ZoomIn className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => { setZoom(prev => Math.max(prev - 0.5, 1)); if(zoom <= 1) setPosition({x:0,y:0}); }} title="Zoom Out"><ZoomOut className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={rotate} title="Rotate Clockwise"><RotateCw className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={resetViewer} title="Reset View"><RotateCcw className="h-5 w-5" /></Button>
+              <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
+              <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-red-500 transition-colors"><X className="h-6 w-6" /></Button></DialogClose>
+            </div>
           </div>
 
           {viewUrls.length > 1 && (
             <>
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); prevUrl(); }}>
-                  <ChevronLeft className="h-8 w-8" />
-                </Button>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); prevUrl(); }}><ChevronLeft className="h-8 w-8" /></Button>
               </div>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl" onClick={(e) => { e.stopPropagation(); nextUrl(); }}>
-                  <ChevronRight className="h-8 w-8" />
-                </Button>
-              </div>
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
-                <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
-                  {currentUrlIndex + 1} / {viewUrls.length}
-                </Badge>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); nextUrl(); }}><ChevronRight className="h-8 w-8" /></Button>
               </div>
             </>
           )}
-          
-          <div className="relative w-full h-full overflow-auto p-4 flex">
+
+          <div 
+            ref={containerRef} 
+            className={cn(
+              "relative w-full h-full flex items-center justify-center overflow-hidden touch-none",
+              zoom > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"
+            )}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onDoubleClick={handleDoubleClick}
+          >
             <div 
-              ref={viewerRef}
-              className={cn(
-                "m-auto transition-transform duration-200 ease-out flex items-center justify-center",
-                zoom > 1 ? "cursor-move" : "cursor-default"
-              )}
-              style={{ transform: `scale(${zoom})`, transformOrigin: 'center' }}
+              ref={mediaRef}
+              className={cn("transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit", isDragging && "transition-none")}
+              style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${zoom}) rotate(${rotation}deg)` }}
             >
               {viewUrl && (
                 isVideoUrl(viewUrl) ? (
-                  <video src={viewUrl} controls autoPlay className="max-w-full max-h-[85vh] shadow-2xl" />
+                  <div className="pointer-events-auto"><video src={viewUrl} controls autoPlay className="max-w-[90vw] max-h-[80vh] shadow-2xl rounded-sm" /></div>
                 ) : (
-                  <img src={viewUrl} className="max-w-full max-h-[85vh] object-contain shadow-2xl" alt="Audit Evidence" />
+                  <img src={viewUrl} className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" alt="Evidence View" draggable={false} />
                 )
               )}
+            </div>
+          </div>
+
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent flex flex-col items-center gap-2 no-print">
+            <div className="flex gap-1.5">
+              {viewUrls.map((_, i) => (
+                <div key={i} className={cn("h-1 w-6 rounded-full transition-all duration-300", i === currentUrlIndex ? "bg-primary w-12" : "bg-white/20")} />
+              ))}
             </div>
           </div>
         </DialogContent>
