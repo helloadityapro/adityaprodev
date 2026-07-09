@@ -112,6 +112,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
 
   const viewerRef = React.useRef<HTMLDivElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const mediaRef = React.useRef<HTMLDivElement>(null);
 
   const visitRef = useMemoFirebase(() => doc(firestore, 'site_visits', visitId), [firestore, visitId]);
   const { data: visit, isLoading } = useDoc<SiteVisit>(visitRef);
@@ -474,10 +475,10 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
           {viewUrls.length > 1 && (
             <>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); prevUrl(); }}><ChevronLeft className="h-8 w-8" /></Button>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); prevUrl(); }}><ChevronLeft className="h-8 w-8" /></Button>
               </div>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); nextUrl(); }}><ChevronRight className="h-8 w-8" /></Button>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); nextUrl(); }}><ChevronRight className="h-8 w-8" /></Button>
               </div>
             </>
           )}
@@ -486,7 +487,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
             ref={containerRef} 
             className={cn(
               "relative w-full h-full flex items-center justify-center overflow-hidden touch-none",
-              zoom > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"
+              zoom > 1 ? "cursor-grabbing" : "cursor-grab"
             )}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
