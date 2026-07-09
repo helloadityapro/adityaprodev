@@ -453,21 +453,21 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
             <DialogDescription>Verification media details</DialogDescription>
           </DialogHeader>
           
-          <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent no-print">
+          <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent no-print">
             <div className="flex items-center gap-3">
               <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px]">Media Audit</span>
-                <span className="text-[8px] font-bold text-white/50 uppercase">{currentFileIndex + 1} of {viewUrls.length} File{viewUrls.length > 1 ? 's' : ''}</span>
+                <span className="text-[8px] font-bold text-white/60 uppercase">{currentUrlIndex + 1} of {viewUrls.length} File{viewUrls.length > 1 ? 's' : ''}</span>
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => setZoom(prev => Math.min(prev + 0.5, 4))} title="Zoom In"><ZoomIn className="h-5 w-5" /></Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => { setZoom(prev => Math.max(prev - 0.5, 1)); if(zoom <= 1) setPosition({x:0,y:0}); }} title="Zoom Out"><ZoomOut className="h-5 w-5" /></Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={rotate} title="Rotate Clockwise"><RotateCw className="h-5 w-5" /></Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={resetViewer} title="Reset View"><RotateCcw className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => setZoom(prev => Math.min(prev + 0.5, 4))} title="Zoom In"><ZoomIn className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => { setZoom(prev => Math.max(prev - 0.5, 1)); if(zoom <= 1) setPosition({x:0,y:0}); }} title="Zoom Out"><ZoomOut className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={rotate} title="Rotate Clockwise"><RotateCw className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={resetViewer} title="Reset View"><RotateCcw className="h-5 w-5" /></Button>
               <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
-              <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-red-500 transition-colors"><X className="h-6 w-6" /></Button></DialogClose>
+              <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/10 hover:bg-red-500 transition-colors"><X className="h-6 w-6" /></Button></DialogClose>
             </div>
           </div>
 
@@ -509,7 +509,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
             </div>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent flex flex-col items-center gap-2 no-print">
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent flex flex-col items-center gap-2 no-print">
             <div className="flex gap-1.5">
               {viewUrls.map((_, i) => (
                 <div key={i} className={cn("h-1 w-6 rounded-full transition-all duration-300", i === currentUrlIndex ? "bg-primary w-12" : "bg-white/20")} />
