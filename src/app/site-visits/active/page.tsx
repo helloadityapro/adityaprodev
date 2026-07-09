@@ -182,7 +182,7 @@ export default function ActiveSiteVisitsPage() {
                       className="w-full h-12 text-lg font-black rounded-sm shadow-md" 
                       onClick={() => router.push(`/site-visits/${visit.id}/finish`)}
                     >
-                      Continue {isSite ? 'Site Visit' : 'Field Audit'} <ArrowRight className="ml-2 h-5 w-5" />
+                      Continue {isSite ? 'Visit' : 'Visit'} <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </CardFooter>
                 )}

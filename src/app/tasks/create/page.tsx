@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, CheckCircle2, LayoutGrid, Globe, Users, Plus, X, Trash2 } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, CheckSquare, Calendar, UserPlus, CheckCircle2, LayoutGrid, Globe, Users, Plus, X, Trash2, Sparkles, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
@@ -117,9 +117,8 @@ export default function CreateTaskPage() {
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
-  const [isUserPopoverOpen, setIsUserPopoverOpen] = React.useState(false);
-  const [userSearchQuery, setUserSearchQuery] = React.useState("");
-  const [isRolePopoverOpen, setIsRolePopoverOpen] = React.useState(false);
+  const [isAssignPopoverOpen, setIsAssignPopoverOpen] = React.useState(false);
+  const [assignSearchQuery, setAssignSearchQuery] = React.useState("");
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSubmitted, setIsSubmitted] = React.useState(false);
@@ -153,7 +152,6 @@ export default function CreateTaskPage() {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
     try {
-      // Resolve final set of assignees from roles and individual IDs
       const roleUsers = allRegisteredUsers?.filter(u => values.assignedRoles.includes(u.role || "")) || [];
       const individualUsers = allRegisteredUsers?.filter(u => values.assignedUserIds.includes(u.id)) || [];
       
@@ -189,9 +187,10 @@ export default function CreateTaskPage() {
         priority: values.priority,
         dueDate: values.dueDate,
         
-        // Multi-assignee fields
         assigneeIds: finalAssigneesList.map(a => a.id),
         assigneeStates: assigneeStates,
+        assignedRoles: values.assignedRoles,
+        assignedIndividualIds: values.assignedUserIds,
         
         assignedById: user.uid,
         assignedByName: userProfile.username || user.email || "Unknown",
@@ -233,7 +232,18 @@ export default function CreateTaskPage() {
   };
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
-  const filteredUsers = allRegisteredUsers?.filter(u => u.username.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.email.toLowerCase().includes(userSearchQuery.toLowerCase())) || [];
+  
+  const searchResults = React.useMemo(() => {
+    const term = assignSearchQuery.trim().toLowerCase();
+    
+    const matchedRoles = availableRoles?.filter(r => r.name.toLowerCase().includes(term)) || [];
+    const matchedUsers = allRegisteredUsers?.filter(u => 
+      u.username.toLowerCase().includes(term) || 
+      u.email.toLowerCase().includes(term)
+    ) || [];
+
+    return { matchedRoles, matchedUsers };
+  }, [assignSearchQuery, availableRoles, allRegisteredUsers]);
 
   if (isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
@@ -378,7 +388,7 @@ export default function CreateTaskPage() {
                     <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Due Date</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Input type="date" {...field} className="rounded-sm pr-10 h-11" />
+                        <Input type="date" {...field} className="h-11 rounded-sm pr-10" />
                         <Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
                       </div>
                     </FormControl>
@@ -388,82 +398,102 @@ export default function CreateTaskPage() {
               </div>
 
               <div className="space-y-4">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Assign To (Multiple Targets)</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <div className="space-y-1.5">
-                      <Label className="text-[9px] font-bold uppercase text-muted-foreground">Target Roles</Label>
-                      <Popover open={isRolePopoverOpen} onOpenChange={setIsRolePopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className={cn("w-full justify-between font-normal rounded-sm h-11", watchedRoles.length === 0 && "text-muted-foreground")}>
-                            <span className="truncate">{watchedRoles.length > 0 ? `${watchedRoles.length} Roles Selected` : "Select Roles..."}</span>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                          <ScrollArea className="h-[200px]">
-                            <div className="p-2 space-y-1">
-                              {availableRoles?.map((role) => (
-                                <div 
-                                  key={role.name} 
-                                  className={cn(
-                                    "flex items-center space-x-2 p-2.5 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer group",
-                                    watchedRoles.includes(role.name) && "bg-primary/5"
-                                  )}
-                                  onClick={() => {
-                                    const next = watchedRoles.includes(role.name) ? watchedRoles.filter(r => r !== role.name) : [...watchedRoles, role.name];
-                                    form.setValue('assignedRoles', next);
-                                  }}
-                                >
-                                  <Checkbox checked={watchedRoles.includes(role.name)} className="rounded-full" />
-                                  <span className={cn("text-xs font-bold uppercase transition-colors", watchedRoles.includes(role.name) ? "text-primary" : "text-foreground")}>{role.name}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        </PopoverContent>
-                      </Popover>
-                   </div>
-
-                   <div className="space-y-1.5">
-                      <Label className="text-[9px] font-bold uppercase text-muted-foreground">Target Individuals</Label>
-                      <Popover open={isUserPopoverOpen} onOpenChange={setIsUserPopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className={cn("w-full justify-between font-normal rounded-sm h-11", watchedUsers.length === 0 && "text-muted-foreground")}>
-                            <span className="truncate">{watchedUsers.length > 0 ? `${watchedUsers.length} Personnel Selected` : "Choose Personnel..."}</span>
-                            <UserPlus className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                          <div className="flex items-center border-b px-3 bg-muted/20">
-                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                            <Input placeholder="Search personnel..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-xs bg-transparent" value={userSearchQuery} onChange={e => setUserSearchQuery(e.target.value)} />
+                <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Target Assignees</Label>
+                <Popover open={isAssignPopoverOpen} onOpenChange={setIsAssignPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-between font-normal rounded-sm h-11", watchedUsers.length === 0 && watchedRoles.length === 0 && "text-muted-foreground")}>
+                      <span className="truncate">
+                        {watchedUsers.length === 0 && watchedRoles.length === 0 ? "Choose Personnel or Roles..." : 
+                         `${watchedUsers.length} Individuals, ${watchedRoles.length} Roles`}
+                      </span>
+                      <Users className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <div className="flex items-center border-b px-3 bg-muted/20">
+                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                      <Input 
+                        placeholder="Search name, email or role..." 
+                        className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm bg-transparent" 
+                        value={assignSearchQuery} 
+                        onChange={e => setAssignSearchQuery(e.target.value)} 
+                      />
+                    </div>
+                    <ScrollArea className="h-[300px]">
+                      <div className="p-2 space-y-4">
+                        {/* ROLES SECTION */}
+                        {searchResults.matchedRoles.length > 0 && (
+                          <div className="space-y-1">
+                            <div className="px-2 py-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground/60 border-b mb-1">Broadcasting (Roles)</div>
+                            {searchResults.matchedRoles.map((role) => (
+                              <div 
+                                key={role.name} 
+                                className={cn(
+                                  "flex items-center space-x-2 p-2 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer group",
+                                  watchedRoles.includes(role.name) && "bg-primary/5"
+                                )}
+                                onClick={() => {
+                                  const next = watchedRoles.includes(role.name) ? watchedRoles.filter(r => r !== role.name) : [...watchedRoles, role.name];
+                                  form.setValue('assignedRoles', next);
+                                }}
+                              >
+                                <Checkbox checked={watchedRoles.includes(role.name)} className="rounded-full" />
+                                <span className={cn("text-xs font-bold uppercase transition-colors", watchedRoles.includes(role.name) ? "text-primary" : "text-foreground")}>{role.name}</span>
+                              </div>
+                            ))}
                           </div>
-                          <ScrollArea className="h-[250px]">
-                            <div className="p-2 space-y-1">
-                              {filteredUsers.map(u => (
-                                <div 
-                                  key={u.id} 
-                                  className={cn(
-                                    "flex items-center space-x-3 p-2.5 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer group",
-                                    watchedUsers.includes(u.id) && "bg-primary/5"
-                                  )}
-                                  onClick={() => {
-                                    const next = watchedUsers.includes(u.id) ? watchedUsers.filter(id => id !== u.id) : [...watchedUsers, u.id];
-                                    form.setValue('assignedUserIds', next);
-                                  }}
-                                >
-                                  <Checkbox checked={watchedUsers.includes(u.id)} className="rounded-full" />
-                                  <div className="flex flex-col min-w-0">
-                                    <span className={cn("text-xs font-bold truncate transition-colors", watchedUsers.includes(u.id) ? "text-primary" : "text-foreground")}>{u.username}</span>
-                                    <span className="text-[8px] text-muted-foreground uppercase font-black tracking-tight">{u.role}</span>
-                                  </div>
+                        )}
+
+                        {/* USERS SECTION */}
+                        {searchResults.matchedUsers.length > 0 && (
+                          <div className="space-y-1">
+                            <div className="px-2 py-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground/60 border-b mb-1">Individual Personnel</div>
+                            {searchResults.matchedUsers.map(u => (
+                              <div 
+                                key={u.id} 
+                                className={cn(
+                                  "flex items-center space-x-3 p-2 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer group",
+                                  watchedUsers.includes(u.id) && "bg-primary/5"
+                                )}
+                                onClick={() => {
+                                  const next = watchedUsers.includes(u.id) ? watchedUsers.filter(id => id !== u.id) : [...watchedUsers, u.id];
+                                  form.setValue('assignedUserIds', next);
+                                }}
+                              >
+                                <Checkbox checked={watchedUsers.includes(u.id)} className="rounded-full" />
+                                <div className="flex flex-col min-w-0">
+                                  <span className={cn("text-xs font-bold truncate transition-colors", watchedUsers.includes(u.id) ? "text-primary" : "text-foreground")}>{u.username}</span>
+                                  <span className="text-[8px] text-muted-foreground uppercase font-black tracking-tight">{u.role}</span>
                                 </div>
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        </PopoverContent>
-                      </Popover>
-                   </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {searchResults.matchedRoles.length === 0 && searchResults.matchedUsers.length === 0 && (
+                          <div className="py-12 text-center text-[10px] font-black uppercase text-muted-foreground italic">No matching results found</div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
+                
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {watchedRoles.map(role => (
+                    <Badge key={role} variant="secondary" className="bg-primary/10 text-primary border-primary/20 h-6 pl-2 pr-1 gap-1 uppercase text-[9px] font-black">
+                      Role: {role}
+                      <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent" onClick={() => form.setValue('assignedRoles', watchedRoles.filter(r => r !== role))}><X className="h-2.5 w-2.5" /></Button>
+                    </Badge>
+                  ))}
+                  {watchedUsers.map(id => {
+                    const u = allRegisteredUsers?.find(user => user.id === id);
+                    return (
+                      <Badge key={id} variant="outline" className="h-6 pl-2 pr-1 gap-1 uppercase text-[9px] font-bold">
+                        {u?.username || 'User'}
+                        <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent" onClick={() => form.setValue('assignedUserIds', watchedUsers.filter(uid => uid !== id))}><X className="h-2.5 w-2.5" /></Button>
+                      </Badge>
+                    );
+                  })}
                 </div>
                 <FormMessage />
               </div>
@@ -527,3 +557,4 @@ export default function CreateTaskPage() {
     </div>
   );
 }
+

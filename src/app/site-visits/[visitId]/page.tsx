@@ -416,8 +416,8 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
         <Separator className="opacity-50" />
         
         <CardFooter className="bg-muted/5 p-8 flex flex-col items-center justify-center text-center gap-2">
-          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em]">End of Official Audit Record</p>
-          <p className="text-[8px] text-muted-foreground/40 font-mono">Verified and archived by Aditya Pro Engine</p>
+          <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em]">End of Official Visit Record</p>
+          <p className="text-[8px] text-muted-foreground/40 font-mono">Aditya Pro</p>
         </CardFooter>
       </Card>
 
@@ -425,7 +425,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
       <Dialog open={!!viewUrl} onOpenChange={(o) => { if(!o) { setZoom(1); setViewUrl(null); setViewUrls([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
           <DialogHeader className="sr-only">
-            <DialogTitle>Audit Media Detail</DialogTitle>
+            <DialogTitle>Visit Media Detail</DialogTitle>
           </DialogHeader>
           
           <div className="absolute top-4 left-4 flex gap-2 z-50 no-print">

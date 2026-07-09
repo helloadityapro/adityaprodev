@@ -377,7 +377,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
     return (
       <div className="p-8 flex flex-col items-center justify-center text-center gap-4 min-h-[60vh]">
         <CheckCircle2 className="h-16 w-16 text-green-500" />
-        <h2 className="text-2xl font-bold">Audit Completed</h2>
+        <h2 className="text-2xl font-bold">Visit Completed</h2>
         <p className="text-muted-foreground">The report for {visit.siteName} has been published.</p>
         <Button onClick={() => router.push('/site-visits/history')} className="rounded-sm font-bold shadow-md">View History</Button>
       </div>
@@ -400,12 +400,12 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
               Your site visit report for <strong>{visit.siteName}</strong> has been archived. 
               We are now syncing the images and videos in the background. 
               <br/><br/>
-              You can safely navigate away or return to the active hub.
+              You can safely navigate away or return to the Site Visits.
             </CardDescription>
           </CardHeader>
           <CardFooter className="space-y-4 pb-8 px-8 flex flex-col">
             <Button className="w-full h-12 text-sm font-black uppercase tracking-widest shadow-lg" onClick={() => router.push("/site-visits/active")}>
-              Active Presence Hub
+              Okay
             </Button>
             <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase text-muted-foreground" onClick={() => router.push("/dashboard")}>
               Go to Dashboard
@@ -440,7 +440,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                 <CardDescription className="text-[10px] font-bold text-muted-foreground uppercase">Log current activities and observations</CardDescription>
               </div>
               <Button variant="outline" size="sm" onClick={addTask} className="text-primary font-bold h-9 sm:h-8 px-3 border-primary/20 bg-white w-full sm:w-auto">
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add Observation
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add New Item
               </Button>
             </div>
           </CardHeader>
@@ -494,7 +494,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                       />
                       <Button variant="outline" size="sm" asChild className="h-9 sm:h-8 text-[10px] font-bold rounded-sm cursor-pointer border-primary/20 text-primary hover:bg-primary/5 w-full sm:w-auto">
                         <label htmlFor={`task-photo-${idx}`}>
-                          <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Attach Proof
+                          <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Add Images
                         </label>
                       </Button>
                     </div>
@@ -520,7 +520,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                   onClick={handleProceedToFinal}
                   disabled={isSubmitting || tasks.every(t => t.text.trim() === "")}
                 >
-                  Conclude {isSite ? 'Visit' : 'Presence'} <ArrowRight className="ml-2 h-5 w-5" />
+                  End {isSite ? 'Visit' : 'Visit'} <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               )}
             </div>
@@ -594,7 +594,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
               </Card>
 
               <Card className="rounded-sm shadow-md border-primary/10">
-                <CardHeader className="p-4"><CardTitle className="text-sm uppercase font-bold tracking-widest">Audit Context</CardTitle></CardHeader>
+                <CardHeader className="p-4"><CardTitle className="text-sm uppercase font-bold tracking-widest">Visit Context</CardTitle></CardHeader>
                 <CardContent className="p-4 sm:p-6 space-y-6">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Primary Purpose</Label>
@@ -612,7 +612,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                   </div>
 
                   <div className="space-y-4 p-4 bg-primary/[0.02] rounded-sm border border-primary/10">
-                    <Label className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 text-primary"><Users className="h-4 w-4" /> Personnel/Contact Available?</Label>
+                    <Label className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 text-primary"><Users className="h-4 w-4" />Client or Client Representative/Personnel Available?</Label>
                     <RadioGroup value={customerAvailable} onValueChange={setCustomerAvailable} className="flex gap-6 mt-1">
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="yes" id="c-yes" /><Label htmlFor="c-yes" className="font-bold cursor-pointer text-xs">Yes</Label>
@@ -635,7 +635,7 @@ export default function FinishSiteVisitPage({ params }: { params: Promise<{ visi
                     onClick={onSubmitFinalReport}
                     disabled={isSubmitting || !selfie || !purpose || details.trim().length < 10}
                   >
-                    {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> DISPATCHING...</> : <><Send className="mr-2 h-4 w-4" /> CONCLUDE & PUBLISH AUDIT</>}
+                    {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> PROCESSING...</> : <><Send className="mr-2 h-4 w-4" /> CONCLUDE & PUBLISH AUDIT</>}
                   </Button>
                 </CardFooter>
               </Card>
