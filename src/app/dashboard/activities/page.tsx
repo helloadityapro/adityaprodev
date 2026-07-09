@@ -123,6 +123,9 @@ type DataItem = {
   startTime?: any;
   endTime?: any;
   approvalDate?: any;
+  assigneeIds?: string[];
+  assigneeStates?: Record<string, any>;
+  assignedRoles?: string[];
 };
 
 type RecentActivity = {
@@ -165,7 +168,6 @@ export default function ActivitiesPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
-  // OPTIMIZATION: Use a smaller limit for feed items to reduce initial payload size
   const queryLimit = 200;
 
   const getFilteredQuery = (coll: string, dateField: string = 'createdAt') => {
@@ -187,13 +189,13 @@ export default function ActivitiesPage() {
   const { data: tasks, isLoading: tasksLoading } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'tasks');
     if (isAdmin) return query(colRef, orderBy('createdAt', 'desc'), limit(queryLimit));
-    return query(colRef, or(where('assignedToId', '==', user?.uid), where('assignedById', '==', user?.uid)), limit(queryLimit));
+    return query(colRef, or(where('assigneeIds', 'array-contains', user?.uid || ""), where('assignedById', '==', user?.uid)), limit(queryLimit));
   }, [firestore, isAdmin, user]));
 
   const { data: visits, isLoading: visitsLoading } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'site_visits');
     if (isAdmin) return query(colRef, orderBy('startTime', 'desc'), limit(queryLimit));
-    return query(colRef, or(where('managerId', '==', user?.uid), where('siteManagerId', '==', user?.uid)), limit(queryLimit));
+    return query(colRef, or(where('managerId', '==', user.uid), where('siteManagerId', '==', user.uid)), limit(queryLimit));
   }, [firestore, user, isAdmin]));
 
   const { data: installationChecklists, isLoading: instLoading } = useCollection<DataItem>(useMemoFirebase(() => getFilteredQuery('installation_checklists'), [firestore, isAdmin, user]));
@@ -211,7 +213,7 @@ export default function ActivitiesPage() {
 
   const { data: attendanceLogs, isLoading: attendanceLoading } = useCollection<DataItem>(useMemoFirebase(() => {
     const colRef = collection(firestore, 'attendance');
-    return query(colRef, orderBy('createdAt', 'desc'), limit(500)); // Slightly more for attendance analytics
+    return query(colRef, orderBy('createdAt', 'desc'), limit(500));
   }, [firestore]));
 
   const { data: allPersonnel, isLoading: personnelLoading } = useCollection<UserProfile>(useMemoFirebase(() => collection(firestore, 'users'), [firestore]));
@@ -238,7 +240,6 @@ export default function ActivitiesPage() {
 
   const summaryStats = React.useMemo(() => {
     if (isLoadingTotal) return null;
-    
     const { start, end } = queryDateRange;
     
     const countInRange = (list: DataItem[] | null, dateField: string, filter?: (i: DataItem) => boolean) => {
@@ -273,16 +274,13 @@ export default function ActivitiesPage() {
         }
     });
 
-    const presentCount = presentUserIds.size;
-    const absentCount = Math.max(0, activeStaff.length - presentCount);
-
     return {
         ptw: ptwCount,
         dpr: dprCount,
         visits: visitCount,
         dispatches: dispatchCount,
-        present: presentCount,
-        absent: absentCount
+        present: presentUserIds.size,
+        absent: Math.max(0, activeStaff.length - presentUserIds.size)
     };
   }, [permits, dprs, visits, vehicleReqs, attendanceLogs, allPersonnel, queryDateRange, isLoadingTotal]);
 
@@ -313,6 +311,7 @@ export default function ActivitiesPage() {
               item.siteEngineerId === user?.uid ||
               item.siteManagerId === user?.uid ||
               item.driverId === user?.uid ||
+              item.assigneeIds?.includes(user?.uid || "") ||
               (item as any)[userField] === userProfile?.username;
 
             const hasSiteAccess = !item.siteName || assignedIds.has(item.siteId || '');
@@ -341,10 +340,22 @@ export default function ActivitiesPage() {
       }
     };
 
+    const getTaskAssigneeSummary = (task: DataItem) => {
+      if (task.assignedRoles && task.assignedRoles.length > 0) {
+        return `All ${task.assignedRoles.join(", ")}s`;
+      }
+      const states = Object.values(task.assigneeStates || {});
+      if (states.length === 0) return "Unassigned";
+      if (states.length === 1) return (states[0] as any).userName;
+      if (states.length === 2) return `${(states[0] as any).userName}, ${(states[1] as any).userName}`;
+      return `${(states[0] as any).userName}, ${(states[1] as any).userName} & ${states.length - 2} others`;
+    };
+
     permits?.forEach(p => addItem(p, 'Permit', 'Compliance', ShieldCheck, 'text-blue-600', 'requestDate', 'siteEngineerName', `${p.siteEngineerName} requested a ${p.ptwType} permit for ${p.siteName}`, `/ptw/list?view=${p.id}`));
     tasks?.forEach(t => {
-      if (t.status === 'Completed') addItem(t, 'Task Finished', 'Tasks', CheckCircle2, 'text-green-600', 'updatedAt', 'assignedToName', `${t.assignedToName} finished task: "${t.title}" for ${t.siteName}`, `/tasks/list`);
-      else addItem(t, 'Task', 'Tasks', CheckSquare, 'text-slate-600', 'createdAt', 'assignedByName', `${t.assignedByName} assigned task "${t.title}" to ${t.assignedToName} for ${t.siteName}`, `/tasks/list`);
+      const summary = getTaskAssigneeSummary(t);
+      if (t.status === 'Completed') addItem(t, 'Task Finished', 'Tasks', CheckCircle2, 'text-green-600', 'updatedAt', 'assignedByName', `Task finished: "${t.title}" for ${t.siteName}`, `/tasks/list`);
+      else addItem(t, 'Task', 'Tasks', CheckSquare, 'text-slate-600', 'createdAt', 'assignedByName', `${t.assignedByName} assigned task "${t.title}" to ${summary} for ${t.siteName}`, `/tasks/list`);
     });
     dprs?.forEach(d => addItem(d, 'DPR', 'Reporting', FileText, 'text-amber-600', 'createdAt', 'userName', `${d.userName} submitted a DPR for ${d.siteName}`, `/dpr/list`));
     movements?.forEach(m => addItem(m, 'Movement', 'Inventory', ArrowLeftRight, 'text-emerald-600', 'createdAt', 'userName', `${m.userName} recorded a material ${m.movementType} for ${m.itemName} at ${m.siteName}`, `/movements/list`));
@@ -357,7 +368,7 @@ export default function ActivitiesPage() {
     pos?.forEach(p => addItem(p, 'Purchase Order', 'Procurement', ShoppingBag, 'text-blue-700', 'createdAt', 'createdByName', `${p.createdByName} generated a Purchase Order ${p.poNumber} for ${p.siteName}`, `/projects/${p.siteId}?tab=po`));
     wos?.forEach(w => addItem(w, 'Work Order', 'Procurement', Gavel, 'text-slate-700', 'createdAt', 'createdByName', `${w.createdByName} issued a Work Order ${w.woNumber} for ${w.siteName}`, `/projects/${w.siteId}?tab=wo`));
     payments?.forEach(p => addItem(p, 'Payment', 'Finance', IndianRupee, 'text-emerald-700', 'date', 'recordedByName', `${p.recordedByName} recorded a payment of ₹${p.amount?.toLocaleString()} against ${p.referenceNumber} for ${p.siteName}`, `/payments/project-wise`));
-    redemptions?.forEach(r => addItem(r, 'Redemption', 'Rewards', CreditCard, 'text-green-600', 'createdAt', 'userName', `${r.userName} requested a points redemption of ₹${r.amountInRs?.toLocaleString()}`, `/settings/rewards`));
+    redemptions?.forEach(r => addItem(r, 'Redemption', 'Rewards', CreditCard, 'text-green-600', 'createdAt', 'userName', `${r.userName} requested a points redemption of ₹${r.amountInRs?.toLocaleString()}`, `/rewards`));
     installationChecklists?.forEach(cl => {
       addItem(cl, 'Checklist', 'Quality', ClipboardCheck, 'text-cyan-600', 'createdAt', 'userName', `${cl.userName} submitted an MMS audit for Table ${cl.tableNumber} at ${cl.siteName}`, `/checklists/data`);
       if (cl.comments && cl.comments.length > 0) {
@@ -570,6 +581,10 @@ export default function ActivitiesPage() {
                   onChange={e => setSearchTerm(e.target.value)}
                 />
               </div>
+
+              <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-9 w-9 rounded-sm border border-primary/10 text-primary">
+                  {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              </Button>
 
               <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="h-9 w-9 rounded-sm border border-primary/10 text-primary hover:bg-primary hover:text-white transition-all shadow-sm" title="Maximize View">
                 <Maximize2 className="h-4 w-4" />
