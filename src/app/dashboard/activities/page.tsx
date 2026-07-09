@@ -56,7 +56,9 @@ import {
   Minimize2,
   X,
   CheckCircle2,
-  Users
+  Users,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
@@ -158,6 +160,7 @@ export default function ActivitiesPage() {
   const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [theme, setTheme] = React.useState<'light' | 'dark'>('light');
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -167,6 +170,30 @@ export default function ActivitiesPage() {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
+
+  React.useEffect(() => {
+    const syncThemeState = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setTheme(isDark ? 'dark' : 'light');
+    };
+
+    syncThemeState();
+    window.addEventListener('theme-change', syncThemeState);
+    return () => window.removeEventListener('theme-change', syncThemeState);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    if (nextTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+    window.dispatchEvent(new Event('theme-change'));
+  };
 
   const queryLimit = 200;
 
