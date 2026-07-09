@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, where, limit, arrayUnion, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, limit, arrayUnion, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +30,12 @@ import {
   Pencil,
   CircleCheck,
   CircleX,
-  Loader2
+  Loader2,
+  FileText,
+  ShieldCheck,
+  ExternalLink,
+  MessageCircle,
+  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -63,6 +68,7 @@ import Link from 'next/link';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 
 type WOItem = {
   description: string;
@@ -70,6 +76,12 @@ type WOItem = {
   rate: number;
   gstPercent: number;
   amount: number;
+};
+
+type Attachment = {
+  url: string;
+  name: string;
+  contentType: string;
 };
 
 type WorkOrder = {
@@ -82,6 +94,9 @@ type WorkOrder = {
   status: string;
   totalAmount: number;
   items: WOItem[];
+  description: string;
+  termsAndConditions?: string;
+  scopeAttachments?: Attachment[];
   createdAt: any;
   createdByName?: string;
   history?: any[];
@@ -106,6 +121,7 @@ export default function GlobalManageWOsPage() {
   const [expandedRows, setExpandedRows] = React.useState<Set<string>>(new Set());
   const [woToDelete, setWoToDelete] = React.useState<WorkOrder | null>(null);
   const [woActionState, setWoActionState] = React.useState<{ wo: WorkOrder, type: 'Accepted' | 'Rejected' } | null>(null);
+  const [viewingWO, setViewingWO] = React.useState<WorkOrder | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -133,8 +149,8 @@ export default function GlobalManageWOsPage() {
   };
 
   const SortIcon = ({ column }: { column: WOSortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const filteredWOs = React.useMemo(() => {
@@ -279,11 +295,11 @@ export default function GlobalManageWOsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20 bg-background">
+            <SelectTrigger className="w-[160px] h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 bg-background">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all" className="text-xs font-bold uppercase">All Records</SelectItem>
+              <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
               <SelectItem value="Pending" className="text-xs font-bold uppercase text-amber-600">Pending</SelectItem>
               <SelectItem value="Accepted" className="text-xs font-bold uppercase text-green-600">Accepted</SelectItem>
               <SelectItem value="Rejected" className="text-xs font-bold uppercase text-red-600">Rejected</SelectItem>
@@ -352,7 +368,7 @@ export default function GlobalManageWOsPage() {
                         ₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell className="text-right px-6">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end items-center gap-1">
                           {isAdmin && wo.status === 'Pending' && (
                             <div className="flex gap-1 mr-2">
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setWoActionState({ wo, type: 'Accepted' })} title="Accept WO">
@@ -363,7 +379,7 @@ export default function GlobalManageWOsPage() {
                               </Button>
                             </div>
                           )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => router.push(`/projects/${wo.siteId}?tab=wo`)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}>
                             <Eye className="h-4 w-4" />
                           </Button>
                           {(isAdmin || isManager) && (
@@ -423,25 +439,190 @@ export default function GlobalManageWOsPage() {
         </CardContent>
       </Card>
 
+      {/* WO Detail Dialog */}
+      <Dialog open={!!viewingWO} onOpenChange={(o) => !o && setViewingWO(null)}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><Gavel className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Work Order Audit</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{viewingWO?.woNumber}</DialogDescription>
+              </div>
+            </div>
+            {viewingWO && (
+              <Badge variant="outline" className={cn(
+                "rounded-sm text-[10px] font-black uppercase px-2 h-6",
+                viewingWO.status === 'Accepted' ? "bg-green-100 text-green-800" : 
+                viewingWO.status === 'Pending' ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"
+              )}>
+                {viewingWO.status}
+              </Badge>
+            )}
+          </DialogHeader>
+
+          <ScrollArea className="flex-1">
+            {viewingWO && (
+              <div className="p-8 space-y-10 text-left">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Contractor Partner</Label>
+                      <p className="text-lg font-black text-foreground leading-tight flex items-center gap-2">
+                        <HardHat className="h-5 w-5 text-primary/40" />
+                        {viewingWO.contractorName}
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Release Date</Label>
+                        <p className="text-sm font-bold flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-primary/40" /> {viewingWO.orderDate}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Project Context</Label>
+                        <p className="text-sm font-black flex items-center gap-1.5 text-primary"><Building2 className="h-3.5 w-3.5" /> {viewingWO.siteName}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-primary/5 rounded-sm border-2 border-primary/10 p-6 flex flex-col justify-center items-center text-center shadow-inner">
+                    <span className="text-[10px] font-black uppercase text-primary tracking-widest mb-2">Total Contract Value</span>
+                    <span className="text-4xl font-black tabular-nums text-primary">₹{viewingWO.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+
+                <Separator className="opacity-50" />
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Detailed Scope of Work</Label>
+                  </div>
+                  <div className="p-5 bg-muted/20 border rounded-sm text-sm leading-relaxed italic text-foreground/80 whitespace-pre-wrap">
+                    "{viewingWO.description || 'No detailed scope provided.'}"
+                  </div>
+                  
+                  {viewingWO.scopeAttachments && viewingWO.scopeAttachments.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                      {viewingWO.scopeAttachments.map((att, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 border rounded-sm bg-background group hover:border-primary/30 transition-all">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="p-2 bg-muted rounded-sm"><FileText className="h-4 w-4 text-primary" /></div>
+                            <span className="text-[10px] font-bold truncate max-w-[150px]" title={att.name}>{att.name}</span>
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
+                            <a href={att.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-primary" />
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Service Breakdown</Label>
+                  </div>
+                  <div className="border rounded-sm overflow-hidden">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead className="text-[10px] font-black uppercase px-4">Description</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase">Qty</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase">Rate</TableHead>
+                          <TableHead className="text-right text-[10px] font-black uppercase px-4">Subtotal</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {viewingWO.items.map((item, idx) => (
+                          <TableRow key={idx} className="bg-background">
+                            <TableCell className="px-4 text-xs font-bold">{item.description}</TableCell>
+                            <TableCell className="text-xs font-mono font-bold">{item.quantity}</TableCell>
+                            <TableCell className="text-xs font-mono font-medium">₹{item.rate.toLocaleString()}</TableCell>
+                            <TableCell className="text-right px-4 font-mono font-black text-xs text-primary">
+                              ₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                {viewingWO.termsAndConditions && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-primary" />
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Terms & Conditions</Label>
+                    </div>
+                    <div className="p-5 bg-muted/20 border rounded-sm text-[11px] leading-relaxed text-muted-foreground font-medium whitespace-pre-wrap">
+                      {viewingWO.termsAndConditions}
+                    </div>
+                  </div>
+                )}
+
+                <Separator className="opacity-50" />
+
+                <div className="space-y-6">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 text-muted-foreground/60">
+                    <History className="h-4 w-4 text-primary" /> Lifecycle Audit
+                  </h3>
+                  <div className="relative border-l-2 border-muted ml-3 pl-6 space-y-8">
+                    {[...(viewingWO.history || [])].sort((a, b) => {
+                      const da = a.timestamp?.toDate?.()?.getTime() || (typeof a.timestamp === 'string' ? new Date(a.timestamp).getTime() : 0);
+                      const db = b.timestamp?.toDate?.()?.getTime() || (typeof b.timestamp === 'string' ? new Date(b.timestamp).getTime() : 0);
+                      return db - da;
+                    }).map((entry, idx) => (
+                      <div key={idx} className="relative">
+                        <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                        <div className="flex flex-col gap-1 text-left">
+                          <span className="text-xs font-bold text-primary uppercase tracking-tight">{entry.action} — {entry.userName}</span>
+                          <p className="text-[10px] text-muted-foreground font-mono font-bold uppercase">
+                            {formatTimestamp(entry.timestamp)}
+                          </p>
+                          <p className="text-xs italic text-foreground/80 mt-1 leading-relaxed">"{entry.details || 'Processed.'}"</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0">
+            {isAdmin && viewingWO?.status === 'Pending' && (
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button className="flex-1 sm:flex-none h-11 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-8" onClick={() => { setWoActionState({ wo: viewingWO!, type: 'Accepted' }); setViewingWO(null); }}>Approve WO</Button>
+                <Button variant="destructive" className="flex-1 sm:flex-none h-11 rounded-sm font-black uppercase text-[10px] tracking-widest px-8" onClick={() => { setWoActionState({ wo: viewingWO!, type: 'Rejected' }); setViewingWO(null); }}>Reject WO</Button>
+              </div>
+            )}
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-11 px-10 tracking-widest w-full sm:w-auto">Close Audit</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!woActionState} onOpenChange={(o) => !o && setWoActionState(null)}>
         <DialogContent className="rounded-sm max-md">
           <DialogHeader>
-            <DialogTitle>Authorize Work Order</DialogTitle>
+            <DialogTitle className="uppercase tracking-tight font-black">Authorize Work Order</DialogTitle>
             <DialogDescription>Set decision for {woActionState?.wo.woNumber}.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-2 text-left">
               <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Decision Remarks</Label>
-              <Textarea id="wo-action-remarks" placeholder="Provide feedback for the contractor engagement..." className="min-h-[100px] rounded-sm" />
+              <Textarea id="wo-action-remarks-global" placeholder="Provide feedback for the contractor engagement..." className="min-h-[120px] rounded-sm" />
             </div>
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
             <Button 
-              className={cn("min-w-[120px]", woActionState?.type === 'Accepted' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+              className={cn("min-w-[120px] rounded-sm font-black uppercase text-[10px]", woActionState?.type === 'Accepted' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
               disabled={isActionProcessing}
               onClick={() => {
-                const remarks = (document.getElementById('wo-action-remarks') as HTMLTextAreaElement)?.value || "";
+                const remarks = (document.getElementById('wo-action-remarks-global') as HTMLTextAreaElement)?.value || "";
                 handleProcessWO(remarks);
               }}
             >
