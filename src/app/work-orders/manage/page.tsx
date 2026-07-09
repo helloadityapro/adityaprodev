@@ -109,6 +109,12 @@ type AccessConfig = {
 
 type WOSortKey = 'woNumber' | 'site' | 'contractor' | 'status' | 'date' | 'total';
 
+const formatTimestamp = (ts: any) => {
+  if (!ts) return '—';
+  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
+  return format(date, 'dd/MM/yyyy HH:mm');
+};
+
 export default function GlobalManageWOsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -358,11 +364,8 @@ export default function GlobalManageWOsPage() {
                           "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
                           wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
                           wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                          wo.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                          "bg-muted text-muted-foreground"
-                        )}>
-                          {wo.status || 'Pending'}
-                        </Badge>
+                          "bg-yellow-50 text-yellow-700 border-yellow-200"
+                        )}>{wo.status || 'Pending'}</Badge>
                       </TableCell>
                       <TableCell className="text-right font-black text-sm font-mono text-foreground">
                         ₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
