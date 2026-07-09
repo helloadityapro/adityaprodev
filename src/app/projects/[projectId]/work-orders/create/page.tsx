@@ -11,10 +11,12 @@ import {
   useDoc, 
   useMemoFirebase, 
   useCollection, 
-  addDocumentNonBlocking 
+  addDocumentNonBlocking,
+  useFirebaseApp
 } from '@/firebase';
 import { collection, doc, serverTimestamp } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +36,10 @@ import {
   Send,
   FileText,
   Trash2,
-  ListPlus
+  ListPlus,
+  FileUp,
+  X,
+  ShieldAlert
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -44,6 +49,8 @@ import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 const woItemSchema = z.object({
   description: z.string().min(1, 'Description is required.'),
@@ -60,6 +67,7 @@ const woSchema = z.object({
   contractorName: z.string(),
   items: z.array(woItemSchema).min(1, 'At least one line item is required.'),
   description: z.string().min(10, 'Please provide a detailed overall scope of work.'),
+  termsAndConditions: z.string().optional(),
 });
 
 type Site = {
@@ -78,6 +86,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
   const resolvedParams = React.use(params);
   const projectId = resolvedParams.projectId;
   const firestore = useFirestore();
+  const firebaseApp = useFirebaseApp();
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
@@ -85,6 +94,9 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [finalTotal, setFinalTotal] = React.useState(0);
+  
+  const [scopeFiles, setScopeFiles] = React.useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
 
   const [isContractorPopoverOpen, setIsContractorPopoverOpen] = React.useState(false);
   const [contractorSearch, setContractorSearch] = React.useState("");
@@ -103,14 +115,7 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
 
   const form = useForm<z.infer<typeof woSchema>>({
     resolver: zodResolver(woSchema),
-    defaultValues: {
-      woNumber: "",
-      orderDate: format(new Date(), 'yyyy-MM-dd'),
-      contractorId: "",
-      contractorName: "",
-      items: [{ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }],
-      description: ""
-    },
+    defaultValues: { woNumber: "", orderDate: format(new Date(), 'yyyy-MM-dd'), contractorId: "", contractorName: "", items: [{ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }], description: "", termsAndConditions: "" },
   });
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
@@ -142,13 +147,58 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
     });
   }, [watchedItems, form]);
 
+  const uploadFile = async (file: File, path: string): Promise<{url: string, name: string, contentType: string}> => {
+    const storage = getStorage(firebaseApp);
+    const storageRef = ref(storage, path);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+    
+    return new Promise((resolve, reject) => {
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
+        }, 
+        (error) => reject(error), 
+        async () => {
+          const url = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve({ url, name: file.name, contentType: file.type });
+        }
+      );
+    });
+  };
+
   const onSubmit = async (values: z.infer<typeof woSchema>) => {
     if (!user || !userProfile || !site) return;
     setIsSubmitting(true);
+    setUploadProgress({});
     try {
+      const attachments = [];
+      if (scopeFiles.length > 0) {
+        const timestamp = Date.now();
+        for (const file of scopeFiles) {
+          const path = `work_orders/scope_docs/${user.uid}/${timestamp}_${file.name.replace(/\s+/g, '_')}`;
+          const uploaded = await uploadFile(file, path);
+          attachments.push(uploaded);
+        }
+      }
+
       const historyEntry = { action: 'Created', userName: userProfile.username || user.email, userId: user.uid, timestamp: new Date(), details: `Work Order released for ₹${totalAmount.toLocaleString('en-IN')} (Pending Admin Approval)` };
       await addDocumentNonBlocking(collection(firestore, 'project_wos'), {
-        siteId: projectId, siteName: site.name, woNumber: values.woNumber, contractorId: values.contractorId, contractorName: values.contractorName, orderDate: values.orderDate, items: values.items, totalAmount, description: values.description, status: 'Pending', createdAt: serverTimestamp(), createdByName: userProfile.username || user.email, history: [historyEntry]
+        siteId: projectId, 
+        siteName: site.name, 
+        woNumber: values.woNumber, 
+        contractorId: values.contractorId, 
+        contractorName: values.contractorName, 
+        orderDate: values.orderDate, 
+        items: values.items, 
+        totalAmount, 
+        description: values.description, 
+        termsAndConditions: values.termsAndConditions || "",
+        scopeAttachments: attachments,
+        status: 'Pending', 
+        createdAt: serverTimestamp(), 
+        createdByName: userProfile.username || user.email, 
+        history: [historyEntry]
       });
       setFinalTotal(totalAmount);
       setIsSuccess(true);
@@ -169,9 +219,9 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4"><div className="bg-primary/10 p-4 rounded-full"><CheckCircle2 className="h-12 w-12 text-primary" /></div></div>
             <CardTitle className="text-2xl font-bold uppercase tracking-tight">WO Submitted</CardTitle>
-            <CardDescription className="text-base leading-relaxed">Work Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been issued to <strong className="text-foreground">{form.getValues('contractorName')}</strong> and is awaiting Admin approval.</CardDescription>
+            <CardDescription className="text-base leading-relaxed">Work Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been issued and is awaiting Admin approval.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4"><Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push(`/projects/${projectId}?tab=wo`)}>Back to Work Orders</Button><Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); }}>Create Another WO</Button></CardContent>
+          <CardContent className="space-y-4"><Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push(`/projects/${projectId}?tab=wo`)}>Back to Work Orders</Button><Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); setScopeFiles([]); }}>Create Another WO</Button></CardContent>
         </Card>
       </div>
     );
@@ -186,7 +236,8 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
       </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden"><CardHeader className="bg-primary/5 border-b"><CardTitle className="text-sm font-black uppercase tracking-widest">Order Context</CardTitle></CardHeader><CardContent className="pt-6"><div className="grid grid-cols-1 md:grid-cols-3 gap-6"><FormField control={form.control} name="woNumber" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">WO Number</FormLabel><FormControl><Input placeholder="e.g. AGEPL/WO/2026/042" {...field} className="h-11 rounded-sm uppercase font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="orderDate" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Order Date</FormLabel><FormControl><div className="relative"><Input type="date" {...field} className="h-11 rounded-sm pr-10" /><Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" /></div></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="contractorId" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Contractor Partner</FormLabel><Popover open={isContractorPopoverOpen} onOpenChange={setIsContractorPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>{field.value ? allContractors?.find(c => c.id === field.value)?.name : "Select Contractor..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search contractors..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={contractorSearch} onChange={(e) => setContractorSearch(e.target.value)} /></div><ScrollArea className="h-[200px]"><div className="p-1">{allContractors?.filter(c => c.name.toLowerCase().includes(contractorSearch.toLowerCase())).map((c) => (<Button key={c.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { field.onChange(c.id); form.setValue('contractorName', c.name); setIsContractorPopoverOpen(false); setContractorSearch(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", c.id === field.value ? "opacity-100" : "opacity-0")} /><div className="flex flex-col items-start"><span className="font-bold">{c.name}</span><span className="text-[8px] font-mono text-muted-foreground">{c.gstin}</span></div></Button>))}</div></ScrollArea></PopoverContent></Popover><FormMessage /></FormItem>)} /></div></CardContent></Card>
+          <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden"><CardHeader className="bg-primary/5 border-b"><CardTitle className="text-sm font-black uppercase tracking-widest">Order Context</CardTitle></CardHeader><CardContent className="pt-6"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><FormField control={form.control} name="woNumber" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">WO Number</FormLabel><FormControl><Input placeholder="e.g. AGEPL/WO/2026/042" {...field} className="h-11 rounded-sm uppercase font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="orderDate" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Order Date</FormLabel><FormControl><div className="relative"><Input type="date" {...field} className="h-11 rounded-sm pr-10" /><Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" /></div></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="contractorId" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Contractor Partner</FormLabel><Popover open={isContractorPopoverOpen} onOpenChange={setIsContractorPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>{field.value ? allContractors?.find(c => c.id === field.value)?.name : "Choose Contractor..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search contractors..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={contractorSearch} onChange={(e) => setContractorSearch(e.target.value)} /></div><ScrollArea className="h-[200px]"><div className="p-1">{allContractors?.filter(c => c.name.toLowerCase().includes(contractorSearch.toLowerCase())).map((c) => (<Button key={c.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { field.onChange(c.id); form.setValue('contractorName', c.name); setIsContractorPopoverOpen(false); setContractorSearch(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", c.id === field.value ? "opacity-100" : "opacity-0")} /><div className="flex flex-col items-start"><span className="font-bold">{c.name}</span><span className="text-[8px] font-mono text-muted-foreground">{c.gstin}</span></div></Button>))}</div></ScrollArea></PopoverContent></Popover><FormMessage /></FormItem>)} /></div></CardContent></Card>
+          
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b pb-2 px-1"><div className="flex items-center gap-2"><ListPlus className="h-4 w-4 text-primary" /><h3 className="text-sm font-black uppercase tracking-widest text-foreground">Service Line Items</h3></div><Button type="button" variant="outline" size="sm" onClick={() => append({ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"><Plus className="h-3.5 w-3.5 mr-1.5" /> Add Service</Button></div>
             <div className="space-y-4">
@@ -210,7 +261,84 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
               })}
             </div>
           </div>
-          <Card className="rounded-sm border-primary/10"><CardHeader className="bg-muted/5 py-3 border-b"><CardTitle className="text-xs font-bold uppercase tracking-wider">Additional Scope & Narrative</CardTitle></CardHeader><CardContent className="pt-6"><FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormControl><Textarea placeholder="Detail specific project milestones, technical requirements, or legal conditions..." rows={6} {...field} className="rounded-sm bg-muted/5 italic" /></FormControl><FormMessage /></FormItem>)} /></CardContent></Card>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card className="rounded-sm border-primary/10 shadow-sm h-fit">
+              <CardHeader className="p-4 bg-muted/5 border-b">
+                <CardTitle className="text-sm uppercase font-bold tracking-widest flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" /> Detailed Scope of Work
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <FormField control={form.control} name="description" render={({ field }) => (
+                  <FormItem>
+                    <FormControl><Textarea placeholder="Detail specific project milestones, technical requirements..." rows={8} {...field} className="rounded-sm bg-background" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <FileUp className="h-4 w-4 text-primary" /> Scope Attachments (Drawings/Specs)
+                  </Label>
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-3">
+                      {scopeFiles.map((file, idx) => (
+                        <div key={idx} className="relative group w-24 h-24 rounded-sm overflow-hidden border bg-muted flex flex-col items-center justify-center p-2 text-center">
+                          {file.type.startsWith('image/') ? (
+                            <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" />
+                          ) : (
+                            <FileText className="h-8 w-8 text-primary opacity-40" />
+                          )}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                             <Button 
+                              type="button"
+                              variant="destructive" size="icon" className="h-7 w-7 rounded-full shadow-lg" 
+                              onClick={() => setScopeFiles(prev => prev.filter((_, i) => i !== idx))}
+                             >
+                               <X className="h-4 w-4" />
+                             </Button>
+                          </div>
+                          {uploadProgress[file.name] !== undefined && (
+                            <div className="absolute bottom-0 left-0 right-0 p-1 bg-white/90">
+                              <Progress value={uploadProgress[file.name]} className="h-1 rounded-none" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      <label className="flex flex-col items-center justify-center w-24 h-24 cursor-pointer border-2 border-dashed border-primary/20 rounded-sm hover:bg-primary/5 transition-all bg-muted/5 group">
+                        <Plus className="h-6 w-6 text-primary/40 group-hover:text-primary transition-colors" />
+                        <span className="text-[8px] font-black uppercase text-primary/40 group-hover:text-primary mt-1">Add File</span>
+                        <input 
+                          type="file" 
+                          multiple 
+                          className="hidden" 
+                          onChange={(e) => setScopeFiles(prev => [...prev, ...Array.from(e.target.files || [])])} 
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-sm border-primary/10 shadow-sm h-fit">
+              <CardHeader className="p-4 bg-muted/5 border-b">
+                <CardTitle className="text-sm uppercase font-bold tracking-widest flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-primary" /> Terms & Conditions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <FormField control={form.control} name="termsAndConditions" render={({ field }) => (
+                  <FormItem>
+                    <FormControl><Textarea placeholder="Payment terms, liquidated damages, termination clauses..." rows={12} {...field} className="rounded-sm bg-background font-medium text-xs leading-relaxed" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl animate-in slide-in-from-bottom-2"><div className="flex items-center gap-4"><div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5"><Gavel className="h-8 w-8" /></div><div className="flex flex-col"><span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Total Contract Value</span><span className="text-4xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div><div className="flex gap-3 w-full sm:w-auto"><Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">Cancel</Button><Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95">{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> SUBMITTING...</> : <><Send className="mr-2 h-4 w-4" /> SUBMIT FOR APPROVAL</>}</Button></div></div>
         </form>
       </Form>

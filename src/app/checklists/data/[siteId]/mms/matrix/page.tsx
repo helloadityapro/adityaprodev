@@ -198,7 +198,7 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
       
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
-      doc.text(`SITE CHECKLIST MATRIX: ${site?.name || 'MMS'}`, margin, 15);
+      doc.text(`SITE CHECKLIST: ${site?.name || 'MMS'}`, margin, 15);
       doc.setFontSize(10);
       doc.text(`Project Company: ${site?.projectCompany || 'Aditya Green Energy'}`, margin, 20);
 

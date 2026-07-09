@@ -322,7 +322,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
                 ) : (
                   <div className="p-6 border-2 border-dashed rounded-sm bg-muted/5 flex flex-col items-center justify-center text-center opacity-40">
                     <ImageIcon className="h-8 w-8 mb-2" />
-                    <p className="text-[10px] font-black uppercase">No Audit Proof</p>
+                    <p className="text-[10px] font-black uppercase">No Visit Attachment</p>
                   </div>
                 )}
 
@@ -389,7 +389,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
             <div className="flex items-center justify-between gap-4 border-b pb-2">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Activity Proof & Evidence</h3>
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-foreground">Visit Attachments</h3>
               </div>
               <Badge variant="secondary" className="rounded-full px-3 py-0.5 h-5 text-[10px] font-bold bg-muted text-muted-foreground border-none">
                 {visit.tasks?.length || 0} Items Logged
@@ -423,7 +423,7 @@ export default function SiteVisitDetailPage({ params }: { params: Promise<{ visi
                       </div>
                     ) : (
                       <div className="h-20 bg-muted/10 border border-dashed rounded-sm flex items-center justify-center text-[9px] font-bold text-muted-foreground uppercase opacity-40">
-                        Documentation provided without visual proof
+                        Documentation provided without Attachments
                       </div>
                     )}
                   </div>

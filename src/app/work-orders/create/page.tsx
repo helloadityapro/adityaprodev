@@ -11,10 +11,12 @@ import {
   useDoc, 
   useMemoFirebase, 
   useCollection, 
-  addDocumentNonBlocking 
+  addDocumentNonBlocking, 
+  useFirebaseApp 
 } from '@/firebase';
-import { collection, doc, serverTimestamp } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +36,10 @@ import {
   Send,
   FileText,
   Trash2,
-  ListPlus
+  ListPlus,
+  FileUp,
+  X,
+  ShieldAlert
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -43,6 +48,8 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 const woItemSchema = z.object({
   description: z.string().min(1, 'Description is required.'),
@@ -61,6 +68,7 @@ const woSchema = z.object({
   contractorName: z.string(),
   items: z.array(woItemSchema).min(1, 'At least one line item is required.'),
   description: z.string().min(10, 'Please provide a detailed overall scope of work.'),
+  termsAndConditions: z.string().optional(),
 });
 
 type Site = {
@@ -77,6 +85,7 @@ type Contractor = {
 
 export default function GlobalCreateWOPage() {
   const firestore = useFirestore();
+  const firebaseApp = useFirebaseApp();
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
@@ -84,6 +93,9 @@ export default function GlobalCreateWOPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [finalTotal, setFinalTotal] = React.useState(0);
+  
+  const [scopeFiles, setScopeFiles] = React.useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearch, setSiteSearch] = React.useState("");
@@ -94,7 +106,6 @@ export default function GlobalCreateWOPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
   
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
-  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -112,7 +123,8 @@ export default function GlobalCreateWOPage() {
       contractorId: "",
       contractorName: "",
       items: [{ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }],
-      description: ""
+      description: "",
+      termsAndConditions: ""
     },
   });
 
@@ -158,10 +170,41 @@ export default function GlobalCreateWOPage() {
     c.gstin.toLowerCase().includes(contractorSearch.toLowerCase())
   ) || [];
 
+  const uploadFile = async (file: File, path: string): Promise<{url: string, name: string, contentType: string}> => {
+    const storage = getStorage(firebaseApp);
+    const storageRef = ref(storage, path);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+    
+    return new Promise((resolve, reject) => {
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
+        }, 
+        (error) => reject(error), 
+        async () => {
+          const url = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve({ url, name: file.name, contentType: file.type });
+        }
+      );
+    });
+  };
+
   const onSubmit = async (values: z.infer<typeof woSchema>) => {
     if (!user || !userProfile) return;
     setIsSubmitting(true);
+    setUploadProgress({});
     try {
+      const attachments = [];
+      if (scopeFiles.length > 0) {
+        const timestamp = Date.now();
+        for (const file of scopeFiles) {
+          const path = `work_orders/scope_docs/${user.uid}/${timestamp}_${file.name.replace(/\s+/g, '_')}`;
+          const uploaded = await uploadFile(file, path);
+          attachments.push(uploaded);
+        }
+      }
+
       const historyEntry = {
         action: 'Created',
         userName: userProfile.username || user.email,
@@ -180,6 +223,8 @@ export default function GlobalCreateWOPage() {
         items: values.items,
         totalAmount,
         description: values.description,
+        termsAndConditions: values.termsAndConditions || "",
+        scopeAttachments: attachments,
         status: 'Pending',
         createdAt: serverTimestamp(),
         createdByName: userProfile.username || user.email,
@@ -209,7 +254,7 @@ export default function GlobalCreateWOPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push('/work-orders/manage')}>Manage All WOs</Button>
-            <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); }}>Create Another</Button>
+            <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); setScopeFiles([]); }}>Create Another</Button>
           </CardContent>
         </Card>
       </div>
@@ -328,7 +373,7 @@ export default function GlobalCreateWOPage() {
                 return (
                   <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2">
                     {fields.length > 1 && (
-                      <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive" onClick={() => remove(index)}>
+                      <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     )}
@@ -370,14 +415,81 @@ export default function GlobalCreateWOPage() {
             </div>
           </div>
 
-          <div className="mt-8 space-y-4">
-            <FormField control={form.control} name="description" render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-primary" /> Detailed Scope of Work</FormLabel>
-                <FormControl><Textarea placeholder="Detail specific project milestones, technical requirements, or legal conditions..." rows={8} {...field} className="rounded-sm bg-muted/5 italic" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Card className="rounded-sm border-primary/10 shadow-sm h-fit">
+              <CardHeader className="p-4 bg-muted/5 border-b">
+                <CardTitle className="text-sm uppercase font-bold tracking-widest flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-primary" /> Detailed Scope of Work
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-6">
+                <FormField control={form.control} name="description" render={({ field }) => (
+                  <FormItem>
+                    <FormControl><Textarea placeholder="Detail specific project milestones, technical requirements..." rows={8} {...field} className="rounded-sm bg-background" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                
+                <div className="space-y-3">
+                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <FileUp className="h-4 w-4 text-primary" /> Scope Attachments (Drawings/Specs)
+                  </Label>
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-3">
+                      {scopeFiles.map((file, idx) => (
+                        <div key={idx} className="relative group w-24 h-24 rounded-sm overflow-hidden border bg-muted flex flex-col items-center justify-center p-2 text-center">
+                          {file.type.startsWith('image/') ? (
+                            <img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" />
+                          ) : (
+                            <FileText className="h-8 w-8 text-primary opacity-40" />
+                          )}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                             <Button 
+                              type="button"
+                              variant="destructive" size="icon" className="h-7 w-7 rounded-full shadow-lg" 
+                              onClick={() => setScopeFiles(prev => prev.filter((_, i) => i !== idx))}
+                             >
+                               <X className="h-4 w-4" />
+                             </Button>
+                          </div>
+                          {uploadProgress[file.name] !== undefined && (
+                            <div className="absolute bottom-0 left-0 right-0 p-1 bg-white/90">
+                              <Progress value={uploadProgress[file.name]} className="h-1 rounded-none" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      <label className="flex flex-col items-center justify-center w-24 h-24 cursor-pointer border-2 border-dashed border-primary/20 rounded-sm hover:bg-primary/5 transition-all bg-muted/5 group">
+                        <Plus className="h-6 w-6 text-primary/40 group-hover:text-primary transition-colors" />
+                        <span className="text-[8px] font-black uppercase text-primary/40 group-hover:text-primary mt-1">Add File</span>
+                        <input 
+                          type="file" 
+                          multiple 
+                          className="hidden" 
+                          onChange={(e) => setScopeFiles(prev => [...prev, ...Array.from(e.target.files || [])])} 
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-sm border-primary/10 shadow-sm h-fit">
+              <CardHeader className="p-4 bg-muted/5 border-b">
+                <CardTitle className="text-sm uppercase font-bold tracking-widest flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-primary" /> Terms & Conditions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <FormField control={form.control} name="termsAndConditions" render={({ field }) => (
+                  <FormItem>
+                    <FormControl><Textarea placeholder="Payment terms, liquidated damages, termination clauses..." rows={12} {...field} className="rounded-sm bg-background font-medium text-xs leading-relaxed" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </CardContent>
+            </Card>
           </div>
 
           <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
