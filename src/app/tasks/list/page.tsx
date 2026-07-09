@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, increment, getDoc, limit } from "firebase/firestore";
+import { collection, doc, query, where, or, serverTimestamp, increment, getDoc, limit } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,7 +30,9 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  UserCheck
+  UserCheck,
+  MessageCircle,
+  Share2
 } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
@@ -315,7 +317,224 @@ export default function TaskListPage() {
     setDeletingTask(null);
   };
 
-  if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
+  const handleWhatsAppShare = (task: Task) => {
+    const message = `*Aditya Pro - Task Notification*\n\n*Task:* ${task.title}\n*Site:* ${task.siteName}\n*Due Date:* ${format(new Date(task.dueDate), 'dd MMM yyyy')}\n*Assigned By:* ${task.assignedByName}\n\n*Description:*\n${task.description}\n\n_Check the Aditya Pro app for full details and progress updates._`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
+  function renderTable() {
+    return (
+      <>
+        {/* Mobile Card Layout */}
+        <div className="md:hidden divide-y">
+          {filteredTasks.length > 0 ? filteredTasks.map((task) => {
+            const assignees = Object.values(task.assigneeStates || {});
+            const completedCount = assignees.filter(s => s.status === 'Completed').length;
+            
+            return (
+              <div key={task.id} className="p-4 space-y-3 bg-card hover:bg-muted/5 transition-colors" onClick={() => toggleExpand(task.id)}>
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Due {format(new Date(task.dueDate), 'dd MMM yy')}</span>
+                    <h3 className="font-bold text-sm leading-tight text-foreground truncate">{task.title}</h3>
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <StatusBadge status={task.status} />
+                    <Badge variant="secondary" className="text-[8px] h-4 px-1 rounded-sm bg-primary/5 text-primary border-primary/10">
+                       {completedCount}/{assignees.length} Finished
+                    </Badge>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
+                    <MapPin className="h-3 w-3 text-primary/60" />
+                    <span>{task.siteName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <PriorityBadge priority={task.priority} />
+                    <Badge variant="secondary" className="text-[8px] font-black h-5 px-1.5 uppercase rounded-sm bg-primary/5 text-primary border-none">
+                      {getSummarizedAssignees(task)}
+                    </Badge>
+                  </div>
+                </div>
+
+                {expandedTaskIds.has(task.id) && (
+                   <div className="pt-4 border-t space-y-4 animate-in slide-in-from-top-1">
+                      {Object.values(task.assigneeStates || {}).map(s => (
+                        <div key={s.userId} className="p-3 bg-muted/20 border rounded-sm space-y-2">
+                           <div className="flex justify-between items-center">
+                              <span className="text-xs font-bold text-foreground">{s.userName}</span>
+                              <StatusBadge status={s.status} className="h-4 px-1 text-[7px]" />
+                           </div>
+                           {s.remarks && <p className="text-[10px] italic text-muted-foreground leading-snug">"{s.remarks}"</p>}
+                        </div>
+                      ))}
+                   </div>
+                )}
+
+                <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <User className="h-3.5 w-3.5 text-primary" />
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase">By {task.assignedByName}</span>
+                  </div>
+                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(task)}><MessageCircle className="h-4 w-4" /></Button>
+                    {((task.assigneeIds || []).includes(user?.uid || "") || isAdmin || task.assignedById === user?.uid) && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => { 
+                        setActionTask(task); 
+                        const targetId = (task.assigneeIds || []).includes(user?.uid || "") ? user?.uid : (task.assigneeIds[0] || "");
+                        setSelectedUpdateUserId(targetId || "");
+                        setPendingStatus(task.assigneeStates?.[targetId || ""]?.status || "To-do");
+                      }}><Pencil className="h-4 w-4" /></Button>
+                    )}
+                    {isAdmin && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingTask(task)}><Trash2 className="h-4 w-4" /></Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="p-12 text-center text-muted-foreground italic text-sm">No tasks found.</div>
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block">
+          <Table>
+            <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
+              <TableRow>
+                <TableHead className="w-12"></TableHead>
+                <TableHead className="w-32">Due Date</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Assignees</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Assigned By</TableHead>
+                <TableHead className="text-right px-6">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredTasks.length > 0 ? filteredTasks.map((task) => {
+                const assignees = Object.values(task.assigneeStates || {});
+                const completedCount = assignees.filter(s => s.status === 'Completed').length;
+                
+                return (
+                  <React.Fragment key={task.id}>
+                    <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => toggleExpand(task.id)}>
+                      <TableCell className="pl-4">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm">
+                          {expandedTaskIds.has(task.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono text-xs font-bold text-primary">{format(new Date(task.dueDate), 'dd MMM yy')}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-bold text-sm text-foreground">{task.title}</span>
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+                            <MapPin className="h-3 w-3 text-primary/40" /> {task.siteName}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell><PriorityBadge priority={task.priority} /></TableCell>
+                      <TableCell>
+                        <span className="text-xs font-bold text-foreground">
+                          {getSummarizedAssignees(task)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <StatusBadge status={task.status} />
+                          <Badge variant="secondary" className="w-fit text-[8px] h-4 px-1 rounded-sm bg-primary/5 text-primary/60 border-none font-black uppercase">
+                            {completedCount}/{assignees.length} Finished
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <UserCheck className="h-3.5 w-3.5 text-primary opacity-60" />
+                          <span className="text-[10px] font-black uppercase text-muted-foreground">{task.assignedByName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end items-center gap-1" onClick={e => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleWhatsAppShare(task)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
+                          {((task.assigneeIds || []).includes(user?.uid || "") || isAdmin || task.assignedById === user?.uid) && (
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm" 
+                              onClick={() => { 
+                                setActionTask(task); 
+                                const targetId = (task.assigneeIds || []).includes(user?.uid || "") ? user?.uid : (task.assigneeIds[0] || "");
+                                setSelectedUpdateUserId(targetId || "");
+                                setPendingStatus(task.assigneeStates?.[targetId || ""]?.status || "To-do");
+                              }}
+                              title="Record Progress"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {isAdmin && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingTask(task)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {expandedTaskIds.has(task.id) && (
+                      <TableRow className="bg-primary/[0.01]">
+                        <TableCell colSpan={8} className="p-0 border-b">
+                          <div className="p-6 px-20 space-y-6 animate-in slide-in-from-top-1 duration-200 text-left">
+                            <div className="flex items-center gap-2 border-b pb-2">
+                              <ShieldCheck className="h-4 w-4 text-primary" />
+                              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Task Allotment Breakdown</h4>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                              {Object.values(task.assigneeStates || {}).map((s) => (
+                                <Card key={s.userId} className="rounded-sm shadow-sm border-primary/5">
+                                  <CardHeader className="p-3 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0">
+                                    <div className="flex items-center gap-2">
+                                      <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center font-black text-[10px] text-primary">{s.userName.charAt(0).toUpperCase()}</div>
+                                      <span className="font-bold text-xs">{s.userName}</span>
+                                    </div>
+                                    <StatusBadge status={s.status} className="h-4 px-1 text-[8px]" />
+                                  </CardHeader>
+                                  <CardContent className="p-3 space-y-3">
+                                    <div className="flex flex-col gap-1">
+                                      <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Personnel Status</span>
+                                      <p className="text-[11px] font-medium leading-relaxed italic text-foreground/80">
+                                        "{s.remarks || 'Awaiting update...'}"
+                                      </p>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              }) : (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-40 text-center italic text-muted-foreground uppercase font-black text-[11px] opacity-20 tracking-[0.2em]">
+                    No tasks recorded for this selection
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -355,197 +574,7 @@ export default function TaskListPage() {
         </div>
       </div>
 
-      <div className="md:hidden space-y-4">
-        {filteredTasks.length > 0 ? filteredTasks.map((task) => (
-          <Card key={task.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden" onClick={() => toggleExpand(task.id)}>
-            <CardContent className="p-4 space-y-4 text-left">
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex flex-col gap-1 min-w-0">
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Due {format(new Date(task.dueDate), 'dd MMM yy')}</span>
-                  <h3 className="font-bold text-sm leading-tight text-foreground truncate">{task.title}</h3>
-                </div>
-                <StatusBadge status={task.status} />
-              </div>
-              
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-tight">
-                  <MapPin className="h-3 w-3 text-primary/60" />
-                  <span>{task.siteName}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <PriorityBadge priority={task.priority} />
-                  <Badge variant="secondary" className="text-[8px] font-black h-5 px-1.5 uppercase rounded-sm bg-primary/5 text-primary border-none">
-                    {getSummarizedAssignees(task)}
-                  </Badge>
-                </div>
-              </div>
-
-              {expandedTaskIds.has(task.id) && (
-                 <div className="pt-4 border-t space-y-4 animate-in slide-in-from-top-1">
-                    {Object.values(task.assigneeStates || {}).map(s => (
-                      <div key={s.userId} className="p-3 bg-muted/20 border rounded-sm space-y-2">
-                         <div className="flex justify-between items-center">
-                            <span className="text-xs font-bold text-foreground">{s.userName}</span>
-                            <StatusBadge status={s.status} className="h-4 px-1 text-[7px]" />
-                         </div>
-                         {s.remarks && <p className="text-[10px] italic text-muted-foreground leading-snug">"{s.remarks}"</p>}
-                      </div>
-                    ))}
-                 </div>
-              )}
-
-              <div className="pt-2 border-t border-primary/5 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase">By {task.assignedByName}</span>
-                </div>
-                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                  {((task.assigneeIds || []).includes(user?.uid || "") || isAdmin || task.assignedById === user?.uid) && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => { 
-                      setActionTask(task); 
-                      const targetId = (task.assigneeIds || []).includes(user?.uid || "") ? user?.uid : (task.assigneeIds[0] || "");
-                      setSelectedUpdateUserId(targetId || "");
-                      setPendingStatus(task.assigneeStates?.[targetId || ""]?.status || "To-do");
-                    }}><Pencil className="h-4 w-4" /></Button>
-                  )}
-                  {isAdmin && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingTask(task)}><Trash2 className="h-4 w-4" /></Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )) : <div className="text-center py-12 text-muted-foreground italic">No tasks found.</div>}
-      </div>
-
-      <div className="hidden md:block">
-        <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden">
-          <CardContent className="p-0 text-left">
-            <ScrollArea className="h-[600px] w-full">
-              <Table>
-                <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
-                  <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead className="w-32">Due Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Assignees</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Assigned By</TableHead>
-                    <TableHead className="text-right px-6">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTasks.length > 0 ? filteredTasks.map((task) => {
-                    const assignees = Object.values(task.assigneeStates || {});
-                    const completedCount = assignees.filter(s => s.status === 'Completed').length;
-                    
-                    return (
-                      <React.Fragment key={task.id}>
-                        <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => toggleExpand(task.id)}>
-                          <TableCell className="pl-4">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm">
-                              {expandedTaskIds.has(task.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                            </Button>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-mono text-xs font-bold text-primary">{format(new Date(task.dueDate), 'dd MMM yy')}</span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-bold text-sm text-foreground">{task.title}</span>
-                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
-                                <MapPin className="h-3 w-3 text-primary/40" /> {task.siteName}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell><PriorityBadge priority={task.priority} /></TableCell>
-                          <TableCell>
-                            <span className="text-xs font-bold text-foreground">
-                              {getSummarizedAssignees(task)}
-                            </span>
-                          </TableCell>
-                          <TableCell><StatusBadge status={task.status} /></TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5">
-                              <UserCheck className="h-3.5 w-3.5 text-primary opacity-60" />
-                              <span className="text-[10px] font-black uppercase text-muted-foreground">{task.assignedByName}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right px-6">
-                            <div className="flex justify-end items-center gap-1" onClick={e => e.stopPropagation()}>
-                              {((task.assigneeIds || []).includes(user?.uid || "") || isAdmin || task.assignedById === user?.uid) && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm" 
-                                  onClick={() => { 
-                                    setActionTask(task); 
-                                    const targetId = (task.assigneeIds || []).includes(user?.uid || "") ? user?.uid : (task.assigneeIds[0] || "");
-                                    setSelectedUpdateUserId(targetId || "");
-                                    setPendingStatus(task.assigneeStates?.[targetId || ""]?.status || "To-do");
-                                  }}
-                                  title="Record Progress"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              )}
-                              {isAdmin && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingTask(task)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        {expandedTaskIds.has(task.id) && (
-                          <TableRow className="bg-primary/[0.01]">
-                            <TableCell colSpan={8} className="p-0 border-b">
-                              <div className="p-6 px-20 space-y-6 animate-in slide-in-from-top-1 duration-200 text-left">
-                                <div className="flex items-center gap-2 border-b pb-2">
-                                  <ShieldCheck className="h-4 w-4 text-primary" />
-                                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Task Allotment Breakdown</h4>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                  {Object.values(task.assigneeStates || {}).map((s) => (
-                                    <Card key={s.userId} className="rounded-sm shadow-sm border-primary/5">
-                                      <CardHeader className="p-3 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0">
-                                        <div className="flex items-center gap-2">
-                                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center font-black text-[10px] text-primary">{s.userName.charAt(0).toUpperCase()}</div>
-                                          <span className="font-bold text-xs">{s.userName}</span>
-                                        </div>
-                                        <StatusBadge status={s.status} className="h-4 px-1 text-[8px]" />
-                                      </CardHeader>
-                                      <CardContent className="p-3 space-y-3">
-                                        <div className="flex flex-col gap-1">
-                                          <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Personnel Status</span>
-                                          <p className="text-[11px] font-medium leading-relaxed italic text-foreground/80">
-                                            "{s.remarks || 'Awaiting update...'}"
-                                          </p>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </React.Fragment>
-                    );
-                  }) : (
-                    <TableRow>
-                      <TableCell colSpan={8} className="h-40 text-center italic text-muted-foreground uppercase font-black text-[11px] opacity-20 tracking-[0.2em]">
-                        No tasks recorded for this selection
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </div>
+      {renderTable()}
 
       <Dialog open={!!actionTask} onOpenChange={() => { setActionTask(null); setPendingStatus(""); setSelectedUpdateUserId(""); }}>
         <DialogContent className="rounded-sm max-w-lg">
@@ -652,16 +681,4 @@ export default function TaskListPage() {
       </AlertDialog>
     </div>
   );
-}
-
-function subDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() - days);
-  return result;
-}
-
-function subMonths(date: Date, months: number): Date {
-  const result = new Date(date);
-  result.setMonth(result.getMonth() - months);
-  return result;
 }
