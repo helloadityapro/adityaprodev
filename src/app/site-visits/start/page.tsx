@@ -70,30 +70,12 @@ export default function StartSiteVisitPage() {
   const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
   const accessibleSites = React.useMemo(() => {
-    if (!allSites || !userProfile) return [];
+    if (!allSites) return [];
     
-    // Special Authorization: Admins AND Liaison & Documents department see all sites
-    if (isAdmin || userProfile.department === "Liaison & Documents") {
-      return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
-    }
-    
-    // Sovereignty Logic for Engineers and Managers
-    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
-    if (isManager) {
-      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
-      if (teamMembers) {
-        teamMembers.forEach(member => {
-          (member.assignedProjectIds || []).forEach(id => {
-            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
-            if (!hasOtherOverride) siteIds.add(id);
-          });
-        });
-      }
-    }
-    
-    const filtered = allSites.filter(s => siteIds.has(s.id));
-    return Array.from(new Map(filtered.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
+    // Requirements Update: Display all sites to everyone for starting a visit
+    // This allows any personnel to check into a site regardless of their direct assignment
+    return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
