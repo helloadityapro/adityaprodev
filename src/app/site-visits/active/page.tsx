@@ -1,17 +1,19 @@
+
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, doc, query, where, or, and } from "firebase/firestore";
+import { collection, doc, query, where, or, and, updateDoc, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, User, Building2, Globe, RefreshCw } from "lucide-react";
+import { Clock, MapPin, Navigation, ArrowRight, Timer, HardHat, User, Building2, Globe, RefreshCw, XCircle } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 type SiteVisit = {
   id: string;
@@ -31,6 +33,7 @@ export default function ActiveSiteVisitsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userProfileRef);
@@ -78,6 +81,18 @@ export default function ActiveSiteVisitsPage() {
       return timeB - timeA;
     });
   }, [visits]);
+
+  const handleForceFinalize = async (vId: string) => {
+    try {
+      await updateDoc(doc(firestore, 'site_visits', vId), {
+        status: 'completed',
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: 'Report Finalized', description: 'Media synchronization terminated. Report has been marked as complete.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
+    }
+  };
 
   if (isLoading || isProfileLoading) {
     return (
@@ -176,14 +191,24 @@ export default function ActiveSiteVisitsPage() {
                     </div>
                   </div>
                 </CardContent>
-                {visit.managerId === user?.uid && !isSyncing && (
+                {((visit.managerId === user?.uid && !isSyncing) || (isSyncing && (visit.managerId === user?.uid || isAdmin))) && (
                   <CardFooter className="bg-muted/10 border-t p-4">
-                    <Button 
-                      className="w-full h-12 text-lg font-black rounded-sm shadow-md" 
-                      onClick={() => router.push(`/site-visits/${visit.id}/finish`)}
-                    >
-                      Continue {isSite ? 'Visit' : 'Visit'} <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
+                    {isSyncing ? (
+                      <Button 
+                        variant="destructive"
+                        className="w-full h-12 text-sm font-black rounded-sm shadow-md" 
+                        onClick={() => handleForceFinalize(visit.id)}
+                      >
+                        <XCircle className="mr-2 h-4 w-4" /> End Sync & Finalize Report
+                      </Button>
+                    ) : (
+                      <Button 
+                        className="w-full h-12 text-lg font-black rounded-sm shadow-md" 
+                        onClick={() => router.push(`/site-visits/${visit.id}/finish`)}
+                      >
+                        Continue {isSite ? 'Visit' : 'Visit'} <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+                    )}
                   </CardFooter>
                 )}
               </Card>
