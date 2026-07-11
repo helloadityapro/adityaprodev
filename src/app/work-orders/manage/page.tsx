@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, orderBy, where, limit, arrayUnion, serverTimestamp } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -35,7 +35,8 @@ import {
   ShieldCheck,
   ExternalLink,
   MessageCircle,
-  Clock
+  Clock,
+  Printer
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -129,6 +130,7 @@ export default function GlobalManageWOsPage() {
   const [woActionState, setWoActionState] = React.useState<{ wo: WorkOrder, type: 'Accepted' | 'Rejected' } | null>(null);
   const [viewingWO, setViewingWO] = React.useState<WorkOrder | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
+  const [isExportingPDF, setIsExportingPDF] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -249,7 +251,121 @@ export default function GlobalManageWOsPage() {
     }
   };
 
-  const handleExport = () => {
+  const exportToPDF = async (wo: WorkOrder) => {
+    setIsExportingPDF(true);
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const margin = 20;
+      let currY = 30;
+
+      // Header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.setTextColor(45, 115, 255); // Primary Blue
+      doc.text('WORK ORDER', 105, currY, { align: 'center' });
+      
+      currY += 15;
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text('ADITYA GREEN ENERGY PRIVATE LIMITED', margin, currY);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Registered Office: Maharashtra, India', margin, currY + 5);
+      
+      currY += 20;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, currY, 210 - margin, currY);
+      
+      currY += 10;
+      doc.setFont('helvetica', 'bold');
+      doc.text(`WO NUMBER: ${wo.woNumber}`, margin, currY);
+      doc.text(`DATE: ${wo.orderDate}`, 210 - margin, currY, { align: 'right' });
+      
+      currY += 10;
+      doc.text('TO:', margin, currY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(wo.contractorName, margin, currY + 5);
+      
+      currY += 15;
+      doc.setFont('helvetica', 'bold');
+      doc.text('PROJECT SITE:', margin, currY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(wo.siteName, margin + 30, currY);
+
+      // Description
+      currY += 15;
+      doc.setFont('helvetica', 'bold');
+      doc.text('SCOPE OF WORK:', margin, currY);
+      doc.setFont('helvetica', 'normal');
+      const splitDesc = doc.splitTextToSize(wo.description || 'N/A', 170);
+      doc.text(splitDesc, margin, currY + 5);
+      currY += 10 + (splitDesc.length * 5);
+
+      // Table Header
+      doc.setFillColor(245, 245, 245);
+      doc.rect(margin, currY, 170, 10, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.text('DESCRIPTION', margin + 2, currY + 6);
+      doc.text('QTY', margin + 70, currY + 6);
+      doc.text('RATE', margin + 90, currY + 6);
+      doc.text('BASIC', margin + 115, currY + 6);
+      doc.text('GST %', margin + 135, currY + 6);
+      doc.text('TOTAL', margin + 168, currY + 6, { align: 'right' });
+      
+      currY += 10;
+      doc.setFont('helvetica', 'normal');
+      
+      wo.items.forEach((item) => {
+        if (currY > 260) { doc.addPage(); currY = 30; }
+        const basic = item.quantity * item.rate;
+        const sub = item.amount;
+        
+        const splitItemDesc = doc.splitTextToSize(item.description, 65);
+        doc.text(splitItemDesc, margin + 2, currY + 5);
+        doc.text(item.quantity.toString(), margin + 70, currY + 5);
+        doc.text(item.rate.toLocaleString(), margin + 90, currY + 5);
+        doc.text(basic.toLocaleString(), margin + 115, currY + 5);
+        doc.text(`${item.gstPercent}%`, margin + 135, currY + 5);
+        doc.setFont('helvetica', 'bold');
+        doc.text(sub.toLocaleString(), 210 - margin - 2, currY + 5, { align: 'right' });
+        doc.setFont('helvetica', 'normal');
+        
+        currY += Math.max(10, splitItemDesc.length * 5 + 2);
+        doc.line(margin, currY - 2, 210 - margin, currY - 2);
+      });
+
+      // Total
+      currY += 10;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('TOTAL CONTRACT VALUE:', margin + 70, currY);
+      doc.setTextColor(45, 115, 255);
+      doc.text(`INR ${wo.totalAmount.toLocaleString('en-IN')}`, 210 - margin, currY, { align: 'right' });
+
+      // T&C
+      if (wo.termsAndConditions) {
+        currY += 20;
+        if (currY > 240) { doc.addPage(); currY = 30; }
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.text('TERMS & CONDITIONS:', margin, currY);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        const splitTC = doc.splitTextToSize(wo.termsAndConditions, 170);
+        doc.text(splitTC, margin, currY + 5);
+      }
+
+      doc.save(`WorkOrder_${wo.woNumber.replace(/\//g, '_')}.pdf`);
+      toast({ title: 'Document Exported', description: 'Official Work Order PDF has been generated.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: e.message });
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
+  const handleExportCSV = () => {
     if (filteredWOs.length === 0) return;
     const exportData = filteredWOs.map(wo => ({
       'WO Number': wo.woNumber,
@@ -280,8 +396,8 @@ export default function GlobalManageWOsPage() {
           <p className="text-muted-foreground text-sm font-medium">Organizational overview of all service contracts and partner engagements.</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
-            <FileDown className="h-4 w-4 mr-2" /> Export
+          <Button onClick={handleExportCSV} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+            <FileDown className="h-4 w-4 mr-2" /> Export Excel
           </Button>
           <Button onClick={() => router.push('/work-orders/create')} className="h-10 rounded-sm font-bold shadow-md px-6">
             <Plus className="h-4 w-4 mr-2" /> New Work Order
@@ -364,7 +480,8 @@ export default function GlobalManageWOsPage() {
                           "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
                           wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
                           wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                          "bg-yellow-50 text-yellow-700 border-yellow-200"
+                          wo.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                          "bg-muted text-muted-foreground"
                         )}>{wo.status || 'Pending'}</Badge>
                       </TableCell>
                       <TableCell className="text-right font-black text-sm font-mono text-foreground">
@@ -526,29 +643,39 @@ export default function GlobalManageWOsPage() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <Layers className="h-4 w-4 text-primary" />
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Service Breakdown</Label>
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Service Breakdown (Financial Detail)</Label>
                   </div>
                   <div className="border rounded-sm overflow-hidden">
                     <Table>
                       <TableHeader className="bg-muted/30">
                         <TableRow>
-                          <TableHead className="text-[10px] font-black uppercase px-4">Description</TableHead>
-                          <TableHead className="text-[10px] font-black uppercase">Qty</TableHead>
-                          <TableHead className="text-[10px] font-black uppercase">Rate</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase px-4">Service Item</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase text-center">Qty</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase text-center">Unit Rate</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase text-center">Basic Total</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase text-center">GST %</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase text-center">GST Amt</TableHead>
                           <TableHead className="text-right text-[10px] font-black uppercase px-4">Subtotal</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {viewingWO.items.map((item, idx) => (
-                          <TableRow key={idx} className="bg-background">
-                            <TableCell className="px-4 text-xs font-bold">{item.description}</TableCell>
-                            <TableCell className="text-xs font-mono font-bold">{item.quantity}</TableCell>
-                            <TableCell className="text-xs font-mono font-medium">₹{item.rate.toLocaleString()}</TableCell>
-                            <TableCell className="text-right px-4 font-mono font-black text-xs text-primary">
-                              ₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {viewingWO.items.map((item, idx) => {
+                          const basic = item.quantity * item.rate;
+                          const gstAmt = basic * (item.gstPercent / 100);
+                          return (
+                            <TableRow key={idx} className="bg-background hover:bg-muted/5 transition-colors">
+                              <TableCell className="px-4 text-xs font-bold leading-tight max-w-[200px]">{item.description}</TableCell>
+                              <TableCell className="text-xs font-mono font-bold text-center">{item.quantity}</TableCell>
+                              <TableCell className="text-xs font-mono font-medium text-center">₹{item.rate.toLocaleString()}</TableCell>
+                              <TableCell className="text-xs font-mono font-bold text-center">₹{basic.toLocaleString()}</TableCell>
+                              <TableCell className="text-xs font-mono font-bold text-center text-muted-foreground">{item.gstPercent}%</TableCell>
+                              <TableCell className="text-xs font-mono font-medium text-center text-muted-foreground">₹{gstAmt.toLocaleString()}</TableCell>
+                              <TableCell className="text-right px-4 font-mono font-black text-xs text-primary">
+                                ₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -595,14 +722,28 @@ export default function GlobalManageWOsPage() {
             )}
           </ScrollArea>
 
-          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0">
-            {isAdmin && viewingWO?.status === 'Pending' && (
-              <div className="flex gap-2 w-full sm:w-auto">
-                <Button className="flex-1 sm:flex-none h-11 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-8" onClick={() => { setWoActionState({ wo: viewingWO!, type: 'Accepted' }); setViewingWO(null); }}>Approve WO</Button>
-                <Button variant="destructive" className="flex-1 sm:flex-none h-11 rounded-sm font-black uppercase text-[10px] tracking-widest px-8" onClick={() => { setWoActionState({ wo: viewingWO!, type: 'Rejected' }); setViewingWO(null); }}>Reject WO</Button>
-              </div>
-            )}
-            <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-11 px-10 tracking-widest w-full sm:w-auto">Close Audit</Button></DialogClose>
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 flex items-center justify-between">
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary"
+                disabled={isExportingPDF}
+                onClick={() => viewingWO && exportToPDF(viewingWO)}
+              >
+                {isExportingPDF ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Printer className="h-4 w-4 mr-2" />}
+                Download Official WO
+              </Button>
+            </div>
+            
+            <div className="flex gap-2 items-center">
+              {isAdmin && viewingWO?.status === 'Pending' && (
+                <div className="flex gap-2">
+                  <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-8" onClick={() => { setWoActionState({ wo: viewingWO!, type: 'Accepted' }); setViewingWO(null); }}>Approve WO</Button>
+                  <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-8" onClick={() => { setWoActionState({ wo: viewingWO!, type: 'Rejected' }); setViewingWO(null); }}>Reject WO</Button>
+                </div>
+              )}
+              <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-10 tracking-widest">Close</Button></DialogClose>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -648,5 +789,26 @@ export default function GlobalManageWOsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
+  const colors = {
+    primary: "bg-primary/5 border-primary/10 text-primary",
+    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
+    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
+  };
+
+  return (
+    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
+        <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-3.5 sm:h-4 sm:w-4" />
+      </CardHeader>
+      <CardContent className="p-3 sm:p-4 pt-0">
+        <div className="text-xl sm:text-2xl font-black">{value}</div>
+      </CardContent>
+    </Card>
   );
 }
