@@ -709,6 +709,78 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
         </SidebarMenu>
       </SidebarGroup>
 
+      {/* REGISTRIES Section */}
+      <SidebarGroup>
+        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">REGISTRIES</SidebarGroupLabel>
+        <SidebarMenu>
+          <Collapsible asChild defaultOpen={pathname.startsWith('/registries')} className="group/collapsible">
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton tooltip="Registries" isActive={pathname.startsWith('/registries')} className="rounded-sm">
+                  <LayoutGrid className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Registries</span>
+                  <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {canShow('admin-suppliers') && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/registries/suppliers'} onClick={handleMobileClose}>
+                        <Link href="/registries/suppliers">
+                          <Truck className="h-4 w-4" />
+                          <span>Suppliers</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                  {canShow('admin-contractors') && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/registries/contractors'} onClick={handleMobileClose}>
+                        <Link href="/registries/contractors">
+                          <HardHat className="h-4 w-4" />
+                          <span>Contractors</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                  {canShow('admin-makes') && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/registries/makes'} onClick={handleMobileClose}>
+                        <Link href="/registries/makes">
+                          <Tag className="h-4 w-4" />
+                          <span>Makes Registry</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                  {canShow('master-data-tables-add') && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/registries/tables/add'} onClick={handleMobileClose}>
+                        <Link href="/registries/tables/add">
+                          <Plus className="h-4 w-4" />
+                          <span>Add Tables Data</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                  {canShow('master-data-tables-list') && (
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/registries/tables/list'} onClick={handleMobileClose}>
+                        <Link href="/registries/tables/list">
+                          <List className="h-4 w-4" />
+                          <span>Tables Data</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  )}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
+        </SidebarMenu>
+      </SidebarGroup>
+
       {/* Checklists Section - Globally Accessible */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Checklists</SidebarGroupLabel>
@@ -748,48 +820,6 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </SidebarMenuItem>
-          </Collapsible>
-        </SidebarMenu>
-      </SidebarGroup>
-
-      {/* MASTER DATA Section */}
-      <SidebarGroup>
-        <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">MASTER DATA</SidebarGroupLabel>
-        <SidebarMenu>
-          <Collapsible asChild defaultOpen={pathname.startsWith('/master-data')} className="group/collapsible">
-            <SidebarMenuItem>
-              <CollapsibleTrigger asChild>
-                <SidebarMenuButton tooltip="Master Data" isActive={pathname.startsWith('/master-data/tables')} className="rounded-sm">
-                  <LayoutGrid className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Master Data</span>
-                  <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                </SidebarMenuButton>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarMenuSub>
-                  {canShow('master-data-tables-add') && (
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/master-data/tables/add'} onClick={handleMobileClose}>
-                        <Link href="/master-data/tables/add">
-                          <Plus className="h-4 w-4" />
-                          <span>Add Tables Data</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  )}
-                  {canShow('master-data-tables-list') && (
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/master-data/tables/list'} onClick={handleMobileClose}>
-                        <Link href="/master-data/tables/list">
-                          <List className="h-4 w-4" />
-                          <span>Tables Data</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  )}
                 </SidebarMenuSub>
               </CollapsibleContent>
             </SidebarMenuItem>
@@ -867,36 +897,6 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                 <Link href="/settings/rewards">
                   <Coins className="h-4 w-4 text-amber-600" />
                   <span className="font-medium">Rewards Setup</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-          {canShow('admin-makes') && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Makes" isActive={pathname.startsWith('/settings/makes')} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/settings/makes">
-                  <Tag className="h-4 w-4" />
-                  <span className="font-medium">Makes Registry</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-          {canShow('admin-suppliers') && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Suppliers" isActive={pathname.startsWith('/settings/suppliers')} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/settings/suppliers">
-                  <Truck className="h-4 w-4" />
-                  <span className="font-medium">Suppliers</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          )}
-          {canShow('admin-contractors') && (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Contractors" isActive={pathname.startsWith('/settings/contractors')} className="rounded-sm" onClick={handleMobileClose}>
-                <Link href="/settings/contractors">
-                  <HardHat className="h-4 w-4" />
-                  <span className="font-medium">Contractors</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

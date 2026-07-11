@@ -60,7 +60,7 @@ export type PageKey =
 export interface AppPage {
   id: PageKey;
   label: string;
-  category: 'Main Hub' | 'Operations' | 'Administration' | 'Project Detail Tabs' | 'Master Data' | 'Checklists';
+  category: 'Main Hub' | 'Operations' | 'Administration' | 'Project Detail Tabs' | 'Registries' | 'Checklists';
   path: string;
 }
 
@@ -87,12 +87,15 @@ export const APP_PAGES: AppPage[] = [
   { id: 'attendance', label: 'Personnel Attendance', category: 'Operations', path: '/attendance' },
   { id: 'attendance-map', label: 'Personnel Live Map', category: 'Operations', path: '/attendance/map-view' },
 
+  { id: 'admin-suppliers', label: 'Supplier Registry', category: 'Registries', path: '/registries/suppliers' },
+  { id: 'admin-contractors', label: 'Contractor Registry', category: 'Registries', path: '/registries/contractors' },
+  { id: 'admin-makes', label: 'Makes Registry', category: 'Registries', path: '/registries/makes' },
+  { id: 'master-data-tables-add', label: 'Add Tables Data', category: 'Registries', path: '/registries/tables/add' },
+  { id: 'master-data-tables-list', label: 'Tables Data', category: 'Registries', path: '/registries/tables/list' },
+
   { id: 'checklists-installation', label: 'Table Level MMS Checklist', category: 'Checklists', path: '/checklists/installation' },
   { id: 'checklists-ht-line', label: 'HT Line Checklist', category: 'Checklists', path: '/checklists/ht-line' },
   { id: 'checklists-data', label: 'Checklist Data Registry', category: 'Checklists', path: '/checklists/data' },
-
-  { id: 'master-data-tables-add', label: 'Add Tables Data', category: 'Master Data', path: '/master-data/tables/add' },
-  { id: 'master-data-tables-list', label: 'Tables Data', category: 'Master Data', path: '/master-data/tables/list' },
   
   { id: 'admin-attendance-summary', label: 'Daily Presence Summary', category: 'Administration', path: '/admin/attendance-summary' },
   { id: 'admin-attendance-matrix', label: 'Monthly Attendance Matrix', category: 'Administration', path: '/admin/attendance-summary/matrix' },
@@ -102,9 +105,6 @@ export const APP_PAGES: AppPage[] = [
   { id: 'admin-permits', label: 'Permit Cleanup & Mgt', category: 'Administration', path: '/settings/permits' },
   { id: 'admin-vehicles', label: 'Fleet Registry', category: 'Administration', path: '/vehicles/manage' },
   { id: 'admin-rewards', label: 'Rewards & Rates Setup', category: 'Administration', path: '/settings/rewards' },
-  { id: 'admin-suppliers', label: 'Supplier Registry', category: 'Administration', path: '/settings/suppliers' },
-  { id: 'admin-makes', label: 'Makes Registry', category: 'Administration', path: '/settings/makes' },
-  { id: 'admin-contractors', label: 'Contractor Registry', category: 'Administration', path: '/settings/contractors' },
   { id: 'admin-users', label: 'Personnel Directory', category: 'Administration', path: '/settings/users' },
   { id: 'admin-teams', label: 'Reporting & Teams', category: 'Administration', path: '/settings/teams' },
   { id: 'admin-access', label: 'User Access Management', category: 'Administration', path: '/settings/access' },
@@ -130,7 +130,7 @@ export const APP_PAGES: AppPage[] = [
  */
 export function getPageKeyByPath(path: string): PageKey | null {
   // 1. Check exact matches or path prefixes from APP_PAGES first
-  const match = APP_PAGES.find(p => p.path !== '' && (path === p.path || path.startsWith(p.path + '/')));
+  const match = APP_PAGES.find(p => p.id !== undefined && p.path !== '' && (path === p.path || path.startsWith(p.path + '/')));
   if (match) return match.id;
 
   // 2. Explicit aliases for operational modules that have multiple entry points
@@ -154,15 +154,17 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/checklists/installation')) return 'checklists-installation';
   if (path.startsWith('/checklists/ht-line')) return 'checklists-ht-line';
   if (path.startsWith('/checklists/data')) return 'checklists-data';
-  if (path.startsWith('/master-data')) {
-    if (path.includes('/tables/add')) return 'master-data-tables-add';
-    if (path.includes('/tables/list')) return 'master-data-tables-list';
+  if (path.startsWith('/registries/tables')) {
+    if (path.includes('/add')) return 'master-data-tables-add';
+    if (path.includes('/list')) return 'master-data-tables-list';
   }
+  if (path.startsWith('/registries/suppliers')) return 'admin-suppliers';
+  if (path.startsWith('/registries/contractors')) return 'admin-contractors';
+  if (path.startsWith('/registries/makes')) return 'admin-makes';
   
   // 3. Vehicles specific (Handling both management and requests under 'trips' key)
   if (path.startsWith('/vehicles/trips') || path.startsWith('/vehicles/request')) return 'trips';
   if (path.startsWith('/vehicles/manage')) return 'admin-vehicles';
-  if (path.startsWith('/settings/makes')) return 'admin-makes';
   
   return null;
 }

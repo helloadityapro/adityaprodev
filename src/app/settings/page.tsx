@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -23,7 +22,8 @@ import {
   Quote,
   Lock,
   Mail,
-  User
+  User,
+  Tag
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -43,10 +43,15 @@ export default function SettingsPage() {
       setIsDarkMode(isDark);
     };
 
-    syncState();
-    window.addEventListener('theme-change', syncState);
-    return () => window.removeEventListener('theme-change', syncState);
+    syncThemeState();
+    window.addEventListener('theme-change', syncThemeState);
+    return () => window.removeEventListener('theme-change', syncThemeState);
   }, []);
+
+  const syncThemeState = () => {
+    const isDark = document.documentElement.classList.contains('dark');
+    setIsDarkMode(isDark);
+  };
 
   const handleThemeChange = (checked: boolean) => {
     setIsDarkMode(checked);
@@ -66,8 +71,9 @@ export default function SettingsPage() {
     { label: 'Quotes Hub', href: '/settings/quotes', icon: Quote, color: 'text-blue-600' },
     { label: 'User Directory', href: '/settings/users', icon: Users, color: 'text-purple-600' },
     { label: 'Team Mapping', href: '/settings/teams', icon: Workflow, color: 'text-emerald-600' },
-    { label: 'Supplier Registry', href: '/settings/suppliers', icon: Truck, color: 'text-indigo-600' },
-    { label: 'Contractor Registry', href: '/settings/contractors', icon: HardHat, color: 'text-orange-600' },
+    { label: 'Supplier Registry', href: '/registries/suppliers', icon: Truck, color: 'text-indigo-600' },
+    { label: 'Contractor Registry', href: '/registries/contractors', icon: HardHat, color: 'text-orange-600' },
+    { label: 'Makes Registry', href: '/registries/makes', icon: Tag, color: 'text-slate-600' },
     { label: 'Permit Management', href: '/settings/permits', icon: FileCheck, color: 'text-primary' },
     { label: 'Dropdown Config', href: '/settings/dropdown-management', icon: Settings2, color: 'text-slate-600' },
   ];

@@ -1,18 +1,8 @@
-
-"use client";
-
+'use client';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-
-/**
- * Base redirect for Master Data module.
- */
-export default function MasterDataBasePage() {
+export default function Redirect() {
   const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/master-data/tables/list');
-  }, [router]);
-
+  useEffect(() => router.replace('/registries/tables/list'), [router]);
   return null;
 }
