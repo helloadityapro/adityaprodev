@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -56,7 +55,9 @@ import {
   ArrowRight,
   Camera,
   CheckSquare,
-  Save
+  Save,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
@@ -654,7 +655,7 @@ export default function PtwListPage() {
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    if (isVideo(viewFile!)) return;
+    if (!viewFile || isVideo(viewFile)) return;
     const delta = e.deltaY > 0 ? -0.2 : 0.2;
     const newScale = Math.min(Math.max(scale + delta, 1), 4);
     setScale(newScale);
@@ -662,7 +663,7 @@ export default function PtwListPage() {
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (scale <= 1 || isVideo(viewFile!)) return;
+    if (scale <= 1 || (viewFile && isVideo(viewFile))) return;
     setIsDragging(true);
     setStartPan({ x: e.clientX - position.x, y: e.clientY - position.y });
   };
@@ -682,7 +683,7 @@ export default function PtwListPage() {
   const handleMouseUp = () => setIsDragging(false);
 
   const handleDoubleClick = () => {
-    if (isVideo(viewFile!)) return;
+    if (viewFile && isVideo(viewFile)) return;
     if (scale > 1) {
       setScale(1);
       setPosition({ x: 0, y: 0 });
@@ -841,7 +842,7 @@ export default function PtwListPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 no-print">
-          {[{ id: 'all', label: 'All Status' }, { id: 'Pending', label: 'Pending Manager' }, { id: 'ManagerApproved', label: 'Pending Admin' }, { id: 'Approved', label: 'Approved' }, { id: 'Rejected', label: 'Rejected' }].map(s => (
+          {[{ id: 'all', label: 'All Approval Status' }, { id: 'Pending', label: 'Pending Manager' }, { id: 'ManagerApproved', label: 'Pending Admin' }, { id: 'Approved', label: 'Approved' }, { id: 'Rejected', label: 'Rejected' }].map(s => (
             <Badge key={s.id} variant={statusFilter === s.id ? 'default' : 'outline'} className="cursor-pointer font-bold text-[10px] h-7 px-2 sm:h-8 sm:px-4 rounded-sm border-primary/20" onClick={() => setStatusFilter(s.id)}>{s.label}</Badge>
           ))}
         </div>
@@ -923,7 +924,7 @@ export default function PtwListPage() {
                               </Button>
                             )}
                             {isAdmin && permit.status === 'Pending' && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setForwardingPermit(permit); }} title="Forward to another Manager">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setForwardingPermit(permit); title="Forward to another Manager" }}>
                                 <Forward className="h-4 w-4" />
                               </Button>
                             )}
@@ -982,7 +983,7 @@ export default function PtwListPage() {
               </div>
             </div>
             
-            <div className="border rounded-sm overflow-hidden bg-background shadow-inner">
+            <div className="border rounded-sm overflow-hidden flex-1 flex flex-col bg-background shadow-inner">
               <ScrollArea className="h-[250px]">
                 <div className="divide-y">
                   {managersList?.filter((m: any) => m.username?.toLowerCase().includes(managerForwardSearch.toLowerCase()) || m.email?.toLowerCase().includes(managerForwardSearch.toLowerCase())).map((m: any) => (
@@ -1196,7 +1197,10 @@ export default function PtwListPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10"><div className="space-y-6 sm:space-y-8"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4"><div className="p-3 sm:p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3"><div className="p-2 bg-primary/10 rounded-full text-primary"><User className="h-3.5 w-3.5" /></div><div className="flex flex-col"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Raised By</Label><p className="text-[11px] sm:text-xs font-black">{detailsPermit.siteEngineerName || 'N/A'}</p></div></div><div className="p-3 sm:p-4 bg-card border rounded-sm shadow-sm flex items-center gap-3"><div className="p-2 bg-green-500/10 rounded-full text-green-600"><ShieldCheck className="h-3.5 w-3.5" /></div><div className="flex flex-col"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Approved By</Label><p className="text-[11px] sm:text-xs font-black">{detailsPermit.timeline?.find(t => t.status === 'Approved')?.userName || detailsPermit.timeline?.find(t => t.status === 'ManagerApproved')?.userName || 'Awaiting'}</p></div></div></div><div className="space-y-2"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-gap-2"><FileText className="h-3 w-3" /> Work Description</Label><div className="p-4 sm:p-6 bg-primary/[0.02] border-2 border-primary/5 rounded-sm text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-medium italic shadow-inner">"{detailsPermit.descriptionOfWork}"</div></div></div><div className="space-y-6 sm:space-y-8"><div className="space-y-2"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-primary tracking-[0.2em] flex items-gap-2"><MapPin className="h-3 w-3" /> Verified GPS Coordinates</Label>{detailsPermit.latitude ? (<div className="p-3 sm:p-4 bg-primary/5 border-2 border-primary/10 rounded-sm flex items-center justify-between shadow-sm group hover:border-primary/30 transition-all"><div className="flex flex-col gap-0.5"><span className="text-[8px] sm:text-[9px] font-black text-muted-foreground uppercase tracking-tighter">Site Position Stamped</span><span className="font-mono text-[10px] sm:text-xs font-black text-primary">{detailsPermit.latitude.toFixed(6)}, {detailsPermit.longitude?.toFixed(6)}</span></div><Button variant="outline" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 rounded-sm no-print border-primary/20 bg-white text-primary" asChild><a href={`https://www.google.com/maps/search/?api=1&query=${detailsPermit.latitude},${detailsPermit.longitude}`} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></a></Button></div>) : (<div className="p-4 bg-muted/20 border border-dashed rounded-sm text-center"><p className="text-xs italic text-muted-foreground font-medium">GPS location data not attached.</p></div>)}</div></div></div>
                 <Separator />
-                <div className="space-y-4 sm:space-y-6"><div className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5 text-primary" /><h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-foreground">Attachments</h3></div>{detailsPermit.attachments && detailsPermit.attachments.length > 0 ? (<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">{detailsPermit.attachments.map((file, idx) => (<div key={idx} className="group relative aspect-square rounded-sm overflow-hidden border bg-muted flex flex-col items-center justify-center">{isImage(file) ? (<><img src={file.url} alt={file.name} className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105" onClick={() => openViewer(file, detailsPermit.attachments!)}/><div className="absolute inset-0 bg-black/40 group-hover:opacity-100 flex items-center justify-center pointer-events-none"><Maximize2 className="h-5 w-5 text-white" /></div><div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">{file.name}</div></>) : isVideo(file) ? (<div className="relative w-full h-full bg-slate-900 flex flex-col items-center justify-center cursor-pointer group" onClick={() => openViewer(file, detailsPermit.attachments!)}><Film className="h-8 w-8 sm:h-10 sm:w-10 text-white opacity-40" /><div className="absolute inset-0 bg-black/40 group-hover:opacity-100 transition-opacity flex items-center justify-center"><PlayCircle className="h-6 w-6 sm:h-8 sm:w-8 text-white" /></div><div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">Video: {file.name}</div></div>) : (<div className="flex flex-col items-center justify-between p-2 h-full w-full bg-background border"><div className="flex-1 flex flex-col items-center justify-center gap-1.5"><FileText className={cn("h-6 w-6 sm:h-8 sm:w-8", file.contentType?.includes('pdf') ? "text-red-500" : "text-blue-500")} /><span className="text-[7px] sm:text-[8px] font-bold uppercase text-center line-clamp-2">{file.name}</span></div><Button variant="secondary" size="sm" className="w-full h-5 sm:h-6 text-[7px] sm:text-[8px] font-bold uppercase rounded-none mt-1" asChild><a href={file.url} target="_blank" rel="noopener noreferrer">View File</a></Button></div>)}</div>))}</div>) : (<div className="p-8 sm:p-12 text-center border-2 border-dashed rounded-sm bg-muted/5"><ImageIcon className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/20 mx-auto mb-2 sm:mb-3" /><p className="text-[10px] sm:text-xs text-muted-foreground font-bold uppercase tracking-widest italic">No files attached to this permit.</p></div>)}</div>
+                <div className="space-y-4 sm:space-y-6"><div className="flex items-center gap-2"><Paperclip className="h-3.5 w-3.5 text-primary" /><h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-foreground">Attachments</h3></div>{detailsPermit.attachments && detailsPermit.attachments.length > 0 ? (<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">{detailsPermit.attachments.map((file, idx) => (
+                  <div key={idx} className="group relative aspect-square rounded-sm overflow-hidden border bg-muted flex flex-col items-center justify-center">
+                    {isImage(file) ? (<><img src={file.url} alt={file.name} className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105" onClick={() => openViewer(file, detailsPermit.attachments!)}/><div className="absolute inset-0 bg-black/40 group-hover:opacity-100 flex items-center justify-center pointer-events-none"><Maximize2 className="h-5 w-5 text-white" /></div><div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">{file.name}</div></>) : isVideo(file) ? (<div className="relative w-full h-full bg-slate-900 flex flex-col items-center justify-center cursor-pointer group" onClick={() => openViewer(file, detailsPermit.attachments!)}><Film className="h-8 w-8 sm:h-10 sm:w-10 text-white opacity-40" /><div className="absolute inset-0 bg-black/40 group-hover:opacity-100 transition-opacity flex items-center justify-center"><PlayCircle className="h-6 w-6 sm:h-8 sm:w-8 text-white" /></div><div className="absolute bottom-0 left-0 right-0 p-1 bg-black/60 text-white text-[7px] font-bold uppercase truncate text-center">Video: {file.name}</div></div>) : (<div className="flex flex-col items-center justify-between p-2 h-full w-full bg-background border"><div className="flex-1 flex flex-col items-center justify-center gap-1.5"><FileText className={cn("h-6 w-6 sm:h-8 sm:w-8", file.contentType?.includes('pdf') ? "text-red-500" : "text-blue-500")} /><span className="text-[7px] sm:text-[8px] font-bold uppercase text-center line-clamp-2">{file.name}</span></div><Button variant="secondary" size="sm" className="w-full h-5 sm:h-6 text-[7px] sm:text-[8px] font-bold uppercase rounded-none mt-1" asChild><a href={file.url} target="_blank" rel="noopener noreferrer">View File</a></Button></div>)}
+                  </div>))}</div>) : (<div className="p-8 sm:p-12 text-center border-2 border-dashed rounded-sm bg-muted/5"><ImageIcon className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/20 mx-auto mb-2 sm:mb-3" /><p className="text-[10px] sm:text-xs text-muted-foreground font-bold uppercase tracking-widest italic">No files attached to this permit.</p></div>)}</div>
                 <Separator />
                 <div className="space-y-4 sm:space-y-6"><h3 className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] flex items-center gap-2"><History className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />Approval History</h3><div className="relative border-l-2 border-muted ml-3 pl-4 sm:pl-6 space-y-6 sm:space-y-8">{[...(detailsPermit.timeline || [])].sort((a, b) => (b.timestamp?.toDate?.() || 0) - (a.timestamp?.toDate?.() || 0)).map((entry, idx) => (<div key={idx} className="relative"><div className="absolute -left-[25px] sm:-left-[31px] top-1 h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-primary ring-4 ring-background" /><div className="flex flex-col gap-1 sm:gap-1.5"><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4"><span className="text-[10px] sm:text-xs font-bold uppercase tracking-tight text-primary leading-tight">{entry.action} — {entry.userName}</span><span className="text-[8px] font-mono font-bold text-muted-foreground uppercase">{formatTimestamp(entry.timestamp)}</span></div><p className="text-xs sm:text-sm italic font-medium leading-relaxed opacity-80">"{entry.remarks}"</p></div></div>))}</div></div>
               </div>
