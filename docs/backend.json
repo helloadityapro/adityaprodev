@@ -415,6 +415,8 @@
         "userId": { "type": "string" },
         "userName": { "type": "string" },
         "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"], "default": "Pending" },
+        "ptwStatus": { "type": "string", "enum": ["Open", "Closed"], "default": "Open" },
+        "closureStep": { "type": "string", "enum": ["Engineer", "Manager", "Admin", "Completed"], "default": "Engineer" },
         "adminRemarks": { "type": "string" },
         "processedBy": { "type": "string" },
         "processedByName": { "type": "string" },

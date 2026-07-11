@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react"
@@ -12,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { TriangleAlert, Loader2, Search, ChevronsUpDown, Check, FileUp, MessageCircle, CheckCircle2, X, FileText, FileImage, ShieldCheck } from "lucide-react"
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, setDocumentNonBlocking, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase"
-import { collection, serverTimestamp, doc, arrayUnion, getDoc, query, where, getDocs, Timestamp, runTransaction, and } from "firebase/firestore"
+import { collection, serverTimestamp, doc, arrayUnion, getDoc, query, where, getDocs, and, runTransaction } from "firebase/firestore"
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
@@ -23,11 +24,11 @@ import imageCompression from 'browser-image-compression';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
-import { format } from "date-fns";
-import { isSuperAdmin } from "@/lib/auth-constants";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { isSuperAdmin } from "@/lib/auth-constants"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
 import { sendNotification } from "@/lib/notifications";
 
 const raisePtwSchema = z.object({
@@ -122,14 +123,11 @@ export default function RaisePtwPage() {
       return Array.from(new Map(allSites.map(site => [site.name, site])).values());
     }
     
-    // Use Sovereignty Calculation
     const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
 
     if (isManager) {
-      // 1. Overrides
       allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
       
-      // 2. Team Inheritance
       if (teamMembers) {
         teamMembers.forEach(member => {
           (member.assignedProjectIds || []).forEach(sid => {
@@ -363,6 +361,8 @@ export default function RaisePtwPage() {
         latitude: location.latitude,
         longitude: location.longitude,
         status: targetStatus,
+        ptwStatus: 'Open',
+        closureStep: 'Engineer',
         statusChangeDate: serverTimestamp(),
         siteManagerId: effectiveSiteManagerId,
         authorizedAdminIds: authorizedAdminIds,
