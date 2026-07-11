@@ -63,6 +63,7 @@ export default function UserAccessManagementPage() {
   const [userOwnDataOnly, setUserOwnDataOnly] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [userSearch, setUserSearch] = React.useState("");
+  const [roleSearch, setRoleSearch] = React.useState("");
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -196,6 +197,13 @@ export default function UserAccessManagementPage() {
     ).sort((a, b) => a.username.localeCompare(b.username));
   }, [allUsers, userSearch]);
 
+  const filteredRoles = React.useMemo(() => {
+    if (!rolesList) return [];
+    return rolesList.filter(r => 
+      r.name.toLowerCase().includes(roleSearch.toLowerCase())
+    ).sort((a, b) => a.name.localeCompare(b.name));
+  }, [rolesList, roleSearch]);
+
   if (isUserLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   return (
@@ -223,13 +231,22 @@ export default function UserAccessManagementPage() {
         <TabsContent value="roles" className="space-y-8 animate-in fade-in duration-300">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <Card className="rounded-sm border-primary/10 shadow-md h-fit overflow-hidden">
-              <CardHeader className="bg-muted/5 border-b py-4">
+              <CardHeader className="bg-muted/5 border-b p-4 space-y-4">
                 <CardTitle className="text-sm font-bold uppercase tracking-widest">Select Designation</CardTitle>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search designation..." 
+                    className="h-9 pl-8 text-xs rounded-sm" 
+                    value={roleSearch}
+                    onChange={e => setRoleSearch(e.target.value)}
+                  />
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <ScrollArea className="h-[400px]">
                   <div className="divide-y">
-                    {rolesList?.map(role => (
+                    {filteredRoles.map(role => (
                       <button
                         key={role.name}
                         onClick={() => setSelectedManagerRole(role.name)}
@@ -242,6 +259,9 @@ export default function UserAccessManagementPage() {
                         <ChevronRight className={cn("h-4 w-4 transition-all", selectedRole === role.name ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2")} />
                       </button>
                     ))}
+                    {filteredRoles.length === 0 && (
+                      <div className="p-8 text-center text-xs text-muted-foreground italic">No roles found matching "{roleSearch}"</div>
+                    )}
                   </div>
                 </ScrollArea>
               </CardContent>
