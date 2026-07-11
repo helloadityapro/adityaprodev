@@ -34,10 +34,11 @@ import {
   Printer,
   ExternalLink,
   ShieldCheck,
-  Clock
+  Clock,
+  MessageCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -117,6 +118,7 @@ export default function GlobalManagePOsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -371,12 +373,25 @@ export default function GlobalManagePOsPage() {
     XLSX.writeFile(wb, `POs_Registry_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
+  const triggerWhatsApp = (po: PurchaseOrder) => {
+    const message = `*Aditya Pro - Purchase Order Update*\n\n*PO:* ${po.poNumber}\n*Site:* ${po.siteName}\n*Supplier:* ${po.supplierName}\n*Value:* ₹${po.totalAmount.toLocaleString('en-IN')}\n*Status:* ${po.status}\n\n*Review Link:* ${window.location.origin}/purchase-orders/manage?view=${po.id}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
+  const handleCloseDetail = () => {
+    setViewingPO(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ''}`);
+  };
+
   if (isProfileLoading || isPOsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -424,136 +439,190 @@ export default function GlobalManagePOsPage() {
         </div>
       </div>
 
-      <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('poNumber')}>
-                    <div className="flex items-center">PO Number <SortIcon column="poNumber" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
-                    <div className="flex items-center">Project Site <SortIcon column="site" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('supplier')}>
-                    <div className="flex items-center">Supplier <SortIcon column="supplier" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
-                    <div className="flex items-center">Order Date <SortIcon column="date" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('status')}>
-                    <div className="flex items-center">Status <SortIcon column="status" /></div>
-                  </TableHead>
-                  <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('total')}>
-                    <div className="flex items-center justify-end">Total Amount <SortIcon column="total" /></div>
-                  </TableHead>
-                  <TableHead className="text-right px-6">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredPOs.length > 0 ? filteredPOs.map((po) => (
-                  <React.Fragment key={po.id}>
-                    <TableRow className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={() => setViewingPO(po)}>
-                      <TableCell className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); toggleRow(po.id); }}>
-                            {expandedRows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </Button>
-                          <span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm font-semibold">{po.siteName}</TableCell>
-                      <TableCell className="text-xs font-medium text-muted-foreground">{po.supplierName}</TableCell>
-                      <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={cn(
-                          "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                          po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
-                          po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                          po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                          "bg-muted text-muted-foreground"
-                        )}>
-                          {po.status || 'Pending'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-black text-sm font-mono text-foreground">
-                        ₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          {isAdmin && po.status === 'Pending' && (
-                            <div className="flex gap-1 mr-2">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setPoActionState({ po, type: 'Accepted' })} title="Accept PO">
-                                <CircleCheck className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setPoActionState({ po, type: 'Rejected' })} title="Reject PO">
-                                <CircleX className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {(isAdmin || isManager) && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
-                              <Link href={`/projects/${po.siteId}/procurement/${po.id}/edit`}>
-                                <Pencil className="h-4 w-4" />
-                              </Link>
+      {/* Mobile-Responsive Card List */}
+      <div className="md:hidden space-y-4">
+        {filteredPOs.length > 0 ? filteredPOs.map((po) => (
+          <Card key={po.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden cursor-pointer" onClick={() => setViewingPO(po)}>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex flex-col gap-1 min-w-0">
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{po.orderDate}</span>
+                  <h3 className="font-bold text-sm leading-tight text-foreground truncate">{po.poNumber}</h3>
+                </div>
+                <Badge variant="outline" className={cn(
+                  "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                  po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                  po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                  po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                  "bg-muted text-muted-foreground"
+                )}>{po.status || 'Pending'}</Badge>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <Building2 className="h-3.5 w-3.5" />
+                  {po.siteName}
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <Truck className="h-3.5 w-3.5" />
+                  {po.supplierName}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-primary/5">
+                <span className="font-black text-primary text-sm font-mono">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => triggerWhatsApp(po)}>
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingPO(po)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )) : (
+          <div className="text-center py-12 text-muted-foreground italic bg-muted/5 border-2 border-dashed rounded-sm">No records found.</div>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('poNumber')}>
+                      <div className="flex items-center">PO Number <SortIcon column="poNumber" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
+                      <div className="flex items-center">Project Site <SortIcon column="site" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('supplier')}>
+                      <div className="flex items-center">Supplier <SortIcon column="supplier" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
+                      <div className="flex items-center">Order Date <SortIcon column="date" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('status')}>
+                      <div className="flex items-center">Status <SortIcon column="status" /></div>
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('total')}>
+                      <div className="flex items-center justify-end">Total Amount <SortIcon column="total" /></div>
+                    </TableHead>
+                    <TableHead className="text-right px-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredPOs.length > 0 ? filteredPOs.map((po) => (
+                    <React.Fragment key={po.id}>
+                      <TableRow className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={() => setViewingPO(po)}>
+                        <TableCell className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); toggleRow(po.id); }}>
+                              {expandedRows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             </Button>
-                          )}
-                          {isAdmin && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}>
-                              <Trash2 className="h-4 w-4" />
+                            <span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm font-semibold">{po.siteName}</TableCell>
+                        <TableCell className="text-xs font-medium text-muted-foreground">{po.supplierName}</TableCell>
+                        <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn(
+                            "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                            po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                            po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                            po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                            "bg-muted text-muted-foreground"
+                          )}>
+                            {po.status || 'Pending'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-black text-sm font-mono text-foreground">
+                          ₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right px-6">
+                          <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            {isAdmin && po.status === 'Pending' && (
+                              <div className="flex gap-1 mr-2">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setPoActionState({ po, type: 'Accepted' })} title="Accept PO">
+                                  <CircleCheck className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setPoActionState({ po, type: 'Rejected' })} title="Reject PO">
+                                  <CircleX className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => triggerWhatsApp(po)}>
+                              <MessageCircle className="h-4 w-4" />
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {expandedRows.has(po.id) && po.items && (
-                      <TableRow className="bg-muted/20">
-                        <TableCell colSpan={7} className="p-0 border-b">
-                          <div className="p-6 px-12 space-y-4 animate-in slide-in-from-top-1 duration-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Layers className="h-3.5 w-3.5 text-primary" />
-                              <span className="text-[10px] font-black uppercase tracking-widest text-primary">Order Item Breakdown</span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                              {po.items.map((item, idx) => (
-                                <div key={idx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm">
-                                  <div className="flex justify-between items-start">
-                                    <span className="text-xs font-black text-foreground">{item.itemName}</span>
-                                    <Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-2 border-t pt-2">
-                                    <div className="flex flex-col">
-                                      <span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span>
-                                      <span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span>
-                                    </div>
-                                    <div className="flex flex-col text-right">
-                                      <span className="text-muted-foreground uppercase font-bold text-[8px]">Total</span>
-                                      <span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {(isAdmin || isManager) && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
+                                <Link href={`/projects/${po.siteId}/procurement/${po.id}/edit`}>
+                                  <Pencil className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            )}
+                            {isAdmin && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
-                    )}
-                  </React.Fragment>
-                )) : (
-                  <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No purchase orders discovered in registry.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                      {expandedRows.has(po.id) && po.items && (
+                        <TableRow className="bg-muted/20">
+                          <TableCell colSpan={7} className="p-0 border-b">
+                            <div className="p-6 px-12 space-y-4 animate-in slide-in-from-top-1 duration-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Layers className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Order Item Breakdown</span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                {po.items.map((item, idx) => (
+                                  <div key={idx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm">
+                                    <div className="flex justify-between items-start">
+                                      <span className="text-xs font-black text-foreground">{item.itemName}</span>
+                                      <Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 border-t pt-2">
+                                      <div className="flex flex-col">
+                                        <span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span>
+                                        <span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span>
+                                      </div>
+                                      <div className="flex flex-col text-right">
+                                        <span className="text-muted-foreground uppercase font-bold text-[8px]">Total</span>
+                                        <span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  )) : (
+                    <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No purchase orders discovered in registry.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* PO Detail Dialog */}
-      <Dialog open={!!viewingPO} onOpenChange={(o) => !o && setViewingPO(null)}>
+      <Dialog open={!!viewingPO} onOpenChange={(o) => !o && handleCloseDetail()}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
@@ -565,7 +634,7 @@ export default function GlobalManagePOsPage() {
             </div>
             {viewingPO && (
               <Badge variant="outline" className={cn(
-                "rounded-sm text-[10px] font-black uppercase px-2 h-6",
+                "text-[9px] font-black uppercase rounded-sm px-2 h-6",
                 viewingPO.status === 'Accepted' ? "bg-green-100 text-green-800" : 
                 viewingPO.status === 'Pending' ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"
               )}>
@@ -704,7 +773,7 @@ export default function GlobalManagePOsPage() {
                 onClick={() => viewingPO && exportToPDF(viewingPO)}
               >
                 {isExportingPDF ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Printer className="h-4 w-4 mr-2" />}
-                Download Official PO
+                Export PDF
               </Button>
             </div>
             

@@ -70,6 +70,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { slugifyRole } from '@/lib/access-control';
 
 type WOItem = {
   description: string;
@@ -166,7 +167,7 @@ export default function GlobalManageWOsPage() {
     
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === userProfile.role)?.ownDataOnly ?? false;
+      : roleConfigs?.find(c => c.id === slugifyRole(userProfile.role || ""))?.ownDataOnly ?? false;
 
     let result = allWOs;
 
@@ -381,6 +382,12 @@ export default function GlobalManageWOsPage() {
     XLSX.writeFile(wb, `WOs_Registry_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
+  const triggerWhatsApp = (wo: WorkOrder) => {
+    const message = `*Aditya Pro - Work Order Update*\n\n*WO:* ${wo.woNumber}\n*Site:* ${wo.siteName}\n*Contractor:* ${wo.contractorName}\n*Value:* ₹${wo.totalAmount.toLocaleString('en-IN')}\n*Status:* ${wo.status}\n\n*Review Link:* ${window.location.origin}/work-orders/manage?view=${wo.id}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   if (isProfileLoading || isWOsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
@@ -433,135 +440,189 @@ export default function GlobalManageWOsPage() {
         </div>
       </div>
 
-      <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('woNumber')}>
-                    <div className="flex items-center">WO Number <SortIcon column="woNumber" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
-                    <div className="flex items-center">Project Site <SortIcon column="site" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('contractor')}>
-                    <div className="flex items-center">Contractor <SortIcon column="contractor" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
-                    <div className="flex items-center">Order Date <SortIcon column="date" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('status')}>
-                    <div className="flex items-center">Status <SortIcon column="status" /></div>
-                  </TableHead>
-                  <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('total')}>
-                    <div className="flex items-center justify-end">Total Amount <SortIcon column="total" /></div>
-                  </TableHead>
-                  <TableHead className="text-right px-6">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredWOs.length > 0 ? filteredWOs.map((wo) => (
-                  <React.Fragment key={wo.id}>
-                    <TableRow className="hover:bg-muted/5 transition-colors group">
-                      <TableCell className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => toggleRow(wo.id)}>
-                            {expandedRows.has(wo.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </Button>
-                          <span className="font-mono text-xs font-black text-primary uppercase">{wo.woNumber}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm font-semibold">{wo.siteName}</TableCell>
-                      <TableCell className="text-xs font-medium text-muted-foreground">{wo.contractorName}</TableCell>
-                      <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={cn(
-                          "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                          wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
-                          wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                          wo.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                          "bg-muted text-muted-foreground"
-                        )}>{wo.status || 'Pending'}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-black text-sm font-mono text-foreground">
-                        ₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end items-center gap-1">
-                          {isAdmin && wo.status === 'Pending' && (
-                            <div className="flex gap-1 mr-2">
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setWoActionState({ wo, type: 'Accepted' })} title="Accept WO">
-                                <CircleCheck className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setWoActionState({ wo, type: 'Rejected' })} title="Reject WO">
-                                <CircleX className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {(isAdmin || isManager) && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
-                              <Link href={`/projects/${wo.siteId}/work-orders/${wo.id}/edit`}>
-                                <Pencil className="h-4 w-4" />
-                              </Link>
+      {/* Mobile-Responsive Card List */}
+      <div className="md:hidden space-y-4">
+        {filteredWOs.length > 0 ? filteredWOs.map((wo) => (
+          <Card key={wo.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden cursor-pointer" onClick={() => setViewingWO(wo)}>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex flex-col gap-1 min-w-0">
+                  <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{wo.orderDate}</span>
+                  <h3 className="font-bold text-sm leading-tight text-foreground truncate">{wo.woNumber}</h3>
+                </div>
+                <Badge variant="outline" className={cn(
+                  "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                  wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                  wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                  wo.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                  "bg-muted text-muted-foreground"
+                )}>{wo.status || 'Pending'}</Badge>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <Building2 className="h-3.5 w-3.5" />
+                  {wo.siteName}
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <HardHat className="h-3.5 w-3.5" />
+                  {wo.contractorName}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-primary/5">
+                <span className="font-black text-primary text-sm font-mono">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => triggerWhatsApp(wo)}>
+                    <MessageCircle className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingWO(wo)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )) : (
+          <div className="text-center py-12 text-muted-foreground italic bg-muted/5 border-2 border-dashed rounded-sm">No records found.</div>
+        )}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block">
+        <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('woNumber')}>
+                      <div className="flex items-center">WO Number <SortIcon column="woNumber" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
+                      <div className="flex items-center">Project Site <SortIcon column="site" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('contractor')}>
+                      <div className="flex items-center">Contractor <SortIcon column="contractor" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
+                      <div className="flex items-center">Order Date <SortIcon column="date" /></div>
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('status')}>
+                      <div className="flex items-center">Status <SortIcon column="status" /></div>
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('total')}>
+                      <div className="flex items-center justify-end">Total Amount <SortIcon column="total" /></div>
+                    </TableHead>
+                    <TableHead className="text-right px-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredWOs.length > 0 ? filteredWOs.map((wo) => (
+                    <React.Fragment key={wo.id}>
+                      <TableRow key={wo.id} className="hover:bg-muted/5 transition-colors cursor-pointer group" onClick={() => setViewingWO(wo)}>
+                        <TableCell className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); toggleRow(wo.id); }}>
+                              {expandedRows.has(wo.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             </Button>
-                          )}
-                          {isAdmin && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}>
-                              <Trash2 className="h-4 w-4" />
+                            <span className="font-mono text-xs font-black text-primary uppercase">{wo.woNumber}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm font-semibold">{wo.siteName}</TableCell>
+                        <TableCell className="text-xs font-medium text-muted-foreground">{wo.contractorName}</TableCell>
+                        <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn(
+                            "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                            wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                            wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                            wo.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                            "bg-muted text-muted-foreground"
+                          )}>{wo.status || 'Pending'}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-black text-sm font-mono text-foreground">
+                          ₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right px-6">
+                          <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            {isAdmin && wo.status === 'Pending' && (
+                              <div className="flex gap-1 mr-2">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setWoActionState({ wo, type: 'Accepted' })} title="Accept WO">
+                                  <CircleCheck className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setWoActionState({ wo, type: 'Rejected' })} title="Reject WO">
+                                  <CircleX className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => triggerWhatsApp(wo)}>
+                              <MessageCircle className="h-4 w-4" />
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {expandedRows.has(wo.id) && wo.items && (
-                      <TableRow className="bg-muted/20">
-                        <TableCell colSpan={7} className="p-0 border-b">
-                          <div className="p-6 px-12 space-y-4 animate-in slide-in-from-top-1 duration-200">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Layers className="h-3.5 w-3.5 text-primary" />
-                              <span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown</span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                              {wo.items.map((item, idx) => (
-                                <div key={idx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm">
-                                  <div className="flex justify-between items-start">
-                                    <span className="text-xs font-black text-foreground">{item.description}</span>
-                                    <Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-2 border-t pt-2">
-                                    <div className="flex flex-col">
-                                      <span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span>
-                                      <span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span>
-                                    </div>
-                                    <div className="flex flex-col text-right">
-                                      <span className="text-muted-foreground uppercase font-bold text-[8px]">Total</span>
-                                      <span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {(isAdmin || isManager) && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
+                                <Link href={`/projects/${wo.siteId}/work-orders/${wo.id}/edit`}>
+                                  <Pencil className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            )}
+                            {isAdmin && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
-                    )}
-                  </React.Fragment>
-                )) : (
-                  <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No work orders discovered in registry.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                      {expandedRows.has(wo.id) && wo.items && wo.items.length > 0 && (
+                        <TableRow className="bg-muted/20">
+                          <TableCell colSpan={7} className="p-0 border-b">
+                            <div className="p-6 px-12 space-y-4 animate-in slide-in-from-top-1 duration-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Layers className="h-3.5 w-3.5 text-primary" />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown</span>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                {wo.items.map((item, idx) => (
+                                  <div key={idx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm">
+                                    <div className="flex justify-between items-start">
+                                      <span className="text-xs font-black text-foreground">{item.description}</span>
+                                      <Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 border-t pt-2">
+                                      <div className="flex flex-col">
+                                        <span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span>
+                                        <span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span>
+                                      </div>
+                                      <div className="flex flex-col text-right">
+                                        <span className="text-muted-foreground uppercase font-bold text-[8px]">Total</span>
+                                        <span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  )) : (
+                    <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic text-xs uppercase opacity-40">No work orders discovered</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* WO Detail Dialog */}
       <Dialog open={!!viewingWO} onOpenChange={(o) => !o && setViewingWO(null)}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
+        <DialogContent className="max-w-4xl p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Gavel className="h-5 w-5 text-primary" /></div>
@@ -572,7 +633,7 @@ export default function GlobalManageWOsPage() {
             </div>
             {viewingWO && (
               <Badge variant="outline" className={cn(
-                "rounded-sm text-[10px] font-black uppercase px-2 h-6",
+                "text-[9px] font-black uppercase rounded-sm px-2 h-6",
                 viewingWO.status === 'Accepted' ? "bg-green-100 text-green-800" : 
                 viewingWO.status === 'Pending' ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"
               )}>
@@ -731,7 +792,7 @@ export default function GlobalManageWOsPage() {
                 onClick={() => viewingWO && exportToPDF(viewingWO)}
               >
                 {isExportingPDF ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Printer className="h-4 w-4 mr-2" />}
-                Download Official WO
+                Export PDF
               </Button>
             </div>
             
