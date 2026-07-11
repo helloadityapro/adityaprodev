@@ -178,6 +178,19 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
   );
 }
 
+function PtwStatusBadge({ status, className }: { status: string, className?: string }) {
+  const isClosed = status === 'Closed';
+  return (
+    <Badge variant="outline" className={cn(
+      "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-tighter border rounded-sm h-5 px-2",
+      isClosed ? "bg-emerald-500 text-white border-emerald-600" : "bg-primary text-white border-primary",
+      className
+    )}>
+      {status || 'Open'}
+    </Badge>
+  );
+}
+
 function WhatsAppUpdateEngineer({ permit }: { permit: Permit }) {
     const firestore = useFirestore();
     const { data: engineerProfile } = useDoc(useMemoFirebase(() => doc(firestore, 'users', permit.siteEngineerId), [firestore, permit.siteEngineerId]));
@@ -196,7 +209,7 @@ function WhatsAppUpdateEngineer({ permit }: { permit: Permit }) {
 }
 
 const formatTimestamp = (ts: any) => {
-  if (!ts) return 'N/A';
+  if (!ts) return '—';
   const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
   return format(date, 'dd MMM yyyy HH:mm');
 };
@@ -570,7 +583,7 @@ export default function PtwListPage() {
       }
 
       const newClosureEntry: ClosureEntry = {
-        step: detailsPermit.closureStep as any,
+        step: (detailsPermit.closureStep || 'Engineer') as any,
         userId: user.uid,
         userName: userProfile.username,
         timestamp: new Date().toISOString(),
@@ -584,7 +597,8 @@ export default function PtwListPage() {
         'Admin': 'Completed'
       };
 
-      const nextStep = nextStepMap[detailsPermit.closureStep as keyof typeof nextStepMap];
+      const currentStep = detailsPermit.closureStep || 'Engineer';
+      const nextStep = nextStepMap[currentStep as keyof typeof nextStepMap];
       const isFinal = nextStep === 'Completed';
 
       const permitRef = doc(firestore, "permits_to_work", detailsPermit.id);
@@ -686,6 +700,15 @@ export default function PtwListPage() {
     setDateFilter("7days");
   };
 
+  const canPerformClosureAction = (p: Permit) => {
+    if (p.status !== 'Approved' || p.ptwStatus === 'Closed') return false;
+    const step = p.closureStep || 'Engineer';
+    if (step === 'Engineer') return p.siteEngineerId === user?.uid;
+    if (step === 'Manager') return p.siteManagerId === user?.uid;
+    if (step === 'Admin') return isAdmin;
+    return false;
+  };
+
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   return (
@@ -766,7 +789,7 @@ export default function PtwListPage() {
               <PopoverContent className="w-[240px] p-0" align="start">
                 <div className="flex items-center border-b px-3">
                   <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                  <Input placeholder="Search engineers..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" value={userSearchQuery} onChange={(e) => setUserSearchQuery(e.target.value)} />
+                  <Input placeholder="Search engineers..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={userSearchQuery} onChange={(e) => setUserSearchQuery(e.target.value)} />
                 </div>
                 <ScrollArea className="h-[200px]">
                   <div className="p-1">
@@ -796,7 +819,7 @@ export default function PtwListPage() {
             <PopoverContent className="w-[240px] p-0" align="start">
               <div className="flex items-center border-b px-3">
                 <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" value={siteSearchQuery} onChange={(e) => setSiteSearchQuery(e.target.value)} />
+                <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={siteSearchQuery} onChange={(e) => setSiteSearchQuery(e.target.value)} />
               </div>
               <ScrollArea className="h-[200px]">
                 <div className="p-1">
@@ -833,10 +856,18 @@ export default function PtwListPage() {
               </div>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><ShieldCheck className="h-3.5 w-3.5 text-primary/60" /><span>{permit.ptwType}</span></div>
-                <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-tight"><Calendar className="h-3.5 w-3.5" />{formatTimestamp(permit.requestDate)}</div>
+                <div className="flex items-center justify-between">
+                   <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-tight"><Calendar className="h-3.5 w-3.5" />{formatTimestamp(permit.requestDate)}</div>
+                   <PtwStatusBadge status={permit.ptwStatus} />
+                </div>
               </div>
               <div className="pt-2 border-t border-primary/5 flex justify-end items-center gap-2">
                 <WhatsAppUpdateEngineer permit={permit} />
+                {canPerformClosureAction(permit) && (
+                  <Button size="sm" className="h-8 rounded-sm bg-primary text-white font-black text-[10px] uppercase px-3 shadow-md" onClick={(e) => { e.stopPropagation(); setDetailsPermit(permit); }}>
+                    <ShieldAlert className="h-3 w-3 mr-1" /> Close PtW
+                  </Button>
+                )}
                 {isAdmin && permit.status === 'Pending' && (
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setForwardingPermit(permit); }} title="Forward to another Manager">
                     <Forward className="h-4 w-4" />
@@ -859,16 +890,17 @@ export default function PtwListPage() {
       </div>
 
       <div className="hidden md:block">
-        <Card className="rounded-sm overflow-hidden border-primary/10">
+        <Card className="rounded-sm overflow-hidden border-primary/10 shadow-lg">
           <CardContent className="p-0">
             <ScrollArea className="w-full">
-              <div className="min-w-[800px]">
+              <div className="min-w-[1000px]">
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="bg-muted/30">
                       <TableHead className="px-6 cursor-pointer hover:bg-muted/5" onClick={() => handleSort('serialNumber')}><div className="flex items-center">Serial & Site <SortIcon column="serialNumber" /></div></TableHead>
                       <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('ptwType')}><div className="flex items-center">Type <SortIcon column="ptwType" /></div></TableHead>
-                      <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('status')}><div className="flex items-center">Status <SortIcon column="status" /></div></TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('status')}><div className="flex items-center">Approval Status <SortIcon column="status" /></div></TableHead>
+                      <TableHead className="cursor-pointer hover:bg-muted/5"><div className="flex items-center">PtW Status</div></TableHead>
                       <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('requestDate')}><div className="flex items-center">Request Date <SortIcon column="requestDate" /></div></TableHead>
                       <TableHead className="text-right px-6">Action</TableHead>
                     </TableRow>
@@ -879,10 +911,16 @@ export default function PtwListPage() {
                         <TableCell><div className="flex flex-col gap-0.5"><span className="font-mono text-[10px] font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</span><span className="font-bold text-sm truncate max-w-[180px]">{permit.siteName}</span></div></TableCell>
                         <TableCell className="text-xs font-semibold">{permit.ptwType}</TableCell>
                         <TableCell><StatusBadge permit={permit} /></TableCell>
+                        <TableCell><PtwStatusBadge status={permit.ptwStatus} /></TableCell>
                         <TableCell className="text-[10px] font-bold text-muted-foreground">{formatTimestamp(permit.requestDate)}</TableCell>
                         <TableCell className="text-right px-6">
                           <div className="flex justify-end gap-1">
                             <WhatsAppUpdateEngineer permit={permit} />
+                            {canPerformClosureAction(permit) && (
+                              <Button size="sm" className="h-8 rounded-sm bg-primary text-white font-black text-[10px] uppercase px-3 shadow-md" onClick={(e) => { e.stopPropagation(); setDetailsPermit(permit); }}>
+                                <ShieldAlert className="h-3 w-3 mr-1" /> Close PtW
+                              </Button>
+                            )}
                             {isAdmin && permit.status === 'Pending' && (
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setForwardingPermit(permit); }} title="Forward to another Manager">
                                 <Forward className="h-4 w-4" />
@@ -991,14 +1029,19 @@ export default function PtwListPage() {
               <div><DialogTitle className="text-base sm:text-lg font-black tracking-tight text-foreground uppercase">Permit Audit Log</DialogTitle><DialogDescription className="text-[10px] font-bold text-muted-foreground">{detailsPermit?.serialNumber}</DialogDescription></div>
             </div>
             <div className="flex items-center gap-2">
-              {detailsPermit && <Badge variant="outline" className={cn("rounded-sm font-black text-[9px] uppercase border-primary/20 bg-background", detailsPermit.ptwStatus === 'Closed' ? "text-emerald-700" : "text-primary")}>{detailsPermit.ptwStatus || 'Open'}</Badge>}
+              {detailsPermit && <PtwStatusBadge status={detailsPermit.ptwStatus} />}
               <DialogClose asChild className="sm:hidden"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-5 w-5" /></Button></DialogClose>
             </div>
           </DialogHeader>
           <ScrollArea className="flex-1 bg-background">
             {detailsPermit && (
               <div id="printable-permit-area" className="p-4 sm:p-8 space-y-8 sm:space-y-12 pb-20">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 p-3 sm:p-4 bg-muted/20 border rounded-sm"><div className="space-y-1 min-w-0"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Site Name</Label><p className="text-[11px] sm:text-xs font-bold truncate">{detailsPermit.siteName}</p></div><div className="space-y-1 min-w-0"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">PtW Type</Label><p className="text-[11px] sm:text-xs font-bold truncate">{detailsPermit.ptwType}</p></div><div className="space-y-1"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Approval Status</Label><div><StatusBadge permit={detailsPermit} /></div></div><div className="space-y-1"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Submitted</Label><p className="text-[10px] sm:text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p></div></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 p-3 sm:p-4 bg-muted/20 border rounded-sm">
+                  <div className="space-y-1 min-w-0"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Site Name</Label><p className="text-[11px] sm:text-xs font-bold truncate">{detailsPermit.siteName}</p></div>
+                  <div className="space-y-1 min-w-0"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">PtW Type</Label><p className="text-[11px] sm:text-xs font-bold truncate">{detailsPermit.ptwType}</p></div>
+                  <div className="space-y-1"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Approval Status</Label><div><StatusBadge permit={detailsPermit} /></div></div>
+                  <div className="space-y-1"><Label className="text-[8px] sm:text-[9px] font-black uppercase text-muted-foreground tracking-widest">Submitted</Label><p className="text-[10px] sm:text-xs font-mono font-bold text-muted-foreground">{formatTimestamp(detailsPermit.requestDate)}</p></div>
+                </div>
                 
                 {/* Closure Hub Section */}
                 {detailsPermit.status === 'Approved' && (
@@ -1015,7 +1058,7 @@ export default function PtwListPage() {
                        <div className="flex items-center gap-2">
                           {['Engineer', 'Manager', 'Admin'].map((step, idx) => {
                             const isDone = (detailsPermit.closureHistory || []).some(h => h.step === step);
-                            const isActive = detailsPermit.closureStep === step;
+                            const isActive = (detailsPermit.closureStep || 'Engineer') === step;
                             return (
                               <React.Fragment key={step}>
                                 <div className={cn(
@@ -1034,10 +1077,10 @@ export default function PtwListPage() {
                     </div>
 
                     {/* Step-specific Form */}
-                    {detailsPermit.ptwStatus === 'Open' && (
+                    {detailsPermit.ptwStatus !== 'Closed' && (
                       <div className="bg-background border rounded-sm p-6 space-y-6 shadow-sm">
                         {(() => {
-                           const currentStep = detailsPermit.closureStep;
+                           const currentStep = detailsPermit.closureStep || 'Engineer';
                            const isAuthorized = 
                              (currentStep === 'Engineer' && detailsPermit.siteEngineerId === user?.uid) ||
                              (currentStep === 'Manager' && detailsPermit.siteManagerId === user?.uid) ||
@@ -1101,7 +1144,7 @@ export default function PtwListPage() {
                                       disabled={isProcessingClosure || !closureRemarks.trim()}
                                       className="rounded-sm font-black uppercase text-[10px] tracking-widest h-12 px-12 shadow-xl shadow-primary/20"
                                    >
-                                      {isProcessingClosure ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Syncing...</> : <><Save className="h-4 w-4 mr-2" /> Finalize Stage</>}
+                                      {isProcessingClosure ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Syncing...</> : <><Save className="mr-2 h-4 w-4 mr-2" /> Finalize Stage</>}
                                    </Button>
                                 </div>
                              </div>
@@ -1216,3 +1259,4 @@ export default function PtwListPage() {
     </div>
   );
 }
+
