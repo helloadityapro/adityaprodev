@@ -55,7 +55,8 @@ import {
   ShieldAlert,
   ArrowRight,
   Camera,
-  CheckSquare
+  CheckSquare,
+  Save
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
@@ -952,7 +953,7 @@ export default function PtwListPage() {
         <DialogContent className="max-w-md w-[95vw] rounded-sm p-6">
           <DialogHeader className="text-left space-y-2"><DialogTitle className="text-xl font-black uppercase tracking-tight">Process Decision</DialogTitle><DialogDescription className="text-xs font-medium">Process permit {actionState?.permit?.serialNumber}</DialogDescription></DialogHeader>
           <div className="py-6 space-y-2"><Label className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase">Action Remarks</Label><Textarea id="action-remarks" placeholder="Provide feedback or justification..." className="min-h-[120px] rounded-sm" /></div>
-          <DialogFooter className="flex flex-col sm:flex-row gap-3"><DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-12 font-bold rounded-sm text-xs">Cancel</Button></DialogClose><Button className={cn("w-full sm:flex-1 h-12 font-bold rounded-sm text-xs", actionState?.status === 'Rejected' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white')} onClick={() => { const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || ""; if (remarks.trim()) { handleAction(actionState!.permit, actionState!.status as any, remarks); setActionState(null); } else { toast({ variant: 'destructive', title: 'Remarks Required' }); } }}>Confirm {actionState?.status === 'Rejected' ? 'Rejection' : 'Approval'}</Button></DialogFooter>
+          <DialogFooter className="flex flex-col sm:flex-row gap-3"><DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-12 font-bold rounded-sm text-xs">Cancel</Button></DialogClose><Button className={cn("w-full sm:flex-1 h-12 font-bold rounded-sm text-xs", actionState?.status === 'Rejected' ? "bg-red-600 hover:bg-red-700 text-white" : "bg-green-600 hover:bg-green-700 text-white")} onClick={() => { const remarks = (document.getElementById('action-remarks') as HTMLTextAreaElement)?.value || ""; if (remarks.trim()) { handleAction(actionState!.permit, actionState!.status as any, remarks); setActionState(null); } else { toast({ variant: 'destructive', title: 'Remarks Required' }); } }}>Confirm {actionState?.status === 'Rejected' ? 'Rejection' : 'Approval'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1259,4 +1260,3 @@ export default function PtwListPage() {
     </div>
   );
 }
-
