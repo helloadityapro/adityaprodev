@@ -186,7 +186,7 @@ export default function UserAccessManagementPage() {
     }
   };
 
-  const categories = ['Main Hub', 'Operations', 'Project Detail Tabs', 'Administration'] as const;
+  const categories = ['Main Hub', 'Operations', 'Registries', 'Checklists', 'Project Detail Tabs', 'Administration'] as const;
 
   const filteredUsers = React.useMemo(() => {
     if (!allUsers) return [];
@@ -201,7 +201,7 @@ export default function UserAccessManagementPage() {
   return (
     <div className="space-y-8 pb-20">
       <div className="flex flex-col gap-1">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/settings')} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
+        <Button variant="ghost" size="sm" onClick={() => router.push('/settings')} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Settings
         </Button>
         <h1 className="flex items-center gap-2">
