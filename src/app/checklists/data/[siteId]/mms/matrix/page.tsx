@@ -131,7 +131,7 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
   const filteredInst = React.useMemo(() => {
     if (!instRecords) return [];
     return [...instRecords].sort((a, b) => 
-      a.tableNumber.localeCompare(b.tableNumber, undefined, { numeric: true, sensitivity: 'base' })
+      a.tableNumber.compare(b.tableNumber, undefined, { numeric: true, sensitivity: 'base' })
     );
   }, [instRecords]);
 
@@ -268,17 +268,9 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
     }
   };
 
-  React.useEffect(() => {
-    if (!isProfileLoading && !isAdmin) {
-      router.replace('/dashboard');
-    }
-  }, [isProfileLoading, isAdmin, router]);
-
   if (isProfileLoading || siteLoading || instLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[600px] w-full" /></div>;
   }
-
-  if (!isAdmin) return null;
 
   return (
     <div className="space-y-6 md:space-y-8 pb-20 animate-in fade-in duration-500">
@@ -315,36 +307,36 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
 
       <Card className="rounded-sm border-primary/10 shadow-xl overflow-hidden min-h-[600px] flex flex-col relative">
         <div className="flex-1 overflow-hidden relative">
-          <ScrollArea className="h-[calc(100vh-250px)] w-full relative z-0">
+          <ScrollArea className="h-full w-full relative z-0">
             <div className="min-w-full">
               <TooltipProvider delayDuration={0}>
                 <Table className="border-separate border-spacing-0 table-fixed w-full">
                   <TableHeader className="sticky top-0 z-20 shadow-sm">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[150px] font-black uppercase text-xs md:text-sm tracking-widest bg-primary text-white sticky left-0 top-0 z-30 px-6 py-4 border-r border-white/10">Table Ref</TableHead>
+                      <TableHead className="w-[120px] sm:w-[150px] font-black uppercase text-[10px] sm:text-xs md:text-sm tracking-widest bg-primary text-white sticky left-0 top-0 z-30 px-3 sm:px-6 py-4 border-r border-white/10">Table Ref</TableHead>
                       {Object.entries(CHECK_LABELS).map(([key, label]) => (
-                        <TableHead key={key} className="text-center font-black uppercase text-[10px] md:text-xs tracking-tight leading-tight w-[160px] px-3 py-4 bg-primary text-white border-r border-white/10 last:border-0 sticky top-0 z-20">{label}</TableHead>
+                        <TableHead key={key} className="text-center font-black uppercase text-[8px] sm:text-[10px] md:text-xs tracking-tight leading-tight w-[100px] sm:w-[160px] px-2 sm:px-3 py-4 bg-primary text-white border-r border-white/10 last:border-0 sticky top-0 z-20">{label}</TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredInst.length > 0 ? filteredInst.map((record) => (
                       <TableRow key={record.id} className="hover:bg-primary/[0.02] transition-colors group">
-                        <TableCell className="px-6 py-4 font-black text-sm border-r border-b bg-background sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">{record.tableNumber}</TableCell>
+                        <TableCell className="px-3 sm:px-6 py-4 font-black text-xs sm:text-sm border-r border-b bg-background sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">{record.tableNumber}</TableCell>
                         {Object.keys(CHECK_LABELS).map((key) => {
                           const check = record.checks.find(c => c.key === key || c.label === (CHECK_LABELS as any)[key]);
                           const status = check?.status;
                           return (
-                            <TableCell key={key} className="text-center py-0 border-r border-b last:border-0 w-[160px] p-0">
+                            <TableCell key={key} className="text-center py-0 border-r border-b last:border-0 w-[100px] sm:w-[160px] p-0">
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <div className="w-full h-full flex justify-center items-center py-5 cursor-default hover:bg-muted/10 transition-colors">
+                                  <div className="w-full h-full flex justify-center items-center py-4 sm:py-5 cursor-default hover:bg-muted/10 transition-colors">
                                     {status === 'OK' ? (
-                                      <Check className="h-5 w-5 text-green-600 drop-shadow-sm" />
+                                      <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 drop-shadow-sm" />
                                     ) : status === 'NOT OK' ? (
-                                      <X className="h-5 w-5 text-red-600 drop-shadow-sm" />
+                                      <X className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 drop-shadow-sm" />
                                     ) : status === 'Pending' ? (
-                                      <AlertTriangle className="h-5 w-5 text-amber-500 drop-shadow-sm" />
+                                      <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500 drop-shadow-sm" />
                                     ) : (
                                       <span className="text-muted-foreground/30 font-black">—</span>
                                     )}
@@ -401,12 +393,13 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
                 </Table>
               </TooltipProvider>
             </div>
+            <ScrollBar orientation="horizontal" />
           </ScrollArea>
         </div>
-        <div className="p-3 border-t bg-muted/5 flex items-center justify-center gap-6 shrink-0 relative z-10">
-           <div className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-green-600" /><span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">OK</span></div>
-           <div className="flex items-center gap-1.5"><X className="h-3.5 w-3.5 text-red-600" /><span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">NOT OK</span></div>
-           <div className="flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-amber-500" /><span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">PENDING</span></div>
+        <div className="p-3 border-t bg-muted/5 flex items-center justify-center gap-4 sm:gap-6 shrink-0 relative z-10">
+           <div className="flex items-center gap-1.5"><Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-green-600" /><span className="text-[8px] sm:text-[9px] font-black uppercase text-foreground/70 tracking-widest">OK</span></div>
+           <div className="flex items-center gap-1.5"><X className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-red-600" /><span className="text-[8px] sm:text-[9px] font-black uppercase text-foreground/70 tracking-widest">NOT OK</span></div>
+           <div className="flex items-center gap-1.5"><AlertTriangle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-500" /><span className="text-[8px] sm:text-[9px] font-black uppercase text-foreground/70 tracking-widest">PENDING</span></div>
         </div>
       </Card>
 

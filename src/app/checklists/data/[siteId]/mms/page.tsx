@@ -677,22 +677,31 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         </div>
       </div>
 
-      <div className="flex flex-row flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-row flex-wrap items-center gap-2">
-          <Button onClick={() => exportToPDF(filteredInst)} disabled={isExporting || filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5">
-            {isExporting ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Rendering...</> : <><FileDown className="h-3.5 w-3.5 mr-1.5" /> PDF Export All</>}
+      <div className="flex flex-row items-center justify-between gap-4">
+        <div className="flex flex-row items-center gap-1.5 sm:gap-2 w-full overflow-x-auto sm:overflow-visible no-scrollbar pb-1">
+          <Button 
+            onClick={() => exportToPDF(filteredInst)} 
+            disabled={isExporting || filteredInst.length === 0} 
+            variant="outline" 
+            className="h-8 sm:h-9 rounded-sm font-black uppercase text-[8px] sm:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5 shrink-0"
+          >
+            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} 
+            PDF Export
           </Button>
 
-          {isAdmin && (
-            <Button onClick={() => router.push(`/checklists/data/${siteId}/mms/matrix`)} disabled={filteredInst.length === 0} variant="outline" className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5">
-              <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> 
-              View Matrix
-            </Button>
-          )}
+          <Button 
+            onClick={() => router.push(`/checklists/data/${siteId}/mms/matrix`)} 
+            disabled={filteredInst.length === 0} 
+            variant="outline" 
+            className="h-8 sm:h-9 rounded-sm font-black uppercase text-[8px] sm:text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5 shrink-0"
+          >
+            <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> 
+            View Matrix
+          </Button>
 
           {site.drawingUrl ? (
-            <div className="flex items-center gap-1.5">
-              <Button variant="outline" size="sm" asChild className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest border-primary/20 text-primary bg-primary/5">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button variant="outline" size="sm" asChild className="h-8 sm:h-9 rounded-sm font-black uppercase text-[8px] sm:text-[10px] tracking-widest border-primary/20 text-primary bg-primary/5">
                 <a href={site.drawingUrl} download target="_blank" rel="noopener noreferrer">
                   <FileText className="h-3.5 w-3.5 mr-1.5" /> 
                   <span className="hidden sm:inline">View Drawing</span>
@@ -700,15 +709,15 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                 </a>
               </Button>
               {(isAdmin || site.drawingUploadedById === user?.uid) && (
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-destructive/10" onClick={() => setDeletingDrawing(site)} title="Delete Drawing">
-                  <Trash2 className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-destructive rounded-sm hover:bg-destructive/10" onClick={() => setDeletingDrawing(site)} title="Delete Drawing">
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               )}
             </div>
           ) : (
-            <div className="relative">
+            <div className="relative shrink-0">
               <input type="file" accept=".pdf" className="hidden" id="drawing-upload" onChange={handleDrawingUpload} disabled={isUploadingDrawing} />
-              <Button asChild disabled={isUploadingDrawing} className="h-9 rounded-sm font-black uppercase text-[8px] md:text-[10px] tracking-widest shadow-md px-4 bg-primary text-primary-foreground">
+              <Button asChild disabled={isUploadingDrawing} className="h-8 sm:h-9 rounded-sm font-black uppercase text-[8px] sm:text-[10px] tracking-widest shadow-md px-3 sm:px-4 bg-primary text-primary-foreground">
                 <label htmlFor="drawing-upload" className="cursor-pointer flex items-center justify-center">
                   {isUploadingDrawing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />} 
                   Add Drawing
@@ -719,7 +728,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         </div>
 
         {isExporting && (
-          <div className="w-[120px] sm:w-[200px] space-y-1.5 animate-in fade-in duration-300">
+          <div className="w-[120px] sm:w-[200px] space-y-1.5 animate-in fade-in duration-300 shrink-0">
             <div className="flex justify-between items-center text-[8px] font-black uppercase text-primary tracking-tighter">
               <span>Rendering</span>
               <span>{generationProgress}%</span>
@@ -849,10 +858,10 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('user')}>
                       <div className="flex items-center">Auditor <AuditSortIcon column="user" /></div>
                     </TableHead>
-                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('status')}>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('status')}>
                       <div className="flex items-center">Status <AuditSortIcon column="status" /></div>
                     </TableHead>
-                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('updatedAt')}>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('updatedAt')}>
                       <div className="flex items-center">Last Edited <AuditSortIcon column="updatedAt" /></div>
                     </TableHead>
                     <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('comments')}>
